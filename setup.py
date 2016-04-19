@@ -59,7 +59,7 @@ tests_require = [
 setup(
     name='snovault',
     version='0.1',
-    description='Metadata database for ENCODE',
+    description='SnoVault Database',
     long_description=README + '\n\n' + CHANGES,
     packages=find_packages('src'),
     package_dir={'': 'src'},
@@ -81,18 +81,13 @@ setup(
         dev-servers = snovault.dev_servers:main
         es-index-listener = snovault.elasticsearch.es_index_listener:main
 
-        add-date-created = snovault.commands.add_date_created:main
         check-rendering = snovault.commands.check_rendering:main
         deploy = snovault.commands.deploy:main
         extract_test_data = snovault.commands.extract_test_data:main
         es-index-data = snovault.commands.es_index_data:main
-        import-data = snovault.commands.import_data:main
         jsonld-rdf = snovault.commands.jsonld_rdf:main
-        migrate-files-aws = snovault.commands.migrate_files_aws:main
         profile = snovault.commands.profile:main
         spreadsheet-to-json = snovault.commands.spreadsheet_to_json:main
-        migrate-attachments-aws = snovault.commands.migrate_attachments_aws:main
-        migrate-dataset-type = snovault.commands.migrate_dataset_type:main
 
         [paste.app_factory]
         main = snovault:main

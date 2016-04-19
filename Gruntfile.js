@@ -4,7 +4,7 @@ module.exports = function(grunt) {
     var path = require('path');
 
     function compressPath(p) {
-        var src = 'src/encoded/static/';
+        var src = 'src/snovault/static/';
         p = path.relative(__dirname, p);
         if (p.slice(0, src.length) == src) {
             return '../' + p.slice(src.length);
@@ -18,7 +18,7 @@ module.exports = function(grunt) {
         pkg: grunt.file.readJSON('package.json'),
         browserify: {
             brace: {
-                dest: './src/encoded/static/build/brace.js',
+                dest: './src/snovault/static/build/brace.js',
                 require: [
                     'brace',
                     'brace/mode/json',
@@ -27,14 +27,14 @@ module.exports = function(grunt) {
                 plugin: [
                     ['minifyify', {
                         map: 'brace.js.map',
-                        output: './src/encoded/static/build/brace.js.map',
+                        output: './src/snovault/static/build/brace.js.map',
                         compressPath: compressPath,
                         uglify: {mangle: NODE_ENV == 'production'},
                     }],
                 ],
             },
             dagre: {
-                dest: './src/encoded/static/build/dagre.js',
+                dest: './src/snovault/static/build/dagre.js',
                 require: [
                     'dagre-d3',
                     'd3',
@@ -45,16 +45,16 @@ module.exports = function(grunt) {
                 plugin: [
                     ['minifyify', {
                         map: 'dagre.js.map',
-                        output: './src/encoded/static/build/dagre.js.map',
+                        output: './src/snovault/static/build/dagre.js.map',
                         compressPath: compressPath,
                         uglify: {mangle: NODE_ENV == 'production'},
                     }],
                 ],
             },
             inline: {
-                dest: './src/encoded/static/build/inline.js',
+                dest: './src/snovault/static/build/inline.js',
                 src: [
-                    './src/encoded/static/inline.js',
+                    './src/snovault/static/inline.js',
                 ],
                 require: [
                     'scriptjs',
@@ -67,18 +67,18 @@ module.exports = function(grunt) {
                 plugin: [
                     ['minifyify', {
                         map: '/static/build/inline.js.map',
-                        output: './src/encoded/static/build/inline.js.map',
+                        output: './src/snovault/static/build/inline.js.map',
                         compressPath: compressPath,
                         uglify: {mangle: NODE_ENV == 'production'},
                     }],
                 ],
             },
             browser: {
-                dest: './src/encoded/static/build/bundle.js',
+                dest: './src/snovault/static/build/bundle.js',
                 src: [
-                    './src/encoded/static/libs/compat.js', // The shims should execute first
-                    './src/encoded/static/libs/respond.js',
-                    './src/encoded/static/browser.js',
+                    './src/snovault/static/libs/compat.js', // The shims should execute first
+                    './src/snovault/static/libs/respond.js',
+                    './src/snovault/static/browser.js',
                 ],
                 external: [
                     'brace',
@@ -98,15 +98,15 @@ module.exports = function(grunt) {
                 plugin: [
                     ['minifyify', {
                         map: 'bundle.js.map',
-                        output: './src/encoded/static/build/bundle.js.map',
+                        output: './src/snovault/static/build/bundle.js.map',
                         compressPath: compressPath,
                         uglify: {mangle: NODE_ENV === 'production'},
                     }],
                 ],
             },
             server: {
-                dest: './src/encoded/static/build/renderer.js',
-                src: ['./src/encoded/static/server.js'],
+                dest: './src/snovault/static/build/renderer.js',
+                src: ['./src/snovault/static/server.js'],
                 options: {
                     builtins: false,
                     detectGlobals: false,
@@ -120,7 +120,7 @@ module.exports = function(grunt) {
                 plugin: [
                     ['minifyify', {map:
                         'renderer.js.map',
-                        output: './src/encoded/static/build/renderer.js.map',
+                        output: './src/snovault/static/build/renderer.js.map',
                         compressPath: compressPath,
                         uglify: {mangle: NODE_ENV === 'production'},
                     }],

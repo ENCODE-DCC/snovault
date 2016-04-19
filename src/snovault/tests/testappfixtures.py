@@ -5,7 +5,7 @@ _app_settings = {
     'item_datastore': 'database',
     'persona.audiences': 'http://localhost:6543',
     'persona.verifier': 'browserid.LocalVerifier',
-    'persona.siteName': 'ENCODE DCC Submission',
+    'persona.siteName': 'Snovault test site',
     'load_test_only': True,
     'testing': True,
     'pyramid.debug_authorization': True,

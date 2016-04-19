@@ -4,6 +4,7 @@ import re
 import subprocess
 import sys
 
+AWS_DEFAULT_REGION = 'us-west-2'
 
 def nameify(s):
     name = ''.join(c if c.isalnum() else '-' for c in s.lower()).strip('-')
@@ -27,7 +28,7 @@ def run(wale_s3_prefix, image_id, instance_type, elasticsearch,
         if elasticsearch == 'yes':
             name = 'elasticsearch-' + name
 
-    session = boto3.Session(region_name='us-west-2', profile_name=profile_name)
+    session = boto3.Session(region_name=AWS_DEFAULT_REGION, profile_name=profile_name)
     ec2 = session.resource('ec2')
 
     domain = 'production' if profile_name == 'production' else 'instance'
@@ -82,12 +83,12 @@ def run(wale_s3_prefix, image_id, instance_type, elasticsearch,
         BlockDeviceMappings=bdm,
         InstanceInitiatedShutdownBehavior='terminate',
         IamInstanceProfile={
-            "Name": 'encoded-instance',
+            "Name": 'snovault-instance',
         }
     )
 
     instance = reservation[0]  # Instance:i-34edd56f
-    print('%s.%s.encodedcc.org' % (instance.id, domain))
+    print('%s.%s.YOURDOMAIN.EXT' % (instance.id, domain))
     instance.wait_until_exists()
     instance.create_tags(Tags=[
         {'Key': 'Name', 'Value': name},
@@ -95,9 +96,9 @@ def run(wale_s3_prefix, image_id, instance_type, elasticsearch,
         {'Key': 'commit', 'Value': commit},
         {'Key': 'started_by', 'Value': username},
     ])
-    print('ssh %s.%s.encodedcc.org' % (name, domain))
+    print('ssh %s.%s.YOURDOMAIN.EXT' % (name, domain))
     if domain == 'instance':
-        print('https://%s.demo.encodedcc.org' % name)
+        print('https://%s.demo.YOURDOMAIN.EXT' % name)
 
     print('pending...')
     instance.wait_until_running()
@@ -114,11 +115,11 @@ def main():
         return value
 
     parser = argparse.ArgumentParser(
-        description="Deploy ENCODE on AWS",
+        description="Deploy a SNOWVAULT app on AWS",
     )
     parser.add_argument('-b', '--branch', default=None, help="Git branch or tag")
     parser.add_argument('-n', '--name', type=hostname, help="Instance name")
-    parser.add_argument('--wale-s3-prefix', default='s3://encoded-backups-prod/production')
+    parser.add_argument('--wale-s3-prefix', default='s3://DATABASE-BACKUP-BUCKET/production')
     parser.add_argument(
         '--candidate', action='store_const', default='demo', const='candidate', dest='role',
         help="Deploy candidate instance")

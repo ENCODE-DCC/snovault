@@ -136,13 +136,13 @@ users:
   gecos: Build user
   inactive: true
   system: true
-- name: encoded
-  gecos: ENCODE Metadata Database daemon user
+- name: snovault
+  gecos: SnoVault Database daemon user
   inactive: true
   system: true
   # Specified homedir must exist
   # https://github.com/rubygems/rubygems/issues/689
-  homedir: /srv/encoded
+  homedir: /srv/snovault
 
 write_files:
 - path: /etc/apt/apt.conf.d/20auto-upgrades

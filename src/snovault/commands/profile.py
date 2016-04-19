@@ -5,11 +5,11 @@ Examples
 
 To run on the production server:
 
-    %(prog)s production.ini "/experiments/ENCSR000ADI/?format=json&datastore=database"
+    %(prog)s production.ini "/{COLLECTION}/{ID}/?format=json&datastore=database"
 
 For the development.ini you must supply the paster app name:
 
-    %(prog)s development.ini --app-name app "/experiments/ENCSR000ADI/?format=json&datastore=database"
+    %(prog)s development.ini --app-name app "/{COLLECTION}/{ID}/?format=json&datastore=database"
 
 """
 import logging
@@ -104,7 +104,7 @@ def main():
     testapp = internal_app(args.config_uri, args.app_name, args.username, args.accept_json)
 
     # Loading app will have configured from config file. Reconfigure here:
-    logging.getLogger('encoded').setLevel(logging.DEBUG)
+    logging.getLogger('snovault').setLevel(logging.DEBUG)
 
     run(testapp, args.method, args.path, args.data, args.warm_ups, args.filename, args.sortby,
         args.stat, args.caller, args.callee, args.response_body)
