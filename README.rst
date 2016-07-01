@@ -2,11 +2,19 @@
 SnoVault JSON-LD Database Framework
 ========================
 
+Version 0.1
+
 |Build status|_
 
 .. |Build status| image:: https://travis-ci.org/ENCODE-DCC/snovault.png?branch=master
 .. _Build status: https://travis-ci.org/ENCODE-DCC/snovault
 
+Installation Instructions
+=========================
+
+Currently these are for Mac OSX.  For linux, look at cloud-config.yml it should be reasonably easy to infer from that
+
+Step 0: Install Xcode (from App Store) and homebrew: http://brew.sh::
 
 Step 1: Verify that homebrew is working properly::
 
