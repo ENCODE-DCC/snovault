@@ -2,11 +2,17 @@
 
 The fixtures in this module setup a full system with postgresql and
 elasticsearch running as subprocesses.
+Does not include data dependent tests
 """
 
 import pytest
 
 pytestmark = [pytest.mark.indexing]
+
+
+@pytest.fixture(autouse=True)
+def autouse_external_tx(external_tx):
+    pass
 
 
 @pytest.fixture(scope='session')
@@ -26,7 +32,7 @@ def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server)
 
 @pytest.yield_fixture(scope='session')
 def app(app_settings):
-    from encoded import main
+    from snovault import main
     app = main({}, **app_settings)
 
     yield app
@@ -74,6 +80,23 @@ def listening_conn(dbapi_conn):
     cursor.close()
 
 
+def test_indexing_simple(testapp, indexer_testapp):
+    # First post a single item so that subsequent indexing is incremental
+    testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexed'] == 1
+    assert 'txn_count' not in res.json
+
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    uuid = res.json['@graph'][0]['uuid']
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexed'] == 1
+    assert res.json['txn_count'] == 1
+    assert res.json['updated'] == [uuid]
+    res = testapp.get('/search/?type=TestingPostPutPatch')
+    assert res.json['total'] == 2
+
+
 def test_listening(testapp, listening_conn):
     import time
     testapp.post_json('/testing-post-put-patch/', {'required': ''})
@@ -83,5 +106,3 @@ def test_listening(testapp, listening_conn):
     notify = listening_conn.notifies.pop()
     assert notify.channel == 'snovault.transaction'
     assert int(notify.payload) > 0
-
-

@@ -1,8 +1,6 @@
 ========================
-SnoVault Database Framework
+SnoVault JSON-LD Database Framework
 ========================
-
-WARNING:  PRE-ALPHA RELEASE DO NOT EXPECT TO WORK OUT OF BOX
 
 |Build status|_
 
@@ -26,7 +24,7 @@ If you need to update dependencies::
 
     $ brew update
     $ brew upgrade
-    $ rm -rf snovault/eggs
+    $ rm -rf snowflakes/eggs
 
 
 Step 3: Run buildout::
@@ -54,8 +52,8 @@ In one terminal startup the database servers and nginx proxy with::
 
     $ bin/dev-servers development.ini --app-name app --clear --init --load
 
-This will first clear any existing data in /tmp/snovault.
-Then postgres and elasticsearch servers will be initiated within /tmp/snovault.
+This will first clear any existing data in /tmp/snowflakes.
+Then postgres and elasticsearch servers will be initiated within /tmp/snowflakes.
 An nginx proxy running on port 8000 will be started.
 The servers are started, and finally the test set will be loaded.
 
@@ -82,7 +80,6 @@ To run with a debugger::
 Specific tests to run locally for schema changes::
 
     $ bin/test -k test_load_workbook
-    $ bin/test -k test_edw_sync
 
 Run the Pyramid tests with::
 
@@ -99,6 +96,25 @@ Run the Javascript tests with::
 Or if you need to supply command line arguments::
 
     $ ./node_modules/.bin/jest
+
+
+Building Javascript
+===================
+
+Our Javascript is written using ES6 and JSX, so needs to be compiled
+using babel and webpack.
+
+To build production-ready bundles, do::
+
+    $ npm run build
+
+(This is also done as part of running buildout.)
+
+To build development bundles and continue updating them as you edit source files, run::
+
+    $ npm run dev
+
+The development bundles are not minified, to speed up building.
 
 
 Notes on SASS/Compass

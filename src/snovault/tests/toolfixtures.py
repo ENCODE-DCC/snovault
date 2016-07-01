@@ -1,6 +1,8 @@
 import pytest
 
 
+# Fixtures  for app
+
 @pytest.fixture
 def registry(app):
     return app.registry

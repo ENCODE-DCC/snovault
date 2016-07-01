@@ -44,16 +44,19 @@ item_with_link = [
 
 COLLECTION_URL = '/testing-post-put-patch/'
 
+
 @pytest.fixture
 def link_targets(testapp):
     url = '/testing-link-targets/'
     for item in targets:
         testapp.post_json(url, item, status=201)
 
+
 @pytest.fixture
 def content(testapp, external_tx):
     res = testapp.post_json(COLLECTION_URL, item_with_uuid[0], status=201)
     return {'@id': res.location}
+
 
 @pytest.fixture
 def content_with_child(testapp):
@@ -63,9 +66,11 @@ def content_with_child(testapp):
     child_id = child_res.json['@graph'][0]['@id']
     return {'@id': parent_id, 'child': child_id}
 
+
 def test_admin_post(testapp, external_tx):
     testapp.post_json(COLLECTION_URL, item, status=201)
     testapp.post_json(COLLECTION_URL, item_with_uuid[0], status=201)
+
 
 def test_admin_put_uuid(content, testapp):
     url = content['@id']
@@ -218,13 +223,6 @@ def test_post_object_with_child(testapp):
     source = res.json['@graph'][0]['reverse'][0]
     res = testapp.get(source)
     assert res.json['target'] == parent_id
-
-
-def test_etag_if_match_tid(testapp, organism):
-    res = testapp.get(organism['@id'] + '?frame=edit', status=200)
-    etag = res.etag
-    testapp.patch_json(organism['@id'], {}, headers={'If-Match': etag}, status=200)
-    testapp.patch_json(organism['@id'], {}, headers={'If-Match': etag}, status=412)
 
 
 def test_retry(testapp):

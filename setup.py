@@ -57,17 +57,17 @@ tests_require = [
 ]
 
 setup(
-    name='snovault',
+    name='snowflakes',
     version='0.1',
-    description='SnoVault Database',
+    description='Snowflake demo Database for SnoVault',
     long_description=README + '\n\n' + CHANGES,
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=True,
     zip_safe=False,
-    author='Laurence Rowe',
+    author='Benjamin Hitz',
     author_email='hitz@stanford.edu',
-    url='http://snovault.org',
+    url='http://github.com/ENCODE-DCC/',
     license='MIT',
     install_requires=requires,
     tests_require=tests_require,
@@ -81,21 +81,24 @@ setup(
         dev-servers = snovault.dev_servers:main
         es-index-listener = snovault.elasticsearch.es_index_listener:main
 
-        check-rendering = snovault.commands.check_rendering:main
-        deploy = snovault.commands.deploy:main
-        extract_test_data = snovault.commands.extract_test_data:main
-        es-index-data = snovault.commands.es_index_data:main
-        jsonld-rdf = snovault.commands.jsonld_rdf:main
-        profile = snovault.commands.profile:main
-        spreadsheet-to-json = snovault.commands.spreadsheet_to_json:main
+        add-date-created = snowflakes.commands.add_date_created:main
+        check-rendering = snowflakes.commands.check_rendering:main
+        deploy = snowflakes.commands.deploy:main
+        extract_test_data = snowflakes.commands.extract_test_data:main
+        es-index-data = snowflakes.commands.es_index_data:main
+        import-data = snowflakes.commands.import_data:main
+        jsonld-rdf = snowflakes.commands.jsonld_rdf:main
+        profile = snowflakes.commands.profile:main
+        spreadsheet-to-json = snowflakes.commands.spreadsheet_to_json:main
+        migrate-attachments-aws = snowflakes.commands.migrate_attachments_aws:main
 
         [paste.app_factory]
-        main = snovault:main
+        main = snowflakes:main
 
         [paste.composite_factory]
         indexer = snovault.elasticsearch.es_index_listener:composite
 
         [paste.filter_app_factory]
-        memlimit = snovault.memlimit:filter_app
+        memlimit = snowflakes.memlimit:filter_app
         ''',
 )

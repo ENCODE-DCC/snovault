@@ -3,6 +3,8 @@ from snovault import (
     collection,
 )
 
+# Test class for keys
+
 
 def includeme(config):
     config.scan(__name__)

@@ -1,0 +1,240 @@
+/*  List key-value pairs display */
+
+// Override bootstrap3 header classes
+dt.h3, dt.h4, dd.h3, dd.h4 {
+    margin-top: 0;
+    @include font-size(1);
+}
+
+dd.h3, dd.h4 {
+    font-weight: normal;
+}
+
+dl.key-value, dl.key-value-doc {
+    margin: 0;
+
+    dt, dd {
+        display: block;
+        float: none;
+        margin: 0;
+        padding: 0;
+        line-height: 1.3;
+        text-align: left;
+        vertical-align: top;
+        width: auto;
+        word-wrap: break-word;
+    }
+
+    dt {
+        font-weight: bold;
+
+        &:after {
+            content: ":";
+        }
+    }
+
+    dd {
+        // For things like gene sequences that are multi-line sequences with no spaces
+        &.sequence {
+            overflow-wrap: break-word;
+            word-break: break-all;
+        }
+    }
+
+    [data-test] {
+        clear: both;
+        margin: 6px 0;
+    }
+}
+
+@media screen and (min-width: $screen-xs-min) {
+    dl.key-value {
+        display: table;
+
+        dt, dd {
+            display: table-cell;
+        }
+
+        dt {
+            min-width: 140px;
+            padding: 8px 0;
+        }
+
+        dd {
+            padding: 8px 0 8px 10px;
+        }
+
+        [data-test] {
+            clear: none;
+            display: table-row;
+        }
+    }
+}
+
+.key-value-flex {
+    margin: 0;
+
+    dt, dd {
+        display: block;
+        margin: 0;
+    }
+
+    dt {
+        font-weight: bold;
+
+        &:after {
+            content: ": ";
+        }
+    }
+
+    dd {
+        @extend .clearfix;
+    }
+
+    div {
+        clear: both;
+        margin: 6px 0;
+    }
+
+    @media screen and (min-width: $screen-xs-min) {
+        display: table;
+
+        dt, dd {
+            display: table-cell;
+            vertical-align: bottom;
+        }
+
+        dt {
+            padding: 6px 20px 6px 0;
+        }
+
+        dd {
+            padding: 6px 0;
+        }
+
+        div {
+            clear: none;
+            display: table-row;
+        }
+    }
+}
+
+// Left-justified key-value
+.key-value-left {
+    @extend .key-value;
+
+    dt, dd {
+        width: auto;
+        padding-top: 0 !important;
+    }
+
+    dt {
+        float: none !important;
+        display: block !important;
+        text-align: left !important;
+        margin-bottom: 0px !important;
+    }
+
+    dd {
+        margin-left: 0 !important;
+
+        &.key-value-left-indent {
+            margin-left: 20px !important;
+        }
+    }
+}
+
+// When multiple items in a <dd> need to be displayed on their own lines.
+// Apply to each <span> within a <dd> that needs its own line.
+.line-item {
+    &:before {
+        content: ' ';
+        display: block;
+    }
+}
+
+.unit::before {
+    content: " ";
+}
+
+dd ul, .multi-value {
+    display: block;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li {
+        display: inline-block;
+        margin-right: 5px;
+
+        span {
+            font-weight: normal;
+        }
+    }
+}
+
+.multi-comma {
+    margin-right: 0;
+
+    &:after {
+        content: ",\00a0";
+    }
+
+    &:last-child:after {
+        content: normal;
+    }
+}
+
+.multi-dd {
+    margin-bottom: 10px;
+}
+
+
+.para-text {
+    line-height: 1.6 !important;
+}
+
+.sw-step-versions {
+    display: inline-block;
+    margin-top: 8px;
+
+    &:first-child {
+        margin-top: 0;
+    }
+}
+
+.software-version-list {
+    display: inline;
+}
+
+.software-version {
+    display: inline-block;
+    padding: 0;
+    margin-right: 5px;
+    @include border-radius(2px);
+    border: 1px solid #c0c0c0;
+    color: #333;
+    @include font-size(0.9);
+    text-decoration: none;
+
+    &:hover {
+        color: #eee;
+        background-color: #333;
+
+        .version {
+            color: #fff;
+            background-color: #808080;
+        }
+    }
+
+    .software {
+        padding: 0 5px;
+    }
+
+    .version {
+        padding: 0 5px;
+        font-weight: bold;
+        background-color: #e0e0e0;
+    }
+}
+

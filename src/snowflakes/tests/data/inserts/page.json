@@ -1,0 +1,174 @@
+[
+    {
+        "name": "homepage",
+        "title": "Snowflakes... By SnoVault",
+        "status": "released",
+        "uuid": "27f9abd9-0081-4ade-8c82-95ec12b3a7dd",
+        "layout": {
+            "rows": [
+                {
+                    "cols": [
+                        {"blocks": ["#block1"]}
+                    ]
+                },
+                {
+                    "cols": [
+                        {"blocks": ["#block2"]},
+                        {"blocks": ["#block3"]},
+                        {"blocks": ["#block4"]}
+                    ]
+                }
+            ],
+            "blocks": [
+                {
+                    "@id": "#block1",
+                    "@type": "richtextblock",
+                    "body": "<div class=\"project-info site-title\">\n    <h1>SNOWFLAKES: Where all objects are special</h1>\n</div>\n<div id=\"info-box\" class=\"project-info text-panel\">\n  <p>Let it Snow, let it Snow, let it Snow dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat.</p>\n</div>"
+                },
+                {
+                    "@id": "#block2",
+                    "@type": "richtextblock",
+                    "body": "<h2>The Enchanced Flakeome</h2>\n<p>Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.</p>"
+                },
+                {
+                    "@id": "#block3",
+                    "@type": "richtextblock",
+                    "body": "<h2>Snowforts!</h2>\n<p>Nam liber tempor cum soluta nobis eleifend option congue nihil imperdiet doming id quod mazim placerat facer possim assum.</p>"
+                },
+                {
+                    "@id": "#block4",
+                    "@type": "teaserblock",
+                    "image": "/images/8a91ae78-731a-4a92-ae7c-273214be408a/",
+                    "body": "<h2>Snowballs!!</h2>",
+                    "href": "/search/?type=Snowball"
+                }
+            ]
+        }
+    },
+    {
+        "name": "test-section",
+        "title": "Test Section",
+        "lab": "thomas-gingeras",
+        "status": "released",
+        "submitted_by": "dignissim.euismod@amet.habitant",
+        "uuid": "41c4ea4e-7a8e-4b91-8fe3-384d0adc8735",
+        "layout": {
+            "rows": [
+                {
+                    "cols": [
+                        {
+                            "className": "col-md-12 class_override",
+                            "blocks": ["#block1"]
+                        }
+                    ]
+                }
+            ],
+            "blocks": [
+                {
+                    "@id": "#block1",
+                    "@type": "richtextblock",
+                    "body": "<h1>Test Section</h1>"
+                }
+            ]
+        }
+    },
+    {
+        "parent": "/test-section",
+        "name": "subpage",
+        "title": "Subpage",
+        "status": "released",
+        "lab": "thomas-gingeras",
+        "submitted_by": "dignissim.euismod@amet.habitant",
+        "uuid": "331928f7-d8f7-4ea6-b4e0-8d380fb22974",
+        "layout": {
+            "rows": [
+                {
+                    "cols": [
+                        {"blocks": ["#block1"]}
+                    ]
+                }
+            ],
+            "blocks": [
+                {
+                    "@id": "#block1",
+                    "@type": "richtextblock",
+                    "body": "<h1>Subpage</h1>"
+                }
+            ]
+        }
+    },
+    {
+        "parent": "/test-section",
+        "name": "subpage-in-progress",
+        "title": "Subpage in progress not visible to users",
+        "lab": "thomas-gingeras",
+        "submitted_by": "dignissim.euismod@amet.habitant",
+        "status": "in progress",
+        "uuid": "83173355-31ff-4ca7-a259-e4af0f3a0169",
+        "layout": {
+            "rows": [
+                {
+                    "cols": [
+                        {"blocks": ["#block1"]}
+                    ]
+                }
+            ],
+            "blocks": [
+                {
+                    "@id": "#block1",
+                    "@type": "richtextblock",
+                    "body": "<h1>Subpage in progress (not logged should be unable to view)</h1>"
+                }
+            ]
+        }
+    },
+    {
+        "name": "permission-test",
+        "title": "Permission Test",
+        "lab": "thomas-gingeras",
+        "status": "in progress",
+        "submitted_by": "dignissim.euismod@amet.habitant",
+        "uuid": "2efb5ffe-5a7b-4a44-9071-2e0651a566e0",
+        "layout": {
+            "rows": [
+                {
+                    "cols": [
+                        {
+                            "className": "col-md-12 class_override",
+                            "blocks": ["#block1"]
+                        }
+                    ]
+                }
+            ],
+            "blocks": [
+                {
+                    "@id": "#block1",
+                    "@type": "richtextblock",
+                    "body": "<h1>Test Edit Me!</h1>"
+                }
+            ]
+        }
+    },
+    {
+        "name": "images",
+        "title": "Images",
+        "status": "released",
+        "uuid": "61edd6b2-bfdb-4db1-b950-8845ac37f65c",
+        "layout": {
+            "rows": [
+                {
+                    "cols": [
+                        {"blocks": ["#block1"]}
+                    ]
+                }
+            ],
+            "blocks": [
+                {
+                    "@id": "#block1",
+                    "@type": "richtextblock",
+                    "body": "<h1>Image Collection Landing Page</h1>"
+                }
+            ]
+        }
+    }
+]

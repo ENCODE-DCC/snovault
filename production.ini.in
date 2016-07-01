@@ -1,7 +1,10 @@
 [app:app]
 use = config:base.ini#app
 session.secret = %(here)s/session-secret.b64
+file_upload_bucket = ${file_upload_bucket}
 blob_bucket = ${blob_bucket}
+blob_store_profile_name = encoded-files-upload
+accession_factory = ${accession_factory}
 indexer.processes = ${indexer_processes}
 
 [composite:indexer]
@@ -30,7 +33,7 @@ port = 6543
 threads = 1
 
 [loggers]
-keys = root, snovault, snovault_listener, file_snovault_listener
+keys = root, snovault, snovault_listener
 
 [handlers]
 keys = console
@@ -52,12 +55,6 @@ propagate = 0
 level = INFO
 handlers = console
 qualname = snovault.elasticsearch.es_index_listener
-propagate = 0
-
-[logger_file_snovault_listener]
-level = INFO
-handlers = console
-qualname = snovault.commands.es_file_index_listener
 propagate = 0
 
 [handler_console]

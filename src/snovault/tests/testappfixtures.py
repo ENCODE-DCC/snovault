@@ -5,16 +5,16 @@ _app_settings = {
     'item_datastore': 'database',
     'persona.audiences': 'http://localhost:6543',
     'persona.verifier': 'browserid.LocalVerifier',
-    'persona.siteName': 'Snovault test site',
+    'persona.siteName': 'Snowflakes',
     'load_test_only': True,
     'testing': True,
     'pyramid.debug_authorization': True,
     'postgresql.statement_timeout': 20,
     'tm.attempts': 3,
     'multiauth.policies': 'persona session remoteuser accesskey',
-    'multiauth.groupfinder': 'encoded.authorization.groupfinder',
+    'multiauth.groupfinder': 'snowflakes.authorization.groupfinder',
     'multiauth.policy.persona.use': 'snovault.authentication.NamespacedAuthenticationPolicy',
-    'multiauth.policy.persona.base': 'encoded.persona.PersonaAuthenticationPolicy',
+    'multiauth.policy.persona.base': 'snowflakes.persona.PersonaAuthenticationPolicy',
     'multiauth.policy.persona.namespace': 'persona',
     'multiauth.policy.session.use': 'snovault.authentication.NamespacedAuthenticationPolicy',
     'multiauth.policy.session.base': 'pyramid.authentication.SessionAuthenticationPolicy',
@@ -43,7 +43,7 @@ def app(app_settings):
     '''WSGI application level functional testing.
        will have to make snovault dummy main app
     '''
-    from encoded import main
+    from snovault import main
     return main({}, **app_settings)
 
 
@@ -88,5 +88,15 @@ def embed_testapp(app):
     environ = {
         'HTTP_ACCEPT': 'application/json',
         'REMOTE_USER': 'EMBED',
+    }
+    return TestApp(app, environ)
+
+
+@pytest.fixture
+def indexer_testapp(app):
+    from webtest import TestApp
+    environ = {
+        'HTTP_ACCEPT': 'application/json',
+        'REMOTE_USER': 'INDEXER',
     }
     return TestApp(app, environ)

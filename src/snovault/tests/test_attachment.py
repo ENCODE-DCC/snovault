@@ -1,6 +1,7 @@
 from base64 import b64decode
 import pytest
 
+# Test for blob storage
 
 RED_DOT = """data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA
 AAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO
