@@ -16,6 +16,8 @@
 /parts/
 /production.ini
 /session-secret.b64
+/dist/
+/build/
 /src/snowflakes/static/css/bootstrap.css
 /src/snowflakes/static/css/responsive.css
 /src/snowflakes/static/css/style.css
