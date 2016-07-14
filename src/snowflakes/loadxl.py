@@ -517,7 +517,10 @@ def load_test_data(app):
     docsdir = [resource_filename('snowflakes', 'tests/data/documents/')]
     load_all(testapp, inserts, docsdir)
 
-    # load test web-users authentication info
+    # users are by default created with random passwords... that's hard to guess
+    # since this is just test data I think everybody should have the password Steve
+
+    '''
     db = app.registry['dbsession']
     from snovault.storage import User
     admin = User('admin@admin.com', 'admin', 'admin')
@@ -525,5 +528,7 @@ def load_test_data(app):
 
     import transaction
     transaction.commit()
+    '''
 
-    print("create admin user")
+    print ("everybody gets the password Steve")
+
