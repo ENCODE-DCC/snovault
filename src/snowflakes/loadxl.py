@@ -516,3 +516,14 @@ def load_test_data(app):
     inserts = resource_filename('snowflakes', 'tests/data/inserts/')
     docsdir = [resource_filename('snowflakes', 'tests/data/documents/')]
     load_all(testapp, inserts, docsdir)
+
+    # load test web-users authentication info
+    db = app.registry['dbsession']
+    from snovault.storage import User
+    admin = User('admin@admin.com', 'admin', 'admin')
+    db.add(admin)
+
+    import transaction
+    transaction.commit()
+
+    print("create admin user")
