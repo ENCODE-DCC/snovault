@@ -15,15 +15,32 @@ addons:
 env:
   global:
   - secure: |-
-      CMKR45ew7fJWfF/rvaFkV4gNhWRDdM4y8wlj5p1qrEzJ214SENg03fjHJr6B
-      cvNf7vanTJKnVxpxUK9kH5Tn/uaJZtnbnJYehZ4YKwzbJQEAEJpWvCk4C54O
-      7diAxOq7YSxxqA2XdtLydkNlo85BWoucmc0yHEl3weNR9554UmM=
+      TcTEKSEjlu05k3azfO3LMc9NMiZMBqj1pOqg4FOxcprU3Bw7+k5aC/6wMUHI
+      mAt0ivzTh1Wbmtirj/XhXArlSVECBQUk7qoEnCDdDr8nhBsHem+N8T/51xGS
+      mbGuJKT/xECnR23FyFIYkzSwktnm+ZGdeFBYPhEwUl7zFDyemHCzLmn4h16P
+      bfssAfN4MGhzkwkMrgkW2DsSfmEGOjDZTt0JqwXR1FXPmCM0zpPZbrO1tguA
+      lxrRVHn4oQjApp1lN0x78cp1SY5EQBpwlGSr0DzLBHM7YW4sZaHpHRheq3eR
+      bn9po39bj+n5qpmwdlCe1o6AJ8NdphxxM1Cc1QBr8BD2pCjGioSkKyXECVgz
+      i/UrovLo9FbFuCSuh/uAiIF5asQdk3I/y49PwDqAJ+0Q3uJI2gKTRFpb6Ewy
+      3Vy1OGj966T3zgynE50ZHE7C86AxOCrR73dl9m1mBMHkv6xzFTeYYzSxFBd1
+      esnBJzv370jgxd9BsJ6M4fK74Sti8gbgeaVV9UAIO/N1CcyMzMKLl4t3LHRQ
+      dce/VzH1y+2xmMRk2ylQMsai92rwxqshyoj7abDG/0ScApUQui8kXYCCGx3P
+      bfJ0bgC0NAudtQaUgXbZN+efX90kodIXp4aSgbh41pW9VoFFhnU2wGt8Knnt
+      bLoEOSclE0Wslf1OrylHT3g=
   - secure: |-
-      WmE7J5Vxheir50Heuji0JVpEmoYH5iPkLMQFgnocY1UspO1ka1+8M7SOgsUH
-      SK5yLKZ/6oJyhlySqqTmCfYy3y/WXRNG76dy1kjVj/DEbx+n6Yu0nElw84ED
-      ZR5KkpFMaKLA505soY+4lJc4jRl5u0qwCB1Ad3UgTgfkI4QSaGM=
+      wZZgg67c7Qlhw+4Oi7wti4hR61A6zXiqbQ59lQwjVQqg5dY+OSmx0sVqRjrO7
+      Uqh6bp7lX9ygTVy4t5SWkmLjriUixgGkNGjLlSbMZFouNtE9Uxqasy6xzwQiV
+      lyhf+E9VaJ4iAJbV6yvnIvmBOa10l6ih2RiwYvybLxacqITscNUetXRpo+Qkr
+      EpUSrdXisxlMsMji77kHOZqrUXqRuWss3Y24na7i2RAOuV6tfQ1IPPDcZxj/+
+      uQWWGHHZCbonNm7lzFxMNrECnkbH5t4zWlOk7Pw96XgvTg0Kk64lEm5l3Z988
+      +6VjrmjE9xEJzlFrzF6XmzVYkcqn5hlKEHBYFjqNNuxQd6KTergxxj7GfAlSS
+      MKsiY7eeBD2i0oAX3A8OPI9oOGrcRRKzSqKcv5fEeCZ/vV+n/B5LxU2lT6Xq8
+      t47qsm7JptPr+M3tFw00mvAAhnuUR6hmD0VvMDpFNsu9X9ZPH0w1lLIJ5VQLb
+      4scjAlHg0CP//MpoVtnpmqpOCJi/cCUQmGjBvKnYcRDjeZVyV7TcrHXWY5gDX
+      dupbuu33llfRtSQ2anjqNY4MFKrEbtb6n4s2+SP4dVNV36VAe0f+Ujp0vDAk3
+      4heHupboqoOYsJaL9bmumjnGBvvFB5tngcvKV0HE54DvzOk+QmmdO1B2OXOT3
+      EYc4biKIhqDc=
   - PATH="/usr/share/elasticsearch/bin:/usr/lib/postgresql/9.3/bin:$PATH"
-  - secure: bRzVMZ+ZWEpbS8OIk3ably4xMXja9GmJXJ7P2QbTtwmxzXbQ3jEEWMPyg2rMH/KGdj/pGTExksxHsHGaqIRbo+yh/vKgo5M7qKATL1WX6M0aG02hdPcVoi096O+GlatDZ5MRdkAu5AG4VRe16YQgMCX8Uo40l+F8H/DYYu4faXYF7maS+YIHfGdgW3rc/Tc+b54bAltDJYaAVKaMEOW18p3cGRkTrRL1ebU2Y7pRsQ75ZqQOUONK5odtSbPziKNDm/bmV1AR2dTcmO5a8JUhoVo0ZmLfD+0GcQ9d6Z+MhXtGCEMBsdhQCv5/OT0hNod7I3H9/QH6xfV8u33el5JhKcGnuPLwKX5XK3i4hEfILAM2SuJ4UjyjbkR4GRODfWJU5tejq47hRVfoGON9+f56OMUbBw3mZZ3c8DYJXVmvlw1MT45PV1ssPXG3dGFNfpoTv7ikWQrU+DJDZugLPL6e0qZ2tCI60+MKY8K3n/pl0Y7tX5shbyI70TUlnNMnGs9LaX/t9ng4CJmFuIykdUJtnYN9Pg+kL+Uux1kq3uOb2OgPZ0+tHSAAySqL+TW4w3VdH21zhzrORWDh6TjzAgPxEaNtZIYUzxO8YY4JtLzVb+u+kozpR7C/RId4ivg+wOh9zb8kuKuQEa6VVHqA80M7haK37RekKmdAmsOSlDBnRZs=
 matrix:
   include:
   - python: '2.7'
