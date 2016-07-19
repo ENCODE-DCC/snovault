@@ -45,9 +45,8 @@ var Title = React.createClass({
 // It lives for the entire duration the page is loaded.
 // App maintains state for the
 var App = React.createClass({
-    mixins: [mixins.Persona, mixins.HistoryAndTriggers],
+    mixins: [mixins.SessionManagement, mixins.HistoryAndTriggers],
     triggers: {
-        login: 'triggerLogin',
         profile: 'triggerProfile',
         logout: 'triggerLogout'
     },

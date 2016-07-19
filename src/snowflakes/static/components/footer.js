@@ -58,6 +58,12 @@ var Footer = React.createClass({
 
 // LoginBox Popup
 var LoginBoxes = React.createClass({
+	contextTypes: {
+			fetch: React.PropTypes.func,
+			session: React.PropTypes.object,
+      navigate: React.PropTypes.func
+	},
+
   mixins: [OverlayMixin],
   getInitialState: function() {
   	return {username: '', password: '', isOpen: false};
@@ -73,16 +79,41 @@ var LoginBoxes = React.createClass({
 		  isOpen: !this.state.isOpen
 	  });
   },
+	loginToServer: function(data) {
+			console.log(data);
+			fetch('/login', {
+				method: "POST",
+				body: JSON.stringify(data),
+				headers: {
+					"Content-Type": "application/json",
+				},
+				credentials: "same-origin"
+      })
+      .then(response => {
+        if (!response.ok) throw response;
+        return response.json();
+      })
+      .then(session_properties => {
+          console.log("got session props as", session_properties);
+          this.context.session['auth.userid'] = data.username; 
+          var next_url = window.location.href;
+          if (window.location.hash == '#logged-out') {
+              next_url = window.location.pathname + window.location.search;
+          }
+          this.context.navigate(next_url, {replace: true});
+        },function(error) {
+				console.log("we got an error during login", error);
+      })
+	},
   handleSubmit: function(e){
     e.preventDefault();
     var username = this.state.username.trim();
-	var password = this.state.password.trim();
+		var password = this.state.password.trim();
   	if (username === '' || password === '') {
     	return;
     }
-    // do something
+		this.loginToServer({username: username, password: password});
     this.setState({username: '', password: ''});
-    console.log('EXIT THE PAGE NOW');
   },
   render: function () {
 	return (
@@ -107,12 +138,6 @@ var LoginBoxes = React.createClass({
         	<ul className="links">
             	<li><button id="popuploginbtn" className="sexy-btn"
 	                onClick={this.handleSubmit}><span>Sign in</span></button></li>
-				<li><form action='http://google.com'><button id="regbtn" className="sexy-btn">
-					<span>Register</span></button></form></li>
-				<li><form action='http://google.com'><button id="passbtn" className="sexy-btn">
-					<span>Change password</span></button></form></li>
-				{/*<li><a href="https://www.google.com/">Register</a></li>
-	            <li><a href="https://www.google.com/">New password</a></li>*/}
 	            <li><button id="closebtn" className="sexy-btn"
 	                onClick={this.handleToggle}><span>Close</span></button></li>
         	</ul>
