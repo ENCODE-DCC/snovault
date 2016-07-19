@@ -6,6 +6,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.rst')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 
+
 requires = [
     'Pillow',
     'PyBrowserID',
@@ -57,9 +58,9 @@ tests_require = [
 ]
 
 setup(
-    name='snowflakes',
-    version='0.1',
-    description='Snowflake demo Database for SnoVault',
+    name='snovault',
+    version='0.10',
+    description='Snovault Hybrid Object Relational Database Framework',
     long_description=README + '\n\n' + CHANGES,
     packages=find_packages('src'),
     package_dir={'': 'src'},
@@ -67,7 +68,7 @@ setup(
     zip_safe=False,
     author='Benjamin Hitz',
     author_email='hitz@stanford.edu',
-    url='http://github.com/ENCODE-DCC/',
+    url='http://github.com/ENCODE-DCC/snovault/',
     license='MIT',
     install_requires=requires,
     tests_require=tests_require,
@@ -101,4 +102,27 @@ setup(
         [paste.filter_app_factory]
         memlimit = snowflakes.memlimit:filter_app
         ''',
+    classifiers=[
+        # How mature is this project? Common values are
+        #   3 - Alpha
+        #   4 - Beta
+        #   5 - Production/Stable
+        'Development Status :: 3 - Alpha',
+
+        # Indicate who your project is intended for
+        'Intended Audience :: Developers',
+        'Intended Audience :: Science/Research',
+        'Framework :: Pyramid',
+
+
+        # Pick your license as you wish (should match "license" above)
+        'License :: OSI Approved :: MIT License',
+        'Topic :: Database :: Database Engines/Servers',
+
+        # Specify the Python versions you support here. In particular, ensure
+        # that you indicate whether you support Python 2, Python 3 or both.
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.4',
+    ],
 )
