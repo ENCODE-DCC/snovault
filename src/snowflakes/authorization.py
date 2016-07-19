@@ -19,7 +19,7 @@ def groupfinder(login, request):
         elif localname in ['TEST_AUTHENTICATED']:
             return ['viewing_group.SNOWFLAKE']
 
-    if namespace in ('mailto', 'remoteuser', 'persona'):
+    if namespace in ('mailto', 'remoteuser', 'webuser'):
         users = collections.by_item_type['user']
         try:
             user = users[localname]

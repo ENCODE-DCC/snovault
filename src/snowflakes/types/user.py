@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-
+import uuid
+from pyramid.httpexceptions import HTTPUnprocessableEntity
 from pyramid.view import (
     view_config,
 )
@@ -13,6 +14,7 @@ from .base import (
 )
 from snovault import (
     CONNECTION,
+    DBSESSION,
     calculated_property,
     collection,
     load_schema,
@@ -20,6 +22,9 @@ from snovault import (
 from snovault.calculated import calculate_properties
 from snovault.resource_views import item_view_object
 from snovault.util import expand_path
+from snovault.crud_views import collection_add
+from snovault.schema_utils import validate_request
+from snovault.storage import User as AuthUser
 
 
 ONLY_ADMIN_VIEW_DETAILS = [
@@ -72,6 +77,27 @@ class User(Item):
         owner = 'userid.%s' % self.uuid
         return {owner: 'role.owner'}
 
+    def _update(self, properties, sheets=None):
+        '''
+        overwritting this so as to create an associated 'web user'
+        for each user object, if it doesn't have on already
+        '''
+        super(User, self)._update(properties, sheets)
+
+        # after we save if we don't have AuthUser create it
+        db = self.registry[DBSESSION]
+        email = properties['email']
+        if db.query(AuthUser).filter_by(email=email).first():
+            return
+
+        name ="%s %s" % (properties['first_name'], properties['last_name'])
+        # we don't keep passwords in our user schema, so just create a random one here
+        pwd = str(uuid.uuid4())
+
+        # this is executed in an existing session, so it should get saved eventually
+        auth_user = AuthUser(email, pwd, name)
+        db.add(auth_user)
+
     @calculated_property(schema={
         "title": "Access Keys",
         "type": "array",
@@ -113,6 +139,44 @@ def user_basic_view(context, request):
         except KeyError:
             pass
     return filtered
+
+
+@view_config(context=User.Collection, permission='add', request_method='POST',
+             physical_path="/users")
+def user_add(context,request):
+    ''' if we have a password in our request, create and auth entry
+     for the user as well
+     '''
+
+    #do we have valid data
+    pwd = request.json.get('password', None)
+    pwd_less_data = request.json.copy()
+
+    if pwd is not None:
+        del pwd_less_data['password']
+
+    validate_request(context.type_info.schema, request, pwd_less_data)
+
+    if request.errors:
+        return HTTPUnprocessableEntity(json={'errors':request.errors},
+                                     content_type='application/json')
+
+    # this will create an AuthUser with random password
+    result = collection_add(context, request)
+    if result:
+        email = request.json.get('email')
+        pwd = request.json.get('password', None)
+
+        if pwd is not None:
+            # now update the password
+            db = request.registry['dbsession']
+            auth_user = db.query(AuthUser).filter_by(email=email).first()
+            auth_user.password = pwd
+
+            import transaction
+            transaction.commit()
+
+    return result
 
 
 @calculated_property(context=User, category='user_action')

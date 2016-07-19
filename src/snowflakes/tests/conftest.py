@@ -23,11 +23,8 @@ def autouse_external_tx(external_tx):
 _app_settings = {
     'collection_datastore': 'database',
     'item_datastore': 'database',
-    'multiauth.policies': 'persona session remoteuser accesskey',
+    'multiauth.policies': 'session remoteuser accesskey webuser',
     'multiauth.groupfinder': 'snowflakes.authorization.groupfinder',
-    'multiauth.policy.persona.use': 'snovault.authentication.NamespacedAuthenticationPolicy',
-    'multiauth.policy.persona.base': 'snowflakes.persona.PersonaAuthenticationPolicy',
-    'multiauth.policy.persona.namespace': 'persona',
     'multiauth.policy.session.use': 'snovault.authentication.NamespacedAuthenticationPolicy',
     'multiauth.policy.session.base': 'pyramid.authentication.SessionAuthenticationPolicy',
     'multiauth.policy.session.namespace': 'mailto',
@@ -38,9 +35,9 @@ _app_settings = {
     'multiauth.policy.accesskey.namespace': 'accesskey',
     'multiauth.policy.accesskey.base': 'snovault.authentication.BasicAuthAuthenticationPolicy',
     'multiauth.policy.accesskey.check': 'snovault.authentication.basic_auth_check',
-    'persona.audiences': 'http://localhost:6543',
-    'persona.verifier': 'browserid.LocalVerifier',
-    'persona.siteName': 'ENCODE DCC Submission',
+    'multiauth.policy.webuser.use' : 'snovault.authentication.NamespacedAuthenticationPolicy',
+    'multiauth.policy.webuser.namespace' : 'webuser',
+    'multiauth.policy.webuser.base' : 'snovault.authentication.WebUserAuthenticationPolicy',
     'load_test_only': True,
     'testing': True,
     'pyramid.debug_authorization': True,
@@ -54,7 +51,6 @@ _app_settings = {
 def app_settings(request, wsgi_server_host_port, conn, DBSession):
     from snovault import DBSESSION
     settings = _app_settings.copy()
-    settings['persona.audiences'] = 'http://%s:%s' % wsgi_server_host_port
     settings[DBSESSION] = DBSession
     return settings
 
