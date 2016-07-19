@@ -516,3 +516,17 @@ def load_test_data(app):
     inserts = resource_filename('snowflakes', 'tests/data/inserts/')
     docsdir = [resource_filename('snowflakes', 'tests/data/documents/')]
     load_all(testapp, inserts, docsdir)
+
+    # users are by default created with random passwords... that's hard to guess
+    # since this is just test data I think everybody should have the password Steve
+
+    db = app.registry['dbsession']
+    from snovault.storage import User
+    for count, user in enumerate(db.query(User).all()):
+        user.password = "Steve"
+
+    import transaction
+    transaction.commit()
+
+    print ("all %s users get the password Steve" % (count))
+

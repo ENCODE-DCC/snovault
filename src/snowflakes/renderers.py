@@ -110,6 +110,13 @@ def security_tween_factory(handler, registry):
                 return handler(request)
             raise CSRFTokenError('Incorrect CSRF token')
 
+        # NOTE: cutting out CSRF protection here ... why protect against CSRF if you provide an
+        # unathenticated endpoint that will delivery the CSRF token? I'm looking at you /session.
+        # this should be revisted, either embed the csrf token in the index.html as part of the
+        # rendering subprocess somehow, or return it from the login view and let the client store it
+        # but of course that sounds a lot like JWT...
+        return handler(request)
+
         if login is None:
             login = request.authenticated_userid
         if login is not None:
