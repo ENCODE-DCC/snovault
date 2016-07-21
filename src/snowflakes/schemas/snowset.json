@@ -56,18 +56,13 @@
             "enum" : [
                 "proposed",
                 "started",
-                "in progress",
                 "submitted",
                 "ready for review",
                 "deleted",
                 "released",
                 "revoked",
                 "archived",
-                "replaced",
-                "in review",
-                "release ready",
-                "verified",
-                "preliminary"
+                "replaced"
             ]
         }
     },
