@@ -80,7 +80,6 @@ var LoginBoxes = React.createClass({
 	  });
   },
 	loginToServer: function(data) {
-			console.log(data);
 			//clear any error messages
 			this.setState({errormsg: ""});
 
@@ -94,7 +93,7 @@ var LoginBoxes = React.createClass({
       })
       .then(response => {
         if (!response.ok){
-					this.setSTate({errormsg : "Invalid Login"});
+					this.setState({errormsg : "Invalid Login"});
 					throw response;
 				}
         return response.json();
