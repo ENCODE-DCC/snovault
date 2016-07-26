@@ -67,6 +67,7 @@ setup(
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=True,
+    package_data={'':['nginx-dev.conf']},
     zip_safe=False,
     author='Benjamin Hitz',
     author_email='hitz@stanford.edu',
