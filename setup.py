@@ -97,7 +97,7 @@ setup(
         migrate-attachments-aws = snowflakes.commands.migrate_attachments_aws:main
 
         [paste.app_factory]
-        main = snowflakes:main
+        snowflakes = snowflakes:main
 
         [paste.composite_factory]
         indexer = snovault.elasticsearch.es_index_listener:composite
