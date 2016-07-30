@@ -98,6 +98,7 @@ setup(
 
         [paste.app_factory]
         main = snowflakes:main
+        snowflakes = snowflakes:main
 
         [paste.composite_factory]
         indexer = snovault.elasticsearch.es_index_listener:composite
