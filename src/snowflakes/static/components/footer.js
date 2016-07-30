@@ -66,7 +66,7 @@ var LoginBoxes = React.createClass({
 
   mixins: [OverlayMixin],
   getInitialState: function() {
-  	return {username: '', password: '', isOpen: false};
+  	return {username: '', password: '', isOpen: false, errormsg: ''};
   },
   usernameFill: function(v) {
   	this.setState({username: v});
@@ -81,6 +81,9 @@ var LoginBoxes = React.createClass({
   },
 	loginToServer: function(data) {
 			console.log(data);
+			//clear any error messages
+			this.setState({errormsg: ""});
+
 			fetch('/login', {
 				method: "POST",
 				body: JSON.stringify(data),
@@ -90,7 +93,10 @@ var LoginBoxes = React.createClass({
 				credentials: "same-origin"
       })
       .then(response => {
-        if (!response.ok) throw response;
+        if (!response.ok){
+					this.setSTate({errormsg : "Invalid Login"});
+					throw response;
+				}
         return response.json();
       })
       .then(session_properties => {
@@ -127,10 +133,15 @@ var LoginBoxes = React.createClass({
          if (!this.state.isOpen) {
              return <span/>;
          }
+				 var error_msg = '';
+				 if (this.state.errormsg) {
+					 error_msg = <div className="error">{this.state.errormsg}</div>;
+				 }
          return (
 	  <Modal onRequestHide={this.handleToggle} dialogClassName="login-modal">
         <div className="login-box">
         	<h1 className="title">Account Login</h1>
+					{error_msg}
       		<label className="fill-label">Username:</label>
         	<TextBox default="Username" fill={this.usernameFill} tType="text"/>
         	<label className="fill-label">Password:</label>
