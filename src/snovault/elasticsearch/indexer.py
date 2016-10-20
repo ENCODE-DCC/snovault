@@ -151,7 +151,7 @@ def index(request):
                 txn_count=txn_count,
                 first_txn_timestamp=first_txn.isoformat(),
             )
-
+    import pdb; pdb.set_trace()
     if invalidated and not dry_run:
         # Exporting a snapshot mints a new xid, so only do so when required.
         # Not yet possible to export a snapshot on a standby server:
@@ -160,7 +160,7 @@ def index(request):
         if not recovery:
             snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
         
-        if request.registry.settings.get['queue_server_address'] == 'localhost':
+        if request.registry.settings.get('queue_server_address') == 'localhost':
             queue_server.populate_shared_queue(invalidated, xmin, snapshot_id)
         queue_client = QueueClient(request.registry)
 
