@@ -18,6 +18,10 @@ from .interfaces import (
     ELASTIC_SEARCH,
     INDEXER,
 )
+
+from multiprocessing.managers import BaseManager
+import queue
+
 import datetime
 import logging
 import pytz
@@ -33,6 +37,12 @@ def includeme(config):
     config.scan(__name__)
     registry = config.registry
     registry[INDEXER] = Indexer(registry)
+    if registry.settings.get('shared_queue_server'):
+        q = queue.Queue()
+        QueueManager.register('get_queue', callable=lambda:q)
+        m = QueueManager(address=('', 50000), authkey=b'demos')
+        m.start()
+        registry['queue_manager'] = m
 
 
 @view_config(route_name='index', request_method='POST', permission="index")
@@ -154,8 +164,21 @@ def index(request):
         snapshot_id = None
         if not recovery:
             snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
+        
+        if request.registry.settings.get['shared_queue_server']:
+            shared_queue = populate_shared_queue(request, invalidated, xmin, snapshot_id)
+        else:
+            shared_queue = get_shared_queue(request)
 
-        result['errors'] = indexer.update_objects(request, invalidated, xmin, snapshot_id)
+        indexing_errors = []
+
+        while shared_queue.qsize() > 0 and not outbid():
+            chunk = get_chunk_of_uuids(shared_queue, 1000)
+            tmp_errors = indexer.update_objects(request, chunk)
+            indexing_errors.extend(tmp_errors)
+
+
+        result['errors'] = indexing_errors
         result['indexed'] = len(invalidated)
 
         if record:
@@ -176,6 +199,33 @@ def index(request):
         result['lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
 
     return result
+
+def populate_shared_queue(request, invalidated, xmin, snapshot_id):
+    multiprocessing_manager = request.registry['queue_manager']
+    _queue = multiprocessing_manager.get_queue()
+    for uuid in invalidated:
+        _queue.put((uuid, xmin, snapshot_id))
+    return _queue
+
+def get_shared_queue(request):
+    QueueManager.register('get_queue')
+    multiprocessing_manager = QueueManager(address=(request.registry['shared_queue_server'], 50000), authkey=b'demos')
+    multiprocessing_manager.connect()
+    _queue = multiprocessing_manager.get_queue()
+    return _queue
+
+def get_chunk_of_uuids(shared_queue, size):
+    chunk = []
+    try:
+        for i in range(size):
+            chunk.append(shared_queue.get(False))
+    except queue.Empty:
+        pass
+    return chunk
+
+def outbid():
+    # TO-DO: check whether instance is up for termination
+    return True
 
 
 def all_uuids(registry, types=None):
@@ -204,9 +254,9 @@ class Indexer(object):
         self.es = registry[ELASTIC_SEARCH]
         self.index = registry.settings['snovault.elasticsearch.index']
 
-    def update_objects(self, request, uuids, xmin, snapshot_id):
+    def update_objects(self, request, uuids):
         errors = []
-        for i, uuid in enumerate(uuids):
+        for i, (uuid, xmin, snapshot_id) in enumerate(uuids):
             error = self.update_object(request, uuid, xmin)
             if error is not None:
                 errors.append(error)
@@ -256,3 +306,7 @@ class Indexer(object):
 
     def shutdown(self):
         pass
+
+class QueueManager(BaseManager):
+    pass
+

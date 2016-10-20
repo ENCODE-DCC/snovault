@@ -12,6 +12,7 @@ import atexit
 import logging
 import time
 import transaction
+import copy
 from .indexer import (
     INDEXER,
     Indexer,
@@ -126,9 +127,9 @@ class MPIndexer(Indexer):
             context=get_context('forkserver'),
         )
 
-    def update_objects(self, request, uuids, xmin, snapshot_id):
+    def update_objects(self, request, uuids):
         # Ensure that we iterate over uuids in this thread not the pool task handler.
-        tasks = [(uuid, xmin, snapshot_id) for uuid in uuids]
+        tasks = copy.deepcopy(uuids)
         errors = []
         try:
             for i, error in enumerate(self.pool.imap_unordered(
