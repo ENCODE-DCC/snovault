@@ -20,7 +20,7 @@ class MPQueue(object):
         arr = list()
         try:
             while True:
-                arr.append(queue.get())
+                arr.append(queue.get(False))
         except queue.Empty:
             pass
         return arr
