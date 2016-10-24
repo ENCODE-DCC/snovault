@@ -13,7 +13,10 @@ from snovault import (
 from snovault.storage import (
     TransactionRecord,
 )
-from snovault.multiprocessing_queue import QueueClient
+from snovault.multiprocessing_queue import (
+    QueueServer,
+    QueueClient
+)
 
 from urllib3.exceptions import ReadTimeoutError
 from .interfaces import (
@@ -41,164 +44,175 @@ def includeme(config):
 
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
-    INDEX = request.registry.settings['snovault.elasticsearch.index']
-    # Setting request.datastore here only works because routed views are not traversed.
-    request.datastore = 'database'
-    record = request.json.get('record', False)
-    dry_run = request.json.get('dry_run', False)
-    recovery = request.json.get('recovery', False)
-    es = request.registry[ELASTIC_SEARCH]
+    
     indexer = request.registry[INDEXER]
-    queue_server = request.registry['queue_server']
-
-    session = request.registry[DBSESSION]()
-    connection = session.connection()
-    # http://www.postgresql.org/docs/9.3/static/functions-info.html#FUNCTIONS-TXID-SNAPSHOT
-    if recovery:
-        query = connection.execute(
-            "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;"
-            "SELECT txid_snapshot_xmin(txid_current_snapshot());"
-        )
+    
+    if request.registry.settings.get('queue_server_address') == 'localhost':
+        has_queue_server = True
     else:
-        query = connection.execute(
-            "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE;"
-            "SELECT txid_snapshot_xmin(txid_current_snapshot());"
-        )
-    # DEFERRABLE prevents query cancelling due to conflicts but requires SERIALIZABLE mode
-    # which is not available in recovery.
-    xmin = query.scalar()  # lowest xid that is still in progress
+        has_queue_server = False
+    
+    if has_queue_server:
+        INDEX = request.registry.settings['snovault.elasticsearch.index']
+        # Setting request.datastore here only works because routed views are not traversed.
+        request.datastore = 'database'
+        record = request.json.get('record', False)
+        dry_run = request.json.get('dry_run', False)
+        recovery = request.json.get('recovery', False)
+        es = request.registry[ELASTIC_SEARCH]
 
-    first_txn = None
-    last_xmin = None
-    if 'last_xmin' in request.json:
-        last_xmin = request.json['last_xmin']
-    else:
-        try:
-            status = es.get(index=INDEX, doc_type='meta', id='indexing')
-        except NotFoundError:
-            interval_settings = {"index": {"refresh_interval": "30s"}}
-            es.indices.put_settings(index=INDEX, body=interval_settings)
-            pass
+        session = request.registry[DBSESSION]()
+        connection = session.connection()
+        # http://www.postgresql.org/docs/9.3/static/functions-info.html#FUNCTIONS-TXID-SNAPSHOT
+        if recovery:
+            query = connection.execute(
+                "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;"
+                "SELECT txid_snapshot_xmin(txid_current_snapshot());"
+            )
         else:
-            last_xmin = status['_source']['xmin']
+            query = connection.execute(
+                "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE;"
+                "SELECT txid_snapshot_xmin(txid_current_snapshot());"
+            )
+        # DEFERRABLE prevents query cancelling due to conflicts but requires SERIALIZABLE mode
+        # which is not available in recovery.
+        xmin = query.scalar()  # lowest xid that is still in progress
 
-    result = {
-        'xmin': xmin,
-        'last_xmin': last_xmin,
-    }
-
-    flush = False
-    if last_xmin is None:
-        result['types'] = types = request.json.get('types', None)
-        invalidated = list(all_uuids(request.registry, types))
-        flush = True
-    else:
-        txns = session.query(TransactionRecord).filter(
-            TransactionRecord.xid >= last_xmin,
-        )
-
-        invalidated = set()
-        updated = set()
-        renamed = set()
-        max_xid = 0
-        txn_count = 0
-        for txn in txns.all():
-            txn_count += 1
-            max_xid = max(max_xid, txn.xid)
-            if first_txn is None:
-                first_txn = txn.timestamp
+        first_txn = None
+        last_xmin = None
+        if 'last_xmin' in request.json:
+            last_xmin = request.json['last_xmin']
+        else:
+            try:
+                status = es.get(index=INDEX, doc_type='meta', id='indexing')
+            except NotFoundError:
+                interval_settings = {"index": {"refresh_interval": "30s"}}
+                es.indices.put_settings(index=INDEX, body=interval_settings)
+                pass
             else:
-                first_txn = min(first_txn, txn.timestamp)
-            renamed.update(txn.data.get('renamed', ()))
-            updated.update(txn.data.get('updated', ()))
+                last_xmin = status['_source']['xmin']
 
-        result['txn_count'] = txn_count
-        if txn_count == 0:
-            return result
+        result = {
+            'xmin': xmin,
+            'last_xmin': last_xmin,
+        }
 
-        es.indices.refresh(index=INDEX)
-        res = es.search(index=INDEX, size=SEARCH_MAX, body={
-            'filter': {
-                'or': [
-                    {
-                        'terms': {
-                            'embedded_uuids': updated,
-                            '_cache': False,
-                        },
-                    },
-                    {
-                        'terms': {
-                            'linked_uuids': renamed,
-                            '_cache': False,
-                        },
-                    },
-                ],
-            },
-            '_source': False,
-        })
-        if res['hits']['total'] > SEARCH_MAX:
-            invalidated = list(all_uuids(request.registry))
+        flush = False
+        if last_xmin is None:
+            result['types'] = types = request.json.get('types', None)
+            invalidated = list(all_uuids(request.registry, types))
             flush = True
         else:
-            referencing = {hit['_id'] for hit in res['hits']['hits']}
-            invalidated = referencing | updated
-            result.update(
-                max_xid=max_xid,
-                renamed=renamed,
-                updated=updated,
-                referencing=len(referencing),
-                invalidated=len(invalidated),
-                txn_count=txn_count,
-                first_txn_timestamp=first_txn.isoformat(),
+            txns = session.query(TransactionRecord).filter(
+                TransactionRecord.xid >= last_xmin,
             )
-    import pdb; pdb.set_trace()
-    if invalidated and not dry_run:
-        # Exporting a snapshot mints a new xid, so only do so when required.
-        # Not yet possible to export a snapshot on a standby server:
-        # http://www.postgresql.org/message-id/CAHGQGwEtJCeHUB6KzaiJ6ndvx6EFsidTGnuLwJ1itwVH0EJTOA@mail.gmail.com
-        snapshot_id = None
-        if not recovery:
-            snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
-        
-        if request.registry.settings.get('queue_server_address') == 'localhost':
+
+            invalidated = set()
+            updated = set()
+            renamed = set()
+            max_xid = 0
+            txn_count = 0
+            for txn in txns.all():
+                txn_count += 1
+                max_xid = max(max_xid, txn.xid)
+                if first_txn is None:
+                    first_txn = txn.timestamp
+                else:
+                    first_txn = min(first_txn, txn.timestamp)
+                renamed.update(txn.data.get('renamed', ()))
+                updated.update(txn.data.get('updated', ()))
+
+            result['txn_count'] = txn_count
+            if txn_count == 0:
+                return result
+
+            es.indices.refresh(index=INDEX)
+            res = es.search(index=INDEX, size=SEARCH_MAX, body={
+                'filter': {
+                    'or': [
+                        {
+                            'terms': {
+                                'embedded_uuids': updated,
+                                '_cache': False,
+                            },
+                        },
+                        {
+                            'terms': {
+                                'linked_uuids': renamed,
+                                '_cache': False,
+                            },
+                        },
+                    ],
+                },
+                '_source': False,
+            })
+            if res['hits']['total'] > SEARCH_MAX:
+                invalidated = list(all_uuids(request.registry))
+                flush = True
+            else:
+                referencing = {hit['_id'] for hit in res['hits']['hits']}
+                invalidated = referencing | updated
+                result.update(
+                    max_xid=max_xid,
+                    renamed=renamed,
+                    updated=updated,
+                    referencing=len(referencing),
+                    invalidated=len(invalidated),
+                    txn_count=txn_count,
+                    first_txn_timestamp=first_txn.isoformat(),
+                )
+        if invalidated and not dry_run:
+            # Exporting a snapshot mints a new xid, so only do so when required.
+            # Not yet possible to export a snapshot on a standby server:
+            # http://www.postgresql.org/message-id/CAHGQGwEtJCeHUB6KzaiJ6ndvx6EFsidTGnuLwJ1itwVH0EJTOA@mail.gmail.com
+            snapshot_id = None
+            if not recovery:
+                snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
+            
+            queue_server = QueueServer(request.registry)
             queue_server.populate_shared_queue(invalidated, xmin, snapshot_id)
+                
+            index_in_batches(request, indexer, queue_server, 1000)
+
+            result['errors'] = queue_server.to_list(queue_server.result_queue)
+            result['indexed'] = len(invalidated)
+
+            if record:
+                es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
+                if es.indices.get_settings(index=INDEX)['snovault']['settings']['index'].get('refresh_interval', '') != '1s':
+                    interval_settings = {"index": {"refresh_interval": "1s"}}
+                    es.indices.put_settings(index=INDEX, body=interval_settings)
+
+            es.indices.refresh(index=INDEX)
+
+            if flush:
+                try:
+                    es.indices.flush_synced(index=INDEX)  # Faster recovery on ES restart
+                except ConflictError:
+                    pass
+
+        if first_txn is not None:
+            result['lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
+
+        return result
+    
+    else:
+        
         queue_client = QueueClient(request.registry)
+        index_in_batches(request, indexer, queue_client, 1000)
 
-        indexing_errors = []
 
-        while queue_client.queue.qsize() > 0 and not outbid():
-            chunk = queue_client.get_chunk_of_uuids(1000)
-            tmp_errors = indexer.update_objects(request, chunk)
-            indexing_errors.extend(tmp_errors)
-
-        result['errors'] = indexing_errors
-        result['indexed'] = len(invalidated)
-
-        if record:
-            es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
-            if es.indices.get_settings(index=INDEX)['snovault']['settings']['index'].get('refresh_interval', '') != '1s':
-                interval_settings = {"index": {"refresh_interval": "1s"}}
-                es.indices.put_settings(index=INDEX, body=interval_settings)
-
-        es.indices.refresh(index=INDEX)
-
-        if flush:
-            try:
-                es.indices.flush_synced(index=INDEX)  # Faster recovery on ES restart
-            except ConflictError:
-                pass
-
-    if first_txn is not None:
-        result['lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
-
-    return result
+def index_in_batches(request, indexer, queue_client, size):
+    while queue_client.queue.qsize() > 0 and not outbid():
+        chunk = queue_client.get_chunk_of_uuids(size)
+        (queue_client.result_queue.put(result) for result in indexer.update_objects(request, chunk))
 
 
 
 
 def outbid():
     # TO-DO: check whether instance is up for termination
-    return True
+    return False
 
 
 def all_uuids(registry, types=None):
