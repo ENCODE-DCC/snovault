@@ -170,6 +170,7 @@ def index(request):
                     if 'error_message' in item:
                         log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
                         item['error_message'] = "Error occured during indexing, check the logs"
+                result['errors'] = error_messages
 
 
             if es.indices.get_settings(index=INDEX)['snovault']['settings']['index'].get('refresh_interval', '') != '1s':
