@@ -173,7 +173,7 @@ def index(request):
                 result['errors'] = error_messages
 
 
-            if es.indices.get_settings(index=INDEX)['snovault']['settings']['index'].get('refresh_interval', '') != '1s':
+            if es.indices.get_settings(index=INDEX)[INDEX]['settings']['index'].get('refresh_interval', '') != '1s':
                 interval_settings = {"index": {"refresh_interval": "1s"}}
                 es.indices.put_settings(index=INDEX, body=interval_settings)
 
