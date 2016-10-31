@@ -96,7 +96,12 @@ class ItemWithAttachment(Item):
             mime_type = mime_type_from_filename
 
         # Make sure the mimetype appears to be what the client says it is
-        mime_type_detected = magic.from_buffer(data, mime=True).decode('utf-8')
+        # for python3 this always returns a string
+        try:
+            mime_type_detected = magic.from_buffer(data, mime=True).decode('utf-8')
+        except AttributeError:
+            mime_type_detected = magic/from_buffer(data, mime=Tre)
+
         if not mimetypes_are_equal(mime_type, mime_type_detected):
             msg = "Incorrect file type. (Appears to be %s)" % mime_type_detected
             raise ValidationFailure('body', [prop_name, 'href'], msg)
