@@ -96,7 +96,7 @@ class ItemWithAttachment(Item):
             mime_type = mime_type_from_filename
 
         # Make sure the mimetype appears to be what the client says it is
-        # for python3 this always returns a string
+        # for python3 magic.from_buffer always returns a string a thus doesn't need to be decoded
         try:
             mime_type_detected = magic.from_buffer(data, mime=True).decode('utf-8')
         except AttributeError:
