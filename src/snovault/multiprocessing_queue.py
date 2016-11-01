@@ -28,10 +28,10 @@ class MPQueue(object):
 class QueueServer(MPQueue):
 
     def __init__(self, registry):
-        self.queue = queue.Queue()
-        self.result_queue = queue.Queue()
-        QueueManager.register('get_queue', callable=lambda:self.queue)
-        QueueManager.register('get_result_queue', callable=lambda:self.queue)
+        local_queue = queue.Queue()
+        local_result_queue = queue.Queue()
+        QueueManager.register('get_queue', callable=lambda:local_queue)
+        QueueManager.register('get_result_queue', callable=lambda:local_result_queue)
         self.manager = QueueManager(address=('', 50000), 
                                     authkey=registry.settings['queue_authkey'].encode('utf-8'))
         self.start()
@@ -46,7 +46,7 @@ class QueueClient(MPQueue):
 
     def __init__(self, registry):
         QueueManager.register('get_queue')
-        QueueManager.registry('get_result_queue')
+        QueueManager.register('get_result_queue')
         self.manager = QueueManager(address=(registry.settings['queue_server_address'], 50000), 
                                     authkey=registry.settings['queue_authkey'].encode('utf-8'))
         self.manager.connect()

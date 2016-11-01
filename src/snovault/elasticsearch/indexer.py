@@ -200,8 +200,10 @@ def index(request):
         try:
             queue_client = QueueClient(request.registry)
             index_in_batches(request, indexer, queue_client, 1000)
-        except (ConnectionRefusedError):
+        except Exception as e:
+            log.warn("connection error {}".format(repr(e)))
             pass
+        return {}
 
 
 def index_in_batches(request, indexer, queue_client, size):
