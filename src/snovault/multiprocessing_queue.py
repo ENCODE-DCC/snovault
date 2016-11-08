@@ -16,11 +16,11 @@ class MPQueue(object):
         for uuid in invalidated:
             self.queue.put((uuid, xmin, snapshot_id))
 
-    def to_list(self, queue):
+    def to_list(self, queue_obj):
         arr = list()
         try:
             while True:
-                arr.append(queue.get(False))
+                arr.append(queue_obj.get(False))
         except queue.Empty:
             pass
         return arr
