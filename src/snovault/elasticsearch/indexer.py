@@ -29,6 +29,7 @@ import datetime
 import logging
 import pytz
 import time
+import copy
 
 
 log = logging.getLogger(__name__)
@@ -180,18 +181,30 @@ def index(request):
             queue_server.shutdown()
 
             if record:
-                es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
+                try:
+                    es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
+                except:
+                    error_messages = copy.deepcopy(result['errors'])
+                    del result['errors']
+                    es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
+                    for item in error_messages:
+                        if 'error_message' in item:
+                            log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
+                            item['error_message'] = "Error occured during indexing, check the logs"
+                    result['errors'] = error_messages
+
+
                 if es.indices.get_settings(index=INDEX)['snovault']['settings']['index'].get('refresh_interval', '') != '1s':
                     interval_settings = {"index": {"refresh_interval": "1s"}}
                     es.indices.put_settings(index=INDEX, body=interval_settings)
 
-            es.indices.refresh(index=INDEX)
+                es.indices.refresh(index=INDEX)
 
-            if flush:
-                try:
-                    es.indices.flush_synced(index=INDEX)  # Faster recovery on ES restart
-                except ConflictError:
-                    pass
+                if flush:
+                    try:
+                        es.indices.flush_synced(index=INDEX)  # Faster recovery on ES restart
+                    except ConflictError:
+                        pass
 
         if first_txn is not None:
             result['lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
@@ -265,7 +278,7 @@ class Indexer(object):
         except Exception as e:
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             timestamp = datetime.datetime.now().isoformat()
-            return {'error': repr(e), 'timestamp': timestamp, 'uuid': str(uuid)}
+            return {'error_message': repr(e), 'timestamp': timestamp, 'uuid': str(uuid)}
 
         last_exc = None
         for backoff in [0, 10, 20, 40, 80]:
@@ -293,7 +306,7 @@ class Indexer(object):
                 return
 
         timestamp = datetime.datetime.now().isoformat()
-        return {'error': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
+        return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
 
     def shutdown(self):
         pass
