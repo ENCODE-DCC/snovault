@@ -177,6 +177,8 @@ def index(request):
             result['errors'] = queue_server.to_list(queue_server.result_queue)
             result['indexed'] = len(invalidated)
 
+            queue_server.shutdown()
+
             if record:
                 es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
                 if es.indices.get_settings(index=INDEX)['snovault']['settings']['index'].get('refresh_interval', '') != '1s':
