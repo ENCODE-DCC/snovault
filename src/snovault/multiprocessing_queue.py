@@ -52,6 +52,7 @@ class QueueClient(MPQueue):
     def __init__(self, registry):
         QueueManager.register('get_queue')
         QueueManager.register('get_result_queue')
+        QueueManager.register('get_done_queue')
         self.manager = QueueManager(address=(registry.settings['queue_server_address'], 50000), 
                                     authkey=registry.settings['queue_authkey'].encode('utf-8'))
         self.manager.connect()
