@@ -300,7 +300,7 @@ class Indexer(object):
                     request_timeout=30,
                 )
                 if self.queue_client:
-                    self.done_queue.put(str(uuid))
+                    self.queue_client.done_queue.put(str(uuid))
             except StatementError:
                 # Can't reconnect until invalid transaction is rolled back
                 raise
