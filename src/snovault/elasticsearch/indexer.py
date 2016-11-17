@@ -30,6 +30,7 @@ import logging
 import pytz
 import time
 import copy
+import random
 
 
 log = logging.getLogger(__name__)
@@ -228,6 +229,7 @@ def index(request):
 def index_in_batches(request, indexer, queue_client, size):
     while queue_client.queue.qsize() > 0 and not outbid():
         chunk = queue_client.get_chunk_of_uuids(size)
+        random.shuffle(chunk)
         (queue_client.result_queue.put(result) for result in indexer.update_objects(request, chunk))
 
 
