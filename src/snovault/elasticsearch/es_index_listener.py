@@ -23,6 +23,7 @@ import sys
 import threading
 import time
 from urllib.parse import parse_qsl
+from snovault.multiprocessing_queue import QueueClient
 
 log = logging.getLogger(__name__)
 
@@ -268,6 +269,12 @@ def composite(loader, global_conf, **settings):
         status = '200 OK'
         response_headers = [('Content-type', 'application/json')]
         start_response(status, response_headers)
+        try:
+            if testapp.app.registry.settings.get('queue_server_address') == 'localhost':
+                queue_client = QueueClient(testapp.app.registry)
+                status_holder['status']['queue_size'] = queue_client.queue.qsize()
+        except:
+            pass
         return [json.dumps(status_holder['status'])]
 
     return status_app

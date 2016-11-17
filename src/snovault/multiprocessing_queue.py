@@ -38,8 +38,8 @@ class QueueServer(MPQueue):
         self.manager.start()
         self.queue = self.manager.get_queue()
         self.result_queue = self.manager.get_result_queue()
+        atexit.register(self.shutdown)
 
-    @atexit.register
     def shutdown(self):
         self.manager.shutdown()
 
