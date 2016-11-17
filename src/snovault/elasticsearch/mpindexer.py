@@ -26,6 +26,8 @@ def includeme(config):
     if config.registry.settings.get('indexer_worker'):
         return
     processes = config.registry.settings.get('indexer.processes')
+    if config.registry.settings.get('queue_server_address') != 'localhost':
+        processes = None
     try:
         processes = int(processes)
     except:

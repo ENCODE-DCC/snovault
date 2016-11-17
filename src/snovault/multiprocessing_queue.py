@@ -31,14 +31,18 @@ class QueueServer(MPQueue):
     def __init__(self, registry):
         local_queue = queue.Queue()
         local_result_queue = queue.Queue()
+        local_done_queue = queue.Queue()
         QueueManager.register('get_queue', callable=lambda:local_queue)
         QueueManager.register('get_result_queue', callable=lambda:local_result_queue)
+        QueueManager.register('get_done_queue', callable=lambda:local_done_queue)
         self.manager = QueueManager(address=('', 50000), 
                                     authkey=registry.settings['queue_authkey'].encode('utf-8'))
+        atexit.register(self.shutdown)
         self.manager.start()
         self.queue = self.manager.get_queue()
         self.result_queue = self.manager.get_result_queue()
-        atexit.register(self.shutdown)
+        self.done_queue = self.manager.get_done_queue()
+
 
     def shutdown(self):
         self.manager.shutdown()
@@ -53,6 +57,7 @@ class QueueClient(MPQueue):
         self.manager.connect()
         self.queue = self.manager.get_queue()
         self.result_queue = self.manager.get_result_queue()
+        self.done_queue = self.manager.get_done_queue()
 
 
 class QueueManager(BaseManager):

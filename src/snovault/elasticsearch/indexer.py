@@ -172,7 +172,11 @@ def index(request):
             
             queue_server = QueueServer(request.registry)
             queue_server.populate_shared_queue(invalidated, xmin, snapshot_id)
-                
+            index_in_batches(request, indexer, queue_server, 1000)
+
+            # Go over the failed uuids one more time, need a cleaner implementation
+            failed_uuids = list(set(invalidated) - set(queue_server.to_list(queue_server.done_queue)))
+            queue_server.populate_shared_queue(failed_uuids, xmin, snapshot_id)
             index_in_batches(request, indexer, queue_server, 1000)
 
             result['errors'] = queue_server.to_list(queue_server.result_queue)
@@ -257,6 +261,10 @@ class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
         self.index = registry.settings['snovault.elasticsearch.index']
+        if registry.settings.get('queue_server_address') != 'localhost':
+            self.queue_client = QueueClient(registry)
+        else:
+            self.queue_client = None
 
     def update_objects(self, request, uuids):
         errors = []
@@ -289,6 +297,8 @@ class Indexer(object):
                     id=str(uuid), version=xmin, version_type='external_gte',
                     request_timeout=30,
                 )
+                if self.queue_client:
+                    self.done_queue.put(str(uuid))
             except StatementError:
                 # Can't reconnect until invalid transaction is rolled back
                 raise
