@@ -263,10 +263,7 @@ class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
         self.index = registry.settings['snovault.elasticsearch.index']
-        if registry.settings.get('queue_server_address') != 'localhost':
-            self.queue_client = QueueClient(registry)
-        else:
-            self.queue_client = None
+        self.queue_client = QueueClient(registry)
 
     def update_objects(self, request, uuids):
         errors = []
@@ -299,8 +296,7 @@ class Indexer(object):
                     id=str(uuid), version=xmin, version_type='external_gte',
                     request_timeout=30,
                 )
-                if self.queue_client:
-                    self.queue_client.done_queue.put(str(uuid))
+                self.queue_client.done_queue.put(str(uuid))
             except StatementError:
                 # Can't reconnect until invalid transaction is rolled back
                 raise
