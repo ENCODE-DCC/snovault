@@ -235,7 +235,7 @@ def audit_mapping():
         },
         'detail': {
             'type': 'string',
-            'index': 'analyzed', 
+            'index': 'analyzed',
         },
         'level_name': {
             'type': 'string',
@@ -426,35 +426,35 @@ def type_mapping(types, item_type, embed=True):
 
             m = m['properties'][p]
 
-    boost_values = schema.get('boost_values', None)
-    if boost_values is None:
-        boost_values = {
-            prop_name: 1.0
-            for prop_name in ['@id', 'title']
-            if prop_name in mapping['properties']
-        }
-    for name, boost in boost_values.items():
-        props = name.split('.')
-        last = props.pop()
-        new_mapping = mapping['properties']
-        for prop in props:
-            new_mapping = new_mapping[prop]['properties']
-        new_mapping[last]['boost'] = boost
-        if last in NON_SUBSTRING_FIELDS:
-            new_mapping[last]['include_in_all'] = False
-            if last in PATH_FIELDS:
-                new_mapping[last]['index_analyzer'] = 'snovault_path_analyzer'
-            else:
-                new_mapping[last]['index'] = 'not_analyzed'
-        else:
-            new_mapping[last]['index_analyzer'] = 'snovault_index_analyzer'
-            new_mapping[last]['search_analyzer'] = 'snovault_search_analyzer'
-            new_mapping[last]['include_in_all'] = True
-
-    # Automatic boost for uuid
-    if 'uuid' in mapping['properties']:
-        mapping['properties']['uuid']['index'] = 'not_analyzed' 
-        mapping['properties']['uuid']['include_in_all'] = False
+    # boost_values = schema.get('boost_values', None)
+    # if boost_values is None:
+    #     boost_values = {
+    #         prop_name: 1.0
+    #         for prop_name in ['@id', 'title']
+    #         if prop_name in mapping['properties']
+    #     }
+    # for name, boost in boost_values.items():
+    #     props = name.split('.')
+    #     last = props.pop()
+    #     new_mapping = mapping['properties']
+    #     for prop in props:
+    #         new_mapping = new_mapping[prop]['properties']
+    #     new_mapping[last]['boost'] = boost
+    #     if last in NON_SUBSTRING_FIELDS:
+    #         new_mapping[last]['include_in_all'] = False
+    #         if last in PATH_FIELDS:
+    #             new_mapping[last]['index_analyzer'] = 'snovault_path_analyzer'
+    #         else:
+    #             new_mapping[last]['index'] = 'not_analyzed'
+    #     else:
+    #         new_mapping[last]['index_analyzer'] = 'snovault_index_analyzer'
+    #         new_mapping[last]['search_analyzer'] = 'snovault_search_analyzer'
+    #         new_mapping[last]['include_in_all'] = True
+    #
+    # # Automatic boost for uuid
+    # if 'uuid' in mapping['properties']:
+    #     mapping['properties']['uuid']['index'] = 'not_analyzed'
+    #     mapping['properties']['uuid']['include_in_all'] = False
     return mapping
 
 
