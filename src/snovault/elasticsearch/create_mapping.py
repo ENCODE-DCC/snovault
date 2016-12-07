@@ -112,6 +112,9 @@ def schema_mapping(name, schema, field='*'):
         }
 
     if type_ == 'string':
+        # non-embedded objects
+        if 'linkTo' in schema.keys():
+            return
 
         sub_mapping = {
             'type': 'string',
@@ -388,12 +391,23 @@ def combined_mapping(types, *item_types):
 
 
 def type_mapping(types, item_type, embed=True):
-    print('__________')
-    print('++',item_type)
+    """
+    Mapping for each type. This is relatively simple if embed=False.
+    When embed=True, the embedded fields (defined in /types/ directory) will
+    be used to generate custom embedding of objects. Embedding paths are
+    separated by dots. If the last field is an object, all fields in that
+    object will be embedded (e.g. biosource.individual). To embed a specific
+    field only, do add it at the end of the path: biosource.individual.title
+
+    No field checking has been added yet (TODO?), so make sure fields are
+    spelled correctly.
+
+    Any fields that are not objects will NOT be embedded UNLESS they are in the
+    embedded list, again defined in the types .py file for the object.
+    """
     type_info = types[item_type]
     schema = type_info.schema
     mapping = schema_mapping(item_type, schema)
-    print(mapping)
     if not embed:
         return mapping
     embed_obj = {}  # overall embedded object
@@ -401,12 +415,11 @@ def type_mapping(types, item_type, embed=True):
     for prop in type_info.embedded:
         single_embed = {}
         s = schema
-
         m = mapping
         for p in prop.split('.'):
             ref_types = None
             subschema = None
-            penultimate_obj = False
+            ultimate_obj = False # set to true if on last level of embedding
             field = '*'
             if p == prop.split('.')[-1] and len(prop.split('.')) > 1:
                 # See if the embedding was done improperly (last field is object)
@@ -414,14 +427,19 @@ def type_mapping(types, item_type, embed=True):
                     # if last field is object, default to embedding all fields (*)
                 if subschema is None: # Check if second to last field is object
                     subschema = s
-                    penultimate_obj = True
+                    ultimate_obj = True
                     field = p
+            elif len(prop.split('.')) == 1: # only an object was given. Embed fully
+                subschema = s.get('properties', {}).get(p)
+                # if a non-obj field, return (no embedding is going on)
+                if subschema is None:
+                    break
             else: # in this case, field itself should be an object. If not, return
-                # See if the embedding was done improperly (last field is object)
+                # If last field is an object, embed it entirely
                 subschema = s.get('properties', {}).get(p)
                 field = p
                 if subschema is None:
-                    return mapping
+                    break
             subschema = subschema.get('items', subschema)
             if 'linkFrom' in subschema:
                 _ref_type, _ = subschema['linkFrom'].split('.', 1)
@@ -435,8 +453,8 @@ def type_mapping(types, item_type, embed=True):
             else:
                 s = reduce(combine_schemas, (types[t].schema for t in ref_types))
             # Check if mapping for property is already an object
-            # multiple subobjects may be embedded, so be carful here
-            if penultimate_obj:
+            # multiple subobjects may be embedded, so be careful here
+            if ultimate_obj:
                 m['properties'][field] = schema_mapping(p, s, field)
             elif p in m['properties'].keys():
                 if m['properties'][p]['type'] == 'string':
@@ -445,7 +463,7 @@ def type_mapping(types, item_type, embed=True):
                     m['properties'][p][field] = schema_mapping(p, s, field)
             else:
                 m['properties'][p] = schema_mapping(p, s, field)
-            m = m['properties'][p]
+            m = m['properties'][p] if not ultimate_obj else m['properties']
 
     # boost_values = schema.get('boost_values', None)
     # if boost_values is None:
