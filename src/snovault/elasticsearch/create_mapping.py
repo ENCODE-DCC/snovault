@@ -55,7 +55,7 @@ def sorted_dict(d):
     return json.loads(json.dumps(d), object_pairs_hook=sorted_pairs_hook)
 
 
-def schema_mapping(name, schema):
+def schema_mapping(name, schema, field='*'):
     if 'linkFrom' in schema:
         type_ = 'string'
     else:
@@ -63,14 +63,17 @@ def schema_mapping(name, schema):
 
     # Elasticsearch handles multiple values for a field
     if type_ == 'array' and schema['items']:
-        return schema_mapping(name, schema['items'])
+        return schema_mapping(name, schema['items'], field)
 
     if type_ == 'object':
         properties = {}
         for k, v in schema.get('properties', {}).items():
-            mapping = schema_mapping(k, v)
+            mapping = schema_mapping(k, v, '*')
             if mapping is not None:
-                properties[k] = mapping
+                if field == '*':
+                    properties[k] = mapping
+                elif k == field:
+                    properties[k] = mapping
         return {
             'type': 'object',
             'include_in_all': False,
@@ -385,24 +388,40 @@ def combined_mapping(types, *item_types):
 
 
 def type_mapping(types, item_type, embed=True):
+    print('__________')
+    print('++',item_type)
     type_info = types[item_type]
     schema = type_info.schema
     mapping = schema_mapping(item_type, schema)
+    print(mapping)
     if not embed:
         return mapping
+    embed_obj = {}  # overall embedded object
 
     for prop in type_info.embedded:
+        single_embed = {}
         s = schema
-        m = mapping
 
+        m = mapping
         for p in prop.split('.'):
             ref_types = None
-
-            subschema = s.get('properties', {}).get(p)
-            if subschema is None:
-                msg = 'Unable to find schema for %r embedding %r in %r' % (p, prop, item_type)
-                raise ValueError(msg)
-
+            subschema = None
+            penultimate_obj = False
+            field = '*'
+            if p == prop.split('.')[-1] and len(prop.split('.')) > 1:
+                # See if the embedding was done improperly (last field is object)
+                subschema = s.get('properties', {}).get(p)
+                    # if last field is object, default to embedding all fields (*)
+                if subschema is None: # Check if second to last field is object
+                    subschema = s
+                    penultimate_obj = True
+                    field = p
+            else: # in this case, field itself should be an object. If not, return
+                # See if the embedding was done improperly (last field is object)
+                subschema = s.get('properties', {}).get(p)
+                field = p
+                if subschema is None:
+                    return mapping
             subschema = subschema.get('items', subschema)
             if 'linkFrom' in subschema:
                 _ref_type, _ = subschema['linkFrom'].split('.', 1)
@@ -411,19 +430,21 @@ def type_mapping(types, item_type, embed=True):
                 ref_types = subschema['linkTo']
                 if not isinstance(ref_types, list):
                     ref_types = [ref_types]
-
             if ref_types is None:
-                m = m['properties'][p]
                 s = subschema
-                continue
-
-            s = reduce(combine_schemas, (types[t].schema for t in ref_types))
-
+            else:
+                s = reduce(combine_schemas, (types[t].schema for t in ref_types))
             # Check if mapping for property is already an object
             # multiple subobjects may be embedded, so be carful here
-            if m['properties'][p]['type'] == 'string':
-                m['properties'][p] = schema_mapping(p, s)
-
+            if penultimate_obj:
+                m['properties'][field] = schema_mapping(p, s, field)
+            elif p in m['properties'].keys():
+                if m['properties'][p]['type'] == 'string':
+                    m['properties'][p] = schema_mapping(p, s, field)
+                elif m['properties'][p]['type'] == 'object':  # simply adding a field
+                    m['properties'][p][field] = schema_mapping(p, s, field)
+            else:
+                m['properties'][p] = schema_mapping(p, s, field)
             m = m['properties'][p]
 
     # boost_values = schema.get('boost_values', None)
