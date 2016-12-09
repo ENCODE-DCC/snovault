@@ -72,8 +72,6 @@ def index(request):
         try:
             status = es.get(index=INDEX, doc_type='meta', id='indexing')
         except NotFoundError:
-            interval_settings = {"index": {"refresh_interval": "30s"}}
-            es.indices.put_settings(index=INDEX, body=interval_settings)
             pass
         else:
             last_xmin = status['_source']['xmin']
@@ -171,12 +169,7 @@ def index(request):
                         log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
                         item['error_message'] = "Error occured during indexing, check the logs"
                 result['errors'] = error_messages
-
-
-            if es.indices.get_settings(index=INDEX)['snovault']['settings']['index'].get('refresh_interval', '') != '1s':
-                interval_settings = {"index": {"refresh_interval": "1s"}}
-                es.indices.put_settings(index=INDEX, body=interval_settings)
-
+                
         es.indices.refresh(index=INDEX)
 
         if flush:
