@@ -30,6 +30,11 @@ log = logging.getLogger(__name__)
 
 # An index to store non-content metadata
 META_MAPPING = {
+    '_all': {
+        'enabled': False,
+        'analyzer': 'snovault_index_analyzer',
+        'search_analyzer': 'snovault_search_analyzer'
+    },
     'dynamic_templates': [
         {
             'store_generic': {
@@ -497,15 +502,21 @@ def type_mapping(types, item_type, embed=True):
     return mapping
 
 
-def run(app, collections=None, dry_run=False):
+def run(app, collections=None, dry_run=False, check_first=True):
     index = app.registry.settings['snovault.elasticsearch.index']
     registry = app.registry
     if not dry_run:
         es = app.registry[ELASTIC_SEARCH]
         try:
-            es.indices.create(index=index, body=index_settings())
-        except RequestError:
-            if collections is None:
+            exists = False
+            if check_first:
+                exists = es.indices.exists(index=index)
+            if not exists:
+                es.indices.create(index=index, body=index_settings())
+            else:
+                print("index %s already exists no need to create mapping" % (index))
+        except RequestError as e:
+            if not collections:
                 es.indices.delete(index=index)
                 es.indices.create(index=index, body=index_settings())
 
@@ -529,9 +540,9 @@ def run(app, collections=None, dry_run=False):
 
         if collection_name is not 'meta':
             mapping = es_mapping(mapping)
-
         try:
-            es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping})
+            es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping},
+                                  update_all_types=True)
         except:
             log.exception("Could not create mapping for the collection %s", doc_type)
         else:
@@ -549,6 +560,8 @@ def main():
     parser.add_argument(
         '--dry-run', action='store_true', help="Don't post to ES, just print")
     parser.add_argument('config_uri', help="path to configfile")
+    parser.add_argument('--check-first', action='store_true',
+                        help="check if index exists first before attempting creation")
     args = parser.parse_args()
 
     logging.basicConfig()
@@ -557,7 +570,7 @@ def main():
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.DEBUG)
 
-    return run(app, args.item_type, args.dry_run)
+    return run(app, args.item_type, args.dry_run, args.check_first)
 
 
 if __name__ == '__main__':

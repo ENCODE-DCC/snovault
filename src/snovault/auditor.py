@@ -217,6 +217,9 @@ def inherit_audits(request, embedded, embedded_paths):
     audits = {}
     for audit_path in audit_paths:
         result = request.embed(audit_path, '@@audit-self')
+        # catch situations for fields, not objects, are embedded
+        if result is None or not isinstance(result, dict) or 'audit' not in result.keys():
+            continue
         for audit in result['audit']:
             if audit['level_name'] in audits:
                 audits[audit['level_name']].append(audit)
@@ -239,6 +242,7 @@ def item_view_audit_self(context, request):
 @view_config(context=Item, permission='audit', request_method='GET',
              name='audit')
 def item_view_audit(context, request):
+
     path = request.resource_path(context)
     properties = request.embed(path, '@@object')
     audit = inherit_audits(request, properties, context.audit_inherit or context.embedded)

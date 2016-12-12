@@ -231,6 +231,7 @@ class Indexer(object):
     def update_object(self, request, uuid, xmin):
         try:
             result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
+            print('_______',result['item_type'],'\n',result,'\n')
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
             raise
@@ -238,7 +239,6 @@ class Indexer(object):
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             timestamp = datetime.datetime.now().isoformat()
             return {'error_message': repr(e), 'timestamp': timestamp, 'uuid': str(uuid)}
-
         last_exc = None
         for backoff in [0, 10, 20, 40, 80]:
             time.sleep(backoff)
@@ -266,6 +266,7 @@ class Indexer(object):
 
         timestamp = datetime.datetime.now().isoformat()
         return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
+
 
     def shutdown(self):
         pass
