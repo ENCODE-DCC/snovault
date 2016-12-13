@@ -231,7 +231,6 @@ class Indexer(object):
     def update_object(self, request, uuid, xmin):
         try:
             result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
-            print('_______',result['item_type'],'\n',result,'\n')
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
             raise

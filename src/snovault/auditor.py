@@ -193,6 +193,9 @@ def traversed_path_ids(request, obj, path):
     if isinstance(path, basestring):
         path = path.split('.')
     if not path:
+        # handle embedding subobjects that aren't actually in the DB
+        if isinstance(obj, dict) and '@id' not in obj.keys():
+            return
         yield obj if isinstance(obj, basestring) else obj['@id']
         return
     name = path[0]
@@ -217,7 +220,7 @@ def inherit_audits(request, embedded, embedded_paths):
     audits = {}
     for audit_path in audit_paths:
         result = request.embed(audit_path, '@@audit-self')
-        # catch situations for fields, not objects, are embedded
+        # catch situations when fields, not objects, are embedded
         if result is None or not isinstance(result, dict) or 'audit' not in result.keys():
             continue
         for audit in result['audit']:

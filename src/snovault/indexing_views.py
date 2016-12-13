@@ -16,7 +16,11 @@ def includeme(config):
 def item_index_data(context, request):
     uuid = str(context.uuid)
     properties = context.upgrade_properties()
-    links = context.links(properties)
+    # ES 2 and up don't allow dots in links. Update these to use ~s
+    new_links = {}
+    for key, val in context.links(properties).items():
+        new_links['~'.join(key.split('.'))] = val
+    links = new_links
     unique_keys = context.unique_keys(properties)
 
     principals_allowed = {}
@@ -53,7 +57,6 @@ def item_index_data(context, request):
 
     path = path + '/'
     embedded = request.embed(path, '@@embedded', fields_to_embed=context.embedded, schema=context.schema, item_type=context.item_type)
-    print('>>> ', embedded)
     object = request.embed(path, '@@object')
     audit = request.embed(path, '@@audit')['audit']
 

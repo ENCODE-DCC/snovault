@@ -77,9 +77,7 @@ def embed(request, *elements, **kw):
     request._embedded_uuids.update(embedded)
     request._linked_uuids.update(linked)
     # parse result to conform to selective embedding
-    if(item_type is not None and item_type in [t.lower() for t in result['@type']]):
-        if item_type == 'biosample':
-            import pdb; pdb.set_trace()
+    if item_type is not None and fields_to_embed is not None:
         p_result = parse_result(result, fields_to_embed, schema)
         return p_result
     return result
@@ -99,25 +97,35 @@ def _embed(request, path, as_user='EMBED'):
     return result, subreq._embedded_uuids, subreq._linked_uuids
 
 
-def parse_result(result, fields_to_embed, schema, level=0):
-    print('++++BEGIN\n', result)
+def parse_result(result, fields_to_embed, schema):
     parsed_result = {}
     linkTo_fields = []
     # First add all non-link to fields if top-level
-    if(level == 0):
-        for key, val in result.items():
-            if key in schema['properties'].keys():
-                if 'linkTo' in schema['properties'][key]: # single obj
-                    linkTo_fields.append(key)
-                # array of objs
-                elif 'items' in schema['properties'][key] and 'linkTo' in schema['properties'][key]['items']:
-                    linkTo_fields.append(key)
+    for key, val in result.items():
+        if key in schema['properties'].keys():
+            if 'linkTo' in schema['properties'][key]: # single obj
+                linkTo_fields.append(key)
+            # array of objs
+            elif 'items' in schema['properties'][key] and 'linkTo' in schema['properties'][key]['items']:
+                linkTo_fields.append(key)
+            elif 'subobject' in schema['properties'][key] and schema['properties'][key]['subobject'] == True:
+                sub_fields_to_embed = ['.'.join(emb.split('.')[1:]) for emb in fields_to_embed if (key == emb.split('.')[0] and len(emb.split('.')) > 1)]
+                if schema['properties'][key]['type'] == 'array':
+                    subobject = []
+                    for subitem in val:
+                        subobject.append(parse_result(subitem, sub_fields_to_embed, schema['properties'][key]['items']))
+                else:  # not an array of subobjects, just a subobject
+                    subobject = parse_result(val, sub_fields_to_embed, schema['properties'][key])
+                parsed_result[key] = subobject
             else:
                 parsed_result[key] = val
+        else:
+            parsed_result[key] = val
     if not isinstance(fields_to_embed, list): # no embedding here
         return parsed_result
     for field in linkTo_fields:
-        matching_embeds = [emb for emb in fields_to_embed if field in emb]
+        # the embed will be used if it has the matching base-level linkTo
+        matching_embeds = [emb for emb in fields_to_embed if field == emb.split('.')[0]]
         if len(matching_embeds) == 0: # do not embed this object
             continue
         matching_embeds = ['.'.join(emb.split('.')[1:]) if len(emb.split('.')) > 1 else '*' for emb in matching_embeds]
@@ -128,6 +136,7 @@ def parse_result(result, fields_to_embed, schema, level=0):
 
 
 def inner_parse(result, field):
+    split_field = field.split('.')
     if field == '*':
         if isinstance(result, dict) and 'uuid' in result.keys():
             for key, val in result.items():
@@ -136,9 +145,13 @@ def inner_parse(result, field):
         return result
     elif isinstance(result, list):
         ret_arr = []
-        split_field = field.split('.')
         for result_entry in result:
             if len(split_field) > 1:
+                # ensure desired field exists
+                if isinstance(result_entry, dict) and split_field[0] not in result_entry.keys():
+                    # field not found for this entry; do not include it
+                    ret_arr.append({'uuid': result_entry['uuid']})
+                    continue
                 inner_val = inner_parse(result_entry[split_field[0]], '.'.join(split_field[1:]))
                 if split_field == 'uuid':
                     ret_arr.append({split_field[0]: inner_val})
@@ -153,21 +166,27 @@ def inner_parse(result, field):
                             found_val[key] = val['@id'] if '@id' in val.keys() else val['uuid']
                 if field == 'uuid':
                     ret_arr.append({field: found_val})
-                else:
+                elif found_val != 'NOT_FOUND':
                     ret_arr.append({field: found_val, 'uuid': result_entry['uuid']})
+                else:
+                    ret_arr.append({'uuid': result_entry['uuid']})
         return ret_arr
     else:
         ret_obj = {}
-        split_field = field.split('.')
         if len(split_field) > 1:
             if split_field != 'uuid':
                 ret_obj['uuid'] = result['uuid']
             ret_obj[split_field[0]] = inner_parse(result[split_field[0]], '.'.join(split_field[1:]))
         else:
+            if not isinstance(result, dict):
+                return result
             if field != 'uuid':
                 ret_obj['uuid'] = result['uuid']
-            found_val = result[field] if field in result.keys() else 'NOT_FOUND'
-            ret_obj[field] = found_val
+            try:
+                ret_obj[field] = result[field]
+            except:
+                print('Embedded key ', field, ' was not found inside object: ', result)
+                raise
         return ret_obj
 
 
@@ -180,6 +199,12 @@ def update_embedded_obj(emb_obj, field, update_val):
                 if isinstance(val, dict):
                     update_val[k] = update_embedded_obj(update_val[k], key, val)
         curr_field_val = recursive_merge_field(curr_field_val, update_val)
+    elif isinstance(update_val, str):
+        if curr_field_val == {}:
+            curr_field_val = update_val
+        else:
+            # less information is returned by updating, so keep as-is
+            return emb_obj
     else:
         for key, val in update_val.items():
             if isinstance(val, dict):
@@ -211,7 +236,6 @@ def recursive_merge_field(prev_field, update_field):
             elif up_key not in prev_field.keys():
                 to_return[up_key] = up_val
     return to_return
-
 
 
 class NullRenderer:
