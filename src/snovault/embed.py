@@ -98,6 +98,15 @@ def _embed(request, path, as_user='EMBED'):
 
 
 def parse_result(result, fields_to_embed, schema):
+    """
+    Code for ES upgrade.
+    Takes a fully-embedded json result and parses it based off of the
+    appropriate schema and fields to be embedded, which are defined in the
+    /types/ file for that object (outside of snovault).
+    Recursive function, so this can handle subobjects defined in schemas that
+    are themselves not schemas.
+    Must handle cases where linkTo fields are objects or arrays of objects.
+    """
     parsed_result = {}
     linkTo_fields = []
     # First add all non-link to fields if top-level
@@ -136,6 +145,23 @@ def parse_result(result, fields_to_embed, schema):
 
 
 def inner_parse(result, field):
+    """
+    Code for ES upgrade.
+    Takes one embedded field (such as biosource.individual.organism) and the
+    corresponding branch of the fully expanded json from parse_result().
+    Trims the json down to get the desired data. The final part of the field
+    (when split by '.') may be an object or a single field within a schema
+    (of any type). Handles 3 main cases:
+        1. All fields are to embedded, but no linkTos.
+        2. There is a linkTo, and the embedded objects are in an array
+        3. There is a linkTo and field is the embedded object (no array)
+    This function is used recursively if the current level isn't the deepest
+    level of desired embedding.
+
+    Will raise an error if an embedded field is trying to be found that doesn't
+    exist (this would occur if a field was incorrectly embedded in the /types/
+    file).
+    """
     split_field = field.split('.')
     if field == '*':
         if isinstance(result, dict) and 'uuid' in result.keys():
@@ -175,12 +201,14 @@ def inner_parse(result, field):
         ret_obj = {}
         if len(split_field) > 1:
             if split_field != 'uuid':
+                # add uuid here to keep consistent with the way arrays are done
                 ret_obj['uuid'] = result['uuid']
             ret_obj[split_field[0]] = inner_parse(result[split_field[0]], '.'.join(split_field[1:]))
         else:
             if not isinstance(result, dict):
                 return result
             if field != 'uuid':
+                # add uuid here to keep consistent with the way arrays are done
                 ret_obj['uuid'] = result['uuid']
             try:
                 ret_obj[field] = result[field]
@@ -191,6 +219,13 @@ def inner_parse(result, field):
 
 
 def update_embedded_obj(emb_obj, field, update_val):
+    """
+    Used to combine the resulting json from one embedded field from
+    inner_parse() with the aggregate embedded result.
+    Used recursively if in object is found within the embedded object.
+    emb_obj is the json aggregate json result so far, field is the field that
+    will be embedded on, and update_val is the result from inner_parse().
+    """
     curr_field_val = emb_obj[field] if field in emb_obj.keys() else {}
     if isinstance(update_val, list):
         # address updating deeper objects
@@ -216,6 +251,18 @@ def update_embedded_obj(emb_obj, field, update_val):
 
 # merges by uuid
 def recursive_merge_field(prev_field, update_field):
+    """
+    Takes two branches of a json object that have the same field origin and
+    recursively merge their values (prev_field and update_field args).
+    For example, this would be used to merge the embed results for:
+        biosource.organism.individual.name
+        and
+        biosource.organims.individual.scientific_name
+    (These fields are simply an example of object names; used in encode and
+    fourfront)
+    For arrays, uuids are needed to make sure the correct array entries are
+    being merged together.
+    """
     if prev_field == {} or prev_field == update_field:
         return update_field
     if isinstance(update_field, list):
