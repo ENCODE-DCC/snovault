@@ -60,9 +60,9 @@ def embed(request, *elements, **kw):
     path = join(*elements)
     path = unquote_bytes_to_wsgi(native_(path))
     # check to see if this embed is a non-object field
-    invalid = identify_invalid_embed(path)
-    if invalid:
-        return
+    invalid_check = identify_invalid_embed(path)
+    if invalid_check != 'valid':
+        return invalid_check
     log.debug('embed: %s', path)
     if as_user is not None:
         result, embedded, linked = _embed(request, path, as_user)
@@ -77,9 +77,7 @@ def embed(request, *elements, **kw):
     request._embedded_uuids.update(embedded)
     request._linked_uuids.update(linked)
     # parse result to conform to selective embedding
-    print('-  ', fields_to_embed)
     if fields_to_embed is not None:
-        print('---  PARSING!')
         p_result = parse_result(result, fields_to_embed, schema)
         return p_result
     return result
@@ -108,7 +106,11 @@ def identify_invalid_embed(path):
     the object needed for that field will already be handled.
     Return True if invalid
     """
-    return (len(path.split('/')) != 4 and path[0] != '/')
+    if len(path.split('/')) != 4 and path[0] != '/':
+        # return the value of the desired field, since this is not an obj to embed
+        return path.split('/')[0]
+    else:
+        return 'valid'
 
 
 def parse_result(result, fields_to_embed, schema):
