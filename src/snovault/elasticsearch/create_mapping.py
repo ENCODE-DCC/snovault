@@ -464,7 +464,8 @@ def type_mapping(types, item_type, embed=True):
             elif p in m['properties'].keys():
                 if m['properties'][p]['type'] == 'string':
                     m['properties'][p] = schema_mapping(p, s, field)
-                elif m['properties'][p]['type'] == 'object':  # simply adding a field
+                # add a field that's an object
+                elif m['properties'][p]['type'] == 'object' and p != field and field != '*':
                     m['properties'][p][field] = schema_mapping(p, s, field)
             else:
                 m['properties'][p] = schema_mapping(p, s, field)

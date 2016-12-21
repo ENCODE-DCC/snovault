@@ -57,13 +57,13 @@ def embed(request, *elements, **kw):
     fields_to_embed = kw.get('fields_to_embed')
     schema = kw.get('schema')
     as_user = kw.get('as_user')
-    item_type = kw.get('item_type')
     path = join(*elements)
     path = unquote_bytes_to_wsgi(native_(path))
     # check to see if this embed is a non-object field
-    if len(path.split('/')) != 4 and path[0] != '/':
-        return path.split('/')[0]  # grab field from <field>/@@embed
-    print('embed: %s', path)
+    invalid = identify_invalid_embed(path)
+    if invalid:
+        return
+    log.debug('embed: %s', path)
     if as_user is not None:
         result, embedded, linked = _embed(request, path, as_user)
     else:
@@ -77,7 +77,9 @@ def embed(request, *elements, **kw):
     request._embedded_uuids.update(embedded)
     request._linked_uuids.update(linked)
     # parse result to conform to selective embedding
-    if item_type is not None and fields_to_embed is not None:
+    print('-  ', fields_to_embed)
+    if fields_to_embed is not None:
+        print('---  PARSING!')
         p_result = parse_result(result, fields_to_embed, schema)
         return p_result
     return result
@@ -95,6 +97,18 @@ def _embed(request, path, as_user='EMBED'):
     except HTTPNotFound:
         raise KeyError(path)
     return result, subreq._embedded_uuids, subreq._linked_uuids
+
+
+def identify_invalid_embed(path):
+    """
+    With new embedding system, we might attempt to embed something that doesn't
+    have a fully formed path (i.e. uuid/@@object instead of /type/uuid/@@object)
+    so abort embed when this path is given.
+    This is okay because this only occurs when a specific field is desired;
+    the object needed for that field will already be handled.
+    Return True if invalid
+    """
+    return (len(path.split('/')) != 4 and path[0] != '/')
 
 
 def parse_result(result, fields_to_embed, schema):

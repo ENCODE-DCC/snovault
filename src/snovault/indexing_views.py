@@ -56,7 +56,7 @@ def item_index_data(context, request):
                 for key in unique_keys[key_name])
 
     path = path + '/'
-    embedded = request.embed(path, '@@embedded', fields_to_embed=context.embedded, schema=context.schema, item_type=context.item_type)
+    embedded = request.embed(path, '@@embedded', fields_to_embed=context.embedded, schema=context.schema)
     object = request.embed(path, '@@object')
     audit = request.embed(path, '@@audit')['audit']
 
