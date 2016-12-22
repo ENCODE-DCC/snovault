@@ -55,7 +55,6 @@ def embed(request, *elements, **kw):
     # Should really be more careful about what gets included instead.
     # Cache cut response time from ~800ms to ~420ms.
     fields_to_embed = kw.get('fields_to_embed')
-    schema = kw.get('schema')
     as_user = kw.get('as_user')
     path = join(*elements)
     path = unquote_bytes_to_wsgi(native_(path))
@@ -76,9 +75,10 @@ def embed(request, *elements, **kw):
 
     request._embedded_uuids.update(embedded)
     request._linked_uuids.update(linked)
-    # parse result to conform to selective embedding
+    # if we have a list of fields to embed, @@embebded is being called.
+    # parse and trim fully embedded obj according to the fields to embed.
     if fields_to_embed is not None:
-        p_result = parse_result(result, fields_to_embed, schema)
+        p_result = parse_embedded_result(result, fields_to_embed)
         return p_result
     return result
 
@@ -104,201 +104,149 @@ def identify_invalid_embed(path):
     so abort embed when this path is given.
     This is okay because this only occurs when a specific field is desired;
     the object needed for that field will already be handled.
-    Return True if invalid
+    Return the value of the non-obj field, else 'valid' if obj can be embedded
     """
-    if len(path.split('/')) != 4 and path[0] != '/':
+    if len(path) > 0 and len(path.split('/')) != 4 and path[0] != '/':
         # return the value of the desired field, since this is not an obj to embed
         return path.split('/')[0]
     else:
         return 'valid'
 
 
-def parse_result(result, fields_to_embed, schema):
+def parse_embedded_result(result, fields_to_embed):
     """
-    Code for ES upgrade.
-    Takes a fully-embedded json result and parses it based off of the
-    appropriate schema and fields to be embedded, which are defined in the
-    /types/ file for that object (outside of snovault).
-    Recursive function, so this can handle subobjects defined in schemas that
-    are themselves not schemas.
-    Must handle cases where linkTo fields are objects or arrays of objects.
+    Take a list of fields to embed, with each item being a '.' separated list of
+    fields (i.e biosource.individual.organism.name). Uses these to parse and
+    trim down the fully embedded result
+    Returns the trimmed (selectively embedded) result
+    """
+    parsed_model = build_embedded_model(fields_to_embed)
+    return build_embedded_result(result, parsed_model)
+
+
+def build_embedded_model(fields_to_embed):
+    """
+    Takes a list of fields to embed and builds the framework used to parse
+    the fully embedded result. 'fields' refer to specific fields that are to
+    be embedded within an object. The base level object gets a special flag,
+    '*', which means all non-object fields are embedded by default.
+    Below is an example calculated from the following fields:
+    INPUT:
+    [modifications.modified_regions.chromosome,
+    lab.uuid,
+    award,
+    biosource]
+    OUTPUT:
+    {'modifications': {'modified_regions': {'fields': ['chromosome']}},
+     'lab': {'fields': ['uuid']},
+     'fields': ['award', 'biosource'], '*': ['fully embed this object']}
+    """
+    parsed_model = {'*':['fully embed this object']}
+    for field in fields_to_embed:
+        split_field = field.split('.')
+        field_pointer = parsed_model
+        for subfield in split_field:
+            if subfield == split_field[-1]:
+                if 'fields' in field_pointer.keys():
+                    field_pointer['fields'].append(subfield)
+                else:
+                    field_pointer['fields'] = [subfield]
+                continue
+            elif subfield not in field_pointer.keys():
+                field_pointer[subfield] = {}
+            field_pointer = field_pointer[subfield]
+    return parsed_model
+
+
+def build_embedded_result(result, parsed_model):
+    """
+    Uses the parsed model from build_embedded_model() and uses it to recursively
+    build a selectively embedded result.
+    Loops through the key, val pairs in the fully embedded result and checks
+    against the model, adding them to the parsed_result if they are included.
     """
     parsed_result = {}
-    linkTo_fields = []
-    # First add all non-link to fields if top-level
-    for key, val in result.items():
-        if key in schema['properties'].keys():
-            if 'linkTo' in schema['properties'][key]: # single obj
-                linkTo_fields.append(key)
-            # array of objs
-            elif 'items' in schema['properties'][key] and 'linkTo' in schema['properties'][key]['items']:
-                linkTo_fields.append(key)
-            elif 'subobject' in schema['properties'][key] and schema['properties'][key]['subobject'] == True:
-                sub_fields_to_embed = ['.'.join(emb.split('.')[1:]) for emb in fields_to_embed if (key == emb.split('.')[0] and len(emb.split('.')) > 1)]
-                if schema['properties'][key]['type'] == 'array':
-                    subobject = []
-                    for subitem in val:
-                        subobject.append(parse_result(subitem, sub_fields_to_embed, schema['properties'][key]['items']))
-                else:  # not an array of subobjects, just a subobject
-                    subobject = parse_result(val, sub_fields_to_embed, schema['properties'][key])
-                parsed_result[key] = subobject
-            else:
-                parsed_result[key] = val
-        else:
-            parsed_result[key] = val
-    if not isinstance(fields_to_embed, list): # no embedding here
-        return parsed_result
-    for field in linkTo_fields:
-        # the embed will be used if it has the matching base-level linkTo
-        matching_embeds = [emb for emb in fields_to_embed if field == emb.split('.')[0]]
-        if len(matching_embeds) == 0: # do not embed this object
-            continue
-        matching_embeds = ['.'.join(emb.split('.')[1:]) if len(emb.split('.')) > 1 else '*' for emb in matching_embeds]
-        for emb in matching_embeds:
-            inner_result = inner_parse(deepcopy(result[field]), emb)
-            parsed_result = update_embedded_obj(parsed_result, field, inner_result)
+    # Use all fields, check all possible embeds
+    if '*' in parsed_model.keys():
+        fields_to_use = result.keys()
+    # This is true when there are no embedded objects down the line
+    # Embed only the fields specified in the model when this is the case
+    elif set(parsed_model.keys()) == set(['fields']):
+        fields_to_use = [val for val in result.keys() if val in parsed_model['fields']]
+    # No fields to use, only look for the deeper level of embedding
+    else:
+        fields_to_use = parsed_model.keys()
+    for key in fields_to_use:
+        val = result[key]
+        embed_val = False
+        if isinstance(val, str):
+            embed_val = handle_string_embed(key, val, parsed_model)
+        elif isinstance(val, list):
+            embed_val = handle_list_embed(key, val, parsed_model)
+        elif isinstance(val, dict):
+            embed_val = handle_dict_embed(key, val, parsed_model)
+        else:  # catch any other case
+            embed_val = val
+        # embed_val will be false if there in the case of a non-existent value
+        # In such a case, don't embed even if it's requested in the fields
+        if embed_val:
+            parsed_result[key] = embed_val
     return parsed_result
 
 
-def inner_parse(result, field):
+def handle_string_embed(key, val, parsed_model):
     """
-    Code for ES upgrade.
-    Takes one embedded field (such as biosource.individual.organism) and the
-    corresponding branch of the fully expanded json from parse_result().
-    Trims the json down to get the desired data. The final part of the field
-    (when split by '.') may be an object or a single field within a schema
-    (of any type). Handles 3 main cases:
-        1. All fields are to embedded, but no linkTos.
-        2. There is a linkTo, and the embedded objects are in an array
-        3. There is a linkTo and field is the embedded object (no array)
-    This function is used recursively if the current level isn't the deepest
-    level of desired embedding.
-
-    Will raise an error if an embedded field is trying to be found that doesn't
-    exist (this would occur if a field was incorrectly embedded in the /types/
-    file).
+    Allow a string to be embedded only if it is not an @id field (which will
+    not return 'valid' using identify_invalid_embed).
     """
-    split_field = field.split('.')
-    if field == '*':
-        if isinstance(result, dict) and 'uuid' in result.keys():
-            for key, val in result.items():
-                if isinstance(val, dict) and 'uuid' in val.keys():
-                    result[key] = val['@id'] if '@id' in val.keys() else val['uuid']
-        return result
-    elif isinstance(result, list):
-        ret_arr = []
-        for result_entry in result:
-            if len(split_field) > 1:
-                # ensure desired field exists
-                if isinstance(result_entry, dict) and split_field[0] not in result_entry.keys():
-                    # field not found for this entry; do not include it
-                    ret_arr.append({'uuid': result_entry['uuid']})
-                    continue
-                inner_val = inner_parse(result_entry[split_field[0]], '.'.join(split_field[1:]))
-                if split_field == 'uuid':
-                    ret_arr.append({split_field[0]: inner_val})
-                else:  # must use uuid to to allow for annotation of array items
-                    ret_arr.append({split_field[0]: inner_val, 'uuid': result_entry['uuid']})
-            else:
-                found_val = result_entry[field] if field in result_entry.keys() else 'NOT_FOUND'
-                # ensure that deeper objects are not automatically embedded if we're already at the deepest desired embed
-                if isinstance(found_val, dict) and 'uuid' in found_val.keys():
-                    for key, val in found_val.items():
-                        if isinstance(val, dict) and 'uuid' in val.keys():
-                            found_val[key] = val['@id'] if '@id' in val.keys() else val['uuid']
-                if field == 'uuid':
-                    ret_arr.append({field: found_val})
-                elif found_val != 'NOT_FOUND':
-                    ret_arr.append({field: found_val, 'uuid': result_entry['uuid']})
-                else:
-                    ret_arr.append({'uuid': result_entry['uuid']})
-        return ret_arr
+    if identify_invalid_embed(val) != 'valid':
+        return val
     else:
-        ret_obj = {}
-        if len(split_field) > 1:
-            if split_field != 'uuid':
-                # add uuid here to keep consistent with the way arrays are done
-                ret_obj['uuid'] = result['uuid']
-            ret_obj[split_field[0]] = inner_parse(result[split_field[0]], '.'.join(split_field[1:]))
-        else:
-            if not isinstance(result, dict):
-                return result
-            if field != 'uuid':
-                # add uuid here to keep consistent with the way arrays are done
-                ret_obj['uuid'] = result['uuid']
-            try:
-                ret_obj[field] = result[field]
-            except:
-                print('Embedded key ', field, ' was not found inside object: ', result)
-                raise
-        return ret_obj
+        return False
 
 
-def update_embedded_obj(emb_obj, field, update_val):
+def handle_list_embed(key, val, parsed_model):
     """
-    Used to combine the resulting json from one embedded field from
-    inner_parse() with the aggregate embedded result.
-    Used recursively if in object is found within the embedded object.
-    emb_obj is the json aggregate json result so far, field is the field that
-    will be embedded on, and update_val is the result from inner_parse().
+    Handles lists, which could be either lists of embedded objects or other
+    fields. Pass them on accordingly and conglomerate the results.
     """
-    curr_field_val = emb_obj[field] if field in emb_obj.keys() else {}
-    if isinstance(update_val, list):
-        # address updating deeper objects
-        for k in range(len(update_val)):
-            for key, val in update_val[k].items():
-                if isinstance(val, dict):
-                    update_val[k] = update_embedded_obj(update_val[k], key, val)
-        curr_field_val = recursive_merge_field(curr_field_val, update_val)
-    elif isinstance(update_val, str):
-        if curr_field_val == {}:
-            curr_field_val = update_val
+    list_result = []
+    for item in val:
+        if isinstance(item, str):
+            list_result.append(handle_string_embed(key, item, parsed_model))
+        elif isinstance(item, list):
+            list_result.append(handle_list_embed(key, item, parsed_model))
+        elif isinstance(item, dict):
+            list_result.append(handle_dict_embed(key, item, parsed_model))
+        else:  # no chance of this being an embedded object, so just use it
+            list_result.append(item)
+    list_result = [entry for entry in list_result if entry]  # remove Falses
+    return list_result if len(list_result) > 0 else False
+
+
+def handle_dict_embed(key, val, parsed_model):
+    """
+    Given an object, determine whether this object should be embedded. In
+    addition, check to see if something will be embedded further down the line
+    (e.g. the obj is individual and individual.organism.name will be embedded).
+    Else, identify a subobject (obj defined within a schema) or a fully
+    embedded object that has no deeper embedding within it.
+    """
+    if key in parsed_model.keys():
+        # test if itself fully embedded and deeper embedding involved
+        if 'fields' in parsed_model.keys() and key in parsed_model['fields']:
+            # Adding this * makes all fields get added, not just the down-the-
+            # line embed
+            parsed_model[key]['*'] = 'fully embed this obj'
+            return build_embedded_result(val, parsed_model[key])
+        # deeper embedding involved, but not fully embedded
         else:
-            # less information is returned by updating, so keep as-is
-            return emb_obj
+            return build_embedded_result(val, parsed_model[key])
+    elif 'uuid' not in val.keys() or key in parsed_model['fields']:
+        # this is a subobject or a embedded object that has no deeper embedding
+        return build_embedded_result(val, {'*': 'fully embed this obj'})
     else:
-        for key, val in update_val.items():
-            if isinstance(val, dict):
-                update_val = update_embedded_obj(update_val, key, val)
-        curr_field_val = recursive_merge_field(curr_field_val, update_val)
-    emb_obj[field] = curr_field_val
-    return emb_obj
-
-
-# merges by uuid
-def recursive_merge_field(prev_field, update_field):
-    """
-    Takes two branches of a json object that have the same field origin and
-    recursively merge their values (prev_field and update_field args).
-    For example, this would be used to merge the embed results for:
-        biosource.organism.individual.name
-        and
-        biosource.organims.individual.scientific_name
-    (These fields are simply an example of object names; used in encode and
-    fourfront)
-    For arrays, uuids are needed to make sure the correct array entries are
-    being merged together.
-    """
-    if prev_field == {} or prev_field == update_field:
-        return update_field
-    if isinstance(update_field, list):
-        for i in range(len(update_field)):
-            for j in range(len(prev_field)):
-                if prev_field[j]['uuid'] == update_field[i]['uuid']:
-                    prev_field[j] = recursive_merge_field(prev_field[j], update_field[i])
-        return prev_field
-    to_return = deepcopy(prev_field)
-    for prev_key, prev_val in prev_field.items():
-        for up_key, up_val in update_field.items():
-            if prev_key == up_key:
-                if isinstance(prev_val, dict) and isinstance(up_val, dict):
-                    if prev_val['uuid'] == up_val['uuid']:  # safety check; shouldn't fail
-                        to_return[prev_key] = recursive_merge_field(prev_val, up_val)
-                else:
-                    to_return[prev_key] = up_val
-            elif up_key not in prev_field.keys():
-                to_return[up_key] = up_val
-    return to_return
+        return False
 
 
 class NullRenderer:
