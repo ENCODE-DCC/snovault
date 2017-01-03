@@ -196,10 +196,12 @@ def build_embedded_result(result, parsed_model):
 
 def handle_string_embed(key, val, parsed_model):
     """
-    Allow a string to be embedded only if it is not an @id field (which will
-    not return 'valid' using identify_invalid_embed).
+    Allow a string to be embedded only if it's an @id field for this object
+    or a non-object related string
     """
-    if identify_invalid_embed(val) != 'valid':
+    if key == '@id':
+        return val
+    elif identify_invalid_embed(val) != 'valid':
         return val
     else:
         return False
