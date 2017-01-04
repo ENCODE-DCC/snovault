@@ -177,6 +177,7 @@ def build_embedded_result(result, parsed_model):
     # Use any applicable fields and any embedded objects
     else:
         # find any fields on this level to use
+        curr_level_fields = []
         if 'fields_to_use' in parsed_model.keys():
             curr_level_fields = [val for val in result.keys() if val in parsed_model['fields_to_use']]
         # find fields that correspond to deeper embedded objs

@@ -75,9 +75,7 @@ def schema_mapping(name, schema, field='*'):
         for k, v in schema.get('properties', {}).items():
             mapping = schema_mapping(k, v, '*')
             if mapping is not None:
-                if field == '*':
-                    properties[k] = mapping
-                elif k == field:
+                if field == '*' or k == field:
                     properties[k] = mapping
         return {
             'type': 'object',
@@ -117,7 +115,7 @@ def schema_mapping(name, schema, field='*'):
         }
 
     if type_ == 'string':
-        # non-embedded objects
+        # don't make a mapping for non-embedded objects
         if 'linkTo' in schema.keys():
             return
 
@@ -397,7 +395,7 @@ def combined_mapping(types, *item_types):
 
 def type_mapping(types, item_type, embed=True):
     """
-    Mapping for each type. This is relatively simple if embed=False.
+    Create mapping for each type. This is relatively simple if embed=False.
     When embed=True, the embedded fields (defined in /types/ directory) will
     be used to generate custom embedding of objects. Embedding paths are
     separated by dots. If the last field is an object, all fields in that
@@ -426,6 +424,7 @@ def type_mapping(types, item_type, embed=True):
             subschema = None
             ultimate_obj = False # set to true if on last level of embedding
             field = '*'
+            # Check if we're at the end of a hierarchy of embeds
             if p == prop.split('.')[-1] and len(prop.split('.')) > 1:
                 # See if the embedding was done improperly (last field is object)
                 subschema = s.get('properties', {}).get(p)
@@ -434,7 +433,8 @@ def type_mapping(types, item_type, embed=True):
                     subschema = s
                     ultimate_obj = True
                     field = p
-            elif len(prop.split('.')) == 1: # only an object was given. Embed fully
+            # Check if only an object was given. Embed fully (leave field = *)
+            elif len(prop.split('.')) == 1:
                 subschema = s.get('properties', {}).get(p)
                 # if a non-obj field, return (no embedding is going on)
                 if subschema is None:
@@ -459,7 +459,7 @@ def type_mapping(types, item_type, embed=True):
                 s = reduce(combine_schemas, (types[t].schema for t in ref_types))
             # Check if mapping for property is already an object
             # multiple subobjects may be embedded, so be careful here
-            if ultimate_obj:
+            if ultimate_obj: # this means we're at the at the end of an embed
                 m['properties'][field] = schema_mapping(p, s, field)
             elif p in m['properties'].keys():
                 if m['properties'][p]['type'] == 'string':
