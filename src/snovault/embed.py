@@ -127,7 +127,7 @@ def parse_embedded_result(result, fields_to_embed):
 def build_embedded_model(fields_to_embed):
     """
     Takes a list of fields to embed and builds the framework used to parse
-    the fully embedded result. 'fields' refer to specific fields that are to
+    the fully embedded result. 'fields_to_use' refer to specific fields that are to
     be embedded within an object. The base level object gets a special flag,
     '*', which means all non-object fields are embedded by default.
     Below is an example calculated from the following fields:
@@ -137,9 +137,9 @@ def build_embedded_model(fields_to_embed):
     award,
     biosource]
     OUTPUT:
-    {'modifications': {'modified_regions': {'fields': ['chromosome']}},
-     'lab': {'fields': ['uuid']},
-     'fields': ['award', 'biosource'], '*': ['fully embed this object']}
+    {'modifications': {'modified_regions': {'fields_to_use': ['chromosome']}},
+     'lab': {'fields_to_use': ['uuid']},
+     'fields_to_use': ['award', 'biosource'], '*': ['fully embed this object']}
     """
     parsed_model = {'*':['fully embed this object']}
     for field in fields_to_embed:
@@ -147,10 +147,10 @@ def build_embedded_model(fields_to_embed):
         field_pointer = parsed_model
         for subfield in split_field:
             if subfield == split_field[-1]:
-                if 'fields' in field_pointer.keys():
-                    field_pointer['fields'].append(subfield)
+                if 'fields_to_use' in field_pointer.keys():
+                    field_pointer['fields_to_use'].append(subfield)
                 else:
-                    field_pointer['fields'] = [subfield]
+                    field_pointer['fields_to_use'] = [subfield]
                 continue
             elif subfield not in field_pointer.keys():
                 field_pointer[subfield] = {}
@@ -169,13 +169,19 @@ def build_embedded_result(result, parsed_model):
     # Use all fields, check all possible embeds
     if '*' in parsed_model.keys():
         fields_to_use = result.keys()
-    # This is true when there are no embedded objects down the line
+    # This is true when there are no embedded objects down the line; that is,
+    # we need only be concerned about fields on the current obj level.
     # Embed only the fields specified in the model when this is the case
-    elif set(parsed_model.keys()) == set(['fields']):
-        fields_to_use = [val for val in result.keys() if val in parsed_model['fields']]
-    # No fields to use, only look for the deeper level of embedding
+    elif set(parsed_model.keys()) == set(['fields_to_use']):
+        fields_to_use = [val for val in result.keys() if val in parsed_model['fields_to_use']]
+    # Use any applicable fields and any embedded objects
     else:
-        fields_to_use = parsed_model.keys()
+        # find any fields on this level to use
+        if 'fields_to_use' in parsed_model.keys():
+            curr_level_fields = [val for val in result.keys() if val in parsed_model['fields_to_use']]
+        # find fields that correspond to deeper embedded objs
+        embed_objs = [val for val in parsed_model.keys() if val != 'fields_to_use']
+        fields_to_use = curr_level_fields + embed_objs
     for key in fields_to_use:
         val = result[key]
         embed_val = False
@@ -236,7 +242,7 @@ def handle_dict_embed(key, val, parsed_model):
     """
     if key in parsed_model.keys():
         # test if itself fully embedded and deeper embedding involved
-        if 'fields' in parsed_model.keys() and key in parsed_model['fields']:
+        if 'fields_to_use' in parsed_model.keys() and key in parsed_model['fields_to_use']:
             # Adding this * makes all fields get added, not just the down-the-
             # line embed
             parsed_model[key]['*'] = 'fully embed this obj'
@@ -244,7 +250,7 @@ def handle_dict_embed(key, val, parsed_model):
         # deeper embedding involved, but not fully embedded
         else:
             return build_embedded_result(val, parsed_model[key])
-    elif 'uuid' not in val.keys() or key in parsed_model['fields']:
+    elif 'uuid' not in val.keys() or key in parsed_model['fields_to_use']:
         # this is a subobject or a embedded object that has no deeper embedding
         return build_embedded_result(val, {'*': 'fully embed this obj'})
     else:
