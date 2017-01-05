@@ -192,6 +192,14 @@ def item_view_page(context, request):
     return properties
 
 
+# Use to display page as frame=object, but with page calculated properties
+def item_view_page_object(context, request):
+    properties = item_links(context, request)
+    calculated = calculate_properties(context, request, properties, category='page')
+    properties.update(calculated)
+    return properties
+
+
 @view_config(context=Item, permission='expand', request_method='GET',
              name='expand')
 def item_view_expand(context, request):
