@@ -102,6 +102,7 @@ class Snowflake(Item):
 
     embedded = [
         'lab',
+        'lab.awards.project',
         'submitted_by',
 
     ]

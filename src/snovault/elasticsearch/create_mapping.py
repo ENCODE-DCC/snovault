@@ -532,7 +532,6 @@ def run(app, collections=None, dry_run=False, check_first=True):
             doc_type = collection_name
             collection = registry[COLLECTIONS].by_item_type[collection_name]
             mapping = type_mapping(registry[TYPES], collection.type_info.item_type)
-
         if mapping is None:
             continue  # Testing collections
         if dry_run:

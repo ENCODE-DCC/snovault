@@ -19,3 +19,5 @@ Other mapping changes included removal of boost, which wasn't working anyways.
 For example, the indexed 'links' field for an item would change from user.lab to user~lab.
 
 The overall result of these changes is that the 'embedded' and 'links' properties of any item are changed post-indexing. ES mapping is changed pre-indexing.
+
+TO TEST THIS BEHAVIOR, a test named 'test_selective_embedding' was added to src/snowflakes/tests/test_search.py 
