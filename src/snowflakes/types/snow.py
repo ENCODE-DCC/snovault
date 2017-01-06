@@ -104,7 +104,6 @@ class Snowflake(Item):
         'lab',
         'lab.awards.project',
         'submitted_by',
-
     ]
     audit_inherit = [
         'lab',
