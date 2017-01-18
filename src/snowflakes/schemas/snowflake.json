@@ -64,7 +64,7 @@
             "description": "The snowset (ball, fort, etc.) the snowflake belongs to.",
             "type": "string",
             "linkTo": ["Snowset", "Snowball", "Snowfort"]
-        } 
+        }
     },
     "columns": {
         "title": {
@@ -82,8 +82,8 @@
         "lab": {
             "title": "Lab"
         },
-        "lab": {
-            "title": "Lab"
+        "award": {
+            "title": "Award"
         },
         "date_created": {
             "title": "Date added"

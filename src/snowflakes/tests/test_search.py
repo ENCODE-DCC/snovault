@@ -25,8 +25,17 @@ def test_selective_embedding(workbook, testapp):
     assert test_json[0]['lab']['uuid'] == 'cfb789b8-46f3-4d59-a2b3-adc39e7df93a'
     # this specific field should be embedded ('lab.awards.project')
     assert test_json[0]['lab']['awards'][0]['project'] == 'ENCODE'
-    # this field should not be embedded (not in embedded list)
+    # this specific field should be embedded ('lab.awards.title')
+    assert test_json[0]['lab']['awards'][0]['title'] == 'A DATA COORDINATING CENTER FOR ENCODE'
+    # this specific field was not embedded and should not be present
     assert 'name' not in test_json[0]['lab']['awards'][0]
+    # the whole award object should be embedded.
+    # test type and a couple keys
+    assert isinstance(test_json[0]['award'], dict)
+    assert test_json[0]['award']['start_date'] == '2012-09-21'
+    # since award.pi was not specifically embedded, pi field should not exist
+    assert 'pi' not in test_json[0]['award']
+
 
 
 def test_report_view(workbook, testapp):

@@ -61,6 +61,11 @@ def sorted_dict(d):
 
 
 def schema_mapping(name, schema, field='*'):
+    """
+    Create the mapping for a given schema. Defaults to using all fields for
+    objects (*), but can handle specific fields using the field parameter.
+    This allows for the mapping to match the selective embedding
+    """
     if 'linkFrom' in schema:
         type_ = 'string'
     else:

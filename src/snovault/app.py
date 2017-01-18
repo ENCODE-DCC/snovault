@@ -161,7 +161,7 @@ def app_version(config):
         if diff:
             version += '-patch' + hashlib.sha1(diff).hexdigest()[:7]
     except:
-        version = "test_version"
+        version = os.environ.get("ENCODED_VERSION", "test_version")
     config.registry.settings['snovault.app_version'] = version
 
 

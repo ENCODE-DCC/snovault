@@ -103,7 +103,9 @@ class Snowflake(Item):
     embedded = [
         'lab',
         'lab.awards.project',
+        'lab.awards.title',
         'submitted_by',
+        'award'
     ]
     audit_inherit = [
         'lab',

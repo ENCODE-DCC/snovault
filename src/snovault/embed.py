@@ -120,8 +120,8 @@ def parse_embedded_result(result, fields_to_embed):
     trim down the fully embedded result
     Returns the trimmed (selectively embedded) result
     """
-    parsed_model = build_embedded_model(fields_to_embed)
-    return build_embedded_result(result, parsed_model)
+    embedded_model = build_embedded_model(fields_to_embed)
+    return build_embedded_result(result, embedded_model)
 
 
 def build_embedded_model(fields_to_embed):
@@ -141,10 +141,10 @@ def build_embedded_model(fields_to_embed):
      'lab': {'fields_to_use': ['uuid']},
      'fields_to_use': ['award', 'biosource'], '*': ['fully embed this object']}
     """
-    parsed_model = {'*':['fully embed this object']}
+    embedded_model = {'*':['fully embed this object']}
     for field in fields_to_embed:
         split_field = field.split('.')
-        field_pointer = parsed_model
+        field_pointer = embedded_model
         for subfield in split_field:
             if subfield == split_field[-1]:
                 if 'fields_to_use' in field_pointer.keys():
@@ -155,53 +155,54 @@ def build_embedded_model(fields_to_embed):
             elif subfield not in field_pointer.keys():
                 field_pointer[subfield] = {}
             field_pointer = field_pointer[subfield]
-    return parsed_model
+    return embedded_model
 
 
-def build_embedded_result(result, parsed_model):
+def build_embedded_result(result, embedded_model):
     """
-    Uses the parsed model from build_embedded_model() and uses it to recursively
-    build a selectively embedded result.
+    Uses the embedded model from build_embedded_model() and uses it to recursively
+    though handle_dict_embed() to build a selectively embedded result.
     Loops through the key, val pairs in the fully embedded result and checks
     against the model, adding them to the parsed_result if they are included.
     """
     parsed_result = {}
     # Use all fields, check all possible embeds
-    if '*' in parsed_model.keys():
+    if '*' in embedded_model.keys():
         fields_to_use = result.keys()
     # This is true when there are no embedded objects down the line; that is,
     # we need only be concerned about fields on the current obj level.
     # Embed only the fields specified in the model when this is the case
-    elif set(parsed_model.keys()) == set(['fields_to_use']):
-        fields_to_use = [val for val in result.keys() if val in parsed_model['fields_to_use']]
+    elif list(embedded_model.keys()) == ['fields_to_use']:
+        # eliminate all fields that are not found within the actual results
+        fields_to_use = [val for val in result.keys() if val in embedded_model['fields_to_use']]
     # Use any applicable fields and any embedded objects
     else:
         # find any fields on this level to use
         curr_level_fields = []
-        if 'fields_to_use' in parsed_model.keys():
-            curr_level_fields = [val for val in result.keys() if val in parsed_model['fields_to_use']]
+        if 'fields_to_use' in embedded_model.keys():
+            curr_level_fields = [val for val in result.keys() if val in embedded_model['fields_to_use']]
         # find fields that correspond to deeper embedded objs
-        embed_objs = [val for val in parsed_model.keys() if val != 'fields_to_use']
+        embed_objs = [val for val in embedded_model.keys() if val != 'fields_to_use']
         fields_to_use = curr_level_fields + embed_objs
     for key in fields_to_use:
         val = result[key]
-        embed_val = False
+        embed_val = None
         if isinstance(val, str):
-            embed_val = handle_string_embed(key, val, parsed_model)
+            embed_val = handle_string_embed(key, val, embedded_model)
         elif isinstance(val, list):
-            embed_val = handle_list_embed(key, val, parsed_model)
+            embed_val = handle_list_embed(key, val, embedded_model)
         elif isinstance(val, dict):
-            embed_val = handle_dict_embed(key, val, parsed_model)
+            embed_val = handle_dict_embed(key, val, embedded_model)
         else:  # catch any other case
             embed_val = val
         # embed_val will be false if there in the case of a non-existent value
         # In such a case, don't embed even if it's requested in the fields
-        if embed_val:
+        if embed_val is not None:
             parsed_result[key] = embed_val
     return parsed_result
 
 
-def handle_string_embed(key, val, parsed_model):
+def handle_string_embed(key, val, embedded_model):
     """
     Allow a string to be embedded only if it's an @id field for this object
     or a non-object related string
@@ -211,10 +212,10 @@ def handle_string_embed(key, val, parsed_model):
     elif identify_invalid_embed(val) != 'valid':
         return val
     else:
-        return False
+        return None
 
 
-def handle_list_embed(key, val, parsed_model):
+def handle_list_embed(key, val, embedded_model):
     """
     Handles lists, which could be either lists of embedded objects or other
     fields. Pass them on accordingly and conglomerate the results.
@@ -222,18 +223,18 @@ def handle_list_embed(key, val, parsed_model):
     list_result = []
     for item in val:
         if isinstance(item, str):
-            list_result.append(handle_string_embed(key, item, parsed_model))
+            list_result.append(handle_string_embed(key, item, embedded_model))
         elif isinstance(item, list):
-            list_result.append(handle_list_embed(key, item, parsed_model))
+            list_result.append(handle_list_embed(key, item, embedded_model))
         elif isinstance(item, dict):
-            list_result.append(handle_dict_embed(key, item, parsed_model))
+            list_result.append(handle_dict_embed(key, item, embedded_model))
         else:  # no chance of this being an embedded object, so just use it
             list_result.append(item)
     list_result = [entry for entry in list_result if entry]  # remove Falses
-    return list_result if len(list_result) > 0 else False
+    return list_result if len(list_result) > 0 else None
 
 
-def handle_dict_embed(key, val, parsed_model):
+def handle_dict_embed(key, val, embedded_model):
     """
     Given an object, determine whether this object should be embedded. In
     addition, check to see if something will be embedded further down the line
@@ -241,21 +242,21 @@ def handle_dict_embed(key, val, parsed_model):
     Else, identify a subobject (obj defined within a schema) or a fully
     embedded object that has no deeper embedding within it.
     """
-    if key in parsed_model.keys():
+    if key in embedded_model.keys():
         # test if itself fully embedded and deeper embedding involved
-        if 'fields_to_use' in parsed_model.keys() and key in parsed_model['fields_to_use']:
+        if 'fields_to_use' in embedded_model.keys() and key in embedded_model['fields_to_use']:
             # Adding this * makes all fields get added, not just the down-the-
             # line embed
-            parsed_model[key]['*'] = 'fully embed this obj'
-            return build_embedded_result(val, parsed_model[key])
+            embedded_model[key]['*'] = 'fully embed this obj'
+            return build_embedded_result(val, embedded_model[key])
         # deeper embedding involved, but not fully embedded
         else:
-            return build_embedded_result(val, parsed_model[key])
-    elif 'uuid' not in val.keys() or key in parsed_model['fields_to_use']:
+            return build_embedded_result(val, embedded_model[key])
+    elif 'uuid' not in val.keys() or key in embedded_model['fields_to_use']:
         # this is a subobject or a embedded object that has no deeper embedding
         return build_embedded_result(val, {'*': 'fully embed this obj'})
     else:
-        return False
+        return None
 
 
 class NullRenderer:
