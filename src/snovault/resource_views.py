@@ -138,11 +138,8 @@ def item_links_with_types(context, request):
         uuid_to_path(request, properties, path)
     # add @type and @id
     properties['@type'] = context.base_types
-    properties['@id'] = request.path
-    if ":" in request.path:
-        obj_type = request.path.split('/')[1]
-        acc = properties['accession']
-        properties['@id'] ='/%s/%s' % (obj_type, acc)
+    conn = request.registry[CONNECTION]
+    properties['@id'] = request.resource_path(conn[context.uuid])
     return properties
 
 
