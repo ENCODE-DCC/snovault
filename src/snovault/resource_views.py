@@ -209,7 +209,7 @@ def item_view_page(context, request):
 def item_view_page_object(context, request):
     # special function to calculate properties, including @id and @type
     properties = item_links_with_types(context, request)
-    calculated = calculate_properties(context, request, properties, category='page')
+    calculated = calculate_properties(context, request, properties)
     properties.update(calculated)
     return properties
 
