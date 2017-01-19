@@ -130,19 +130,6 @@ def item_links(context, request):
     return properties
 
 
-def item_links_with_types(context, request):
-    # This works from the schema rather than the links table
-    # so that upgrade on GET can work.
-    properties = context.__json__(request)
-    for path in context.type_info.schema_links:
-        uuid_to_path(request, properties, path)
-    # add @type and @id
-    properties['@type'] = context.base_types
-    conn = request.registry[CONNECTION]
-    properties['@id'] = request.resource_path(conn[context.uuid])
-    return properties
-
-
 def uuid_to_path(request, obj, path):
     if isinstance(path, basestring):
         path = path.split('.')
@@ -207,10 +194,13 @@ def item_view_page(context, request):
 
 # Use to display page as frame=object, but with page calculated properties
 def item_view_page_object(context, request):
-    # special function to calculate properties, including @id and @type
-    properties = item_links_with_types(context, request)
+    # calculate properties, including @id and @type
+    properties = item_links(context, request)
     calculated = calculate_properties(context, request, properties)
     properties.update(calculated)
+    # calculate page properties, such as actions and audits
+    calculated_w_actions = calculate_properties(context, request, properties, category='page')
+    properties.update(calculated_w_actions)
     return properties
 
 
