@@ -194,13 +194,11 @@ def item_view_page(context, request):
 
 # Use to display page as frame=object, but with page calculated properties
 def item_view_page_object(context, request):
-    # calculate properties, including @id and @type
-    properties = item_links(context, request)
-    calculated = calculate_properties(context, request, properties)
+    item_path = request.resource_path(context)
+    properties = request.embed(item_path, '@@object')
+    # add page calculated properties, such as actions and audits
+    calculated = calculate_properties(context, request, properties, category='page')
     properties.update(calculated)
-    # calculate page properties, such as actions and audits
-    calculated_w_actions = calculate_properties(context, request, properties, category='page')
-    properties.update(calculated_w_actions)
     return properties
 
 
