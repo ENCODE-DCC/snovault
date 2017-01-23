@@ -42,6 +42,10 @@ es_logger.setLevel(logging.ERROR)
 log = logging.getLogger('snovault.elasticsearch.es_index_listener')
 MAX_CLAUSES_FOR_ES = 8192
 
+
+f = open('/srv/encoded/indexing.log', 'a')
+
+
 def includeme(config):
     config.add_route('index', '/index')
     config.scan(__name__)
@@ -444,6 +448,7 @@ class Indexer(object):
         return errors
 
     def update_object(self, request, uuid, xmin, restart=False):
+        start = time.time()
         request.datastore = 'database'  # required by 2-step indexer
 
         # OPTIONAL: restart support
@@ -459,6 +464,7 @@ class Indexer(object):
         # OPTIONAL: restart support
 
         last_exc = None
+
         try:
             doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
         except StatementError:
@@ -467,6 +473,9 @@ class Indexer(object):
         except Exception as e:
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             last_exc = repr(e)
+
+        es_start = time.time()
+        py_elapsed = es_start - start
 
         if last_exc is None:
             for backoff in [0, 10, 20, 40, 80]:
@@ -491,6 +500,17 @@ class Indexer(object):
                     last_exc = repr(e)
                     break
                 else:
+                    es_elapsed = time.time() - es_start
+                    f.write('Indexed {} {} {} {} {} {} {}\n'.format(
+                        result['paths'][0],
+                        result['item_type'],
+                        start,
+                        py_elapsed,
+                        es_elapsed,
+                        len(result['embedded_uuids']),
+                        len(result['linked_uuids']),
+                    ))
+                    f.sync()
                     # Get here on success and outside of try
                     return
 
