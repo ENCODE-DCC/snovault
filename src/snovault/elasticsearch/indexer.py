@@ -28,6 +28,8 @@ import copy
 log = logging.getLogger(__name__)
 SEARCH_MAX = 99999  # OutOfMemoryError if too high
 
+f = open('/srv/encoded/indexing.log', 'a')
+
 
 def includeme(config):
     config.add_route('index', '/index')
@@ -229,6 +231,8 @@ class Indexer(object):
         return errors
 
     def update_object(self, request, uuid, xmin):
+        start = time.time()
+
         try:
             result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
         except StatementError:
@@ -238,6 +242,9 @@ class Indexer(object):
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             timestamp = datetime.datetime.now().isoformat()
             return {'error_message': repr(e), 'timestamp': timestamp, 'uuid': str(uuid)}
+
+        es_start = time.time()
+        py_elapsed = es_start - start
 
         last_exc = None
         for backoff in [0, 10, 20, 40, 80]:
@@ -262,6 +269,17 @@ class Indexer(object):
                 last_exc = repr(e)
                 break
             else:
+                es_elapsed = time.time() - es_start
+                f.write('Indexed {} {} {} {} {} {} {}\n'.format(
+                    result['paths'][0],
+                    result['item_type'],
+                    start,
+                    py_elapsed,
+                    es_elapsed,
+                    len(result['embedded_uuids']),
+                    len(result['linked_uuids']),
+                ))
+                f.sync()
                 return
 
         timestamp = datetime.datetime.now().isoformat()
