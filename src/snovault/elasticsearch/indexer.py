@@ -279,7 +279,7 @@ class Indexer(object):
                     len(result['embedded_uuids']),
                     len(result['linked_uuids']),
                 ))
-                f.sync()
+                f.flush()
                 return
 
         timestamp = datetime.datetime.now().isoformat()
