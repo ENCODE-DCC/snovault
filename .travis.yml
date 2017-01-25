@@ -14,32 +14,33 @@ addons:
     - graphviz
 env:
   global:
+
   - secure: |-
-      TcTEKSEjlu05k3azfO3LMc9NMiZMBqj1pOqg4FOxcprU3Bw7+k5aC/6wMUHI
-      mAt0ivzTh1Wbmtirj/XhXArlSVECBQUk7qoEnCDdDr8nhBsHem+N8T/51xGS
-      mbGuJKT/xECnR23FyFIYkzSwktnm+ZGdeFBYPhEwUl7zFDyemHCzLmn4h16P
-      bfssAfN4MGhzkwkMrgkW2DsSfmEGOjDZTt0JqwXR1FXPmCM0zpPZbrO1tguA
-      lxrRVHn4oQjApp1lN0x78cp1SY5EQBpwlGSr0DzLBHM7YW4sZaHpHRheq3eR
-      bn9po39bj+n5qpmwdlCe1o6AJ8NdphxxM1Cc1QBr8BD2pCjGioSkKyXECVgz
-      i/UrovLo9FbFuCSuh/uAiIF5asQdk3I/y49PwDqAJ+0Q3uJI2gKTRFpb6Ewy
-      3Vy1OGj966T3zgynE50ZHE7C86AxOCrR73dl9m1mBMHkv6xzFTeYYzSxFBd1
-      esnBJzv370jgxd9BsJ6M4fK74Sti8gbgeaVV9UAIO/N1CcyMzMKLl4t3LHRQ
-      dce/VzH1y+2xmMRk2ylQMsai92rwxqshyoj7abDG/0ScApUQui8kXYCCGx3P
-      bfJ0bgC0NAudtQaUgXbZN+efX90kodIXp4aSgbh41pW9VoFFhnU2wGt8Knnt
-      bLoEOSclE0Wslf1OrylHT3g=
+      j9Ako+NzgzqQH8Vj13m/HyAad3nwM9YW/Wdjox7MsSV0xb75G0kuQWf6+hvIi
+      Nw10G8z7JQB3Wdh9CWaCf8Lqo2o72NmU1Gm3ZmJWFkHS1PNI7Hlnn80oDddR5
+      ruf3fPtHJGAC6cdID4Y+pqqYCnvhAh+BXRLNzve8W8GP9FJJjnK5YDMWv9Bo6
+      CxTqiSkQvNogvaNGTHOqEzsdMr8Yan/9Ev4bte+jWmkprBUFVpVbcgJPOM5Vr
+      XTF2Aum8lVBYJeG6PtK+F8IpcobpLfnPT38EY5P7nICOoWqdgwGttNPcM7nK+
+      +bgpfoonZ7BUUHRf5Dudm5jc3mZGSM0iUAq1jbUjnqHClQUXD+mdcITRE838t
+      iIUj+ydOEBVaUNBo76uYO7m79cqJeRpESX9FsikvTBfqE3/kt+CJyxOHewDiS
+      Wm594M0LAuLSMcaq9Fl9qQM5LkMYIHe+c9uMTxSCYRkE4EcY8qjyynUXmrJdn
+      jPbqH0vvCY6JosvSjFbm8k8Csh3QLhcUE2JuNypPRj/Hzo7F8I1FF5zZLMaWl
+      Dxa10WUqDgU8oP2POzWiQGuakECkGK8Om8QjVhvBdi6vVwgZXG5vF3CunVzBR
+      Q6baeRBgyeLqOsnqiC9japGKOhYOz1Tta4P679VBurzXaUsmboumARSEGDhpN
+      fXLT/z+xeiLw=
   - secure: |-
-      wZZgg67c7Qlhw+4Oi7wti4hR61A6zXiqbQ59lQwjVQqg5dY+OSmx0sVqRjrO7
-      Uqh6bp7lX9ygTVy4t5SWkmLjriUixgGkNGjLlSbMZFouNtE9Uxqasy6xzwQiV
-      lyhf+E9VaJ4iAJbV6yvnIvmBOa10l6ih2RiwYvybLxacqITscNUetXRpo+Qkr
-      EpUSrdXisxlMsMji77kHOZqrUXqRuWss3Y24na7i2RAOuV6tfQ1IPPDcZxj/+
-      uQWWGHHZCbonNm7lzFxMNrECnkbH5t4zWlOk7Pw96XgvTg0Kk64lEm5l3Z988
-      +6VjrmjE9xEJzlFrzF6XmzVYkcqn5hlKEHBYFjqNNuxQd6KTergxxj7GfAlSS
-      MKsiY7eeBD2i0oAX3A8OPI9oOGrcRRKzSqKcv5fEeCZ/vV+n/B5LxU2lT6Xq8
-      t47qsm7JptPr+M3tFw00mvAAhnuUR6hmD0VvMDpFNsu9X9ZPH0w1lLIJ5VQLb
-      4scjAlHg0CP//MpoVtnpmqpOCJi/cCUQmGjBvKnYcRDjeZVyV7TcrHXWY5gDX
-      dupbuu33llfRtSQ2anjqNY4MFKrEbtb6n4s2+SP4dVNV36VAe0f+Ujp0vDAk3
-      4heHupboqoOYsJaL9bmumjnGBvvFB5tngcvKV0HE54DvzOk+QmmdO1B2OXOT3
-      EYc4biKIhqDc=
+      N/IgA/htX86U+Tk0+RI15bWKCAEvg2/UuEjWzINRwlrTkPiwqOQdoJ8/DWdDW
+      W2qU5a4zrBbS5ZlhHxGcLObsS6grsoscPh8b+sfSTD53YFlDMWfmmDABUVwEl
+      gwm4OETRBg2yBkdMi6rusQIuBy/iU1K6B3jv7kC4nYor0ps1r2/QO8VgrTgWt
+      J62eRf7kp/EY2k8KBidJtj+ljinHQdBtgzu78QyNBUueLwzme6zZiH9EGMRj5
+      Q+sD/Wn+oM09vjsZZjDAWPNVNo+Lvs1M7DsVWfZrVR7+oLnCTGetYpp/2EC5b
+      XEd6CnHO7NlHecbuqvr/GyN+55GOSPJxLnRKURGhZwpRQwGr4Apy6URSE7SDI
+      kZ6fhrDrC0/eiUlFMAaWiegkojTiWBRmeEj9O9MSmLXFMXQGiY3YC6ukj4QS3
+      iKuXgPXH7S9lj8kTF2lNaoqcDw4TGU0i/cQv0BEqsSTKoxNuQhev0sqz8jv87
+      8SYtCTI1/1gheYjFhdV0aGdsn6JuJirNWmr5Ebb15IpMXKMvq6H491qMJFYCJ
+      C0cq1ad+T3gAsxRdvIgWrU86QMLNxlgyNW+eijTZH5XDvYtVjBovyuf2zZ2P4
+      7F+UQNsSLGGLVORcsmBG7ByCMYljVk8i14rWonrXVjPP1fuwIp2AIZzNK6KrJ
+      tQzLeb5gEy3A=
   - PATH="/usr/share/elasticsearch/bin:/usr/lib/postgresql/9.3/bin:$PATH"
 matrix:
   include:
@@ -79,21 +80,21 @@ before_script:
     while test -f "$SC_PIDFILE" && test ! -f "$SC_READYFILE"; do sleep .5; done
   fi
 script:
-  - if test -z "$BROWSER"; then npm test; fi
-  - if test -z "$BROWSER"; then bin/test -v -v --timeout=400 -m "not bdd"; fi
-  - >
-    if test -n "$BROWSER"; then
-      test -f "$SC_PIDFILE" && bin/test -v -v --timeout=400 -m "bdd" --tb=short \
-        --splinter-implicit-wait 10 \
-        --splinter-webdriver remote \
-        --splinter-remote-url "http://$SAUCE_USERNAME:$SAUCE_ACCESS_KEY@localhost:4445/wd/hub" \
-        --splinter-socket-timeout 300 \
-        --browser-arg tunnel-identifier "$TRAVIS_JOB_NUMBER" \
-        --browser-arg-int build  "$TRAVIS_BUILD_NUMBER" \
-        --browser-arg-int idleTimeout 300 \
-        --browser-arg name "$TRAVIS_REPO_SLUG $TRAVIS_BRANCH $TRAVIS_COMMIT" \
-        --browser-arg browser "$BROWSER"
-    fi
+- if test -z "$BROWSER"; then npm test; fi
+- if test -z "$BROWSER"; then bin/test -v -v --timeout=400 -m "not bdd"; fi
+- |
+  if test -n "$BROWSER"; then
+    test -f "$SC_PIDFILE" && bin/test -v -v --timeout=400 -m "bdd" --tb=short \
+      --splinter-implicit-wait 10 \
+      --splinter-webdriver remote \
+      --splinter-remote-url "http://$SAUCE_USERNAME:$SAUCE_ACCESS_KEY@localhost:4445/wd/hub" \
+      --splinter-socket-timeout 300 \
+      --browser-arg tunnel-identifier "$TRAVIS_JOB_NUMBER" \
+      --browser-arg-int build  "$TRAVIS_BUILD_NUMBER" \
+      --browser-arg-int idleTimeout 300 \
+      --browser-arg name "$TRAVIS_REPO_SLUG $TRAVIS_BRANCH $TRAVIS_COMMIT" \
+      --browser-arg browser "$BROWSER"
+  fi
 after_script:
 - |
   if test -f "$SC_PIDFILE"; then

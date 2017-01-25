@@ -2,7 +2,7 @@
 SnoVault JSON-LD Database Framework
 ========================
 
-Version 0.1
+Version 0.22
 
 |Build status|_
 
