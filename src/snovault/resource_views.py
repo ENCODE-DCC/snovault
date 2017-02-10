@@ -203,7 +203,7 @@ def item_view_page_object(context, request):
     # add page calculated properties, such as actions and audits
     calculated = calculate_properties(context, request, properties_emb, category='page')
     properties_emb.update(calculated)
-    return properties_emb
+    return properties_emb, properties_obj
 
 
 @view_config(context=Item, permission='expand', request_method='GET',
