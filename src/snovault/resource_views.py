@@ -161,7 +161,6 @@ def uuid_to_path(request, obj, path):
              name='object')
 def item_view_object(context, request):
     """ Render json structure
-
     1. Fetch stored properties, possibly upgrading.
     2. Link canonicalization (overwriting uuids.)
     3. Calculated properties (including reverse links.)
@@ -190,20 +189,6 @@ def item_view_page(context, request):
     calculated = calculate_properties(context, request, properties, category='page')
     properties.update(calculated)
     return properties
-
-
-# Use to display page as frame=embedded, but with @ids for all linked objs not embedded
-def item_view_page_object(context, request):
-    item_path = request.resource_path(context)
-    properties_emb = request.embed(item_path, '@@embedded')
-    properties_obj = request.embed(item_path, '@@object')
-    for key, val in properties_obj.items():
-        if key not in properties_emb:
-            properties_emb[key] = val
-    # add page calculated properties, such as actions and audits
-    calculated = calculate_properties(context, request, properties_emb, category='page')
-    properties_emb.update(calculated)
-    return properties_emb
 
 
 @view_config(context=Item, permission='expand', request_method='GET',
@@ -289,4 +274,5 @@ def item_view_edit(context, request):
                 conn.get_by_uuid(uuid) for uuid in context.get_rev_links(propname)
             ) if request.has_permission('visible_for_edit', child)
         )
+
     return properties
