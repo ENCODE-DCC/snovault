@@ -1,6 +1,5 @@
-from copy import deepcopy
 from .cache import ManagerLRUCache
-from past.builtins import basestring
+from .util import quick_deepcopy
 from posixpath import join
 from pyramid.compat import (
     native_,
@@ -65,7 +64,7 @@ def embed(request, *elements, **kw):
             cached = _embed(request, path)
             embed_cache[path] = cached
         result, embedded, linked = cached
-        result = deepcopy(result)
+        result = quick_deepcopy(result)
     request._embedded_uuids.update(embedded)
     request._linked_uuids.update(linked)
     return result
