@@ -121,7 +121,6 @@ def schema_mapping(name, schema):
         if name in KEYWORD_FIELDS:
             field_type = 'keyword'
         elif name in TEXT_FIELDS:
-            print(name)
             field_type = 'text'
         else:
             field_type = 'keyword'
@@ -133,10 +132,6 @@ def schema_mapping(name, schema):
         # these fields are unintentially partially matching some small search
         # keywords because fields are analyzed by nGram analyzer
         if name in NON_SUBSTRING_FIELDS:
-            if name in PATH_FIELDS:
-                sub_mapping['index_analyzer'] = 'snovault_path_analyzer'
-            else:
-                sub_mapping['type'] = 'keyword'
             sub_mapping['include_in_all'] = False
         return sub_mapping
 
@@ -166,15 +161,7 @@ def schema_mapping(name, schema):
 def index_settings():
     return {
         'settings': {
-            'index': {
-                'number_of_shards': 5,
-                'merge': {
-                    'policy': {
-                        'max_merged_segment': '2gb',
-                        'max_merge_at_once': 5
-                    }
-                }
-            },
+            'index.mapping.total_fields.limit': 4000,
             'analysis': {
                 'filter': {
                     'substring': {
@@ -252,7 +239,7 @@ def es_mapping(mapping):
     return {
         '_all': {
             'enabled': True,
-            'index_analyzer': 'snovault_index_analyzer',
+            'analyzer': 'snovault_index_analyzer',
             'search_analyzer': 'snovault_search_analyzer'
         },
         'dynamic_templates': [
@@ -434,19 +421,9 @@ def type_mapping(types, item_type, embed=True):
         new_mapping[last]['boost'] = boost
         if last in NON_SUBSTRING_FIELDS:
             new_mapping[last]['include_in_all'] = False
-            if last in PATH_FIELDS:
-                new_mapping[last]['index_analyzer'] = 'snovault_path_analyzer'
-            else:
-                new_mapping[last]['index'] = 'not_analyzed'
         else:
-            new_mapping[last]['index_analyzer'] = 'snovault_index_analyzer'
-            new_mapping[last]['search_analyzer'] = 'snovault_search_analyzer'
             new_mapping[last]['include_in_all'] = True
 
-    # Automatic boost for uuid
-    if 'uuid' in mapping['properties']:
-        mapping['properties']['uuid']['index'] = 'not_analyzed' 
-        mapping['properties']['uuid']['include_in_all'] = False
     return mapping
 
 
@@ -455,12 +432,11 @@ def run(app, collections=None, dry_run=False):
     registry = app.registry
     if not dry_run:
         es = app.registry[ELASTIC_SEARCH]
-        try:
-            es.indices.create(index=index, body=index_settings())
-        except (RequestError, TypeError):
-            if collections is None:
-                es.indices.delete(index=index)
-                es.indices.create(index=index, body=index_settings())
+        print(es.indices.exists(index=index))
+        if es.indices.exists(index=index):
+            es.indices.delete(index=index)
+        pdb.set_trace()
+        es.indices.create(index=index, body=index_settings(), update_all_types=True)
 
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
@@ -485,17 +461,12 @@ def run(app, collections=None, dry_run=False):
                 mapping = es_mapping(mapping)
 
             try:
-                pp(mapping)
-                es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping})
+                pp('about to put mapping')
+                es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping}, update_all_types=True)
             except:
                 log.exception("Could not create mapping for the collection %s", doc_type)
             else:
                 es.indices.refresh(index=index)
-    # from collections import Counter
-    # counter = Counter()
-    # for keyword in ALL_PROPERTY_NAMES:
-    #     counter[keyword] += 1
-    # print(counter)
 
 def main():
     import argparse
