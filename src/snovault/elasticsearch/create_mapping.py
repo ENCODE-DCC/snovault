@@ -74,6 +74,8 @@ def schema_mapping(name, schema):
     ALL_PROPERTY_NAMES.append(name)
     if 'linkFrom' in schema:
         type_ = 'string'
+    elif 'linkTo' in schema:
+        type_ = 'object'
     else:
         type_ = schema['type']
 
@@ -405,7 +407,7 @@ def type_mapping(types, item_type, embed=True):
 
             # Check if mapping for property is already an object
             # multiple subobjects may be embedded, so be carful here
-            if m['properties'][p]['type'] in ['keyword', 'text']:
+            if m['properties'][p]['type'] in ['keyword', 'text', 'object']:
                 m['properties'][p] = schema_mapping(p, s)
 
             m = m['properties'][p]
@@ -418,11 +420,17 @@ def type_mapping(types, item_type, embed=True):
             if prop_name in mapping['properties']
         }
     for name, boost in boost_values.items():
+        print(name)
         props = name.split('.')
         last = props.pop()
+        print(last)
         new_mapping = mapping['properties']
+        pp(new_mapping)
         for prop in props:
+            print(props)
+            print(prop)
             new_mapping = new_mapping[prop]['properties']
+        pp(new_mapping)
         new_mapping[last]['boost'] = boost
         if last in NON_SUBSTRING_FIELDS:
             new_mapping[last]['include_in_all'] = False
@@ -446,8 +454,7 @@ def run(app, collections=None, dry_run=False):
 
     for collection_name in collections:
         tmp_collection = [
-            'meta', 'experiment', 'user', 'analysis_step_version',
-            'type'
+            'meta', 'experiment', 'analysis_step_version'
             ]
         if collection_name in tmp_collection:
             if collection_name == 'meta':
@@ -465,7 +472,6 @@ def run(app, collections=None, dry_run=False):
                 continue
             if collection_name is not 'meta':
                 mapping = es_mapping(mapping)
-
             try:
                 pp('about to put mapping')
                 es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping}, update_all_types=True)
