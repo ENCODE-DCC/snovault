@@ -32,6 +32,11 @@ log = logging.getLogger(__name__)
 
 # An index to store non-content metadata
 META_MAPPING = {
+    '_all': {
+        'enabled': False,
+        'analyzer': 'snovault_index_analyzer',
+        'search_analyzer': 'snovault_search_analyzer'
+    },
     'dynamic_templates': [
         {
             'store_generic': {
@@ -432,17 +437,19 @@ def run(app, collections=None, dry_run=False):
     registry = app.registry
     if not dry_run:
         es = app.registry[ELASTIC_SEARCH]
-        print(es.indices.exists(index=index))
         if es.indices.exists(index=index):
             es.indices.delete(index=index)
-        pdb.set_trace()
         es.indices.create(index=index, body=index_settings(), update_all_types=True)
 
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
 
     for collection_name in collections:
-        if collection_name in ['experiment', 'meta']:
+        tmp_collection = [
+            'meta', 'experiment', 'user', 'analysis_step_version',
+            'type'
+            ]
+        if collection_name in tmp_collection:
             if collection_name == 'meta':
                 doc_type = 'meta'
                 mapping = META_MAPPING
@@ -456,7 +463,6 @@ def run(app, collections=None, dry_run=False):
             if dry_run:
                 print(json.dumps(sorted_dict({index: {doc_type: mapping}}), indent=4))
                 continue
-
             if collection_name is not 'meta':
                 mapping = es_mapping(mapping)
 

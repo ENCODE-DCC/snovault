@@ -92,6 +92,8 @@ def run(testapp, timeout=DEFAULT_TIMEOUT, dry_run=False, path='/index', control=
                 )
 
                 try:
+                    print('''''')
+                    print(path)
                     res = testapp.post_json(path, {
                         'record': True,
                         'dry_run': dry_run,

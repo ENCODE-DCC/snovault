@@ -69,12 +69,10 @@ def index(request):
     if 'last_xmin' in request.json:
         last_xmin = request.json['last_xmin']
     else:
-        try:
-            status = es.get(index=INDEX, doc_type='meta', id='indexing')
-        except NotFoundError:
+        status = es.get(index=INDEX, doc_type='meta', id='indexing', ignore=[400, 404])
+        if not status['found']:
             interval_settings = {"index": {"refresh_interval": "30s"}}
             es.indices.put_settings(index=INDEX, body=interval_settings)
-            pass
         else:
             last_xmin = status['_source']['xmin']
 
