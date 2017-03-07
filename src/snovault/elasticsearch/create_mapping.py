@@ -74,8 +74,8 @@ def schema_mapping(name, schema):
     ALL_PROPERTY_NAMES.append(name)
     if 'linkFrom' in schema:
         type_ = 'string'
-    elif 'linkTo' in schema:
-        type_ = 'object'
+    # elif 'linkTo' in schema:
+    #     type_ = 'object'
     else:
         type_ = schema['type']
 
@@ -102,9 +102,7 @@ def schema_mapping(name, schema):
             'fields': {
                 'value': {
                     'type': 'float',
-                    'copy_to': '',
                     'ignore_malformed': True,
-                    'copy_to': []
                 },
                 'raw': {
                     'type': 'keyword',
@@ -168,7 +166,7 @@ def schema_mapping(name, schema):
 def index_settings():
     return {
         'settings': {
-            'index.mapping.total_fields.limit': 4000,
+            'index.mapping.total_fields.limit': 5000,
             'analysis': {
                 'filter': {
                     'substring': {
@@ -376,7 +374,6 @@ def type_mapping(types, item_type, embed=True):
     mapping = schema_mapping(item_type, schema)
     if not embed:
         return mapping
-
     for prop in type_info.embedded:
         s = schema
         m = mapping
@@ -407,7 +404,7 @@ def type_mapping(types, item_type, embed=True):
 
             # Check if mapping for property is already an object
             # multiple subobjects may be embedded, so be carful here
-            if m['properties'][p]['type'] in ['keyword', 'text', 'object']:
+            if m['properties'][p]['type'] in ['keyword', 'text']:
                 m['properties'][p] = schema_mapping(p, s)
 
             m = m['properties'][p]
@@ -420,23 +417,16 @@ def type_mapping(types, item_type, embed=True):
             if prop_name in mapping['properties']
         }
     for name, boost in boost_values.items():
-        print(name)
         props = name.split('.')
         last = props.pop()
-        print(last)
         new_mapping = mapping['properties']
-        pp(new_mapping)
         for prop in props:
-            print(props)
-            print(prop)
             new_mapping = new_mapping[prop]['properties']
-        pp(new_mapping)
         new_mapping[last]['boost'] = boost
         if last in NON_SUBSTRING_FIELDS:
             new_mapping[last]['include_in_all'] = False
         else:
             new_mapping[last]['include_in_all'] = True
-
     return mapping
 
 
@@ -447,14 +437,22 @@ def run(app, collections=None, dry_run=False):
         es = app.registry[ELASTIC_SEARCH]
         if es.indices.exists(index=index):
             es.indices.delete(index=index)
-        es.indices.create(index=index, body=index_settings(), update_all_types=True)
+        es.indices.create(index=index, body=index_settings(), update_all_types=False)
 
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
-
     for collection_name in collections:
         tmp_collection = [
-            'meta', 'experiment', 'analysis_step_version'
+            'meta', 'experiment', 'analysis_step_run', 'award', 'construct',
+            'document', 'lab', 'library', 'organism', 'platform', 'publication',
+            'rnai', 'software', 'software_version', 'source', 'talen', 'treatment',
+            'access_key', 'antibody_approval', 'antibody_lot', 'biosample', 'antibody_characterization',
+            'biosample_characterization', 'construct_characterization', 'donor_characterization', 
+            'genetic_modification_characterization', 'rnai_characterization', 'annotation', 'matched_set',
+            'organism_development_series', 'project', 'publication_data', 'reference', 'reference_epigenome',
+            'replication_timing_series', 'treatment_concentration_series', 'treatment_time_series',
+            'ucsc_browser_composite', 'fly_donor', 'human_donor', 'mouse_donor', 'worm_donor', 'replicate',
+            'file', 'genetic_modification', 'image', 'crispr', 'tale', 'page', 'analysis_step',
             ]
         if collection_name in tmp_collection:
             if collection_name == 'meta':
@@ -473,8 +471,9 @@ def run(app, collections=None, dry_run=False):
             if collection_name is not 'meta':
                 mapping = es_mapping(mapping)
             try:
-                pp('about to put mapping')
-                es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping}, update_all_types=True)
+                pp('about to put mapping for {}'.format(doc_type))
+                # pp(mapping)
+                es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping}, update_all_types=False)
             except:
                 log.exception("Could not create mapping for the collection %s", doc_type)
             else:
