@@ -305,10 +305,25 @@ def no_deps(conn, DBSession):
 
     event.remove(session, 'before_flush', check_dependencies)
 
+
 @pytest.fixture(scope='session')
-def wsgi_server_host_port():
-    from webtest.http import get_free_port
-    return get_free_port()
+def wsgi_server_host_port(request):
+    wsgi_args = dict(request.config.option.wsgi_args or ())
+    if (
+        'port_range.min' in wsgi_args and
+        'port_range.max' in wsgi_args
+    ):
+        import random
+        # spin up wsgi server on specific ports if start and end are defined
+        wsgi_args['port_range.min'] = int(wsgi_args['port_range.min'])
+        wsgi_args['port_range.max'] = int(wsgi_args['port_range.max'])
+        port = random.randrange(wsgi_args['port_range.min'],
+                                wsgi_args['port_range.max'])
+        return ('127.0.0.1', port)
+    else:
+        # otherwise get any free port
+        from webtest.http import get_free_port
+        return get_free_port()
 
 
 @pytest.fixture(scope='session')
