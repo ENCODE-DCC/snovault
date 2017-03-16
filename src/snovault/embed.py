@@ -205,9 +205,12 @@ def build_embedded_result(result, embedded_model):
 def handle_string_embed(key, val, embedded_model):
     """
     Allow a string to be embedded only if it's an @id field for this object
-    or a non-object related string
+    or a non-object related string.
+    Allow @@download strings regardless of format for things like links
     """
     if key == '@id':
+        return val
+    elif '@@download' in val:
         return val
     elif identify_invalid_embed(val) != 'valid':
         return val
