@@ -98,6 +98,7 @@ class TestingLinkSource(Item):
     }
 
 
+
 @collection('testing-link-targets', unique_key='testing_link_target:name')
 class TestingLinkTarget(Item):
     item_type = 'testing_link_target'

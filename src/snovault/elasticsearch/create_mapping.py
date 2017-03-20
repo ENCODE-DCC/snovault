@@ -252,7 +252,7 @@ def es_mapping(mapping):
                 'template_principals_allowed': {
                     'path_match': "principals_allowed.*",
                     'mapping': {
-                        'type': 'keyword',
+                        'type': 'object',
                     },
                 },
             },
@@ -260,7 +260,7 @@ def es_mapping(mapping):
                 'template_unique_keys': {
                     'path_match': "unique_keys.*",
                     'mapping': {
-                        'type': 'keyword',
+                        'type': 'object',
                     },
                 },
             },
@@ -268,7 +268,7 @@ def es_mapping(mapping):
                 'template_links': {
                     'path_match': "links.*",
                     'mapping': {
-                        'type': 'keyword',
+                        'type': 'object',
                     },
                 },
             },
@@ -302,6 +302,7 @@ def es_mapping(mapping):
                 'include_in_all': False,
             },
             'principals_allowed': {
+                'dynamic': False,
                 'type': 'object',
                 'include_in_all': False,
             },
@@ -314,12 +315,14 @@ def es_mapping(mapping):
                 'include_in_all': False,
             },
             'unique_keys': {
+                'dynamic': False,
                 'type': 'object',
                 'include_in_all': False,
             },
             'links': {
                 'type': 'object',
                 'include_in_all': False,
+                'dynamic': False,
             },
             'paths': {
                 'type': 'keyword',
@@ -443,7 +446,7 @@ def run(app, collections=None, dry_run=False):
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
     for collection_name in collections:
         tmp_collection = [
-            'meta', 'experiment', 'analysis_step_run', 'award', 'construct',
+            'meta', 'experiment', 's_run', 'award', 'construct',
             'document', 'lab', 'library', 'organism', 'platform', 'publication',
             'rnai', 'software', 'software_version', 'source', 'talen', 'treatment',
             'access_key', 'antibody_approval', 'antibody_lot', 'biosample', 'antibody_characterization',
@@ -453,6 +456,34 @@ def run(app, collections=None, dry_run=False):
             'replication_timing_series', 'treatment_concentration_series', 'treatment_time_series',
             'ucsc_browser_composite', 'fly_donor', 'human_donor', 'mouse_donor', 'worm_donor', 'replicate',
             'file', 'genetic_modification', 'image', 'crispr', 'tale', 'page', 'analysis_step',
+            'analysis_step_version', 'pipeline', 'bigwigcorrelate_quality_metric', 'bismark_quality_metric',
+            'chipseq_filter_quality_metric', 'complexity_xcorr_quality_metric',
+ 'correlation_quality_metric',
+ 'cpg_correlation_quality_metric',
+ 'duplicates_quality_metric',
+ 'edwbamstats_quality_metric',
+ 'edwcomparepeaks_quality_metric',
+ 'encode2_chipseq_quality_metric',
+ 'fastqc_quality_metric',
+ 'filtering_quality_metric',
+ 'generic_quality_metric',
+ 'hotspot_quality_metric',
+ 'idr_quality_metric',
+ 'idr_summary_quality_metric',
+ 'mad_quality_metric',
+ 'samtools_flagstats_quality_metric',
+ 'samtools_stats_quality_metric',
+ 'star_quality_metric',
+ 'trimming_quality_metric',
+ 'target',
+ 'user',
+ 'testing_dependencies',
+'testing_download',
+ 'testing_key',
+ 'testing_link_source',
+ 'testing_link_target',
+ 'testing_post_put_patch',
+ 'testing_server_default',
             ]
         if collection_name in tmp_collection:
             if collection_name == 'meta':

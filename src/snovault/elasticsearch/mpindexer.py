@@ -21,6 +21,7 @@ from .interfaces import APP_FACTORY
 log = logging.getLogger(__name__)
 
 
+
 def includeme(config):
     if config.registry.settings.get('indexer_worker'):
         return
@@ -120,7 +121,8 @@ class MPIndexer(Indexer):
     @reify
     def pool(self):
         return Pool(
-            processes=self.processes,
+            # processes=self.processes,
+            processes=1,
             initializer=initializer,
             initargs=self.initargs,
             context=get_context('forkserver'),

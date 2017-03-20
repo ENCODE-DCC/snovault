@@ -36,8 +36,8 @@ PY2 = sys.version_info[0] == 2
 
 
 def run(testapp, timeout=DEFAULT_TIMEOUT, dry_run=False, path='/index', control=None, update_status=None):
+    print('es_index_listener running')
     assert update_status is not None
-
     timestamp = datetime.datetime.now().isoformat()
     update_status(
         status='connecting',

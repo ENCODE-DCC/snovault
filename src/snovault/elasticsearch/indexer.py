@@ -23,6 +23,11 @@ import logging
 import pytz
 import time
 import copy
+from pprint import pprint as pp
+
+import sys
+import pdb
+
 
 
 log = logging.getLogger(__name__)
@@ -66,6 +71,10 @@ def index(request):
 
     first_txn = None
     last_xmin = None
+
+    es_log_settings = {"transient": {"logger._root": "TRACE"}}
+    es.cluster.put_settings(es_log_settings)
+
     if 'last_xmin' in request.json:
         last_xmin = request.json['last_xmin']
     else:
@@ -109,7 +118,6 @@ def index(request):
         result['txn_count'] = txn_count
         if txn_count == 0:
             return result
-
         es.indices.refresh(index=INDEX)
         res = es.search(index=INDEX, size=SEARCH_MAX, body={
             'filter': {
@@ -153,13 +161,16 @@ def index(request):
         snapshot_id = None
         if not recovery:
             snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
-
+        print('before indexer.update_objects')
         result['errors'] = indexer.update_objects(request, invalidated, xmin, snapshot_id)
+        print('after indexer.update_objects')
         result['indexed'] = len(invalidated)
 
         if record:
             try:
+                print('before putting in meta object')
                 es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
+                print('after putting in meta object')
             except:
                 error_messages = copy.deepcopy(result['errors'])
                 del result['errors']
@@ -218,6 +229,7 @@ class Indexer(object):
     def update_objects(self, request, uuids, xmin, snapshot_id):
         errors = []
         for i, uuid in enumerate(uuids):
+            print('set trace here again')
             error = self.update_object(request, uuid, xmin)
             if error is not None:
                 errors.append(error)
@@ -241,12 +253,14 @@ class Indexer(object):
         for backoff in [0, 10, 20, 40, 80]:
             time.sleep(backoff)
             try:
+                pp(result)
                 self.es.index(
                     index=self.index, doc_type=result['item_type'], body=result,
                     id=str(uuid), version=xmin, version_type='external_gte',
                     request_timeout=30,
                 )
             except StatementError:
+                print('statement error')
                 # Can't reconnect until invalid transaction is rolled back
                 raise
             except ConflictError:
