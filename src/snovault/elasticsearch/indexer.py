@@ -81,7 +81,7 @@ def index(request):
         status = es.get(index=INDEX, doc_type='meta', id='indexing', ignore=[400, 404])
         if not status['found']:
             interval_settings = {"index": {"refresh_interval": "30s"}}
-            es.indices.put_settings(index=INDEX, body=interval_settings)
+            es.indices.put_settings(index='_all', body=interval_settings)
         else:
             last_xmin = status['_source']['xmin']
 
@@ -182,9 +182,9 @@ def index(request):
                 result['errors'] = error_messages
 
 
-            if es.indices.get_settings(index=INDEX)[INDEX]['settings']['index'].get('refresh_interval', '') != '1s':
-                interval_settings = {"index": {"refresh_interval": "1s"}}
-                es.indices.put_settings(index=INDEX, body=interval_settings)
+            # if es.indices.get_settings(index=INDEX)[INDEX]['settings']['index'].get('refresh_interval', '') != '1s':
+            #     interval_settings = {"index": {"refresh_interval": "1s"}}
+            #     es.indices.put_settings(index=INDEX, body=interval_settings)
 
         es.indices.refresh(index=INDEX)
 
@@ -253,7 +253,6 @@ class Indexer(object):
         for backoff in [0, 10, 20, 40, 80]:
             time.sleep(backoff)
             try:
-                pp(result)
                 self.es.index(
                     index=self.index, doc_type=result['item_type'], body=result,
                     id=str(uuid), version=xmin, version_type='external_gte',

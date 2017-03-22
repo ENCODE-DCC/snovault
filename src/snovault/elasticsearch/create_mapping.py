@@ -247,32 +247,47 @@ def es_mapping(mapping):
             'analyzer': 'snovault_index_analyzer',
             'search_analyzer': 'snovault_search_analyzer'
         },
-        'dynamic_templates': [
-            {
-                'template_principals_allowed': {
-                    'path_match': "principals_allowed.*",
-                    'mapping': {
-                        'type': 'object',
-                    },
-                },
-            },
-            {
-                'template_unique_keys': {
-                    'path_match': "unique_keys.*",
-                    'mapping': {
-                        'type': 'object',
-                    },
-                },
-            },
-            {
-                'template_links': {
-                    'path_match': "links.*",
-                    'mapping': {
-                        'type': 'object',
-                    },
-                },
-            },
-        ],
+        # 'dynamic_templates': [
+        #     {
+        #         'template_principals_allowed': {
+        #             'path_match': "principals_allowed.*",
+        #             'mapping': {
+        #                 'type': 'keyword',
+        #                 # 'fields': {
+        #                 #     'raw': {
+        #                 #         'type': 'keyword',
+        #                 #     }
+        #                 # }
+        #             },
+        #         },
+        #     },
+        #     {
+        #         'template_unique_keys': {
+        #             'path_match': "unique_keys.*",
+        #             'mapping': {
+        #                 'type': 'keyword',
+        #                 # 'fields': {
+        #                 #     'raw': {
+        #                 #         'type': 'keyword',
+        #                 #     }
+        #                 # }
+        #             },
+        #         },
+        #     },
+        #     {
+        #         'template_links': {
+        #             'path_match': "links.*",
+        #             'mapping': {
+        #                 'type': 'keyword',
+        #                 # 'fields': {
+        #                 #     'raw': {
+        #                 #         'type': 'keyword',
+        #                 #     }
+        #                 # }
+        #             },
+        #         },
+        #     },
+        # ],
         'properties': {
             'uuid': {
                 'type': 'keyword',
@@ -302,7 +317,6 @@ def es_mapping(mapping):
                 'include_in_all': False,
             },
             'principals_allowed': {
-                'dynamic': False,
                 'type': 'object',
                 'include_in_all': False,
             },
@@ -315,14 +329,12 @@ def es_mapping(mapping):
                 'include_in_all': False,
             },
             'unique_keys': {
-                'dynamic': False,
                 'type': 'object',
                 'include_in_all': False,
             },
             'links': {
                 'type': 'object',
                 'include_in_all': False,
-                'dynamic': False,
             },
             'paths': {
                 'type': 'keyword',
