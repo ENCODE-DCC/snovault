@@ -305,10 +305,34 @@ def no_deps(conn, DBSession):
 
     event.remove(session, 'before_flush', check_dependencies)
 
+
 @pytest.fixture(scope='session')
-def wsgi_server_host_port():
-    from webtest.http import get_free_port
-    return get_free_port()
+def wsgi_server_host_port(request):
+    wsgi_args = dict(request.config.option.wsgi_args or ())
+    if ('port_range.min' in wsgi_args and 'port_range.max' in wsgi_args):
+        import socket
+        import os
+        # return available port in specified range if min and max are defined
+        port_temp, port_max = int(wsgi_args['port_range.min']), int(wsgi_args['port_range.max'])
+        port_assigned = False
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        while not port_assigned and port_temp <= port_max:
+            try:
+                s.bind(('', port_temp))
+                port_assigned = True
+            except OSError:
+                port_temp += 1
+        if not port_assigned:
+            # port failed to be assigned, so raise an error
+            raise
+        ip, port = s.getsockname()
+        s.close()
+        ip = os.environ.get('WEBTEST_SERVER_BIND', '127.0.0.1')
+        return ip, port
+    else:
+        # otherwise get any free port
+        from webtest.http import get_free_port
+        return get_free_port()
 
 
 @pytest.fixture(scope='session')
