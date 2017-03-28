@@ -47,7 +47,17 @@ def make_subrequest(request, path):
 
 embed_cache = ManagerLRUCache('embed_cache')
 
-
+# Carl: embed is called on any request.embed (config.add_request_method(embed, 'embed'))
+#       indexing_views calls embeds with a field_to_embed parameter (my change)
+#       Currently, subrequests are recursively calling embed by going through
+#       @@object in resource_views.py (this time, without fields_to_embed)
+#       For example, if indexing a user, the order might be:
+#       users/<uuid>/@@index-data --> users/<uuid>/@@embedded
+#       --> users/<uuid>/@@object --> labs/<uuid>/@@object
+#       --> awards/<uuid>/@@object (and so on)
+#       Embedding, as it stands, is complete in its recursiveness. Objects are
+#       fully embedded all the way down
+#       One option would be to use fields_to_embed to limit recursion
 def embed(request, *elements, **kw):
     """ as_user=True for current user
     Pass in fields_to_embed as a keyword arg
@@ -66,6 +76,7 @@ def embed(request, *elements, **kw):
     if as_user is not None:
         result, embedded, linked = _embed(request, path, as_user)
     else:
+        # Carl: caching restarts at every call to _embed. This is not the problem
         cached = embed_cache.get(path, None)
         if cached is None:
             cached = _embed(request, path)
@@ -84,6 +95,7 @@ def embed(request, *elements, **kw):
 
 
 def _embed(request, path, as_user='EMBED'):
+    # Carl: the subrequest is 'built' here, but not actually invoked
     subreq = make_subrequest(request, path)
     subreq.override_renderer = 'null_renderer'
     if as_user is not True:
@@ -91,6 +103,12 @@ def _embed(request, path, as_user='EMBED'):
             del subreq.environ['HTTP_COOKIE']
         subreq.remote_user = as_user
     try:
+        # Carl: this is key. Recursion is triggered by causing a GET @@object
+        #       resource_views. result will be the @@object result, i.e. with
+        #       calculated properties (@id, @type, etc.)
+        #       @id strings in the result are ALL embedded (still not completely
+        #       how this works). The end result is a FULLY embedded object in
+        #       the top level, @@embedded, call to _embed
         result = request.invoke_subrequest(subreq)
     except HTTPNotFound:
         raise KeyError(path)
