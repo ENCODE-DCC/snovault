@@ -14,6 +14,7 @@ from snovault import (
     TYPES,
 )
 from snovault.schema_utils import combine_schemas
+from snovault.fourfront_utils import add_default_embeds
 from .interfaces import ELASTIC_SEARCH
 import collections
 import json
@@ -103,6 +104,10 @@ def schema_mapping(name, schema, field='*'):
                 'raw': {
                     'type': 'string',
                     'index': 'not_analyzed'
+                },
+                'lower_case_sort': {
+                    'type': 'string',
+                    'analyzer': 'case_insensistive_sort'
                 }
             }
         }
@@ -115,6 +120,10 @@ def schema_mapping(name, schema, field='*'):
                 'raw': {
                     'type': 'string',
                     'index': 'not_analyzed'
+                },
+                'lower_case_sort': {
+                    'type': 'string',
+                    'analyzer': 'case_insensistive_sort'
                 }
             }
         }
@@ -138,6 +147,10 @@ def schema_mapping(name, schema, field='*'):
                                 'raw': {
                                     'type': 'string',
                                     'index': 'not_analyzed'
+                                },
+                                'lower_case_sort': {
+                                    'type': 'string',
+                                    'analyzer': 'case_insensistive_sort'
                                 }
                             }
                         })
@@ -159,6 +172,10 @@ def schema_mapping(name, schema, field='*'):
                 'raw': {
                     'type': 'string',
                     'index': 'not_analyzed'
+                },
+                'lower_case_sort': {
+                    'type': 'string',
+                    'analyzer': 'case_insensistive_sort'
                 }
             }
         }
@@ -171,6 +188,10 @@ def schema_mapping(name, schema, field='*'):
                 'raw': {
                     'type': 'string',
                     'index': 'not_analyzed'
+                },
+                'lower_case_sort': {
+                    'type': 'string',
+                    'analyzer': 'case_insensistive_sort'
                 }
             }
         }
@@ -222,6 +243,12 @@ def index_settings():
                             'standard',
                             'lowercase',
                             'asciifolding'
+                        ]
+                    },
+                    'case_insensistive_sort': {
+                        'tokenizer': 'keyword',
+                        'filter': [
+                            'lowercase',
                         ]
                     },
                     'snovault_path_analyzer': {
@@ -416,11 +443,11 @@ def type_mapping(types, item_type, embed=True):
     type_info = types[item_type]
     schema = type_info.schema
     mapping = schema_mapping(item_type, schema)
+    embeds = add_default_embeds(type_info.embedded, schema)
     if not embed:
         return mapping
     embed_obj = {}  # overall embedded object
-
-    for prop in type_info.embedded:
+    for prop in embeds:
         single_embed = {}
         s = schema
         m = mapping
@@ -528,7 +555,6 @@ def run(app, collections=None, dry_run=False, check_first=True):
 
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
-
     for collection_name in collections:
         if collection_name == 'meta':
             doc_type = 'meta'
