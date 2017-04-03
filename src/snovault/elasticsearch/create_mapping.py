@@ -446,7 +446,6 @@ def type_mapping(types, item_type, embed=True):
     embeds = add_default_embeds(type_info.embedded, schema)
     if not embed:
         return mapping
-    embed_obj = {}  # overall embedded object
     for prop in embeds:
         single_embed = {}
         s = schema
