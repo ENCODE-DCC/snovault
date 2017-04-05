@@ -56,13 +56,17 @@ def sorted_dict(d):
 
 
 def schema_mapping(name, schema):
+    # If a mapping is explicitly defined, use it
+    if 'mapping' in schema:
+        return schema['mapping']
+
     if 'linkFrom' in schema:
         type_ = 'string'
     else:
         type_ = schema['type']
 
     # Elasticsearch handles multiple values for a field
-    if type_ == 'array' and schema['items']:
+    if type_ == 'array':
         return schema_mapping(name, schema['items'])
 
     if type_ == 'object':
