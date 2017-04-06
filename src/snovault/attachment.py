@@ -84,6 +84,14 @@ class ItemWithAttachment(Item):
 
         # Make sure the file extensions matches the mimetype
         download_meta['download'] = filename = attachment['download']
+        
+        # We are adding 'application/gzip' mimetype which overrides 'application/x-tar' for .tar files.
+        # The change is only in 'mimetypes' module scope.
+        if not mimetypes.inited:
+            mimetypes.init()
+        if 'application/gzip' not in mimetypes.types_map.values():
+            mimetypes.add_type('application/gzip', '.tar')
+
         mime_type_from_filename, _ = mimetypes.guess_type(filename)
         if mime_type_from_filename is None:
             mime_type_from_filename = 'application/octet-stream'
