@@ -555,7 +555,7 @@ class User(Base):
         self.name = name
         self.email = email
         self.password = password
-    
+
     @classmethod
     def get_by_username(cls, email):
         return _DBSESSION.query(cls).filter(cls.email == email).first()
