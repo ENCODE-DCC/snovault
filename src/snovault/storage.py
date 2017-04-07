@@ -296,6 +296,7 @@ class S3BlobStorage(object):
             key.set_contents_from_string(data)
         download_meta['bucket'] = self.bucket.name
         download_meta['key'] = blob_id
+        download_meta['blob_id'] = str(blob_id)
 
     def _get_bucket_key(self, download_meta):
         # Assume files have been migrated
