@@ -138,9 +138,10 @@ class ItemWithAttachment(Item):
             download_meta['md5sum'] = attachment['md5sum'] = md5sum
 
         registry = find_root(self).registry
-        blob_id = self.uuid
-        download_meta['blob_id'] = blob_id
-        registry[BLOBS].store_blob(data, download_meta, blob_id)
+        # blob_id = self.uuid
+        # download_meta['blob_id'] = blob_id
+        # registry[BLOBS].store_blob(data, download_meta, blob_id)
+        registry[BLOBS].store_blob(data, download_meta)
 
         attachment['href'] = '@@download/%s/%s' % (prop_name, quote(filename))
 
