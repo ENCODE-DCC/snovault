@@ -21,6 +21,7 @@ from snovault import (
 from .validation import ValidationFailure
 import magic
 import mimetypes
+import uuid
 
 
 def includeme(config):
@@ -138,12 +139,11 @@ class ItemWithAttachment(Item):
             download_meta['md5sum'] = attachment['md5sum'] = md5sum
 
         registry = find_root(self).registry
-        # blob_id = self.uuid
-        # download_meta['blob_id'] = blob_id
-        # registry[BLOBS].store_blob(data, download_meta, blob_id)
-        registry[BLOBS].store_blob(data, download_meta)
+        blob_id = str(uuid.uuid4())
+        registry[BLOBS].store_blob(data, download_meta, blob_id)
 
         attachment['href'] = '@@download/%s/%s' % (prop_name, quote(filename))
+        attachment['blob_id'] = blob_id
 
     def _update(self, properties, sheets=None):
         changed = []
