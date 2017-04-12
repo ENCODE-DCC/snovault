@@ -34,6 +34,22 @@ class Connection(object):
     def types(self):
         return self.registry[TYPES]
 
+    def get_by_json(self, key, value, item_type, default=None):
+        model = self.storage.get_by_json(key, value, item_type, default)
+
+        if model is None:
+            return default
+
+        try:
+            Item = self.types.by_item_type[model.item_type].factory
+        except KeyError:
+            raise UnknownItemTypeError(model.item_type)
+
+        item = Item(self.registry, model)
+        model.used_for(item)
+        return item
+
+
     def get_by_uuid(self, uuid, default=None):
         if isinstance(uuid, basestring):
             try:
