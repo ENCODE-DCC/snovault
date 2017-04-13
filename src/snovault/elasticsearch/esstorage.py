@@ -96,6 +96,16 @@ class PickStorage(object):
                 return self.write.get_by_unique_key(unique_key, name)
         return model
 
+
+    def get_by_json(self, key, value, item_type, default=None):
+        storage = self.storage()
+        model = storage.get_by_json(key, value, item_type)
+        if storage is self.read:
+            if model is None or model.invalidated():
+                return self.write.get_by_json(key, value, item_type)
+        return model
+
+
     def get_rev_links(self, model, rel, *item_types):
         return self.storage().get_rev_links(model, rel, *item_types)
 
@@ -121,6 +131,7 @@ class ElasticSearchStorage(object):
 
     def _one(self, query):
         data = self.es.search(index=self.index, body=query)
+
         hits = data['hits']['hits']
         if len(hits) != 1:
             return None
@@ -133,6 +144,23 @@ class ElasticSearchStorage(object):
         except elasticsearch.exceptions.NotFoundError:
             return None
         return CachedModel(hit)
+
+    def get_by_json(self, key, value, item_type, default=None):
+        # find the term with the specific type
+        # also this query will do it to...
+        # {‘fields’: [], ‘filter’: {‘and’: [{‘term’: {‘embedded.term_name.raw’: ‘lung’}}, {‘terms’:
+        # {‘item_type’: [‘ontology_term’]}}]}, ‘_source’: [‘embedded’]}
+
+        term = 'embedded.' + key + '.raw'
+        query = {
+            'filter': {'and': [
+                {'term': {term: value}},
+                {'type': {'value': item_type}},
+            ]}
+        }
+        res = self._one(query)
+        return res
+
 
     def get_by_unique_key(self, unique_key, name):
         term = 'unique_keys.' + unique_key
