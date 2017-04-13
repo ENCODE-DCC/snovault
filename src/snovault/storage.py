@@ -13,7 +13,7 @@ from sqlalchemy import (
     types,
 )
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.dialects.postgresql import JSONB as JSON
+from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext import baked
 from sqlalchemy.ext.declarative import declarative_base
