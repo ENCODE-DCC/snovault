@@ -35,8 +35,6 @@ class Connection(object):
         return self.registry[TYPES]
 
     def get_by_json(self, key, value, item_type, default=None):
-        print(self.storage)
-        import pdb; pdb.set_trace()
         model = self.storage.get_by_json(key, value, item_type, default)
 
         if model is None:
