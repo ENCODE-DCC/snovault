@@ -13,6 +13,7 @@ from sqlalchemy import (
     types,
 )
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.dialects.postgresql import JSONB as JSON
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext import baked
 from sqlalchemy.ext.declarative import declarative_base
@@ -20,10 +21,12 @@ from sqlalchemy.orm import (
     collections,
     scoped_session,
     sessionmaker,
+    contains_eager
 )
 from sqlalchemy.orm.exc import (
     FlushError,
     NoResultFound,
+    MultipleResultsFound,
 )
 from .interfaces import (
     BLOBS,
@@ -70,7 +73,6 @@ baked_query_unique_key = bakery(
     ).filter(Key.name == bindparam('name'), Key.value == bindparam('value'))
 )
 
-
 class RDBStorage(object):
     batchsize = 1000
 
@@ -100,6 +102,23 @@ class RDBStorage(object):
             return default
         else:
             return key.resource
+
+
+    def get_by_json(self, key, value, item_type, default=None):
+        session = self.DBSession()
+        try:
+            # baked query seem to not work with json 
+            query = (session.query(PropertySheet)
+                    .join(PropertySheet.resource)
+                    .filter(Resource.item_type == item_type,
+                            PropertySheet.properties[key].astext == value)
+                    )
+
+            data = query.one()
+            return data.resource
+        except (NoResultFound, MultipleResultsFound):
+            return default
+
 
     def get_rev_links(self, model, rel, *item_types):
         if item_types:
@@ -317,7 +336,7 @@ class S3BlobStorage(object):
         key_obj = bucket.get_key(key, validate=False)
         return key_obj.get_contents_as_string()
 
-
+'''
 class JSON(types.TypeDecorator):
     """Represents an immutable structure as a json-encoded string.
     """
@@ -340,14 +359,14 @@ class JSON(types.TypeDecorator):
             return value
         if value is None:
             return value
-        return json_renderer.dumps(value)
-
+        return json_renderer.dumps(value)/
     def process_result_value(self, value, dialect):
         if self.using_native_json:
             return value
         if value is None:
             return value
         return json.loads(value)
+'''
 
 
 class Key(Base):
