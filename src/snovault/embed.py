@@ -7,6 +7,7 @@ from pyramid.compat import (
     unquote_bytes_to_wsgi,
 )
 from pyramid.httpexceptions import HTTPNotFound
+from pyramid.traversal import find_resource
 import logging
 log = logging.getLogger(__name__)
 
@@ -69,10 +70,11 @@ def embed(request, *elements, **kw):
     path = join(*elements)
     path = unquote_bytes_to_wsgi(native_(path))
     # check to see if this embed is a non-object field
-    invalid_check = identify_invalid_embed(path)
+    if path == 'mixed ectoderm/mesoderm/endoderm-derived structure/@@object':
+        import pdb; pdb.set_trace()
+    invalid_check = identify_invalid_embed(request, path)
     if invalid_check != 'valid':
         return invalid_check
-    log.debug('embed: %s', path)
     if as_user is not None:
         result, embedded, linked = _embed(request, path, as_user)
     else:
@@ -83,13 +85,13 @@ def embed(request, *elements, **kw):
             embed_cache[path] = cached
         result, embedded, linked = cached
         result = deepcopy(result)
-
+    log.debug('embed: %s', path)
     request._embedded_uuids.update(embedded)
     request._linked_uuids.update(linked)
     # if we have a list of fields to embed, @@embebded is being called.
     # parse and trim fully embedded obj according to the fields to embed.
     if fields_to_embed is not None:
-        p_result = parse_embedded_result(result, fields_to_embed)
+        p_result = parse_embedded_result(request, result, fields_to_embed)
         return p_result
     return result
 
@@ -115,7 +117,7 @@ def _embed(request, path, as_user='EMBED'):
     return result, subreq._embedded_uuids, subreq._linked_uuids
 
 
-def identify_invalid_embed(path):
+def identify_invalid_embed(request, path):
     """
     With new embedding system, we might attempt to embed something that doesn't
     have a fully formed path (i.e. uuid/@@object instead of /type/uuid/@@object)
@@ -124,14 +126,22 @@ def identify_invalid_embed(path):
     the object needed for that field will already be handled.
     Return the value of the non-obj field, else 'valid' if obj can be embedded
     """
-    if len(path) > 0 and len(path.split('/')) != 4 and path[0] != '/':
-        # return the value of the desired field, since this is not an obj to embed
-        return path.split('/')[0]
-    else:
-        return 'valid'
+    split_path = path.split('/')
+    proc_path = [sub for sub in split_path if sub[:2] != '@@']
+    use_path = '/'.join(proc_path)
+    try:
+        find_attempt = find_resource(request.root, use_path)
+    except KeyError: # KeyError is due to path not found
+        return split_path[0]
+    # TypeErrors come from certain formatting issues
+    # Known issues: ':' in path (pyramid interprets as scheme)
+    except TypeError:
+        return split_path[0]
+    return 'valid' # this obj can be embedded (a valid resource path)
 
 
-def parse_embedded_result(result, fields_to_embed):
+
+def parse_embedded_result(request, result, fields_to_embed):
     """
     Take a list of fields to embed, with each item being a '.' separated list of
     fields (i.e biosource.individual.organism.name). Uses these to parse and
@@ -139,7 +149,7 @@ def parse_embedded_result(result, fields_to_embed):
     Returns the trimmed (selectively embedded) result
     """
     embedded_model = build_embedded_model(fields_to_embed)
-    return build_embedded_result(result, embedded_model)
+    return build_embedded_result(request, result, embedded_model)
 
 
 def build_embedded_model(fields_to_embed):
@@ -176,7 +186,7 @@ def build_embedded_model(fields_to_embed):
     return embedded_model
 
 
-def build_embedded_result(result, embedded_model):
+def build_embedded_result(request, result, embedded_model):
     """
     Uses the embedded model from build_embedded_model() and uses it to recursively
     though handle_dict_embed() to build a selectively embedded result.
@@ -206,11 +216,11 @@ def build_embedded_result(result, embedded_model):
         val = result[key]
         embed_val = None
         if isinstance(val, str):
-            embed_val = handle_string_embed(key, val, embedded_model)
+            embed_val = handle_string_embed(request, key, val, embedded_model)
         elif isinstance(val, list):
-            embed_val = handle_list_embed(key, val, embedded_model)
+            embed_val = handle_list_embed(request, key, val, embedded_model)
         elif isinstance(val, dict):
-            embed_val = handle_dict_embed(key, val, embedded_model)
+            embed_val = handle_dict_embed(request, key, val, embedded_model)
         else:  # catch any other case
             embed_val = val
         # embed_val will be false if there in the case of a non-existent value
@@ -220,23 +230,21 @@ def build_embedded_result(result, embedded_model):
     return parsed_result
 
 
-def handle_string_embed(key, val, embedded_model):
+def handle_string_embed(request, key, val, embedded_model):
     """
     Allow a string to be embedded only if it's an @id field for this object
     or a non-object related string.
     Allow @@download strings regardless of format for things like links
     """
-    if key == '@id':
+    if key == '@id' or key == 'uuid':
         return val
-    elif '@@download' in val:
-        return val
-    elif identify_invalid_embed(val) != 'valid':
+    elif identify_invalid_embed(request, val) != 'valid':
         return val
     else:
         return None
 
 
-def handle_list_embed(key, val, embedded_model):
+def handle_list_embed(request, key, val, embedded_model):
     """
     Handles lists, which could be either lists of embedded objects or other
     fields. Pass them on accordingly and conglomerate the results.
@@ -244,18 +252,18 @@ def handle_list_embed(key, val, embedded_model):
     list_result = []
     for item in val:
         if isinstance(item, str):
-            list_result.append(handle_string_embed(key, item, embedded_model))
+            list_result.append(handle_string_embed(request, key, item, embedded_model))
         elif isinstance(item, list):
-            list_result.append(handle_list_embed(key, item, embedded_model))
+            list_result.append(handle_list_embed(request, key, item, embedded_model))
         elif isinstance(item, dict):
-            list_result.append(handle_dict_embed(key, item, embedded_model))
+            list_result.append(handle_dict_embed(request, key, item, embedded_model))
         else:  # no chance of this being an embedded object, so just use it
             list_result.append(item)
     list_result = [entry for entry in list_result if entry]  # remove Falses
     return list_result if len(list_result) > 0 else None
 
 
-def handle_dict_embed(key, val, embedded_model):
+def handle_dict_embed(request, key, val, embedded_model):
     """
     Given an object, determine whether this object should be embedded. In
     addition, check to see if something will be embedded further down the line
@@ -269,13 +277,13 @@ def handle_dict_embed(key, val, embedded_model):
             # Adding this * makes all fields get added, not just the down-the-
             # line embed
             embedded_model[key]['*'] = 'fully embed this obj'
-            return build_embedded_result(val, embedded_model[key])
+            return build_embedded_result(request, val, embedded_model[key])
         # deeper embedding involved, but not fully embedded
         else:
-            return build_embedded_result(val, embedded_model[key])
+            return build_embedded_result(request, val, embedded_model[key])
     elif 'uuid' not in val.keys() or key in embedded_model['fields_to_use']:
         # this is a subobject or a embedded object that has no deeper embedding
-        return build_embedded_result(val, {'*': 'fully embed this obj'})
+        return build_embedded_result(request, val, {'*': 'fully embed this obj'})
     else:
         return None
 
