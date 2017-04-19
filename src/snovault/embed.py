@@ -70,8 +70,6 @@ def embed(request, *elements, **kw):
     path = join(*elements)
     path = unquote_bytes_to_wsgi(native_(path))
     # check to see if this embed is a non-object field
-    if path == 'mixed ectoderm/mesoderm/endoderm-derived structure/@@object':
-        import pdb; pdb.set_trace()
     invalid_check = identify_invalid_embed(request, path)
     if invalid_check != 'valid':
         return invalid_check
@@ -126,9 +124,14 @@ def identify_invalid_embed(request, path):
     the object needed for that field will already be handled.
     Return the value of the non-obj field, else 'valid' if obj can be embedded
     """
+    if len(path) == 0 or path[0] != '/':
+        return path
     split_path = path.split('/')
     proc_path = [sub for sub in split_path if sub[:2] != '@@']
     use_path = '/'.join(proc_path)
+    print('----->', use_path)
+    if use_path in ['', '/', '/session-properties', '/me', '/favicon.ico']:
+        return 'valid'
     try:
         find_attempt = find_resource(request.root, use_path)
     except KeyError: # KeyError is due to path not found
@@ -138,7 +141,6 @@ def identify_invalid_embed(request, path):
     except TypeError:
         return split_path[0]
     return 'valid' # this obj can be embedded (a valid resource path)
-
 
 
 def parse_embedded_result(request, result, fields_to_embed):

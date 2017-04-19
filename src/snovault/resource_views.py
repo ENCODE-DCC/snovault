@@ -255,9 +255,12 @@ def item_view_columns(context, request):
 @view_config(context=Item, permission='view_raw', request_method='GET',
              name='raw')
 def item_view_raw(context, request):
+    props = context.properties
     if asbool(request.params.get('upgrade', True)):
-        return context.upgrade_properties()
-    return context.properties
+        props =  context.upgrade_properties()
+    # add uuid to raw view
+    props['uuid'] = str(context.uuid)
+    return props
 
 
 @view_config(context=Item, permission='edit', request_method='GET',
