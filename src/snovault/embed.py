@@ -115,7 +115,7 @@ def _embed(request, path, as_user='EMBED'):
     return result, subreq._embedded_uuids, subreq._linked_uuids
 
 
-def identify_invalid_embed(request, path):
+def identify_invalid_embed(request, path, use_literal=False):
     """
     With new embedding system, we might attempt to embed something that doesn't
     have a fully formed path (i.e. uuid/@@object instead of /type/uuid/@@object)
@@ -123,23 +123,39 @@ def identify_invalid_embed(request, path):
     This is okay because this only occurs when a specific field is desired;
     the object needed for that field will already be handled.
     Return the value of the non-obj field, else 'valid' if obj can be embedded
+
+    This function is used in two ways:
+    1. to differentiate from legitimate objects vs fields in the embedded
+    subrequest chain (as explained above)
+    2. to identify object paths in the parsing of fully embedded objects when
+    given a string value (see handle_string_embed). In this case, use_literal
+    should be true
     """
-    if len(path) == 0 or path[0] != '/':
-        return path
     split_path = path.split('/')
-    proc_path = [sub for sub in split_path if sub[:2] != '@@']
-    use_path = '/'.join(proc_path)
-    print('----->', use_path)
+    invalid_return_val = None
+    use_path = None
+    if use_literal:
+        invalid_return_val = path
+        use_path = path
+    else:
+        # non-literal path is used, which means remove any @@ subelements.
+        # Specifically, remove /@@object, which gets appended to fields as part
+        # of the subrequest chain in embeddeding
+        invalid_return_val = path[:-9] if path[-9:] == '/@@object' else split_path[0]
+        proc_path = [sub for sub in split_path if sub[:2] != '@@']
+        use_path = '/'.join(proc_path)
+    if len(path) == 0 or path[0] != '/':
+        return invalid_return_val
     if use_path in ['', '/', '/session-properties', '/me', '/favicon.ico']:
         return 'valid'
     try:
         find_attempt = find_resource(request.root, use_path)
     except KeyError: # KeyError is due to path not found
-        return split_path[0]
+        return invalid_return_val
     # TypeErrors come from certain formatting issues
     # Known issues: ':' in path (pyramid interprets as scheme)
     except TypeError:
-        return split_path[0]
+        return invalid_return_val
     return 'valid' # this obj can be embedded (a valid resource path)
 
 
@@ -240,7 +256,7 @@ def handle_string_embed(request, key, val, embedded_model):
     """
     if key == '@id' or key == 'uuid':
         return val
-    elif identify_invalid_embed(request, val) != 'valid':
+    elif identify_invalid_embed(request, val, True) != 'valid':
         return val
     else:
         return None
