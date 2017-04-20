@@ -8,6 +8,7 @@ from pyramid.compat import (
 )
 from pyramid.httpexceptions import HTTPNotFound
 from pyramid.traversal import find_resource
+from pyramid.interfaces import IRoutesMapper
 import logging
 log = logging.getLogger(__name__)
 
@@ -146,7 +147,8 @@ def identify_invalid_embed(request, path, use_literal=False):
         use_path = '/'.join(proc_path)
     if len(path) == 0 or path[0] != '/':
         return invalid_return_val
-    if use_path in ['', '/', '/session-properties', '/me', '/favicon.ico']:
+    mapper = request.registry.queryUtility(IRoutesMapper)
+    if mapper.get_route(path.strip('/')):
         return 'valid'
     try:
         find_attempt = find_resource(request.root, use_path)

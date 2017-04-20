@@ -34,7 +34,10 @@ def test_selective_embedding(workbook, testapp):
     assert isinstance(test_json[0]['award'], dict)
     assert test_json[0]['award']['start_date'] == '2012-09-21'
     # since award.pi was not specifically embedded, pi field should not exist
+    # (removed @id-like field)
     assert 'pi' not in test_json[0]['award']
+    # @id-like field that should still be embedded (not a valid @id)
+    assert test_json[0]['lab']['city'] == '/Stanford/USA/'
 
 
 
