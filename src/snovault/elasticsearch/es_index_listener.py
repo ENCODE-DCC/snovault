@@ -27,7 +27,7 @@ from urllib.parse import parse_qsl
 log = logging.getLogger(__name__)
 
 EPILOG = __doc__
-DEFAULT_TIMEOUT = 6000
+DEFAULT_TIMEOUT = 60
 PY2 = sys.version_info[0] == 2
 
 # We need this because of MVCC visibility.
@@ -92,7 +92,7 @@ def run(testapp, timeout=DEFAULT_TIMEOUT, dry_run=False, path='/index', control=
                 )
 
                 try:
-                    print('''''')
+                    print()
                     print(path)
                     res = testapp.post_json(path, {
                         'record': True,
@@ -126,6 +126,9 @@ def run(testapp, timeout=DEFAULT_TIMEOUT, dry_run=False, path='/index', control=
                     max_xid=max_xid,
                 )
                 # Wait on notifcation
+                # Temporary: override timeout so that irrelevant logs won't mess with debugging session
+                timeout = 99999
+
                 readable, writable, err = select.select(sockets, [], sockets, timeout)
 
                 if err:

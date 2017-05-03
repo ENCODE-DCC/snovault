@@ -117,9 +117,18 @@ def batch_upgrade(request):
             error = True
         else:
             if errors:
-                errortext = [
-                    '%s: %s' % ('/'.join(error.path) or '<root>', error.message)
-                    for error in errors]
+                from pprint import pprint as pp
+                for error in errors:
+                    pp('{}#####################################################################'.format(uuid))
+                    for k in dir(error):
+                        if '__' not in k:
+                            pp(error[k])
+                try:
+                    errortext = [
+                        '%s: %s' % ('/'.join(error.path) or '<root>', error.message)
+                        for error in errors]
+                except Exception:
+                    errortext = ['some exception']
                 logger.error(
                     'Validation failure: /%s/%s\n%s', item_type, uuid, '\n'.join(errortext))
                 sp.rollback()

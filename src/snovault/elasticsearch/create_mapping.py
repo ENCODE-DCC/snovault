@@ -42,8 +42,8 @@ META_MAPPING = {
             'store_generic': {
                 'match': '*',
                 'mapping': {
-                    'index': 'no',
-                    'store': 'yes',
+                    'index': False,
+                    'store': True,
                 },
             },
         },
@@ -247,47 +247,24 @@ def es_mapping(mapping):
             'analyzer': 'snovault_index_analyzer',
             'search_analyzer': 'snovault_search_analyzer'
         },
-        # 'dynamic_templates': [
-        #     {
-        #         'template_principals_allowed': {
-        #             'path_match': "principals_allowed.*",
-        #             'mapping': {
-        #                 'type': 'keyword',
-        #                 # 'fields': {
-        #                 #     'raw': {
-        #                 #         'type': 'keyword',
-        #                 #     }
-        #                 # }
-        #             },
-        #         },
-        #     },
-        #     {
-        #         'template_unique_keys': {
-        #             'path_match': "unique_keys.*",
-        #             'mapping': {
-        #                 'type': 'keyword',
-        #                 # 'fields': {
-        #                 #     'raw': {
-        #                 #         'type': 'keyword',
-        #                 #     }
-        #                 # }
-        #             },
-        #         },
-        #     },
-        #     {
-        #         'template_links': {
-        #             'path_match': "links.*",
-        #             'mapping': {
-        #                 'type': 'keyword',
-        #                 # 'fields': {
-        #                 #     'raw': {
-        #                 #         'type': 'keyword',
-        #                 #     }
-        #                 # }
-        #             },
-        #         },
-        #     },
-        # ],
+        'dynamic_templates': [
+            {
+                'template_principals_allowed': {
+                    'path_match': "principals_allowed.*",
+                    'mapping': {
+                        'type': 'keyword',
+                    },
+                },
+            },
+            {
+                'template_unique_keys': {
+                    'path_match': "unique_keys.*",
+                    'mapping': {
+                        'type': 'keyword',
+                    },
+                },
+            },
+        ],
         'properties': {
             'uuid': {
                 'type': 'keyword',
@@ -316,10 +293,6 @@ def es_mapping(mapping):
                 'enabled': False,
                 'include_in_all': False,
             },
-            'principals_allowed': {
-                'type': 'object',
-                'include_in_all': False,
-            },
             'embedded_uuids': {
                 'type': 'keyword',
                 'include_in_all': False,
@@ -328,12 +301,9 @@ def es_mapping(mapping):
                 'type': 'keyword',
                 'include_in_all': False,
             },
-            'unique_keys': {
-                'type': 'object',
-                'include_in_all': False,
-            },
             'links': {
                 'type': 'object',
+                'dynamic': True,
                 'include_in_all': False,
             },
             'paths': {
@@ -452,7 +422,7 @@ def run(app, collections=None, dry_run=False):
         es = app.registry[ELASTIC_SEARCH]
         if es.indices.exists(index=index):
             es.indices.delete(index=index)
-        es.indices.create(index=index, body=index_settings(), update_all_types=False)
+        es.indices.create(index=index, body=index_settings(), update_all_types=True)
 
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
@@ -516,7 +486,7 @@ def run(app, collections=None, dry_run=False):
             try:
                 pp('about to put mapping for {}'.format(doc_type))
                 # pp(mapping)
-                es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping}, update_all_types=False)
+                es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping}, update_all_types=True)
             except:
                 log.exception("Could not create mapping for the collection %s", doc_type)
             else:
