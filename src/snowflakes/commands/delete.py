@@ -9,6 +9,7 @@ from pyramid.threadlocal import manager
 from pyramid.testing import DummyRequest
 from snovault.interfaces import (
     STORAGE,
+    DBSESSION
 )
 
 EPILOG = __doc__
@@ -22,14 +23,20 @@ test_uuids = ['a357b33b-cdaa-4312-91c0-086bfec24181']
 def run(app, dry_run=False):
 
     storage = app.registry[STORAGE].write
-
+    session = app.registry[DBSESSION]
     to_delete = test_uuids
+    import pdb;pdb.set_trace()
     # to_delete = storage.__iter__('talen')
     for rid in to_delete:
         model = storage.get_by_uuid(str(rid))
-        if not dry_run:
-            model.DBSession.delete(model)
-        logger.info('Deleted %s', model.rid)
+        sp = session.begin_nested()
+        session.delete(model)
+        try:
+            sp.commit()
+            logger.info('Deleted %s', model.rid)
+        except:
+            sp.rollback()
+            logger.info('Rollback deletion of %s', model.rid)
 
 
 def main():
