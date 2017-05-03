@@ -121,8 +121,7 @@ class MPIndexer(Indexer):
     @reify
     def pool(self):
         return Pool(
-            # processes=self.processes,
-            processes=1,
+            processes=self.processes,
             initializer=initializer,
             initargs=self.initargs,
             context=get_context('forkserver'),
