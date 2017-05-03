@@ -72,7 +72,7 @@ def index(request):
     first_txn = None
     last_xmin = None
 
-    es_log_settings = {"transient": {"logger._root": "TRACE"}}
+    es_log_settings = {"transient": {"logger._root": "DEBUG"}}
     es.cluster.put_settings(es_log_settings)
 
     if 'last_xmin' in request.json:
