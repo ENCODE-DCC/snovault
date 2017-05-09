@@ -434,6 +434,9 @@ class CurrentPropertySheet(Base):
         viewonly=True,
     )
     resource = orm.relationship('Resource')
+    __mapper_args__ = {
+        'confirm_deleted_rows': False,
+    }
 
 
 class Resource(Base):

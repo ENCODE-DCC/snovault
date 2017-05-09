@@ -11,13 +11,16 @@ from snovault.interfaces import (
     STORAGE,
     DBSESSION
 )
+from snovault.storage import (
+    CurrentPropertySheet,
+)
 
 EPILOG = __doc__
 
 logger = logging.getLogger(__name__)
 
 
-test_uuids = ['a357b33b-cdaa-4312-91c0-086bfec24181']
+test_uuids = ['1b18dab4-50be-4a1d-9b95-5e9fd840c8fb']
 
 
 def run(app, dry_run=False):
@@ -30,6 +33,15 @@ def run(app, dry_run=False):
     for rid in to_delete:
         model = storage.get_by_uuid(str(rid))
         sp = session.begin_nested()
+
+        for cp in model.data.values():
+            for p in cp.history:
+                session.delete(p)
+                logger.info("Queueing %s for deletion", p)
+            session.delete(cp)
+            logger.info("Queueng %s for deletion", cp)
+
+
         session.delete(model)
         try:
             sp.commit()
@@ -54,7 +66,7 @@ def main():
     logging.basicConfig()
     app = get_app(args.config_uri, args.app_name)
     # Loading app will have configured from config file. Reconfigure here:
-    logging.getLogger('encoded').setLevel(logging.DEBUG)
+    logging.getLogger('snowflakes').setLevel(logging.DEBUG)
 
     raised = False
     try:
