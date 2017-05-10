@@ -52,6 +52,9 @@ def item_index_data(context, request):
                 for key in unique_keys[key_name])
 
     path = path + '/'
+    from pprint import pprint as pp
+    pp('variable "path" inside item_index_data:')
+    pp(path)
     embedded = request.embed(path, '@@embedded')
     object = request.embed(path, '@@object')
     audit = request.embed(path, '@@audit')['audit']
