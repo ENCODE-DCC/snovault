@@ -168,6 +168,24 @@ class RDBStorage(object):
         msg = 'Keys conflict: %r' % conflicts
         raise HTTPConflict(msg)
 
+    def delete_by_uuid(self, rid):
+        # WARNING USE WITH CARE PERMANENTLY DELETES RESOURCES
+        session = self.DBSession()
+        sp = session.begin_nested()
+        model = self.get_by_uuid(rid)
+        try:
+            for current_propsheet in model.data.values():
+                # delete the propsheet history
+                for propsheet in current_propsheet.history:
+                    session.delete(propsheet)
+                # now delete the currentPropsheet
+                session.delete(current_propsheet)
+            # now delete the resource, keys and links(via cascade)
+            session.delete(model)
+            sp.commit()
+        except:
+            sp.rollback()
+
     def _update_properties(self, model, properties, sheets=None):
         if properties is not None:
             model.propsheets[''] = properties

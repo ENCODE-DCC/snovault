@@ -110,6 +110,31 @@ def test_current_propsheet_update(session):
     assert current.sid
 
 
+def test_delete(session):
+    from snovault.storage import (
+        CurrentPropertySheet,
+        Resource,
+        PropertySheet,
+    )
+    name = 'testdata'
+    props1 = {'foo': 'bar'}
+    resource = Resource('test_item', {name: props1})
+    session.add(resource)
+    session.flush()
+    resource = session.query(Resource).one()
+    props2 = {'foo': 'baz'}
+    resource[name] = props2
+    session.flush()
+    resource = session.query(Resource).one()
+    session.flush()
+    assert resource[name] == props2
+    assert session.query(PropertySheet).count() == 2
+    assert [propsheet.properties for propsheet in resource.data[name].history] == [props1, props2]
+    current = session.query(CurrentPropertySheet).one()
+    assert current.sid
+
+
+
 def test_keys(session):
     from sqlalchemy.orm.exc import FlushError
     from snovault.storage import (
