@@ -67,3 +67,19 @@ def select_distinct_values(request, value_path, *from_paths):
         values = {value for value_list in value_lists for value in value_list}
 
     return list(values)
+
+
+def quick_deepcopy(obj):
+    """Deep copy an object consisting of dicts, lists, and primitives.
+
+    This is faster than Python's `copy.deepcopy` because it doesn't
+    do bookkeeping to avoid duplicating objects in a cyclic graph.
+
+    This is intended to work fine for data deserialized from JSON,
+    but won't work for everything.
+    """
+    if isinstance(obj, dict):
+        obj = {k: quick_deepcopy(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        obj = [quick_deepcopy(v) for v in obj]
+    return obj

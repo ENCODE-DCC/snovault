@@ -1,7 +1,6 @@
 # See http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/resources.html
 import logging
 from collections import Mapping
-from copy import deepcopy
 from pyramid.decorator import reify
 from pyramid.httpexceptions import HTTPInternalServerError
 from pyramid.security import (
@@ -23,6 +22,7 @@ from .interfaces import (
 from .validation import ValidationFailure
 from .util import (
     ensurelist,
+    quick_deepcopy,
     simple_path_ids,
 )
 
@@ -268,7 +268,7 @@ class Item(Resource):
         }
 
     def upgrade_properties(self):
-        properties = deepcopy(self.properties)
+        properties = quick_deepcopy(self.properties)
         current_version = properties.get('schema_version', '')
         target_version = self.type_info.schema_version
         if target_version is not None and current_version != target_version:

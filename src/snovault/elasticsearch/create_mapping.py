@@ -57,9 +57,6 @@ KEYWORD_FIELDS = ['schema_version', 'uuid', 'accession', 'alternate_accessions',
                   'internal_status', 'target', 'biosample_type']
 TEXT_FIELDS = ['pipeline_error_detail', 'description', 'notes']
 
-ARRAY_FIELDS = ['objective_slims']
-
-ALL_PROPERTY_NAMES = []
 
 
 def sorted_pairs_hook(pairs):
@@ -71,7 +68,10 @@ def sorted_dict(d):
 
 
 def schema_mapping(name, schema):
-    ALL_PROPERTY_NAMES.append(name)
+    # If a mapping is explicitly defined, use it
+    if 'mapping' in schema:
+        return schema['mapping']
+
     if 'linkFrom' in schema:
         type_ = 'string'
     # elif 'linkTo' in schema:
@@ -80,7 +80,7 @@ def schema_mapping(name, schema):
         type_ = schema['type']
 
     # Elasticsearch handles multiple values for a field
-    if type_ == 'array' and schema['items']:
+    if type_ == 'array':
         return schema_mapping(name, schema['items'])
 
     if type_ == 'object':
