@@ -28,7 +28,6 @@ def run(app, dry_run=False):
     storage = app.registry[STORAGE].write
     session = app.registry[DBSESSION]
     to_delete = test_uuids
-    import pdb;pdb.set_trace()
     # to_delete = storage.__iter__('talen')
     for rid in to_delete:
         model = storage.get_by_uuid(str(rid))

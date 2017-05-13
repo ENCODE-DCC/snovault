@@ -183,8 +183,9 @@ class RDBStorage(object):
             # now delete the resource, keys and links(via cascade)
             session.delete(model)
             sp.commit()
-        except:
+        except Exception as e:
             sp.rollback()
+            raise e
 
     def _update_properties(self, model, properties, sheets=None):
         if properties is not None:
@@ -549,6 +550,7 @@ class TransactionRecord(Base):
 # User specific stuff
 import cryptacular.bcrypt
 crypt = cryptacular.bcrypt.BCRYPTPasswordManager()
+
 
 def hash_password(password):
     return crypt.encode(password)
