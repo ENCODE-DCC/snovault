@@ -195,12 +195,12 @@ def build_embedded_model(fields_to_embed):
         field_pointer = embedded_model
         for subfield in split_field:
             if subfield == split_field[-1]:
-                if 'fields_to_use' in field_pointer.keys():
+                if 'fields_to_use' in field_pointer:
                     field_pointer['fields_to_use'].append(subfield)
                 else:
                     field_pointer['fields_to_use'] = [subfield]
                 continue
-            elif subfield not in field_pointer.keys():
+            elif subfield not in field_pointer:
                 field_pointer[subfield] = {}
             field_pointer = field_pointer[subfield]
     return embedded_model
@@ -215,22 +215,22 @@ def build_embedded_result(request, result, embedded_model):
     """
     parsed_result = {}
     # Use all fields, check all possible embeds
-    if '*' in embedded_model.keys():
+    if '*' in embedded_model:
         fields_to_use = result.keys()
     # This is true when there are no embedded objects down the line; that is,
     # we need only be concerned about fields on the current obj level.
     # Embed only the fields specified in the model when this is the case
-    elif list(embedded_model.keys()) == ['fields_to_use']:
+    elif list(embedded_model) == ['fields_to_use']:
         # eliminate all fields that are not found within the actual results
-        fields_to_use = [val for val in result.keys() if val in embedded_model['fields_to_use']]
+        fields_to_use = [val for val in result if val in embedded_model['fields_to_use']]
     # Use any applicable fields and any embedded objects
     else:
         # find any fields on this level to use
         curr_level_fields = []
-        if 'fields_to_use' in embedded_model.keys():
-            curr_level_fields = [val for val in result.keys() if val in embedded_model['fields_to_use']]
+        if 'fields_to_use' in embedded_model:
+            curr_level_fields = [val for val in result if val in embedded_model['fields_to_use']]
         # find fields that correspond to deeper embedded objs
-        embed_objs = [val for val in embedded_model.keys() if val != 'fields_to_use']
+        embed_objs = [val for val in embedded_model if val != 'fields_to_use']
         fields_to_use = curr_level_fields + embed_objs
     for key in fields_to_use:
         val = result[key]
@@ -291,9 +291,9 @@ def handle_dict_embed(request, key, val, embedded_model):
     Else, identify a subobject (obj defined within a schema) or a fully
     embedded object that has no deeper embedding within it.
     """
-    if key in embedded_model.keys():
+    if key in embedded_model:
         # test if itself fully embedded and deeper embedding involved
-        if 'fields_to_use' in embedded_model.keys() and key in embedded_model['fields_to_use']:
+        if 'fields_to_use' in embedded_model and key in embedded_model['fields_to_use']:
             # Adding this * makes all fields get added, not just the down-the-
             # line embed
             embedded_model[key]['*'] = 'fully embed this obj'
@@ -301,7 +301,7 @@ def handle_dict_embed(request, key, val, embedded_model):
         # deeper embedding involved, but not fully embedded
         else:
             return build_embedded_result(request, val, embedded_model[key])
-    elif 'uuid' not in val.keys() or key in embedded_model['fields_to_use']:
+    elif 'uuid' not in val or key in embedded_model['fields_to_use']:
         # this is a subobject or a embedded object that has no deeper embedding
         return build_embedded_result(request, val, {'*': 'fully embed this obj'})
     else:
