@@ -26,28 +26,10 @@ test_uuids = ['1b18dab4-50be-4a1d-9b95-5e9fd840c8fb']
 def run(app, dry_run=False):
 
     storage = app.registry[STORAGE].write
-    session = app.registry[DBSESSION]
     to_delete = test_uuids
     # to_delete = storage.__iter__('talen')
     for rid in to_delete:
-        model = storage.get_by_uuid(str(rid))
-        sp = session.begin_nested()
-
-        for cp in model.data.values():
-            for p in cp.history:
-                session.delete(p)
-                logger.info("Queueing %s for deletion", p)
-            session.delete(cp)
-            logger.info("Queueng %s for deletion", cp)
-
-
-        session.delete(model)
-        try:
-            sp.commit()
-            logger.info('Deleted %s', model.rid)
-        except:
-            sp.rollback()
-            logger.info('Rollback deletion of %s', model.rid)
+        storage.delete_by_uuid(str(rid))
 
 
 def main():
