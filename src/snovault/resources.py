@@ -268,7 +268,11 @@ class Item(Resource):
         }
 
     def upgrade_properties(self):
-        properties = deepcopy(self.properties)
+        try:
+            properties = deepcopy(self.properties)
+        except KeyError:
+            # don't fail if we try to upgrade properties on something not there yet
+            return None
         current_version = properties.get('schema_version', '')
         target_version = self.type_info.schema_version
         if target_version is not None and current_version != target_version:
