@@ -60,7 +60,7 @@ def main():
     parser.add_argument('--clear', action="store_true", help="Clear existing data")
     parser.add_argument('--init', action="store_true", help="Init database")
     parser.add_argument('--load', action="store_true", help="Load test set")
-    parser.add_argument('--datadir', default="/tmp/snovault", help="path to datadir")
+    parser.add_argument('--datadir', default='/tmp/snovault', help="path to datadir")
     args = parser.parse_args()
 
     logging.basicConfig()
