@@ -396,10 +396,6 @@ def attachment(path):
             'type': mime_type,
             'href': 'data:%s;base64,%s' % (mime_type, b64encode(stream.read()).decode('ascii'))
         }
-        from pprint import pprint as pp
-        pp(attach)
-        pp(path)
-        pp()
         if mime_type in ('application/pdf', 'text/plain', 'text/tab-separated-values', 'text/html'):
             # XXX Should use chardet to detect charset for text files here.
             return attach

@@ -74,6 +74,7 @@ class Snowset(Item):
 class Snowball(Snowset):
     item_type = 'snowball'
     schema = load_schema('snowflakes:schemas/snowball.json')
+    embedded = Snowset.embedded
 
 
 @collection(
@@ -86,6 +87,7 @@ class Snowball(Snowset):
 class Snowfort(Snowset):
     item_type = 'snowfort'
     schema = load_schema('snowflakes:schemas/snowfort.json')
+    embedded = Snowset.embedded
 
 
 @collection(
@@ -102,8 +104,8 @@ class Snowflake(Item):
 
     embedded = [
         'lab',
+        'award',
         'submitted_by',
-
     ]
     audit_inherit = [
         'lab',
