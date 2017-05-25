@@ -113,14 +113,15 @@ def test_load_sample_data(
         award,
         lab,
         submitter,
+        snowball,
+        snowflake,
         ):
     assert True, 'Fixtures have loaded sample data'
 
 
-@pytest.mark.xfail
-def test_abstract_collection(testapp, experiment):
-    testapp.get('/Dataset/{accession}'.format(**experiment))
-    testapp.get('/datasets/{accession}'.format(**experiment))
+def test_abstract_collection(testapp, snowball):
+    testapp.get('/Snowset/{accession}'.format(**snowball))
+    testapp.get('/snowsets/{accession}'.format(**snowball))
 
 
 @pytest.mark.slow
