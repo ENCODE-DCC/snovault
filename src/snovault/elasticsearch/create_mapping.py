@@ -427,50 +427,30 @@ def run(app, collections=None, dry_run=False):
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
     for collection_name in collections:
-        tmp_collection = [
-            'meta',
-            'award',
-            'lab',
-            'access_key',
-            'image',
-            'page',
-            'user',
-            'snowset',
-            'snowfort',
-            'snowball',
-            'snowflake',
-            'testing_dependencies',
-            'testing_download',
-            'testing_key',
-            'testing_link_source',
-            'testing_link_target',
-            'testing_post_put_patch',
-            'testing_server_default',
-        ]
-        if collection_name in tmp_collection:
-            if collection_name == 'meta':
-                doc_type = 'meta'
-                mapping = META_MAPPING
-            else:
-                doc_type = collection_name
-                collection = registry[COLLECTIONS].by_item_type[collection_name]
-                mapping = type_mapping(registry[TYPES], collection.type_info.item_type)
+        if collection_name == 'meta':
+            doc_type = 'meta'
+            mapping = META_MAPPING
+        else:
+            doc_type = collection_name
+            collection = registry[COLLECTIONS].by_item_type[collection_name]
+            mapping = type_mapping(registry[TYPES], collection.type_info.item_type)
 
-            if mapping is None:
-                continue  # Testing collections
-            if dry_run:
-                print(json.dumps(sorted_dict({index: {doc_type: mapping}}), indent=4))
-                continue
-            if collection_name is not 'meta':
-                mapping = es_mapping(mapping)
-            try:
-                pp('about to put mapping for {}'.format(doc_type))
-                # pp(mapping)
-                es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping}, update_all_types=True)
-            except:
-                log.exception("Could not create mapping for the collection %s", doc_type)
-            else:
-                es.indices.refresh(index=index)
+        if mapping is None:
+            continue  # Testing collections
+        if dry_run:
+            print(json.dumps(sorted_dict({index: {doc_type: mapping}}), indent=4))
+            continue
+        if collection_name is not 'meta':
+            mapping = es_mapping(mapping)
+        try:
+            pp('about to put mapping for {}'.format(doc_type))
+            # pp(mapping)
+            es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping}, update_all_types=True)
+        except:
+            log.exception("Could not create mapping for the collection %s", doc_type)
+        else:
+            es.indices.refresh(index=index)
+
 
 def main():
     import argparse
