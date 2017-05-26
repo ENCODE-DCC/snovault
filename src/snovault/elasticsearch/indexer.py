@@ -43,7 +43,6 @@ def includeme(config):
 
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
-    import pdb;pdb.set_trace()
     INDEX = request.registry.settings['snovault.elasticsearch.index']
     # Setting request.datastore here only works because routed views are not traversed.
     request.datastore = 'database'
