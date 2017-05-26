@@ -57,7 +57,7 @@ before_install:
 - nvm install 4
 - node --version
 - npm config set python /usr/bin/python2.7
-- sudo chmod -R a+r /etc/elasticsearch
+- sudo chmod -R a+r /etc/elasticsearch /usr/share/elasticsearch
 install:
 - python bootstrap.py --buildout-version 2.4.1 --setuptools-version 18.5
 - bin/buildout -c buildout-travis.cfg || (echo "Retrying buildout" && bin/buildout
