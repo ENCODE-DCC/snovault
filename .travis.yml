@@ -39,6 +39,8 @@ env:
       7F+UQNsSLGGLVORcsmBG7ByCMYljVk8i14rWonrXVjPP1fuwIp2AIZzNK6KrJ
       tQzLeb5gEy3A=
   - PATH="/usr/share/elasticsearch/bin:/usr/lib/postgresql/9.3/bin:$PATH"
+  - JAVA_HOME=/usr/lib/jvm/java-8-oracle
+  - JRE_HOME=/usr/lib/jvm/java-8-oracle/jre
 matrix:
   include:
   - python: '2.7'
