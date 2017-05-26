@@ -8,7 +8,6 @@ addons:
   apt:
     packages:
     - bsdtar
-    - oracle-java8-set-default
     - graphviz
 env:
   global:
