@@ -48,9 +48,9 @@ def test_set_filters():
         ('field1', 'value1'),
     ))
     query = {
-        'filter': {
-            'and': {
-                'filters': [],
+        'query': {
+            'bool': {
+                'filter': [],
             },
         },
     }
@@ -59,12 +59,12 @@ def test_set_filters():
 
     assert used_filters == {'field1': ['value1']}
     assert query == {
-        'filter': {
-            'and': {
-                'filters': [
+        'query': {
+            'bool': {
+                'filter': [
                     {
                         'terms': {
-                            'embedded.field1.raw': ['value1'],
+                            'embedded.field1': ['value1'],
                         },
                     },
                 ],
@@ -89,9 +89,9 @@ def test_set_filters_searchTerm():
         ('searchTerm', 'value1'),
     ))
     query = {
-        'filter': {
-            'and': {
-                'filters': [],
+        'query': {
+            'bool': {
+                'filter': [],
             },
         },
     }
@@ -100,9 +100,9 @@ def test_set_filters_searchTerm():
 
     assert used_filters == {}
     assert query == {
-        'filter': {
-            'and': {
-                'filters': [],
+        'query': {
+            'bool': {
+                'filter': [],
             },
         },
     }
@@ -128,9 +128,9 @@ def test_set_filters_reserved_params(param):
         (param, 'foo'),
     ))
     query = {
-        'filter': {
-            'and': {
-                'filters': [],
+        'query': {
+            'bool': {
+                'filter': [],
             },
         },
     }
@@ -139,9 +139,9 @@ def test_set_filters_reserved_params(param):
 
     assert used_filters == {}
     assert query == {
-        'filter': {
-            'and': {
-                'filters': [],
+        'query': {
+            'bool': {
+                'filter': [],
             },
         },
     }
@@ -158,9 +158,9 @@ def test_set_filters_multivalued():
         ('field1', 'value2'),
     ))
     query = {
-        'filter': {
-            'and': {
-                'filters': [],
+        'query': {
+            'bool': {
+                'filter': [],
             },
         },
     }
@@ -169,12 +169,12 @@ def test_set_filters_multivalued():
 
     assert used_filters == {'field1': ['value1', 'value2']}
     assert query == {
-        'filter': {
-            'and': {
-                'filters': [
+        'query': {
+            'bool': {
+                'filter': [
                     {
                         'terms': {
-                            'embedded.field1.raw': ['value1', 'value2'],
+                            'embedded.field1': ['value1', 'value2'],
                         },
                     },
                 ],
@@ -204,9 +204,9 @@ def test_set_filters_negated():
         ('field1!', 'value1'),
     ))
     query = {
-        'filter': {
-            'and': {
-                'filters': [],
+        'query': {
+            'bool': {
+                'filter': [],
             },
         },
     }
@@ -215,13 +215,13 @@ def test_set_filters_negated():
 
     assert used_filters == {'field1!': ['value1']}
     assert query == {
-        'filter': {
-            'and': {
-                'filters': [
+        'query': {
+            'bool': {
+                'filter': [
                     {
                         'not': {
-                            'terms': {
-                                'embedded.field1.raw': ['value1'],
+                            'term': {
+                                'embedded.field1': ['value1'],
                             },
                         },
                     },
@@ -247,9 +247,9 @@ def test_set_filters_audit():
         ('audit.foo', 'value1'),
     ))
     query = {
-        'filter': {
-            'and': {
-                'filters': [],
+        'query': {
+            'bool': {
+                'filter': [],
             },
         },
     }
@@ -258,9 +258,9 @@ def test_set_filters_audit():
 
     assert used_filters == {'audit.foo': ['value1']}
     assert query == {
-        'filter': {
-            'and': {
-                'filters': [
+        'query': {
+            'bool': {
+                'filter': [
                     {
                         'terms': {
                             'audit.foo': ['value1'],
@@ -289,9 +289,9 @@ def test_set_filters_exists_missing():
         ('field2!', '*'),
     ))
     query = {
-        'filter': {
-            'and': {
-                'filters': [],
+        'query': {
+            'bool': {
+                'filter': [],
             },
         },
     }
@@ -303,17 +303,17 @@ def test_set_filters_exists_missing():
         'field2!': ['*'],
     }
     assert query == {
-        'filter': {
-            'and': {
-                'filters': [
+        'query': {
+            'bool': {
+                'filter': [
                     {
                         'exists': {
-                            'field': 'embedded.field1.raw',
+                            'field': 'embedded.field1',
                         },
                     },
                     {
                         'missing': {
-                            'field': 'embedded.field2.raw',
+                            'field': 'embedded.field2',
                         }
                     }
                 ],
@@ -357,7 +357,7 @@ def test_set_facets():
             'aggs': {
                 'type': {
                     'terms': {
-                        'field': 'embedded.@type.raw',
+                        'field': 'embedded.@type',
                         'exclude': ['Item'],
                         'min_doc_count': 0,
                         'size': 100,
@@ -368,8 +368,8 @@ def test_set_facets():
                 'bool': {
                     'must': [
                         {'terms': {'principals_allowed.view': ['group.admin']}},
-                        {'terms': {'embedded.@type.raw': ['Snowball']}},
-                        {'terms': {'embedded.facet1.raw': ['value1']}},
+                        {'terms': {'embedded.@type': ['Snowball']}},
+                        {'terms': {'embedded.facet1': ['value1']}},
                         {'terms': {'audit.foo': ['value2']}},
                     ],
                 },
@@ -389,8 +389,8 @@ def test_set_facets():
                 'bool': {
                     'must': [
                         {'terms': {'principals_allowed.view': ['group.admin']}},
-                        {'terms': {'embedded.@type.raw': ['Snowball']}},
-                        {'terms': {'embedded.facet1.raw': ['value1']}},
+                        {'terms': {'embedded.@type': ['Snowball']}},
+                        {'terms': {'embedded.facet1': ['value1']}},
                     ],
                 },
             },
@@ -399,7 +399,7 @@ def test_set_facets():
             'aggs': {
                 'facet1': {
                     'terms': {
-                        'field': 'embedded.facet1.raw',
+                        'field': 'embedded.facet1',
                         'min_doc_count': 0,
                         'size': 100,
                     },
@@ -409,7 +409,7 @@ def test_set_facets():
                 'bool': {
                     'must': [
                         {'terms': {'principals_allowed.view': ['group.admin']}},
-                        {'terms': {'embedded.@type.raw': ['Snowball']}},
+                        {'terms': {'embedded.@type': ['Snowball']}},
                         {'terms': {'audit.foo': ['value2']}},
                     ],
                 },
@@ -437,7 +437,7 @@ def test_set_facets_negated_filter():
             'aggs': {
                 'facet1': {
                     'terms': {
-                        'field': 'embedded.facet1.raw',
+                        'field': 'embedded.facet1',
                         'min_doc_count': 0,
                         'size': 100,
                     },
@@ -447,8 +447,8 @@ def test_set_facets_negated_filter():
                 'bool': {
                     'must': [
                         {'terms': {'principals_allowed.view': ['group.admin']}},
-                        {'terms': {'embedded.@type.raw': ['Snowball']}},
-                        {'not': {'terms': {'embedded.field2.raw': ['value1']}}},
+                        {'terms': {'embedded.@type': ['Snowball']}},
+                        {'not': {'terms': {'embedded.field2': ['value1']}}},
                     ],
                 },
             },
@@ -478,10 +478,10 @@ def test_set_facets_type_exists():
                     'filters': {
                         'filters': {
                             'yes': {
-                                'exists': {'field': 'embedded.field1.raw'}
+                                'exists': {'field': 'embedded.field1'}
                             },
                             'no': {
-                                'missing': {'field': 'embedded.field1.raw'}
+                                'missing': {'field': 'embedded.field1'}
                             }
                         },
                     },
@@ -491,8 +491,8 @@ def test_set_facets_type_exists():
                 'bool': {
                     'must': [
                         {'terms': {'principals_allowed.view': ['group.admin']}},
-                        {'terms': {'embedded.@type.raw': ['Snowball']}},
-                        {'missing': {'field': 'embedded.field2.raw'}},
+                        {'terms': {'embedded.@type': ['Snowball']}},
+                        {'missing': {'field': 'embedded.field2'}},
                     ],
                 },
             },
@@ -503,10 +503,10 @@ def test_set_facets_type_exists():
                     'filters': {
                         'filters': {
                             'yes': {
-                                'exists': {'field': 'embedded.field2.raw'}
+                                'exists': {'field': 'embedded.field2'}
                             },
                             'no': {
-                                'missing': {'field': 'embedded.field2.raw'}
+                                'missing': {'field': 'embedded.field2'}
                             }
                         },
                     },
@@ -516,8 +516,8 @@ def test_set_facets_type_exists():
                 'bool': {
                     'must': [
                         {'terms': {'principals_allowed.view': ['group.admin']}},
-                        {'terms': {'embedded.@type.raw': ['Snowball']}},
-                        {'exists': {'field': 'embedded.field1.raw'}},
+                        {'terms': {'embedded.@type': ['Snowball']}},
+                        {'exists': {'field': 'embedded.field1'}},
                     ],
                 },
             },

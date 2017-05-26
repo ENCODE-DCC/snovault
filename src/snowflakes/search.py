@@ -288,6 +288,7 @@ def build_terms_filter(field, terms):
                 },
             }
 
+
 def set_filters(request, query, result, static_items=None):
     """
     Sets filters in the query
@@ -848,7 +849,8 @@ def report(context, request):
     }
     search_base = normalize_query(request)
     res['@id'] = '/report/' + search_base
-    res['download_tsv'] = request.route_path('report_download') + search_base
+    # TODO add this back one day
+    # res['download_tsv'] = request.route_path('report_download') + search_base
     res['title'] = 'Report'
     res['@type'] = ['Report']
     return res

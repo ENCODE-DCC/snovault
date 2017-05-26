@@ -43,6 +43,7 @@ def includeme(config):
 
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
+    import pdb;pdb.set_trace()
     INDEX = request.registry.settings['snovault.elasticsearch.index']
     # Setting request.datastore here only works because routed views are not traversed.
     request.datastore = 'database'
@@ -80,7 +81,12 @@ def index(request):
     else:
         status = es.get(index=INDEX, doc_type='meta', id='indexing', ignore=[400, 404])
         if not status['found']:
-            interval_settings = {"index": {"refresh_interval": "30s"}}
+            interval_settings = {
+                "index": {
+                    "refresh_interval": "30s",
+                    "max_result_window": SEARCH_MAX,
+                }
+            }
             es.indices.put_settings(index='_all', body=interval_settings)
         else:
             last_xmin = status['_source']['xmin']
@@ -120,21 +126,23 @@ def index(request):
             return result
         es.indices.refresh(index=INDEX)
         res = es.search(index=INDEX, size=SEARCH_MAX, body={
-            'filter': {
-                'or': [
-                    {
-                        'terms': {
-                            'embedded_uuids': updated,
-                            '_cache': False,
+            'query': {
+                'bool': {
+                    'should': [
+                        {
+                            'terms': {
+                                'embedded_uuids': updated,
+                                '_cache': False,
+                            },
                         },
-                    },
-                    {
-                        'terms': {
-                            'linked_uuids': renamed,
-                            '_cache': False,
+                        {
+                            'terms': {
+                                'linked_uuids': renamed,
+                                '_cache': False,
+                            },
                         },
-                    },
-                ],
+                    ],
+                },
             },
             '_source': False,
         })
