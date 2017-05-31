@@ -336,11 +336,11 @@ def combine_schemas(a, b):
             combined[name].update(a[name])
             combined[name].update(b[name])
         elif name == 'columns':
-            allFacets = {}
-            allFacets.update(a[name])
-            allFacets.update(b[name])
-            facetKeys = set(a[name].keys()).intersection(set(b[name].keys()))
-            combined[name] = { k:v for k,v in allFacets.items() if k in facetKeys }
+            allValues = {}
+            allValues.update(a[name])
+            allValues.update(b[name])
+            intersectedKeys = set(a[name].keys()).intersection(set(b[name].keys()))
+            combined[name] = { k:v for k,v in allValues.items() if k in intersectedKeys }
     for name in set(a.keys()).difference(b.keys()):
         combined[name] = a[name]
     for name in set(b.keys()).difference(a.keys()):
