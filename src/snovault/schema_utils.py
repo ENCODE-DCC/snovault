@@ -331,18 +331,18 @@ def combine_schemas(a, b):
                 combined[name][k] = b[name][k]
         elif name == 'items':
             combined[name] = combine_schemas(a[name], b[name])
-        elif name in ('boost_values', 'columns'):
+        elif name in ('boost_values', 'facets'):
             combined[name] = {}
             combined[name].update(a[name])
             combined[name].update(b[name])
-        elif name == 'facets':
+        elif name == 'columns':
             allFacets = {}
             allFacets.update(a[name])
             allFacets.update(b[name])
             facetKeys = set(a[name].keys()).intersection(set(b[name].keys()))
             combined[name] = { k:v for k,v in allFacets.items() if k in facetKeys }
-    for name in set(a.keys()).difference(b.keys(), ['facets']):
+    for name in set(a.keys()).difference(b.keys()):
         combined[name] = a[name]
-    for name in set(b.keys()).difference(a.keys(), ['facets']):
+    for name in set(b.keys()).difference(a.keys()):
         combined[name] = b[name]
     return combined
