@@ -255,10 +255,15 @@ def load_schema(filename):
         schema = json.load(utf8(asset.stream()),
                            object_pairs_hook=collections.OrderedDict)
         resolver = RefResolver('file://' + asset.abspath(), schema)
+    # use mixinProperties, mixinFacets, and mixinColumns (if provided)
     schema = mixinSchemas(
-        mixinSchemas(schema, resolver, 'properties'),
-        resolver, 'facets'
+        mixinSchemas(
+            mixinSchemas(schema, resolver, 'properties'),
+            resolver, 'facets'
+        ),
+        resolver, 'columns'
     )
+
 
     # SchemaValidator is not thread safe for now
     SchemaValidator(schema, resolver=resolver, serialize=True)
