@@ -7,22 +7,25 @@ except ImportError:
 
 
 def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
+    # args = [
+    #     os.path.join(prefix, 'elasticsearch'),
+    #     '-f',  # foreground
+    #     '-Des.path.data="%s"' % os.path.join(datadir, 'data'),
+    #     '-Des.path.logs="%s"' % os.path.join(datadir, 'logs'),
+    #     '-Des.node.local=true',
+    #     '-Des.discovery.zen.ping.multicast.enabled=false',
+    #     '-Des.network.host=%s' % host,
+    #     '-Des.http.port=%d' % port,
+    #     '-Des.index.number_of_shards=1',
+    #     '-Des.index.number_of_replicas=0',
+    #     '-Des.index.store.type=memory',
+    #     '-Des.index.store.fs.memory.enabled=true',
+    #     '-Des.index.gateway.type=none',
+    #     '-Des.gateway.type=none',
+    #     '-XX:MaxDirectMemorySize=4096m',
+    # ]
     args = [
         os.path.join(prefix, 'elasticsearch'),
-        '-f',  # foreground
-        '-Des.path.data="%s"' % os.path.join(datadir, 'data'),
-        '-Des.path.logs="%s"' % os.path.join(datadir, 'logs'),
-        '-Des.node.local=true',
-        '-Des.discovery.zen.ping.multicast.enabled=false',
-        '-Des.network.host=%s' % host,
-        '-Des.http.port=%d' % port,
-        '-Des.index.number_of_shards=1',
-        '-Des.index.number_of_replicas=0',
-        '-Des.index.store.type=memory',
-        '-Des.index.store.fs.memory.enabled=true',
-        '-Des.index.gateway.type=none',
-        '-Des.gateway.type=none',
-        '-XX:MaxDirectMemorySize=4096m',
     ]
     # elasticsearch.deb setup
     if os.path.exists('/etc/elasticsearch'):
