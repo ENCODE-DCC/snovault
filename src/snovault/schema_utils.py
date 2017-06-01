@@ -31,8 +31,9 @@ class NoRemoteResolver(RefResolver):
         raise ValueError('Resolution disallowed for: %s' % uri)
 
 
-def mixinProperties(schema, resolver):
-    mixins = schema.get('mixinProperties')
+def mixinSchemas(schema, resolver, key_name = 'properties'):
+    mixinKeyName = 'mixin' + key_name.capitalize()
+    mixins = schema.get(mixinKeyName)
     if mixins is None:
         return schema
     properties = collections.OrderedDict()
@@ -54,12 +55,12 @@ def mixinProperties(schema, resolver):
                     continue
                 raise ValueError('Schema mixin conflict for %s/%s' % (name, k))
     # Allow schema properties to override
-    base = schema.get('properties', {})
+    base = schema.get(key_name, {})
     for name, base_prop in base.items():
         prop = properties.setdefault(name, {})
         for k, v in base_prop.items():
             prop[k] = v
-    schema['properties'] = properties
+    schema[key_name] = properties
     return schema
 
 
@@ -254,7 +255,10 @@ def load_schema(filename):
         schema = json.load(utf8(asset.stream()),
                            object_pairs_hook=collections.OrderedDict)
         resolver = RefResolver('file://' + asset.abspath(), schema)
-    schema = mixinProperties(schema, resolver)
+    schema = mixinSchemas(
+        mixinSchemas(schema, resolver, 'properties'),
+        resolver, 'facets'
+    )
 
     # SchemaValidator is not thread safe for now
     SchemaValidator(schema, resolver=resolver, serialize=True)
