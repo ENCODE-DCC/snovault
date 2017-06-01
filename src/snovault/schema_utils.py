@@ -31,8 +31,9 @@ class NoRemoteResolver(RefResolver):
         raise ValueError('Resolution disallowed for: %s' % uri)
 
 
-def mixinProperties(schema, resolver):
-    mixins = schema.get('mixinProperties')
+def mixinSchemas(schema, resolver, key_name = 'properties'):
+    mixinKeyName = 'mixin' + key_name.capitalize()
+    mixins = schema.get(mixinKeyName)
     if mixins is None:
         return schema
     properties = collections.OrderedDict()
@@ -54,12 +55,12 @@ def mixinProperties(schema, resolver):
                     continue
                 raise ValueError('Schema mixin conflict for %s/%s' % (name, k))
     # Allow schema properties to override
-    base = schema.get('properties', {})
+    base = schema.get(key_name, {})
     for name, base_prop in base.items():
         prop = properties.setdefault(name, {})
         for k, v in base_prop.items():
             prop[k] = v
-    schema['properties'] = properties
+    schema[key_name] = properties
     return schema
 
 
@@ -254,7 +255,15 @@ def load_schema(filename):
         schema = json.load(utf8(asset.stream()),
                            object_pairs_hook=collections.OrderedDict)
         resolver = RefResolver('file://' + asset.abspath(), schema)
-    schema = mixinProperties(schema, resolver)
+    # use mixinProperties, mixinFacets, and mixinColumns (if provided)
+    schema = mixinSchemas(
+        mixinSchemas(
+            mixinSchemas(schema, resolver, 'properties'),
+            resolver, 'facets'
+        ),
+        resolver, 'columns'
+    )
+
 
     # SchemaValidator is not thread safe for now
     SchemaValidator(schema, resolver=resolver, serialize=True)
@@ -331,12 +340,18 @@ def combine_schemas(a, b):
                 combined[name][k] = b[name][k]
         elif name == 'items':
             combined[name] = combine_schemas(a[name], b[name])
-        elif name in ('boost_values', 'columns'):
+        elif name in ('boost_values', 'facets'):
             combined[name] = {}
             combined[name].update(a[name])
             combined[name].update(b[name])
-    for name in set(a.keys()).difference(b.keys(), ['facets']):
+        elif name == 'columns':
+            allValues = {}
+            allValues.update(a[name])
+            allValues.update(b[name])
+            intersectedKeys = set(a[name].keys()).intersection(set(b[name].keys()))
+            combined[name] = { k:v for k,v in allValues.items() if k in intersectedKeys }
+    for name in set(a.keys()).difference(b.keys()):
         combined[name] = a[name]
-    for name in set(b.keys()).difference(a.keys(), ['facets']):
+    for name in set(b.keys()).difference(a.keys()):
         combined[name] = b[name]
     return combined
