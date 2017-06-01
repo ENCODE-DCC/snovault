@@ -8,6 +8,8 @@ To load the initial data:
 """
 from pyramid.paster import get_app
 from elasticsearch import RequestError
+from elasticsearch_dsl import DocType, Date, Integer, Keyword, Text, Mapping, Index
+from elasticsearch_dsl.connections import connections
 from functools import reduce
 from snovault import (
     COLLECTIONS,
@@ -534,11 +536,26 @@ def type_mapping(types, item_type, embed=True):
     return mapping
 
 
+def create_mapping_by_type(in_type):
+    connections.create_connection(hosts=['http://localhost:9200'])
+    es = connections.get_connection()
+    type_index = Index(in_type)
+    @type_index.doc_type
+    class TestType(DocType):
+        title = Text()
+    type_index.settings(number_of_shards=2)
+    # add "index_analyzer":"snovault_index_analyzer" to settings
+    # add "search_analyzer":"snovault_search_analyzer" to settings
+    type_index.create()
+
+
 def run(app, collections=None, dry_run=False, check_first=True):
+    import pdb; pdb.set_trace()
     index = app.registry.settings['snovault.elasticsearch.index']
     registry = app.registry
     if not dry_run:
-        es = app.registry[ELASTIC_SEARCH]
+        es_server = app.registry.settings['elasticsearch.server']
+        connections.create_connection(hosts=[es_server])
         try:
             exists = False
             if check_first:
@@ -604,4 +621,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    create_mapping_by_type()
