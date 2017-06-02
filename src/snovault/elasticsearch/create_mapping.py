@@ -143,7 +143,7 @@ def schema_mapping(name, schema, field='*', nested=False):
 
     if type_ == 'string':
         # don't make a mapping for non-embedded objects
-        if 'linkTo' in schema.keys():
+        if 'linkTo' in schema or 'linkFrom' in schema:
             return
 
         sub_mapping = {
@@ -535,7 +535,15 @@ def type_mapping(types, item_type, embed=True):
     return mapping
 
 
-def create_mapping_by_type(in_type, registry, check_first, dry_run):
+def create_mapping_by_type(in_type, registry):
+    # build the nested mapping for embedded view
+    collection = registry[COLLECTIONS].by_item_type[in_type]
+    embed_mapping = type_mapping(registry[TYPES], collection.type_info.item_type)
+    # finish up the mapping
+    return es_mapping(embed_mapping)
+
+
+def build_index(in_type, mapping, dry_run, check_first):
     this_index = Index(in_type)
     # for testing
     check_first = False
@@ -545,11 +553,6 @@ def create_mapping_by_type(in_type, registry, check_first, dry_run):
     # delete the index, ignore if it doesn't exist
     this_index.delete(ignore=404)
     this_index.settings(**index_settings())
-    # build the nested mapping for embedded view
-    collection = registry[COLLECTIONS].by_item_type[in_type]
-    embed_mapping = type_mapping(registry[TYPES], collection.type_info.item_type)
-    # finish up the mapping
-    mapping = es_mapping(embed_mapping)
     if dry_run:
         print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
     else:
@@ -561,18 +564,19 @@ def create_mapping_by_type(in_type, registry, check_first, dry_run):
 
 
 def run(app, collections=None, dry_run=False, check_first=True):
-    index = app.registry.settings['snovault.elasticsearch.index']
     registry = app.registry
     if not dry_run:
         es_server = app.registry.settings['elasticsearch.server']
         connections.create_connection(hosts=[es_server])
     if not collections:
-        collections = list(registry[COLLECTIONS].by_item_type.keys())
+        collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
     for collection_name in collections:
         if collection_name == 'meta':
-            continue
+            # meta mapping just contains settings
+            build_index(collection_name, META_MAPPING, dry_run, check_first)
         else:
-            create_mapping_by_type(collection_name, registry, check_first, dry_run)
+            mapping = create_mapping_by_type(collection_name, registry)
+            build_index(collection_name, mapping, dry_run, check_first)
 
 
 def main():

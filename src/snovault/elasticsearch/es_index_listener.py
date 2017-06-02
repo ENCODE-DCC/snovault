@@ -36,6 +36,7 @@ PY2 = sys.version_info[0] == 2
 
 
 def run(testapp, timeout=DEFAULT_TIMEOUT, dry_run=False, path='/index', control=None, update_status=None):
+
     assert update_status is not None
 
     timestamp = datetime.datetime.now().isoformat()

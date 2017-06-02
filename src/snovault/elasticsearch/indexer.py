@@ -38,7 +38,6 @@ def includeme(config):
 
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
-    INDEX = request.registry.settings['snovault.elasticsearch.index']
     # Setting request.datastore here only works because routed views are not traversed.
     request.datastore = 'database'
     record = request.json.get('record', False)
@@ -70,10 +69,10 @@ def index(request):
         last_xmin = request.json['last_xmin']
     else:
         try:
-            status = es.get(index=INDEX, doc_type='meta', id='indexing')
+            status = es.get(index='meta', doc_type='meta', id='indexing')
         except NotFoundError:
             interval_settings = {"index": {"refresh_interval": "30s"}}
-            es.indices.put_settings(index=INDEX, body=interval_settings)
+            es.indices.put_settings(index='meta', body=interval_settings)
             pass
         else:
             last_xmin = status['_source']['xmin']
@@ -161,11 +160,11 @@ def index(request):
 
         if record:
             try:
-                es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
+                es.index(index='meta', doc_type='meta', body=result, id='indexing')
             except:
                 error_messages = copy.deepcopy(result['errors'])
                 del result['errors']
-                es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
+                es.index(index='meta', doc_type='meta', body=result, id='indexing')
                 for item in error_messages:
                     if 'error_message' in item:
                         log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
@@ -173,15 +172,15 @@ def index(request):
                 result['errors'] = error_messages
 
 
-            if es.indices.get_settings(index=INDEX)[INDEX]['settings']['index'].get('refresh_interval', '') != '1s':
+            if es.indices.get_settings(index='meta')['meta']['settings']['index'].get('refresh_interval', '') != '1s':
                 interval_settings = {"index": {"refresh_interval": "1s"}}
-                es.indices.put_settings(index=INDEX, body=interval_settings)
+                es.indices.put_settings(index='meta', body=interval_settings)
 
-        es.indices.refresh(index=INDEX)
+        es.indices.refresh(index='meta')
 
         if flush:
             try:
-                es.indices.flush_synced(index=INDEX)  # Faster recovery on ES restart
+                es.indices.flush_synced(index='meta')  # Faster recovery on ES restart
             except ConflictError:
                 pass
 
@@ -215,7 +214,6 @@ def all_uuids(registry, types=None):
 class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
-        self.index = registry.settings['snovault.elasticsearch.index']
 
     def update_objects(self, request, uuids, xmin, snapshot_id):
         errors = []
@@ -243,7 +241,7 @@ class Indexer(object):
             time.sleep(backoff)
             try:
                 self.es.index(
-                    index=self.index, doc_type=result['item_type'], body=result,
+                    index=result['item_type'], doc_type=result['item_type'], body=result,
                     id=str(uuid), version=xmin, version_type='external_gte',
                     request_timeout=30,
                 )
