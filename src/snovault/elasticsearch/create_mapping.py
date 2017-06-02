@@ -8,7 +8,7 @@ To load the initial data:
 """
 from pyramid.paster import get_app
 from elasticsearch import RequestError
-from elasticsearch_dsl import Nested, Mapping, Index
+from elasticsearch_dsl import Index
 from elasticsearch_dsl.connections import connections
 from functools import reduce
 from snovault import (
@@ -63,11 +63,13 @@ def sorted_dict(d):
     return json.loads(json.dumps(d), object_pairs_hook=sorted_pairs_hook)
 
 
-def schema_mapping(name, schema, field='*'):
+def schema_mapping(name, schema, field='*', nested=False):
     """
     Create the mapping for a given schema. Defaults to using all fields for
     objects (*), but can handle specific fields using the field parameter.
-    This allows for the mapping to match the selective embedding
+    This allows for the mapping to match the selective embedding.
+    Nested parameter is a boolean controlling if objects should be type 'nested'
+    (for arrays) or 'object' (for non-arrays)
     """
     if 'linkFrom' in schema:
         type_ = 'string'
@@ -76,26 +78,35 @@ def schema_mapping(name, schema, field='*'):
 
     # Elasticsearch handles multiple values for a field
     if type_ == 'array' and schema['items']:
-        return schema_mapping(name, schema['items'], field)
+        properties = schema_mapping(name, schema['items'], field)
+        if isinstance(properties, dict) and properties['type'] and properties['type'] == 'object':
+            return {
+                'type': 'nested',
+                'include_in_all': False,
+                'properties': properties['properties']
+            }
+        else:
+            return properties
 
-    if type_ == 'object':
+    if type_ == 'object' or nested:
         properties = {}
         for k, v in schema.get('properties', {}).items():
             mapping = schema_mapping(k, v, '*')
             if mapping is not None:
                 if field == '*' or k == field:
                     properties[k] = mapping
+        processed_type = 'nested' if nested else 'object'
         return {
-            'type': 'object',
+            'type': processed_type,
             'include_in_all': False,
             'properties': properties,
         }
 
     if type_ == ["number", "string"]:
         return {
-            'type': 'string',
+            'type': 'text',
             'copy_to': [],
-            'index': 'not_analyzed',
+            'index': True,
             'fields': {
                 'value': {
                     'type': 'float',
@@ -104,11 +115,11 @@ def schema_mapping(name, schema, field='*'):
                     'copy_to': []
                 },
                 'raw': {
-                    'type': 'string',
-                    'index': 'not_analyzed'
+                    'type': 'keyword',
+                    'index': True
                 },
                 'lower_case_sort': {
-                    'type': 'string',
+                    'type': 'text',
                     'analyzer': 'case_insensistive_sort'
                 }
             }
@@ -116,15 +127,15 @@ def schema_mapping(name, schema, field='*'):
 
     if type_ == 'boolean':
         return {
-            'type': 'string',
+            'type': 'text',
             'store': True,
             'fields': {
                 'raw': {
-                    'type': 'string',
-                    'index': 'not_analyzed'
+                    'type': 'keyword',
+                    'index': True
                 },
                 'lower_case_sort': {
-                    'type': 'string',
+                    'type': 'text',
                     'analyzer': 'case_insensistive_sort'
                 }
             }
@@ -136,7 +147,7 @@ def schema_mapping(name, schema, field='*'):
             return
 
         sub_mapping = {
-            'type': 'string',
+            'type': 'text',
             'store': True
         }
 
@@ -147,11 +158,11 @@ def schema_mapping(name, schema, field='*'):
             sub_mapping.update({
                             'fields': {
                                 'raw': {
-                                    'type': 'string',
-                                    'index': 'not_analyzed'
+                                    'type': 'keyword',
+                                    'index': True
                                 },
                                 'lower_case_sort': {
-                                    'type': 'string',
+                                    'type': 'text',
                                     'analyzer': 'case_insensistive_sort'
                                 }
                             }
@@ -162,7 +173,7 @@ def schema_mapping(name, schema, field='*'):
             if name in PATH_FIELDS:
                 sub_mapping['index_analyzer'] = 'snovault_path_analyzer'
             else:
-                sub_mapping['index'] = 'not_analyzed'
+                sub_mapping['index'] = True
             sub_mapping['include_in_all'] = False
         return sub_mapping
 
@@ -172,11 +183,11 @@ def schema_mapping(name, schema, field='*'):
             'store': True,
             'fields': {
                 'raw': {
-                    'type': 'string',
-                    'index': 'not_analyzed'
+                    'type': 'keyword',
+                    'index': True
                 },
                 'lower_case_sort': {
-                    'type': 'string',
+                    'type': 'text',
                     'analyzer': 'case_insensistive_sort'
                 }
             }
@@ -188,11 +199,11 @@ def schema_mapping(name, schema, field='*'):
             'store': True,
             'fields': {
                 'raw': {
-                    'type': 'string',
-                    'index': 'not_analyzed'
+                    'type': 'keyword',
+                    'index': True
                 },
                 'lower_case_sort': {
-                    'type': 'string',
+                    'type': 'text',
                     'analyzer': 'case_insensistive_sort'
                 }
             }
@@ -202,6 +213,7 @@ def schema_mapping(name, schema, field='*'):
 def index_settings():
     return {
         'index': {
+            'mapping.total_fields.limit': 2000,
             'number_of_shards': 5,
             'merge': {
                 'policy': {
@@ -273,16 +285,16 @@ def index_settings():
 def audit_mapping():
     return {
         'category': {
-            'type': 'string',
-            'index': 'not_analyzed',
+            'type': 'text',
+            'index': True,
         },
         'detail': {
-            'type': 'string',
+            'type': 'text',
             'index': 'analyzed',
         },
         'level_name': {
-            'type': 'string',
-            'index': 'not_analyzed',
+            'type': 'text',
+            'index': True,
         },
         'level': {
             'type': 'integer',
@@ -294,7 +306,7 @@ def es_mapping(mapping):
     return {
         '_all': {
             'enabled': True,
-            'index_analyzer': 'snovault_index_analyzer',
+            'analyzer': 'snovault_index_analyzer',
             'search_analyzer': 'snovault_search_analyzer'
         },
         'dynamic_templates': [
@@ -302,8 +314,8 @@ def es_mapping(mapping):
                 'template_principals_allowed': {
                     'path_match': "principals_allowed.*",
                     'mapping': {
-                        'type': 'string',
-                        'index': 'not_analyzed',
+                        'type': 'text',
+                        'index': True,
                     },
                 },
             },
@@ -311,8 +323,8 @@ def es_mapping(mapping):
                 'template_unique_keys': {
                     'path_match': "unique_keys.*",
                     'mapping': {
-                        'type': 'string',
-                        'index': 'not_analyzed',
+                        'type': 'text',
+                        'index': True,
                     },
                 },
             },
@@ -320,26 +332,26 @@ def es_mapping(mapping):
                 'template_links': {
                     'path_match': "links.*",
                     'mapping': {
-                        'type': 'string',
-                        'index': 'not_analyzed',
+                        'type': 'text',
+                        'index': True,
                     },
                 },
             },
         ],
         'properties': {
             'uuid': {
-                'type': 'string',
-                'index': 'not_analyzed',
+                'type': 'text',
+                'index': True,
                 'include_in_all': False,
             },
             'tid': {
-                'type': 'string',
-                'index': 'not_analyzed',
+                'type': 'text',
+                'index': True,
                 'include_in_all': False,
             },
             'item_type': {
-                'type': 'string',
-                'index': 'not_analyzed'
+                'type': 'text',
+                'index': True
             },
             'embedded': mapping,
             'object': {
@@ -362,14 +374,14 @@ def es_mapping(mapping):
                 'include_in_all': False,
             },
             'embedded_uuids': {
-                'type': 'string',
+                'type': 'text',
                 'include_in_all': False,
-                'index': 'not_analyzed'
+                'index': True
             },
             'linked_uuids': {
-                'type': 'string',
+                'type': 'text',
                 'include_in_all': False,
-                'index': 'not_analyzed'
+                'index': True
             },
             'unique_keys': {
                 'type': 'object',
@@ -380,9 +392,9 @@ def es_mapping(mapping):
                 'include_in_all': False,
             },
             'paths': {
-                'type': 'string',
+                'type': 'text',
                 'include_in_all': False,
-                'index': 'not_analyzed'
+                'index': True
             },
             'audit': {
                 'type': 'object',
@@ -408,23 +420,6 @@ def es_mapping(mapping):
             }
         }
     }
-
-
-def combined_mapping(types, *item_types):
-    combined = {
-        'type': 'object',
-        'properties': {},
-    }
-    for item_type in item_types:
-        schema = types[item_type].schema
-        mapping = schema_mapping(item_type, schema)
-        for k, v in mapping['properties'].items():
-            if k in combined:
-                assert v == combined[k]
-            else:
-                combined[k] = v
-
-    return combined
 
 
 def type_mapping(types, item_type, embed=True):
@@ -456,6 +451,7 @@ def type_mapping(types, item_type, embed=True):
             ref_types = None
             subschema = None
             ultimate_obj = False # set to true if on last level of embedding
+            nested = False
             field = '*'
             # Check if we're at the end of a hierarchy of embeds
             if p == prop.split('.')[-1] and len(prop.split('.')) > 1:
@@ -478,7 +474,10 @@ def type_mapping(types, item_type, embed=True):
                 field = p
                 if subschema is None:
                     break
-            subschema = subschema.get('items', subschema)
+            # handle arrays
+            if subschema.get('items') != None:
+                nested = True
+                subschema = subschema.get('items', subschema)
             if 'linkFrom' in subschema:
                 _ref_type, _ = subschema['linkFrom'].split('.', 1)
                 ref_types = [_ref_type]
@@ -493,15 +492,15 @@ def type_mapping(types, item_type, embed=True):
             # Check if mapping for property is already an object
             # multiple subobjects may be embedded, so be careful here
             if ultimate_obj: # this means we're at the at the end of an embed
-                m['properties'][field] = schema_mapping(p, s, field)
-            elif p in m['properties'].keys():
+                m['properties'][field] = schema_mapping(p, s, field, nested)
+            elif p in m['properties']:
                 if m['properties'][p]['type'] == 'string':
-                    m['properties'][p] = schema_mapping(p, s, field)
+                    m['properties'][p] = schema_mapping(p, s, field, nested)
                 # add a field that's an object
                 elif m['properties'][p]['type'] == 'object' and p != field and field != '*':
-                    m['properties'][p][field] = schema_mapping(p, s, field)
+                    m['properties'][p][field] = schema_mapping(p, s, field, nested)
             else:
-                m['properties'][p] = schema_mapping(p, s, field)
+                m['properties'][p] = schema_mapping(p, s, field, nested)
             m = m['properties'][p] if not ultimate_obj else m['properties']
 
     # boost_values = schema.get('boost_values', None)
@@ -523,7 +522,7 @@ def type_mapping(types, item_type, embed=True):
     #         if last in PATH_FIELDS:
     #             new_mapping[last]['index_analyzer'] = 'snovault_path_analyzer'
     #         else:
-    #             new_mapping[last]['index'] = 'not_analyzed'
+    #             new_mapping[last]['index'] = True
     #     else:
     #         new_mapping[last]['index_analyzer'] = 'snovault_index_analyzer'
     #         new_mapping[last]['search_analyzer'] = 'snovault_search_analyzer'
@@ -531,7 +530,7 @@ def type_mapping(types, item_type, embed=True):
     #
     # # Automatic boost for uuid
     # if 'uuid' in mapping['properties']:
-    #     mapping['properties']['uuid']['index'] = 'not_analyzed'
+    #     mapping['properties']['uuid']['index'] = True
     #     mapping['properties']['uuid']['include_in_all'] = False
     return mapping
 
@@ -545,30 +544,18 @@ def create_mapping_by_type(in_type, registry, check_first, dry_run):
         return
     # delete the index, ignore if it doesn't exist
     this_index.delete(ignore=404)
-    # use old index_settings, for the most part
     this_index.settings(**index_settings())
-    this_mapping = Mapping(in_type)
-    # mapping for meta fields
-    this_mapping.meta('_all', META_MAPPING['_all'])
-    this_mapping.meta('dynamic_templates', META_MAPPING['dynamic_templates'])
+    # build the nested mapping for embedded view
     collection = registry[COLLECTIONS].by_item_type[in_type]
-    mapped_fields = type_mapping(registry[TYPES], collection.type_info.item_type)
-    mapped_fields = es_mapping(mapped_fields)
-    import pdb; pdb.set_trace()
-    all_fields = Nested()
-    for m_field in mapped_fields:
-        if m_field == '_all' or m_field == 'dynamic_templates':
-            all_fields.meta(m_field, mapped_fields[m_field])
-        else:
-            all_fields.field(m_field, 'nested', fields=mapped_fields[m_field])
-    this_mapping.field(in_type, all_fields)
-    this_index.mapping(this_mapping)
+    embed_mapping = type_mapping(registry[TYPES], collection.type_info.item_type)
+    # finish up the mapping
+    mapping = es_mapping(embed_mapping)
     if dry_run:
-        print(json.dumps(sorted_dict({in_type: {in_type: mapped_fields}}), indent=4))
+        print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
     else:
+        this_index.create()
         try:
-            ### 'list' object has no attribute 'to_dict'
-            this_index.create()
+            this_index.put_mapping(doc_type=in_type, body={in_type: mapping})
         except:
             log.exception("Could not create mapping for the collection %s", in_type)
 
