@@ -8,7 +8,7 @@ To load the initial data:
 """
 from pyramid.paster import get_app
 from elasticsearch import RequestError
-from elasticsearch_dsl import DocType, Date, Integer, Keyword, Text, Mapping, Index
+from elasticsearch_dsl import Nested, Mapping, Index
 from elasticsearch_dsl.connections import connections
 from functools import reduce
 from snovault import (
@@ -536,64 +536,56 @@ def type_mapping(types, item_type, embed=True):
     return mapping
 
 
-def create_mapping_by_type(in_type):
-    connections.create_connection(hosts=['http://localhost:9200'])
-    es = connections.get_connection()
-    type_index = Index(in_type)
-    @type_index.doc_type
-    class TestType(DocType):
-        title = Text()
-    type_index.settings(number_of_shards=2)
-    # add "index_analyzer":"snovault_index_analyzer" to settings
-    # add "search_analyzer":"snovault_search_analyzer" to settings
-    type_index.create()
+def create_mapping_by_type(in_type, registry, check_first, dry_run):
+    this_index = Index(in_type)
+    # for testing
+    check_first = False
+    if(this_index.exists() and check_first):
+        print("index %s already exists no need to create mapping" % (in_type))
+        return
+    # delete the index, ignore if it doesn't exist
+    this_index.delete(ignore=404)
+    # use old index_settings, for the most part
+    this_index.settings(**index_settings())
+    this_mapping = Mapping(in_type)
+    # mapping for meta fields
+    this_mapping.meta('_all', META_MAPPING['_all'])
+    this_mapping.meta('dynamic_templates', META_MAPPING['dynamic_templates'])
+    collection = registry[COLLECTIONS].by_item_type[in_type]
+    mapped_fields = type_mapping(registry[TYPES], collection.type_info.item_type)
+    mapped_fields = es_mapping(mapped_fields)
+    import pdb; pdb.set_trace()
+    all_fields = Nested()
+    for m_field in mapped_fields:
+        if m_field == '_all' or m_field == 'dynamic_templates':
+            all_fields.meta(m_field, mapped_fields[m_field])
+        else:
+            all_fields.field(m_field, 'nested', fields=mapped_fields[m_field])
+    this_mapping.field(in_type, all_fields)
+    this_index.mapping(this_mapping)
+    if dry_run:
+        print(json.dumps(sorted_dict({in_type: {in_type: mapped_fields}}), indent=4))
+    else:
+        try:
+            ### 'list' object has no attribute 'to_dict'
+            this_index.create()
+        except:
+            log.exception("Could not create mapping for the collection %s", in_type)
 
 
 def run(app, collections=None, dry_run=False, check_first=True):
-    import pdb; pdb.set_trace()
     index = app.registry.settings['snovault.elasticsearch.index']
     registry = app.registry
     if not dry_run:
         es_server = app.registry.settings['elasticsearch.server']
         connections.create_connection(hosts=[es_server])
-        try:
-            exists = False
-            if check_first:
-                exists = es.indices.exists(index=index)
-            if not exists:
-                es.indices.create(index=index, body=index_settings())
-            else:
-                print("index %s already exists no need to create mapping" % (index))
-        except RequestError as e:
-            if not collections:
-                es.indices.delete(index=index)
-                es.indices.create(index=index, body=index_settings())
-
     if not collections:
-        collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
+        collections = list(registry[COLLECTIONS].by_item_type.keys())
     for collection_name in collections:
         if collection_name == 'meta':
-            doc_type = 'meta'
-            mapping = META_MAPPING
-        else:
-            doc_type = collection_name
-            collection = registry[COLLECTIONS].by_item_type[collection_name]
-            mapping = type_mapping(registry[TYPES], collection.type_info.item_type)
-        if mapping is None:
-            continue  # Testing collections
-        if dry_run:
-            print(json.dumps(sorted_dict({index: {doc_type: mapping}}), indent=4))
             continue
-
-        if collection_name is not 'meta':
-            mapping = es_mapping(mapping)
-        try:
-            es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping},
-                                  update_all_types=True)
-        except:
-            log.exception("Could not create mapping for the collection %s", doc_type)
         else:
-            es.indices.refresh(index=index)
+            create_mapping_by_type(collection_name, registry, check_first, dry_run)
 
 
 def main():
@@ -621,4 +613,4 @@ def main():
 
 
 if __name__ == '__main__':
-    create_mapping_by_type()
+    main()

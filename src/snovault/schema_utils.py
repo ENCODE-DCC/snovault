@@ -264,7 +264,6 @@ def load_schema(filename):
         resolver, 'columns'
     )
 
-
     # SchemaValidator is not thread safe for now
     SchemaValidator(schema, resolver=resolver, serialize=True)
     return schema
