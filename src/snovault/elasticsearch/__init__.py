@@ -19,7 +19,6 @@ PY2 = sys.version_info.major == 2
 
 def includeme(config):
     settings = config.registry.settings
-    settings.setdefault('snovault.elasticsearch.index', 'snovault')
 
     config.add_request_method(datastore, 'datastore', reify=True)
 

@@ -545,8 +545,6 @@ def create_mapping_by_type(in_type, registry):
 
 def build_index(in_type, mapping, dry_run, check_first):
     this_index = Index(in_type)
-    # for testing
-    check_first = False
     if(this_index.exists() and check_first):
         print("index %s already exists no need to create mapping" % (in_type))
         return

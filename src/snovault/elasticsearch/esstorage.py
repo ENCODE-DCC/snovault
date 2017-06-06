@@ -15,7 +15,9 @@ def includeme(config):
     from snovault import STORAGE
     registry = config.registry
     es = registry[ELASTIC_SEARCH]
-    es_index = registry.settings['snovault.elasticsearch.index']
+    # ES 5 change: 'snovault' index removed, search among '_all' instead
+    # es_index = registry.settings['snovault.elasticsearch.index']
+    es_index = '_all'
     wrapped_storage = registry[STORAGE]
     registry[STORAGE] = PickStorage(ElasticSearchStorage(es, es_index), wrapped_storage)
 
