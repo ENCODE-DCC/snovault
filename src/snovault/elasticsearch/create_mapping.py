@@ -561,11 +561,22 @@ def build_index(in_type, mapping, dry_run, check_first):
             log.exception("Could not create mapping for the collection %s", in_type)
 
 
+def snovault_cleanup(registry):
+    """
+    Simple function to delete old unused snovault index if it's present
+    """
+    sno_index_name = registry.settings['snovault.elasticsearch.index']
+    snovault_index = Index(sno_index_name)
+    if snovault_index.exists():
+        snovault_index.delete(ignore=404)
+
+
 def run(app, collections=None, dry_run=False, check_first=True):
     registry = app.registry
     if not dry_run:
         es_server = app.registry.settings['elasticsearch.server']
         connections.create_connection(hosts=[es_server])
+        snovault_cleanup(registry)
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
     for collection_name in collections:

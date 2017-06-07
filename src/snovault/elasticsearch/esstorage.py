@@ -1,6 +1,8 @@
 import elasticsearch.exceptions
 from snovault.util import get_root_request
 from elasticsearch.helpers import scan
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MultiMatch, Match
 from pyramid.threadlocal import get_current_request
 from zope.interface import alsoProvides
 from .interfaces import (
@@ -16,7 +18,6 @@ def includeme(config):
     registry = config.registry
     es = registry[ELASTIC_SEARCH]
     # ES 5 change: 'snovault' index removed, search among '_all' instead
-    # es_index = registry.settings['snovault.elasticsearch.index']
     es_index = '_all'
     wrapped_storage = registry[STORAGE]
     registry[STORAGE] = PickStorage(ElasticSearchStorage(es, es_index), wrapped_storage)
@@ -24,28 +25,28 @@ def includeme(config):
 
 class CachedModel(object):
     def __init__(self, hit):
-        self.hit = hit
-        self.source = hit['_source']
+        self.hit = hit.to_dict()
+        self.meta = hit.meta.to_dict()
 
     @property
     def item_type(self):
-        return self.source['item_type']
+        return self.hit['item_type']
 
     @property
     def properties(self):
-        return self.source['properties']
+        return self.hit['properties']
 
     @property
     def propsheets(self):
-        return self.source['propsheets']
+        return self.hit['propsheets']
 
     @property
     def uuid(self):
-        return self.source['uuid']
+        return self.hit['uuid']
 
     @property
     def tid(self):
-        return self.source['tid']
+        return self.hit['tid']
 
     def invalidated(self):
         request = get_root_request()
@@ -54,10 +55,9 @@ class CachedModel(object):
         edits = dict.get(request.session, 'edits', None)
         if edits is None:
             return False
-        version = self.hit['_version']
-        source = self.source
-        linked_uuids = set(source['linked_uuids'])
-        embedded_uuids = set(source['embedded_uuids'])
+        version = self.meta['version']
+        linked_uuids = set(self.hit['linked_uuids'])
+        embedded_uuids = set(self.hit['embedded_uuids'])
         for xid, updated, linked in edits:
             if xid < version:
                 continue
@@ -131,10 +131,8 @@ class ElasticSearchStorage(object):
         self.es = es
         self.index = index
 
-    def _one(self, query):
-        data = self.es.search(index=self.index, body=query)
-
-        hits = data['hits']['hits']
+    def _one(self, search):
+        hits = search.execute()
         if len(hits) != 1:
             return None
         model = CachedModel(hits[0])
@@ -152,8 +150,8 @@ class ElasticSearchStorage(object):
         # also this query will do it to...
         # {‘fields’: [], ‘filter’: {‘and’: [{‘term’: {‘embedded.term_name.raw’: ‘lung’}}, {‘terms’:
         # {‘item_type’: [‘ontology_term’]}}]}, ‘_source’: [‘embedded’]}
-
         term = 'embedded.' + key + '.raw'
+
         query = {
             'filter': {'and': [
                 {'term': {term: value}},
@@ -166,26 +164,22 @@ class ElasticSearchStorage(object):
 
     def get_by_unique_key(self, unique_key, name):
         term = 'unique_keys.' + unique_key
-        query = {
-            'filter': {'term': {term: name}},
-            'version': True,
-        }
-        return self._one(query)
+        # had to use ** kw notation because of variable in field name
+        search = Search(using=self.es)
+        search = search.filter('term', **{term: name})
+        search = search.extra(version=True)
+        return self._one(search)
 
     def get_rev_links(self, model, rel, *item_types):
-        filter_ = {'term': {'links.' + rel: str(model.uuid)}}
+        search = Search(using=self.es)
+        search = search.params(size=SEARCH_MAX)
+        # had to use ** kw notation because of variable in field name
+        search = search.filter('term', **{'links.' + rel: str(model.uuid)})
         if item_types:
-            filter_ = {'and': [
-                filter_,
-                {'terms': {'item_type': item_types}},
-            ]}
-        query = {
-            'fields': [],
-            'filter': filter_,
-        }
-        data = self.es.search(index=self.index, body=query, size=SEARCH_MAX)
+            search = search.filter('terms', item_type=item_types)
+        hits = search.execute()
         return [
-            hit['_id'] for hit in data['hits']['hits']
+            hit.to_dict()['_id'] for hit in hits
         ]
 
     def __iter__(self, *item_types):
