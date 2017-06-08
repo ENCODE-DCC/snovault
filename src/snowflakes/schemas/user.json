@@ -71,7 +71,8 @@
             "uniqueItems": true,
             "permission": "import-items",
             "items": {
-                "type": "string",                "enum": [
+                "type": "string",
+                "enum": [
                     "ENCODE",
                     "GGR",
                     "REMC"

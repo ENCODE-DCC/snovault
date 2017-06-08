@@ -131,7 +131,8 @@ class MPIndexer(Indexer):
     def update_objects(self, request, uuids, xmin, snapshot_id):
         # Ensure that we iterate over uuids in this thread not the pool task handler.
         uuid_count = len(uuids)
-        chunkiness = int((uuid_count - 1) / self.processes) + 1
+        processes = self.processes or 1
+        chunkiness = int((uuid_count - 1) / processes) + 1
         if chunkiness > self.chunksize:
             chunkiness = self.chunksize
 
