@@ -1,8 +1,7 @@
 import elasticsearch.exceptions
 from snovault.util import get_root_request
 from elasticsearch.helpers import scan
-from elasticsearch_dsl import Search
-from elasticsearch_dsl.query import MultiMatch, Match
+from elasticsearch_dsl import Search, Q
 from pyramid.threadlocal import get_current_request
 from zope.interface import alsoProvides
 from .interfaces import (
@@ -10,8 +9,7 @@ from .interfaces import (
     ICachedItem,
 )
 
-SEARCH_MAX = (2 ** 31) - 1
-
+SEARCH_MAX = 99999  # OutOfMemoryError if too high. Previously: (2 ** 31) - 1
 
 def includeme(config):
     from snovault import STORAGE
@@ -25,28 +23,28 @@ def includeme(config):
 
 class CachedModel(object):
     def __init__(self, hit):
-        self.hit = hit.to_dict()
+        self.source = hit.to_dict()
         self.meta = hit.meta.to_dict()
 
     @property
     def item_type(self):
-        return self.hit['item_type']
+        return self.source['item_type']
 
     @property
     def properties(self):
-        return self.hit['properties']
+        return self.source['properties']
 
     @property
     def propsheets(self):
-        return self.hit['propsheets']
+        return self.source['propsheets']
 
     @property
     def uuid(self):
-        return self.hit['uuid']
+        return self.source['uuid']
 
     @property
     def tid(self):
-        return self.hit['tid']
+        return self.source['tid']
 
     def invalidated(self):
         request = get_root_request()
@@ -56,8 +54,8 @@ class CachedModel(object):
         if edits is None:
             return False
         version = self.meta['version']
-        linked_uuids = set(self.hit['linked_uuids'])
-        embedded_uuids = set(self.hit['embedded_uuids'])
+        linked_uuids = set(self.source['linked_uuids'])
+        embedded_uuids = set(self.source['embedded_uuids'])
         for xid, updated, linked in edits:
             if xid < version:
                 continue
@@ -132,6 +130,7 @@ class ElasticSearchStorage(object):
         self.index = index
 
     def _one(self, search):
+        # execute search and return a model if there is one hit
         hits = search.execute()
         if len(hits) != 1:
             return None
@@ -139,27 +138,18 @@ class ElasticSearchStorage(object):
         return model
 
     def get_by_uuid(self, uuid):
-        try:
-            hit = self.es.get(index=self.index, id=str(uuid))
-        except elasticsearch.exceptions.NotFoundError:
-            return None
-        return CachedModel(hit)
+        search = Search(using=self.es)
+        id_query = Q('ids', values=[str(uuid)])
+        search = search.query(id_query)
+        return self._one(search)
 
     def get_by_json(self, key, value, item_type, default=None):
         # find the term with the specific type
-        # also this query will do it to...
-        # {‘fields’: [], ‘filter’: {‘and’: [{‘term’: {‘embedded.term_name.raw’: ‘lung’}}, {‘terms’:
-        # {‘item_type’: [‘ontology_term’]}}]}, ‘_source’: [‘embedded’]}
         term = 'embedded.' + key + '.raw'
-
-        query = {
-            'filter': {'and': [
-                {'term': {term: value}},
-                {'type': {'value': item_type}},
-            ]}
-        }
-        res = self._one(query)
-        return res
+        search = Search(using=self.es)
+        search = search.filter('term', **{term: value})
+        search = search.filter('type', value=item_type)
+        return self._one(search)
 
 
     def get_by_unique_key(self, unique_key, name):
@@ -172,7 +162,7 @@ class ElasticSearchStorage(object):
 
     def get_rev_links(self, model, rel, *item_types):
         search = Search(using=self.es)
-        search = search.params(size=SEARCH_MAX)
+        search = search.extra(size=SEARCH_MAX)
         # had to use ** kw notation because of variable in field name
         search = search.filter('term', **{'links.' + rel: str(model.uuid)})
         if item_types:

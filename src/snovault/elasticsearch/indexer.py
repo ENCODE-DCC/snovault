@@ -111,8 +111,8 @@ def index(request):
         if txn_count == 0:
             return result
 
-        es.indices.refresh(index=INDEX)
-        res = es.search(index=INDEX, size=SEARCH_MAX, body={
+        es.indices.refresh(index='_all')
+        res = es.search(index='_all', size=SEARCH_MAX, body={
             'filter': {
                 'or': [
                     {

@@ -215,6 +215,7 @@ def index_settings():
         'index': {
             'mapping.total_fields.limit': 2000,
             'number_of_shards': 5,
+            'max_result_window': 100000,
             'merge': {
                 'policy': {
                     'max_merged_segment': '2gb',
