@@ -120,7 +120,12 @@ def schema_mapping(name, schema, field='*', nested=False):
                 },
                 'lower_case_sort': {
                     'type': 'text',
-                    'analyzer': 'case_insensistive_sort'
+                    'analyzer': 'case_insensistive_sort',
+                    'fields': {
+                        'keyword': {
+                            'type': 'keyword'
+                        }
+                    }
                 }
             }
         }
@@ -136,7 +141,12 @@ def schema_mapping(name, schema, field='*', nested=False):
                 },
                 'lower_case_sort': {
                     'type': 'text',
-                    'analyzer': 'case_insensistive_sort'
+                    'analyzer': 'case_insensistive_sort',
+                    'fields': {
+                        'keyword': {
+                            'type': 'keyword'
+                        }
+                    }
                 }
             }
         }
@@ -163,7 +173,12 @@ def schema_mapping(name, schema, field='*', nested=False):
                                 },
                                 'lower_case_sort': {
                                     'type': 'text',
-                                    'analyzer': 'case_insensistive_sort'
+                                    'analyzer': 'case_insensistive_sort',
+                                    'fields': {
+                                        'keyword': {
+                                            'type': 'keyword'
+                                        }
+                                    }
                                 }
                             }
                         })
@@ -188,7 +203,12 @@ def schema_mapping(name, schema, field='*', nested=False):
                 },
                 'lower_case_sort': {
                     'type': 'text',
-                    'analyzer': 'case_insensistive_sort'
+                    'analyzer': 'case_insensistive_sort',
+                    'fields': {
+                        'keyword': {
+                            'type': 'keyword'
+                        }
+                    }
                 }
             }
         }
@@ -204,7 +224,12 @@ def schema_mapping(name, schema, field='*', nested=False):
                 },
                 'lower_case_sort': {
                     'type': 'text',
-                    'analyzer': 'case_insensistive_sort'
+                    'analyzer': 'case_insensistive_sort',
+                    'fields': {
+                        'keyword': {
+                            'type': 'keyword'
+                        }
+                    }
                 }
             }
         }
@@ -288,14 +313,29 @@ def audit_mapping():
         'category': {
             'type': 'text',
             'index': True,
+            'fields': {
+                'raw': {
+                    'type': 'keyword'
+                }
+            }
         },
         'detail': {
             'type': 'text',
             'index': 'analyzed',
+            'fields': {
+                'raw': {
+                    'type': 'keyword'
+                }
+            }
         },
         'level_name': {
             'type': 'text',
             'index': True,
+            'fields': {
+                'raw': {
+                    'type': 'keyword'
+                }
+            }
         },
         'level': {
             'type': 'integer',
