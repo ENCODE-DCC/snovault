@@ -110,8 +110,8 @@ def update_object_in_snapshot(args):
 # Running in main process
 
 class MPIndexer(Indexer):
-    chunksize = 32
-    maxtasks = 4  # pooled processes will exit and be replaced after this many tasks are completed.
+    chunksize = 1024
+    maxtasks = 1  # pooled processes will exit and be replaced after this many tasks are completed.
 
     def __init__(self, registry, processes=None):
         super(MPIndexer, self).__init__(registry)
@@ -130,11 +130,16 @@ class MPIndexer(Indexer):
 
     def update_objects(self, request, uuids, xmin, snapshot_id):
         # Ensure that we iterate over uuids in this thread not the pool task handler.
+        uuid_count = len(uuids)
+        chunkiness = int((uuid_count - 1) / self.processes) + 1
+        if chunkiness > self.chunksize:
+            chunkiness = self.chunksize
+
         tasks = [(uuid, xmin, snapshot_id) for uuid in uuids]
         errors = []
         try:
             for i, error in enumerate(self.pool.imap_unordered(
-                    update_object_in_snapshot, tasks, self.chunksize)):
+                    update_object_in_snapshot, tasks, chunkiness)):
                 if error is not None:
                     errors.append(error)
                 if (i + 1) % 50 == 0:
