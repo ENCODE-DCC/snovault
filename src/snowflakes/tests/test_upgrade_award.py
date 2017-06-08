@@ -18,10 +18,27 @@ def award_1(award):
     return item
 
 
+@pytest.fixture
+def award_bad(award):
+    item = award.copy()
+    item.update({
+        'schema_version': '1',
+        'rfa': "ENCODE2",
+        'status': "Not a status"
+    })
+    return item
+
+
 def test_award_upgrade(upgrader, award_1):
     value = upgrader.upgrade('award', award_1, target_version='2')
     assert value['schema_version'] == '2'
     assert value['status'] == 'disabled'
+
+
+def test_award_batch_upgrade(testapp, award_bad):
+    res = testapp.post_json('/awards/', award_bad, 201)
+    assert res.json['schema_version'] == '2'
+    assert res.json['status'] == 'disabled'
 
 
 def test_award_upgrade_encode3(upgrader, award_1):
