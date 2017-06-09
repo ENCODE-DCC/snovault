@@ -63,13 +63,11 @@ def sorted_dict(d):
     return json.loads(json.dumps(d), object_pairs_hook=sorted_pairs_hook)
 
 
-def schema_mapping(name, schema, field='*', nested=False):
+def schema_mapping(name, schema, field='*'):
     """
     Create the mapping for a given schema. Defaults to using all fields for
     objects (*), but can handle specific fields using the field parameter.
     This allows for the mapping to match the selective embedding.
-    Nested parameter is a boolean controlling if objects should be type 'nested'
-    (for arrays) or 'object' (for non-arrays)
     """
     if 'linkFrom' in schema:
         type_ = 'string'
@@ -78,26 +76,17 @@ def schema_mapping(name, schema, field='*', nested=False):
 
     # Elasticsearch handles multiple values for a field
     if type_ == 'array' and schema['items']:
-        properties = schema_mapping(name, schema['items'], field)
-        if isinstance(properties, dict) and properties['type'] and properties['type'] == 'object':
-            return {
-                'type': 'nested',
-                'include_in_all': False,
-                'properties': properties['properties']
-            }
-        else:
-            return properties
+        return schema_mapping(name, schema['items'], field)
 
-    if type_ == 'object' or nested:
+    if type_ == 'object':
         properties = {}
         for k, v in schema.get('properties', {}).items():
             mapping = schema_mapping(k, v, '*')
             if mapping is not None:
                 if field == '*' or k == field:
                     properties[k] = mapping
-        processed_type = 'nested' if nested else 'object'
         return {
-            'type': processed_type,
+            'type': 'object',
             'include_in_all': False,
             'properties': properties,
         }
@@ -238,7 +227,7 @@ def schema_mapping(name, schema, field='*', nested=False):
 def index_settings():
     return {
         'index': {
-            'mapping.total_fields.limit': 2000,
+            'mapping.total_fields.limit': 3000,
             'number_of_shards': 5,
             'max_result_window': 100000,
             'merge': {
@@ -492,7 +481,6 @@ def type_mapping(types, item_type, embed=True):
             ref_types = None
             subschema = None
             ultimate_obj = False # set to true if on last level of embedding
-            nested = False
             field = '*'
             # Check if we're at the end of a hierarchy of embeds
             if p == prop.split('.')[-1] and len(prop.split('.')) > 1:
@@ -515,10 +503,9 @@ def type_mapping(types, item_type, embed=True):
                 field = p
                 if subschema is None:
                     break
-            # handle arrays
-            if subschema.get('items') != None:
-                nested = True
-                subschema = subschema.get('items', subschema)
+            # handle arrays by simply jumping into them
+            # we don't care that they're flattened during mapping
+            subschema = subschema.get('items', subschema)
             if 'linkFrom' in subschema:
                 _ref_type, _ = subschema['linkFrom'].split('.', 1)
                 ref_types = [_ref_type]
@@ -533,15 +520,15 @@ def type_mapping(types, item_type, embed=True):
             # Check if mapping for property is already an object
             # multiple subobjects may be embedded, so be careful here
             if ultimate_obj: # this means we're at the at the end of an embed
-                m['properties'][field] = schema_mapping(p, s, field, nested)
+                m['properties'][field] = schema_mapping(p, s, field)
             elif p in m['properties']:
                 if m['properties'][p]['type'] == 'string':
-                    m['properties'][p] = schema_mapping(p, s, field, nested)
+                    m['properties'][p] = schema_mapping(p, s, field)
                 # add a field that's an object
                 elif m['properties'][p]['type'] == 'object' and p != field and field != '*':
-                    m['properties'][p][field] = schema_mapping(p, s, field, nested)
+                    m['properties'][p][field] = schema_mapping(p, s, field)
             else:
-                m['properties'][p] = schema_mapping(p, s, field, nested)
+                m['properties'][p] = schema_mapping(p, s, field)
             m = m['properties'][p] if not ultimate_obj else m['properties']
 
     # boost_values = schema.get('boost_values', None)
@@ -577,7 +564,10 @@ def type_mapping(types, item_type, embed=True):
 
 
 def create_mapping_by_type(in_type, registry):
-    # build the nested mapping for embedded view
+    """
+    Return a full mapping for a given doc_type of in_type
+    """
+    # build a schema-based hierarchical mapping for embedded view
     collection = registry[COLLECTIONS].by_item_type[in_type]
     embed_mapping = type_mapping(registry[TYPES], collection.type_info.item_type)
     # finish up the mapping
