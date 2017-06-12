@@ -197,9 +197,19 @@ class TestingServerDefault(Item):
     schema = {
         'type': 'object',
         'properties': {
-            'uuid': {
-                'serverDefault': 'uuid4',
-                'type': 'string',
+            "schema_version": {
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)*$",
+                "requestMethod": [],
+                "default": "1",
+            },
+            "uuid": {
+                "title": "UUID",
+                "description": "",
+                "type": "string",
+                "format": "uuid",
+                "permission": "import_items",
+                "requestMethod": "POST",
             },
             'user': {
                 'serverDefault': 'userid',

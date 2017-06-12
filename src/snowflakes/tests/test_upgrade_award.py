@@ -35,12 +35,6 @@ def test_award_upgrade(upgrader, award_1):
     assert value['status'] == 'disabled'
 
 
-def test_award_batch_upgrade(testapp, award_bad):
-    res = testapp.post_json('/awards/', award_bad, 201)
-    assert res.json['schema_version'] == '2'
-    assert res.json['status'] == 'disabled'
-
-
 def test_award_upgrade_encode3(upgrader, award_1):
     award_1['rfa'] = 'ENCODE3'
     value = upgrader.upgrade('award', award_1, target_version='2')
@@ -69,3 +63,8 @@ def test_award_upgrade_viewing_group(upgrader, award_2):
     value = upgrader.upgrade('award', award_2, target_version='3')
     assert value['schema_version'] == '3'
     assert value['viewing_group'] == 'ENCODE3'
+
+
+def test_award_batch_upgrade(award_bad, testapp):
+    # cannot post an invalid object
+    res = testapp.post_json('/awards/', award_bad, status=422)
