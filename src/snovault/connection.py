@@ -25,6 +25,7 @@ class Connection(object):
         self.registry = registry
         self.item_cache = ManagerLRUCache('snovault.connection.item_cache', 1000)
         self.unique_key_cache = ManagerLRUCache('snovault.connection.key_cache', 1000)
+        self.embed_cache = ManagerLRUCache('snovault.connection.embed_cache', 1000)
 
     @reify
     def storage(self):
