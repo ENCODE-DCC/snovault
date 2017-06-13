@@ -87,7 +87,7 @@ def schema_mapping(name, schema, field='*'):
                     properties[k] = mapping
         return {
             'type': 'object',
-            'include_in_all': False,
+            'include_in_all': True,
             'properties': properties,
         }
 
@@ -178,7 +178,7 @@ def schema_mapping(name, schema, field='*'):
                 sub_mapping['index_analyzer'] = 'snovault_path_analyzer'
             else:
                 sub_mapping['index'] = True
-            sub_mapping['include_in_all'] = False
+            sub_mapping['include_in_all'] = True
         return sub_mapping
 
     if type_ == 'number':
@@ -596,10 +596,12 @@ def snovault_cleanup(registry):
     """
     Simple function to delete old unused snovault index if it's present
     """
-    sno_index_name = registry.settings['snovault.elasticsearch.index']
-    snovault_index = Index(sno_index_name)
-    if snovault_index.exists():
-        snovault_index.delete(ignore=404)
+    # see if the old snovault index exists
+    sno_index_name = registry.settings.get('snovault.elasticsearch.index', None)
+    if sno_index_name:
+        snovault_index = Index(sno_index_name)
+        if snovault_index.exists():
+            snovault_index.delete(ignore=404)
 
 
 def run(app, collections=None, dry_run=False, check_first=True):
