@@ -169,7 +169,7 @@ class ElasticSearchStorage(object):
             search = search.filter('terms', item_type=item_types)
         hits = search.execute()
         return [
-            hit.to_dict()['_id'] for hit in hits
+            hit.to_dict().get('_id') for hit in hits if hit.to_dict().get('_id')
         ]
 
     def __iter__(self, *item_types):
