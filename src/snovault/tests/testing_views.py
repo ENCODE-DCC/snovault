@@ -201,7 +201,45 @@ class TestingServerDefault(Item):
                 "type": "string",
                 "pattern": "^\\d+(\\.\\d+)*$",
                 "requestMethod": [],
-                "default": "1",
+            },
+            "uuid": {
+                "title": "UUID",
+                "description": "",
+                "type": "string",
+                "format": "uuid",
+                "permission": "import_items",
+                "requestMethod": "POST",
+            },
+            'user': {
+                'serverDefault': 'userid',
+                'linkTo': 'User',
+                'type': 'string',
+            },
+            'now': {
+                'serverDefault': 'now',
+                'format': 'date-time',
+                'type': 'string',
+            },
+            'accession': {
+                'serverDefault': 'accession',
+                'accessionType': 'AB',
+                'format': 'accession',
+                'type': 'string',
+            },
+        }
+    }
+
+
+@collection('testing-bad-accession')
+class TestingBadAccession(Item):
+    item_type = 'testing_bad_accession'
+    schema = {
+        'type': 'object',
+        'properties': {
+            "schema_version": {
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)*$",
+                "default": "2",
             },
             "uuid": {
                 "title": "UUID",

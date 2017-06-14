@@ -67,6 +67,7 @@ def update_item(storage, context):
     update = False
     errors = []
     properties = context.properties
+    import pdb;pdb.set_trace()
     if target_version is None or current_version == target_version:
         unique_keys = context.unique_keys(properties)
         links = context.links(properties)
@@ -111,8 +112,8 @@ def batch_upgrade(request):
             item = find_resource(root, uuid)
             item_type = item.type_info.item_type
             update, errors = update_item(storage, item)
-        except Exception:
-            logger.exception('Error updating: /%s/%s', item_type, uuid)
+        except Exception as e:
+            logger.error('Error %s updating: /%s/%s' % (e, item_type, uuid))
             sp.rollback()
             error = True
         else:
