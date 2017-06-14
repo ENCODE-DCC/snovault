@@ -178,7 +178,6 @@ def schema_mapping(name, schema, field='*'):
                 sub_mapping['index_analyzer'] = 'snovault_path_analyzer'
             else:
                 sub_mapping['index'] = True
-            sub_mapping['include_in_all'] = True
         return sub_mapping
 
     if type_ == 'number':
