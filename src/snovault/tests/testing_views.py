@@ -239,7 +239,7 @@ class TestingBadAccession(Item):
             "schema_version": {
                 "type": "string",
                 "pattern": "^\\d+(\\.\\d+)*$",
-                "default": "2",
+                "default": "1",
             },
             "uuid": {
                 "title": "UUID",
