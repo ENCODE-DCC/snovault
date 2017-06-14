@@ -589,7 +589,6 @@ def create_mapping_by_type(in_type, registry):
 
 def build_index(in_type, mapping, dry_run, check_first):
     this_index = Index(in_type)
-    # TESTING
     if(this_index.exists() and check_first):
         # compare previous mapping and current mapping to see if we need
         # to update. if not, return to save indexing
