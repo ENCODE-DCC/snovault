@@ -401,6 +401,20 @@ def es_mapping(mapping):
             'principals_allowed': {
                 'type': 'object',
                 'include_in_all': False,
+                'properties': {
+                    'view': {
+                        'type': 'keyword',
+                        'index': True
+                    },
+                    'edit': {
+                        'type': 'keyword',
+                        'index': True
+                    },
+                    'audit': {
+                        'type': 'keyword',
+                        'index': True
+                    }
+                }
             },
             'embedded_uuids': {
                 'type': 'text',
