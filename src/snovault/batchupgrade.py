@@ -18,6 +18,7 @@ from snovault import (
 from pyramid.view import view_config
 from pyramid.traversal import find_resource
 from .schema_utils import validate
+from pprint import pprint as pp
 
 EPILOG = __doc__
 logger = logging.getLogger(__name__)
@@ -117,6 +118,18 @@ def batch_upgrade(request):
             error = True
         else:
             if errors:
+                for error in errors:
+                    pp('{}#####################################################################'.format(uuid))
+                    for k in dir(error):
+                        if '__' not in k:
+                            pp(error[k])
+                try:
+                    errortext = [
+                        '%s: %s' % ('/'.join(error.path) or '<root>', error.message)
+                        for error in errors]
+                except Exception:
+                    errortext = ['some exception']
+
                 errortext = [
                     '%s: %s' % ('/'.join(error.path) or '<root>', error.message)
                     for error in errors]
