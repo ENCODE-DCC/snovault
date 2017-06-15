@@ -119,10 +119,8 @@ def batch_upgrade(request):
         else:
             if errors:
                 for error in errors:
-                    pp('{}#####################################################################'.format(uuid))
-                    for k in dir(error):
-                        if '__' not in k:
-                            pp(error[k])
+                    pp("{}#####################################################################".format(uuid))
+                    pp(vars(error))
                 try:
                     errortext = [
                         '%s: %s' % ('/'.join(error.path) or '<root>', error.message)
@@ -130,9 +128,6 @@ def batch_upgrade(request):
                 except Exception:
                     errortext = ['some exception']
 
-                errortext = [
-                    '%s: %s' % ('/'.join(error.path) or '<root>', error.message)
-                    for error in errors]
                 logger.error(
                     'Validation failure: /%s/%s\n%s', item_type, uuid, '\n'.join(errortext))
                 sp.rollback()
