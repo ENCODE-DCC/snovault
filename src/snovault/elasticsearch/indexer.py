@@ -113,21 +113,27 @@ def index(request):
 
         es.indices.refresh(index='_all')
         res = es.search(index='_all', size=SEARCH_MAX, body={
-            'filter': {
-                'or': [
-                    {
-                        'terms': {
-                            'embedded_uuids': updated,
-                            '_cache': False,
+            'query': {
+                'bool': {
+                    'filter': {
+                        'bool': {
+                            'should': [
+                                {
+                                    'terms': {
+                                        'embedded_uuids': updated,
+                                        '_cache': False,
+                                    },
+                                },
+                                {
+                                    'terms': {
+                                        'linked_uuids': renamed,
+                                        '_cache': False,
+                                    },
+                                },
+                            ],
                         },
                     },
-                    {
-                        'terms': {
-                            'linked_uuids': renamed,
-                            '_cache': False,
-                        },
-                    },
-                ],
+                },
             },
             '_source': False,
         })

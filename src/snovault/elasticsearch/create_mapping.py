@@ -178,7 +178,6 @@ def schema_mapping(name, schema, field='*'):
                 sub_mapping['index_analyzer'] = 'snovault_path_analyzer'
             else:
                 sub_mapping['index'] = True
-            sub_mapping['include_in_all'] = True
         return sub_mapping
 
     if type_ == 'number':
@@ -402,6 +401,20 @@ def es_mapping(mapping):
             'principals_allowed': {
                 'type': 'object',
                 'include_in_all': False,
+                'properties': {
+                    'view': {
+                        'type': 'keyword',
+                        'index': True
+                    },
+                    'edit': {
+                        'type': 'keyword',
+                        'index': True
+                    },
+                    'audit': {
+                        'type': 'keyword',
+                        'index': True
+                    }
+                }
             },
             'embedded_uuids': {
                 'type': 'text',
@@ -577,8 +590,12 @@ def create_mapping_by_type(in_type, registry):
 def build_index(in_type, mapping, dry_run, check_first):
     this_index = Index(in_type)
     if(this_index.exists() and check_first):
-        print("index %s already exists no need to create mapping" % (in_type))
-        return
+        # compare previous mapping and current mapping to see if we need
+        # to update. if not, return to save indexing
+        prev_mapping = this_index.get_mapping()[in_type]['mappings'][in_type]
+        if prev_mapping == mapping:
+            print("index %s already exists no need to create mapping" % (in_type))
+            return
     # delete the index, ignore if it doesn't exist
     this_index.delete(ignore=404)
     this_index.settings(**index_settings())
