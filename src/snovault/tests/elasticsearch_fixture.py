@@ -26,10 +26,12 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
     # ]
     args = [
         os.path.join(prefix, 'elasticsearch'),
+        '-Enetwork.host=%s' % host,
+        '-Ehttp.port=%d' % port,
     ]
     # elasticsearch.deb setup
     if os.path.exists('/etc/elasticsearch'):
-        args.append('-Des.path.conf=/etc/elasticsearch')
+        args.append('-Epath.conf=/etc/elasticsearch')
     process = subprocess.Popen(
         args,
         close_fds=True,
@@ -40,6 +42,7 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
     SUCCESS_LINE = b'started\n'
 
     lines = []
+    echo=True
     for line in iter(process.stdout.readline, b''):
         if echo:
             sys.stdout.write(line.decode('utf-8'))
