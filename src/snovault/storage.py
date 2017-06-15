@@ -112,6 +112,7 @@ class RDBStorage(object):
                     .join(PropertySheet.resource)
                     .filter(Resource.item_type == item_type,
                             PropertySheet.properties[key].astext == value)
+                    .distinct(PropertySheet.resource)
                     )
 
             data = query.one()
