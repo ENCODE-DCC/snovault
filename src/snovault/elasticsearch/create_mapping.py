@@ -602,7 +602,7 @@ def build_index(es, in_type, mapping, dry_run, check_first):
     if dry_run:
         print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
     else:
-        this_index.create()
+        this_index.create(request_timeout=30)
         try:
             this_index.put_mapping(doc_type=in_type, body={in_type: mapping})
         except:
