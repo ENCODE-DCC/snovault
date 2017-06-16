@@ -27,11 +27,11 @@ def test_batch_upgrade_1(testapp, invalid_snowball):
 def test_batch_upgrade_2(testapp, snowball):
     patch = {
         'schema_version': '1',
-        'status': 'CURRENT',
+        'status': 'FLYBARGS',
     }
     res = testapp.patch_json(snowball['@id'] + '?validate=false', patch)
 
-    assert snowball['status'] == 'CURRENT'
+    assert snowball['status'] == 'FLYBARGS'
     assert snowball['schema_version'] == '1'
     upgrade = testapp.post_json(
         '/batch_upgrade', {'batch': [snowball['uuid']]}, status=200)
