@@ -68,7 +68,7 @@ def test_test_accession_server_defaults(admin, test_accession_anontestapp, extra
         extra_environ=extra_environ,
     )
     item = res.json['@graph'][0]
-    assert item['accession'].startswith('TSTAB')
+    assert item['accession'].startswith('TSTSS')
 
     test_accession_anontestapp.patch_json(
         res.location, {}, status=200,
@@ -87,22 +87,27 @@ def test_batch_upgrade_error(admin, root, test_accession_anontestapp, extra_envi
     test_ob = res.json['@graph'][0]
     url = test_ob['@id']
     res = test_accession_anontestapp.get(url, extra_environ=extra_environ)
-    assert res.json['schema_version'] == '2'
+    assert res.json['schema_version'] == '1'
 
     schema_update = {
         'type': 'string',
     }
 
-    assert collection.type_info.schema_version == '2'
-    # downgrade via monkey patch
-    monkeypatch.setitem(properties['schema_version'], 'default', '1')
+    good_schema_update = {
+        'serverDefault': 'accession',
+        'accessionType': 'FL',
+        'format': 'accession',
+        'type': 'string',
+    }
+
+    monkeypatch.setitem(properties['schema_version'], 'default', '2')
     monkeypatch.setitem(properties, 'accession', schema_update)
-    monkeypatch.setattr(collection.type_info, 'schema_version', '1')
-    monkeypatch.setitem(collection.type_info.schema['properties'], 'accession', schema_update)
+    monkeypatch.setattr(collection.type_info, 'schema_version', '2')
     patched_res = test_accession_anontestapp.patch_json(
-        url, {'accession': 'totallyWrong', 'schema_version': "1"}, status=200,
+        url, {'accession': 'badAccession'}, status=200,
         extra_environ=extra_environ)
-    assert patched_res.json['@graph'][0]['schema_version'] == '1'
+    assert patched_res.json['@graph'][0]['schema_version'] == '2'
+    assert patched_res.json['@graph'][0]['accession'] == 'badAccession'
 
     upgrade = test_accession_anontestapp.post_json(
         '/batch_upgrade', {'batch': [test_ob['uuid']]}, status=200,
@@ -111,6 +116,6 @@ def test_batch_upgrade_error(admin, root, test_accession_anontestapp, extra_envi
     assert upgrade.json['results'][0] == [
         'testing_bad_accession',
         test_ob['uuid'],
-        False,
-        True,
+        False,  # updated
+        True,   # errors
     ]

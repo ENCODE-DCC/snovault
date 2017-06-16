@@ -222,7 +222,7 @@ class TestingServerDefault(Item):
             },
             'accession': {
                 'serverDefault': 'accession',
-                'accessionType': 'AB',
+                'accessionType': 'SS',
                 'format': 'accession',
                 'type': 'string',
             },
@@ -261,7 +261,7 @@ class TestingBadAccession(Item):
             },
             'accession': {
                 'serverDefault': 'accession',
-                'accessionType': 'AB',
+                'accessionType': 'SS',
                 'format': 'accession',
                 'type': 'string',
             },

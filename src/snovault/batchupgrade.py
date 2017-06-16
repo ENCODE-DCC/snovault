@@ -67,7 +67,6 @@ def update_item(storage, context):
     update = False
     errors = []
     properties = context.properties
-    import pdb;pdb.set_trace()
     if target_version is None or current_version == target_version:
         unique_keys = context.unique_keys(properties)
         links = context.links(properties)
