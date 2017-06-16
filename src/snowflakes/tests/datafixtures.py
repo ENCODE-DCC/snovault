@@ -128,10 +128,22 @@ def attachment():
 
 
 @pytest.fixture
-def document(testapp, lab, award):
+def snowball(testapp, lab, award):
     item = {
         'award': award['@id'],
         'lab': lab['@id'],
-        'document_type': 'growth protocol',
+        'method': 'hand-packed',
     }
-    return testapp.post_json('/document', item).json['@graph'][0]
+    return testapp.post_json('/snowball', item).json['@graph'][0]
+
+
+@pytest.fixture
+def snowflake(testapp, lab, award, snowball):
+    item = {
+        'snowset': snowball['@id'],
+        'type': 'fluffy',
+        'status': 'in progress',
+        'award': award['@id'],
+        'lab': lab['@id'],
+    }
+    return testapp.post_json('/snowflake', item).json['@graph'][0]
