@@ -227,7 +227,7 @@ def index_settings():
     return {
         'index': {
             'mapping.total_fields.limit': 3000,
-            'number_of_shards': 5,
+            'number_of_shards': 1,
             'max_result_window': 100000,
             'merge': {
                 'policy': {
@@ -592,10 +592,14 @@ def build_index(es, in_type, mapping, dry_run, check_first):
     if(this_index.exists() and check_first):
         # compare previous mapping and current mapping to see if we need
         # to update. if not, return to save indexing
-        prev_mapping = this_index.get_mapping()[in_type]['mappings'][in_type]
-        if prev_mapping == mapping:
-            print("index %s already exists no need to create mapping" % (in_type))
-            return
+        try:
+            prev_mapping = this_index.get_mapping()[in_type]['mappings'][in_type]
+        except KeyError:
+            pass
+        else:
+            if prev_mapping == mapping:
+                print("index %s already exists no need to create mapping" % (in_type))
+                return
     # delete the index, ignore if it doesn't exist
     this_index.delete(ignore=404)
     this_index.settings(**index_settings())
