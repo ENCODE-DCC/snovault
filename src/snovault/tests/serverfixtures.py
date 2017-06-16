@@ -66,6 +66,7 @@ def elasticsearch_host_port():
 def elasticsearch_server(request, elasticsearch_host_port):
     from .elasticsearch_fixture import server_process
     host, port = elasticsearch_host_port
+    host = 'localhost'
     port = 9200
     tmpdir = request.config._tmpdirhandler.mktemp('elasticsearch', numbered=True)
     tmpdir = str(tmpdir)
