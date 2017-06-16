@@ -587,8 +587,8 @@ def create_mapping_by_type(in_type, registry):
     return es_mapping(embed_mapping)
 
 
-def build_index(in_type, mapping, dry_run, check_first):
-    this_index = Index(in_type)
+def build_index(es, in_type, mapping, dry_run, check_first):
+    this_index = Index(in_type, using=es)
     if(this_index.exists() and check_first):
         # compare previous mapping and current mapping to see if we need
         # to update. if not, return to save indexing
@@ -609,14 +609,14 @@ def build_index(in_type, mapping, dry_run, check_first):
             log.exception("Could not create mapping for the collection %s", in_type)
 
 
-def snovault_cleanup(registry):
+def snovault_cleanup(es, registry):
     """
     Simple function to delete old unused snovault index if it's present
     """
     # see if the old snovault index exists
     sno_index_name = registry.settings.get('snovault.elasticsearch.index', None)
     if sno_index_name:
-        snovault_index = Index(sno_index_name)
+        snovault_index = Index(sno_index_name, using=es)
         if snovault_index.exists():
             snovault_index.delete(ignore=404)
 
@@ -624,18 +624,17 @@ def snovault_cleanup(registry):
 def run(app, collections=None, dry_run=False, check_first=True):
     registry = app.registry
     if not dry_run:
-        es_server = app.registry.settings['elasticsearch.server']
-        connections.create_connection(hosts=[es_server])
-        snovault_cleanup(registry)
+        es = app.registry[ELASTIC_SEARCH]
+        snovault_cleanup(es, registry)
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
     for collection_name in collections:
         if collection_name == 'meta':
             # meta mapping just contains settings
-            build_index(collection_name, META_MAPPING, dry_run, check_first)
+            build_index(es, collection_name, META_MAPPING, dry_run, check_first)
         else:
             mapping = create_mapping_by_type(collection_name, registry)
-            build_index(collection_name, mapping, dry_run, check_first)
+            build_index(es, collection_name, mapping, dry_run, check_first)
 
 
 def main():
