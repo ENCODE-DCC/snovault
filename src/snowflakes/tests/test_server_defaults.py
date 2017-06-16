@@ -3,6 +3,7 @@ from pytest import fixture
 
 COLLECTION_URL = '/testing-server-defaults'
 
+
 @fixture
 def extra_environ(admin):
     email = admin['email']
@@ -74,56 +75,3 @@ def test_test_accession_server_defaults(admin, test_accession_anontestapp, extra
         res.location, {}, status=200,
         extra_environ=extra_environ,
     )
-
-
-def test_batch_upgrade_error(admin, root, test_accession_anontestapp, extra_environ, monkeypatch):
-    res = test_accession_anontestapp.post_json(
-        '/testing-bad-accession/?validate=false',
-        {'thing': 'three', 'schema_version': '1'}, status=201,
-        extra_environ=extra_environ,
-    )
-    collection = root['testing_bad_accession']
-    properties = collection.type_info.schema['properties']
-
-    test_ob = res.json['@graph'][0]
-    url = test_ob['@id']
-    res = test_accession_anontestapp.get(url, extra_environ=extra_environ)
-    assert res.json['schema_version'] == '1'
-    assert res.json['thing'] == 'three'
-
-    '''
-    schema_update = {
-        'type': 'string',
-    }
-
-    good_schema_update = {
-        'serverDefault': 'accession',
-        'accessionType': 'FL',
-        'format': 'accession',
-        'type': 'string',
-    }
-
-    #monkeypatch.setitem(properties, 'thing', schema_update)
-    patched_res = test_accession_anontestapp.patch_json(
-        url + '?validate=false', {'thing': 'three'}, status=200,
-        extra_environ=extra_environ)
-    assert patched_res.json['@graph'][0]['schema_version'] == '1'
-    assert patched_res.json['@graph'][0]['thing'] == "three"
-    '''
-    monkeypatch.setitem(properties['schema_version'], 'default', '2')
-    monkeypatch.setattr(collection.type_info, 'schema_version', '2')
-
-    upgrade = test_accession_anontestapp.post_json(
-        '/batch_upgrade', {'batch': [test_ob['uuid']]}, status=200,
-        extra_environ=extra_environ)
-
-    res = test_accession_anontestapp.get(url, extra_environ=extra_environ)
-    assert res.json['schema_version'] == '2'
-    assert res.json['thing'] == 'three'
-
-    assert upgrade.json['results'][0] == [
-        'testing_bad_accession',
-        test_ob['uuid'],
-        False,  # updated
-        True,   # errors
-    ]

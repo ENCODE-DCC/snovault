@@ -138,6 +138,18 @@ def snowball(testapp, lab, award):
 
 
 @pytest.fixture
+def invalid_snowball(testapp, lab, award):
+    item = {
+        'award': award['uuid'],
+        'lab': lab['uuid'],
+        'method': 'hand-packed',
+        'schema_version': '1',
+        'status': 'CURRENT',
+    }
+    return testapp.post_json('/snowball/' + '?validate=false', item).json['@graph'][0]
+
+
+@pytest.fixture
 def snowflake(testapp, lab, award, snowball):
     item = {
         'snowset': snowball['@id'],
