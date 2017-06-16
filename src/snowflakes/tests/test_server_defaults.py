@@ -78,7 +78,8 @@ def test_test_accession_server_defaults(admin, test_accession_anontestapp, extra
 
 def test_batch_upgrade_error(admin, root, test_accession_anontestapp, extra_environ, monkeypatch):
     res = test_accession_anontestapp.post_json(
-        '/testing-bad-accession/', {}, status=201,
+        '/testing-bad-accession/?validate=false',
+        {'thing': 'three', 'schema_version': '1'}, status=201,
         extra_environ=extra_environ,
     )
     collection = root['testing_bad_accession']
@@ -88,7 +89,9 @@ def test_batch_upgrade_error(admin, root, test_accession_anontestapp, extra_envi
     url = test_ob['@id']
     res = test_accession_anontestapp.get(url, extra_environ=extra_environ)
     assert res.json['schema_version'] == '1'
+    assert res.json['thing'] == 'three'
 
+    '''
     schema_update = {
         'type': 'string',
     }
@@ -100,18 +103,23 @@ def test_batch_upgrade_error(admin, root, test_accession_anontestapp, extra_envi
         'type': 'string',
     }
 
-    monkeypatch.setitem(properties['schema_version'], 'default', '2')
-    monkeypatch.setitem(properties, 'accession', schema_update)
-    monkeypatch.setattr(collection.type_info, 'schema_version', '2')
+    #monkeypatch.setitem(properties, 'thing', schema_update)
     patched_res = test_accession_anontestapp.patch_json(
-        url, {'accession': 'badAccession'}, status=200,
+        url + '?validate=false', {'thing': 'three'}, status=200,
         extra_environ=extra_environ)
-    assert patched_res.json['@graph'][0]['schema_version'] == '2'
-    assert patched_res.json['@graph'][0]['accession'] == 'badAccession'
+    assert patched_res.json['@graph'][0]['schema_version'] == '1'
+    assert patched_res.json['@graph'][0]['thing'] == "three"
+    '''
+    monkeypatch.setitem(properties['schema_version'], 'default', '2')
+    monkeypatch.setattr(collection.type_info, 'schema_version', '2')
 
     upgrade = test_accession_anontestapp.post_json(
         '/batch_upgrade', {'batch': [test_ob['uuid']]}, status=200,
         extra_environ=extra_environ)
+
+    res = test_accession_anontestapp.get(url, extra_environ=extra_environ)
+    assert res.json['schema_version'] == '2'
+    assert res.json['thing'] == 'three'
 
     assert upgrade.json['results'][0] == [
         'testing_bad_accession',

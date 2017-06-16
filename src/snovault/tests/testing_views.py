@@ -239,7 +239,6 @@ class TestingBadAccession(Item):
             "schema_version": {
                 "type": "string",
                 "pattern": "^\\d+(\\.\\d+)*$",
-                "default": "1",
             },
             "uuid": {
                 "title": "UUID",
@@ -248,6 +247,10 @@ class TestingBadAccession(Item):
                 "format": "uuid",
                 "permission": "import_items",
                 "requestMethod": "POST",
+            },
+            'thing': {
+                'type': "number",
+                'default': 3,
             },
             'user': {
                 'serverDefault': 'userid',
