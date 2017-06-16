@@ -110,6 +110,35 @@ def test_current_propsheet_update(session):
     assert current.sid
 
 
+def test_get_by_json(session):
+    from snovault.storage import (
+        CurrentPropertySheet,
+        Resource,
+        PropertySheet,
+    )
+    name = 'testdata'
+    props1 = {'foo': 'bar'}
+    resource = Resource('test_item', {name: props1})
+    session.add(resource)
+    session.flush()
+    resource = session.query(Resource).one()
+    props2 = {'foo': 'baz'}
+    resource[name] = props2
+    session.flush()
+    resource = session.query(Resource).one()
+    session.flush()
+    query = (session.query(PropertySheet)
+             .join(PropertySheet.resource)
+             .filter(PropertySheet.properties['foo'].astext == 'baz')
+             .distinct(PropertySheet.resource)
+             )
+
+    data = query.one()
+    assert data.resource.properties == props2
+
+
+
+
 def test_keys(session):
     from sqlalchemy.orm.exc import FlushError
     from snovault.storage import (

@@ -600,6 +600,7 @@ def build_index(es, in_type, mapping, dry_run, check_first):
             if prev_mapping == mapping:
                 print("index %s already exists no need to create mapping" % (in_type))
                 return
+        return
     # delete the index, ignore if it doesn't exist
     this_index.delete(ignore=404)
     this_index.settings(**index_settings())
