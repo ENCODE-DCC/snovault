@@ -597,7 +597,7 @@ def build_index(in_type, mapping, dry_run, check_first):
             print("index %s already exists no need to create mapping" % (in_type))
             return
     # delete the index, ignore if it doesn't exist
-    this_index.delete(ignore=404, request_timeout=30)
+    # this_index.delete(ignore=404, request_timeout=30)
     this_index.settings(**index_settings())
     if dry_run:
         print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
