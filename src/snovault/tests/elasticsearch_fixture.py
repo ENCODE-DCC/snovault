@@ -30,8 +30,8 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
         '-Ehttp.port=%d' % port,
     ]
     # elasticsearch.deb setup
-    # if os.path.exists('/etc/elasticsearch'):
-    #    args.append('-Epath.conf=/etc/elasticsearch')
+    if os.path.exists('/etc/elasticsearch'):
+       args.append('-Epath.conf=/etc/elasticsearch')
     process = subprocess.Popen(
         args,
         close_fds=True,
