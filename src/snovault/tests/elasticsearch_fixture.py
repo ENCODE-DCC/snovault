@@ -31,6 +31,7 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
     ]
     # elasticsearch for travis
     if os.environ.get('TRAVIS'):
+        echo=True
         args.append('-Epath.conf=%s/deploy' % os.environ['TRAVIS_BUILD_DIR'])
     elif os.path.exists('/etc/elasticsearch'):
         # elasticsearch.deb setup
@@ -46,7 +47,6 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
     SUCCESS_LINE = b'started\n'
 
     lines = []
-    echo=True
     for line in iter(process.stdout.readline, b''):
         if echo:
             sys.stdout.write(line.decode('utf-8'))
