@@ -41,7 +41,8 @@
     },
     "properties": {
         "schema_version": {
-            "default": "1"
+            "default": "2",
+            "comment": "for testing upgrades"
         },
         "method": {
             "title": "Method",
