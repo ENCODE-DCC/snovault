@@ -117,6 +117,17 @@ def award(testapp):
     return testapp.post_json('/award', item).json['@graph'][0]
 
 
+@pytest.fixture
+def invalid_award(testapp):
+    item = {
+        'name': 'award names cannot have spaces',
+        'rfa': 'ENCODE3',
+        'project': 'ENCODE',
+        'viewing_group': 'ENCODE',
+    }
+    return testapp.post_json('/award' + '?validate=false', item).json['@graph'][0]
+
+
 RED_DOT = """data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA
 AAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO
 9TXL0Y4OHwAAAABJRU5ErkJggg=="""
@@ -144,7 +155,20 @@ def invalid_snowball(testapp, lab, award):
         'lab': lab['uuid'],
         'method': 'hand-packed',
         'schema_version': '1',
-        'status': 'CURRENT',
+        'status': 'FLYBARGS',
+    }
+    return testapp.post_json('/snowball/' + '?validate=false', item).json['@graph'][0]
+
+
+@pytest.fixture
+def invalid_snowball2(testapp, lab, award):
+    item = {
+        'award': award['uuid'],
+        'lab': lab['uuid'],
+        'method': 'hand-packed',
+        'schema_version': '1',
+        'status': 'FLINGERNEERS',
+        'alternate_accessions': ['THE THING THAT SHOULD NOT BE']
     }
     return testapp.post_json('/snowball/' + '?validate=false', item).json['@graph'][0]
 

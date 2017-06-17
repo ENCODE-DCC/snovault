@@ -1,48 +1,42 @@
-def test_batch_upgrade_1(testapp, invalid_snowball):
-    '''
-    patch = {
-        'schema_version': '1',
-        'status': 'CURRENT',
-    }
-    res = testapp.patch_json(invalid_snowball['@id'] + '?validate=false', patch)
-    '''
+def test_batch_upgrade(testapp, invalid_snowball):
 
-    assert invalid_snowball['status'] == 'CURRENT'
-    assert invalid_snowball['schema_version'] == '1'
+    assert invalid_snowball['status'] == 'FLYBARGS'
     upgrade = testapp.post_json(
         '/batch_upgrade', {'batch': [invalid_snowball['uuid']]}, status=200)
 
     res = testapp.get(invalid_snowball['@id'])
     assert res.json['schema_version'] == '2'
-    assert res.json['status'] == 'submitted'
 
     assert upgrade.json['results'][0] == [
         'snowball',
         invalid_snowball['uuid'],
-        False,  # updated
-        False,   # errors
+        True,  # updated
+        True,   # errors
     ]
 
 
-def test_batch_upgrade_2(testapp, snowball):
-    patch = {
-        'schema_version': '1',
-        'status': 'FLYBARGS',
-    }
-    res = testapp.patch_json(snowball['@id'] + '?validate=false', patch)
+def test_batch_upgrade_multi(testapp, invalid_snowball, invalid_snowball2):
 
-    assert snowball['status'] == 'FLYBARGS'
-    assert snowball['schema_version'] == '1'
+    assert invalid_snowball2['alternate_accessions'] == ['THE THING THAT SHOULD NOT BE']
     upgrade = testapp.post_json(
-        '/batch_upgrade', {'batch': [snowball['uuid']]}, status=200)
+        '/batch_upgrade', {'batch': [invalid_snowball['uuid'], invalid_snowball2['uuid']]}, status=200)
 
-    res = testapp.get(snowball['@id'])
-    assert res.json['schema_version'] == '2'
-    assert res.json['status'] == 'submitted'
-
+    assert len(upgrade.json['results']) == 2
     assert upgrade.json['results'][0] == [
         'snowball',
-        snowball['uuid'],
-        False,  # updated
-        False,   # errors
+        invalid_snowball['uuid'],
+        True,  # updated
+        True,   # errors
+    ]
+
+
+def test_batch_upgrade_regex(testapp, invalid_award):
+    assert invalid_award['name'] == 'award names cannot have spaces'
+    upgrade = testapp.post_json('/batch_upgrade', {'batch': [invalid_award['uuid']]}, status=200)
+
+    assert upgrade.json['results'][0] == [
+        'award',
+        invalid_award['uuid'],
+        True,  # updated
+        True,   # errors
     ]

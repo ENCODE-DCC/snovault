@@ -21,5 +21,5 @@ def award_0_2(value, system):
 @upgrade_step('award', '2', '3')
 def award_2_3(value, system):
 
-    if value['viewing_group'] == 'ENCODE':
-        value['viewing_group'] = 'ENCODE3'
+    if value['viewing_group'] == 'ENCODE3':
+        value['viewing_group'] = 'ENCODE'

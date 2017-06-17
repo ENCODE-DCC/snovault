@@ -12,6 +12,3 @@ def snowset_0_2(value, system):
             value['status'] = 'deleted'
         elif value['status'] == 'CURRENT':
             value['status'] = 'submitted'  # there is a dependency on date_released+"released"
-
-    else:
-        value['status'] = 'submitted'

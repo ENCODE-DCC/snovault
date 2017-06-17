@@ -62,7 +62,7 @@ def award_2(award_1):
 def test_award_upgrade_viewing_group(upgrader, award_2):
     value = upgrader.upgrade('award', award_2, target_version='3')
     assert value['schema_version'] == '3'
-    assert value['viewing_group'] == 'ENCODE3'
+    assert value['viewing_group'] == 'ENCODE'
 
 
 def test_award_batch_upgrade(award_bad, testapp):
