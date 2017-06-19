@@ -91,6 +91,30 @@ def schema_mapping(name, schema, field='*'):
             'properties': properties,
         }
 
+    # hardcode fields with dates for now
+    if name == 'date_created':
+        return {
+            'type': 'date',
+            'format':"yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",
+            'copy_to': [],
+            'index': True,
+            'fields': {
+                'raw': {
+                    'type': 'keyword',
+                    'index': True
+                },
+                'lower_case_sort': {
+                    'type': 'text',
+                    'analyzer': 'case_insensistive_sort',
+                    'fields': {
+                        'keyword': {
+                            'type': 'keyword'
+                        }
+                    }
+                }
+            }
+        }
+
     if type_ == ["number", "string"]:
         return {
             'type': 'text',
