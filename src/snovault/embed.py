@@ -233,7 +233,9 @@ def build_embedded_result(request, result, embedded_model):
         embed_objs = [val for val in embedded_model if val != 'fields_to_use']
         fields_to_use = curr_level_fields + embed_objs
     for key in fields_to_use:
-        val = result[key]
+        val = result.get(key)
+        if not val:
+            continue
         embed_val = None
         if isinstance(val, str):
             embed_val = handle_string_embed(request, key, val, embedded_model)
