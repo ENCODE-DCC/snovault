@@ -195,7 +195,10 @@ def build_embedded_model(fields_to_embed):
         field_pointer = embedded_model
         for subfield in split_field:
             if subfield == split_field[-1]:
-                if 'fields_to_use' in field_pointer:
+                if subfield == '*':
+                    # '*' means all fields are used
+                    field_pointer['*'] = ['fully embed this object']
+                elif 'fields_to_use' in field_pointer:
                     field_pointer['fields_to_use'].append(subfield)
                 else:
                     field_pointer['fields_to_use'] = [subfield]

@@ -96,7 +96,6 @@ def schema_mapping(name, schema, field='*'):
         return {
             'type': 'date',
             'format':"yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",
-            'copy_to': [],
             'index': True,
             'fields': {
                 'raw': {
@@ -118,14 +117,11 @@ def schema_mapping(name, schema, field='*'):
     if type_ == ["number", "string"]:
         return {
             'type': 'text',
-            'copy_to': [],
             'index': True,
             'fields': {
                 'value': {
                     'type': 'float',
-                    'copy_to': '',
                     'ignore_malformed': True,
-                    'copy_to': []
                 },
                 'raw': {
                     'type': 'keyword',
@@ -171,35 +167,27 @@ def schema_mapping(name, schema, field='*'):
 
         sub_mapping = {
             'type': 'text',
-            'store': True
+            'store': True,
+            'fields': {
+                'raw': {
+                    'type': 'keyword',
+                    'index': True
+                },
+                'lower_case_sort': {
+                    'type': 'text',
+                    'analyzer': 'case_insensistive_sort',
+                    'fields': {
+                        'keyword': {
+                            'type': 'keyword'
+                        }
+                    }
+                }
+            }
         }
 
-        if schema.get('elasticsearch_mapping_index_type'):
-             if schema.get('elasticsearch_mapping_index_type')['default'] == 'analyzed':
-                return sub_mapping
-        else:
-            sub_mapping.update({
-                            'fields': {
-                                'raw': {
-                                    'type': 'keyword',
-                                    'index': True
-                                },
-                                'lower_case_sort': {
-                                    'type': 'text',
-                                    'analyzer': 'case_insensistive_sort',
-                                    'fields': {
-                                        'keyword': {
-                                            'type': 'keyword'
-                                        }
-                                    }
-                                }
-                            }
-                        })
-            # these fields are unintentially partially matching some small search
-            # keywords because fields are analyzed by nGram analyzer
         if name in NON_SUBSTRING_FIELDS:
             if name in PATH_FIELDS:
-                sub_mapping['index_analyzer'] = 'snovault_path_analyzer'
+                sub_mapping['analyzer'] = 'snovault_path_analyzer'
             else:
                 sub_mapping['index'] = True
         return sub_mapping
@@ -507,38 +495,28 @@ def type_mapping(types, item_type, embed=True):
     type_info = types[item_type]
     schema = type_info.schema
     mapping = schema_mapping(item_type, schema)
-    embeds = add_default_embeds(type_info.embedded, schema)
+    embeds = add_default_embeds(item_type, types, type_info.embedded, schema)
     if not embed:
         return mapping
     for prop in embeds:
         single_embed = {}
-        s = schema
-        m = mapping
-        for p in prop.split('.'):
+        curr_s = schema
+        curr_m = mapping
+        for curr_p in prop.split('.'):
             ref_types = None
             subschema = None
             ultimate_obj = False # set to true if on last level of embedding
             field = '*'
-            # Check if we're at the end of a hierarchy of embeds
-            if p == prop.split('.')[-1] and len(prop.split('.')) > 1:
-                # See if the embedding was done improperly (last field is object)
-                subschema = s.get('properties', {}).get(p)
-                    # if last field is object, default to embedding all fields (*)
-                if subschema is None: # Check if second to last field is object
-                    subschema = s
-                    ultimate_obj = True
-                    field = p
             # Check if only an object was given. Embed fully (leave field = *)
-            elif len(prop.split('.')) == 1:
-                subschema = s.get('properties', {}).get(p)
+            if len(prop.split('.')) == 1:
+                subschema = curr_s.get('properties', {}).get(curr_p, None)
                 # if a non-obj field, return (no embedding is going on)
-                if subschema is None:
+                if not subschema:
                     break
-            else: # in this case, field itself should be an object. If not, return
-                # If last field is an object, embed it entirely
-                subschema = s.get('properties', {}).get(p)
-                field = p
-                if subschema is None:
+            else:
+                subschema = curr_s.get('properties', {}).get(curr_p, None)
+                field = curr_p
+                if not subschema:
                     break
             # handle arrays by simply jumping into them
             # we don't care that they're flattened during mapping
@@ -551,22 +529,31 @@ def type_mapping(types, item_type, embed=True):
                 if not isinstance(ref_types, list):
                     ref_types = [ref_types]
             if ref_types is None:
-                s = subschema
+                curr_s = subschema
             else:
-                s = reduce(combine_schemas, (types[t].schema for t in ref_types))
-            # Check if mapping for property is already an object
+                curr_s = reduce(combine_schemas, (types[t].schema for t in ref_types))
+            # Check if we're at the end of a hierarchy of embeds
+            if len(prop.split('.')) > 1 and curr_p == prop.split('.')[-2]:
+                # See if the next (last) field is an object
+                # if not (which is proper), then this is the ultimate obj
+                next_subschema = subschema.get('properties', {}).get(prop.split('.')[-1], None)
+                # if subschema is none ()
+                if not next_subschema:
+                    ultimate_obj = True
+                    field = prop.split('.')[-1]
+
+            # see if there's already a mapping associated with this embed:
             # multiple subobjects may be embedded, so be careful here
-            if ultimate_obj: # this means we're at the at the end of an embed
-                m['properties'][field] = schema_mapping(p, s, field)
-            elif p in m['properties']:
-                if m['properties'][p]['type'] == 'string':
-                    m['properties'][p] = schema_mapping(p, s, field)
-                # add a field that's an object
-                elif m['properties'][p]['type'] == 'object' and p != field and field != '*':
-                    m['properties'][p][field] = schema_mapping(p, s, field)
+            if curr_p in curr_m['properties'] and curr_m['properties'][curr_p]['type'] == 'object':
+                mapped = schema_mapping(curr_p, curr_s, field)
+                curr_m['properties'][curr_p]['properties'].update(mapped['properties'])
             else:
-                m['properties'][p] = schema_mapping(p, s, field)
-            m = m['properties'][p] if not ultimate_obj else m['properties']
+                curr_m['properties'][curr_p] = schema_mapping(curr_p, curr_s, field)
+
+            if ultimate_obj: # this means we're at the at the end of an embed
+                break
+            else:
+                curr_m = curr_m['properties'][curr_p]
 
     # boost_values = schema.get('boost_values', None)
     # if boost_values is None:
