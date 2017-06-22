@@ -203,10 +203,7 @@ def build_embedded_model(fields_to_embed):
                 elif 'fields_to_use' in field_pointer:
                     field_pointer['fields_to_use'].append(subfield)
                 else:
-                    try:
-                        field_pointer['fields_to_use'] = [subfield]
-                    except:
-                        import pdb; pdb.set_trace()
+                    field_pointer['fields_to_use'] = [subfield]
                 continue
             elif subfield not in field_pointer:
                 field_pointer[subfield] = {}
