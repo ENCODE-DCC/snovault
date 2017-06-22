@@ -48,7 +48,7 @@ def run(testapp, timeout=DEFAULT_TIMEOUT, dry_run=False, path='/index', control=
 
     # Make sure elasticsearch is up before trying to index.
     if path == '/index_file':
-        es = testapp.app.registry['snp_search']
+        return
     else:
         es = testapp.app.registry[ELASTIC_SEARCH]
     es.info()
