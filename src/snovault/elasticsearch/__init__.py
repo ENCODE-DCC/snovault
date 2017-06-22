@@ -36,8 +36,8 @@ def includeme(config):
         config.include('.esstorage')
 
     config.include('.indexer')
-    if asbool(settings.get('indexer')) and not PY2:
-        config.include('.mpindexer')
+    # if asbool(settings.get('indexer')) and not PY2:
+    #     config.include('.mpindexer')
 
 
 def datastore(request):

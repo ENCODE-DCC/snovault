@@ -187,11 +187,11 @@ def build_embedded_model(fields_to_embed):
     OUTPUT:
     {'modifications': {'modified_regions': {'fields_to_use': ['chromosome']}},
      'lab': {'fields_to_use': ['uuid']},
-     'award': {'*': 'fully embed this object'},
-     'bisource': {'*': 'fully embed this object'},
-     '*': 'fully embed this object'}
+     'award': {'*': ['fully embed this object']},
+     'bisource': {'*': ['fully embed this object']},
+     '*': ['fully embed this object']}
     """
-    embedded_model = {'*':'fully embed this object'}
+    embedded_model = {'*':['fully embed this object']}
     for field in fields_to_embed:
         split_field = field.split('.')
         field_pointer = embedded_model
@@ -199,11 +199,14 @@ def build_embedded_model(fields_to_embed):
             if subfield == split_field[-1]:
                 if subfield == '*':
                     # '*' means all fields are used
-                    field_pointer['*'] = 'fully embed this object'
+                    field_pointer['*'] = ['fully embed this object']
                 elif 'fields_to_use' in field_pointer:
                     field_pointer['fields_to_use'].append(subfield)
                 else:
-                    field_pointer['fields_to_use'] = [subfield]
+                    try:
+                        field_pointer['fields_to_use'] = [subfield]
+                    except:
+                        import pdb; pdb.set_trace()
                 continue
             elif subfield not in field_pointer:
                 field_pointer[subfield] = {}
@@ -303,14 +306,14 @@ def handle_dict_embed(request, key, val, embedded_model):
         if 'fields_to_use' in embedded_model and key in embedded_model['fields_to_use']:
             # Adding this * makes all fields get added, not just the down-the-
             # line embed
-            embedded_model[key]['*'] = 'fully embed this obj'
+            embedded_model[key]['*'] = ['fully embed this obj']
             return build_embedded_result(request, val, embedded_model[key])
         # deeper embedding involved, but not fully embedded
         else:
             return build_embedded_result(request, val, embedded_model[key])
     elif 'uuid' not in val or key in embedded_model['fields_to_use']:
         # this is a subobject or a embedded object that has no deeper embedding
-        return build_embedded_result(request, val, {'*': 'fully embed this obj'})
+        return build_embedded_result(request, val, {'*': ['fully embed this obj']})
     else:
         return None
 
