@@ -182,12 +182,14 @@ def build_embedded_model(fields_to_embed):
     INPUT:
     [modifications.modified_regions.chromosome,
     lab.uuid,
-    award,
-    biosource]
+    award.*,
+    biosource.*]
     OUTPUT:
     {'modifications': {'modified_regions': {'fields_to_use': ['chromosome']}},
      'lab': {'fields_to_use': ['uuid']},
-     'fields_to_use': ['award', 'biosource'], '*': ['fully embed this object']}
+     'award': {'*': ['fully embed this object']},
+     'bisource': {'*': ['fully embed this object']},
+     '*': ['fully embed this object']}
     """
     embedded_model = {'*':['fully embed this object']}
     for field in fields_to_embed:
