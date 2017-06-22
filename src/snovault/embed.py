@@ -187,11 +187,11 @@ def build_embedded_model(fields_to_embed):
     OUTPUT:
     {'modifications': {'modified_regions': {'fields_to_use': ['chromosome']}},
      'lab': {'fields_to_use': ['uuid']},
-     'award': {'*': ['fully embed this object']},
-     'bisource': {'*': ['fully embed this object']},
-     '*': ['fully embed this object']}
+     'award': {'*': 'fully embed this object'},
+     'bisource': {'*': 'fully embed this object'},
+     '*': 'fully embed this object'}
     """
-    embedded_model = {'*':['fully embed this object']}
+    embedded_model = {'*':'fully embed this object'}
     for field in fields_to_embed:
         split_field = field.split('.')
         field_pointer = embedded_model
@@ -199,7 +199,7 @@ def build_embedded_model(fields_to_embed):
             if subfield == split_field[-1]:
                 if subfield == '*':
                     # '*' means all fields are used
-                    field_pointer['*'] = ['fully embed this object']
+                    field_pointer['*'] = 'fully embed this object'
                 elif 'fields_to_use' in field_pointer:
                     field_pointer['fields_to_use'].append(subfield)
                 else:
