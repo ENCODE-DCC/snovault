@@ -26,7 +26,7 @@ import copy
 
 
 log = logging.getLogger(__name__)
-SEARCH_MAX = 99999  # OutOfMemoryError if too high
+SEARCH_MAX = 9999  # OutOfMemoryError if too high
 
 
 def includeme(config):

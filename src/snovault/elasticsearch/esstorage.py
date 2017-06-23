@@ -9,7 +9,7 @@ from .interfaces import (
     ICachedItem,
 )
 
-SEARCH_MAX = 99999  # OutOfMemoryError if too high. Previously: (2 ** 31) - 1
+SEARCH_MAX = 9999  # OutOfMemoryError if too high. Previously: (2 ** 31) - 1
 
 def includeme(config):
     from snovault import STORAGE

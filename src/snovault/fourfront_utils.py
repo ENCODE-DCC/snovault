@@ -20,7 +20,7 @@ def add_default_embeds(item_type, types, embeds, schema={}):
         split_field = field.strip().split('.')
         if len(split_field) > 1:
             # ensure that the embed is valid
-            is_valid, error_message = confirm_embed_with_schemas(item_type, types, split_field[:-1], schema)
+            is_valid, error_message = confirm_embed_with_schemas(item_type, types, split_field, schema)
             if not is_valid:
                 if error_message:
                     print(error_message)
@@ -28,7 +28,7 @@ def add_default_embeds(item_type, types, embeds, schema={}):
             embed_path = '.'.join(split_field[:-1])
             # last part of split_field should a specific fieldname or *
             # if *, then display_title and link_id are taken care of
-            if split_field[-1] == '*':
+            if split_field[-2:] == '.*':
                 already_processed.append(embed_path)
                 continue
             if embed_path not in already_processed:
@@ -39,28 +39,38 @@ def add_default_embeds(item_type, types, embeds, schema={}):
                     processed_fields.append(embed_path + '.display_title')
 
     # automatically embed top level linkTo's not already embedded
-    schema_default_linkTos = check_for_linkTo('', schema)
-    for default_linkTo in schema_default_linkTos:
-        # add link_id and display_title for default_linkTo if not already there
-        if default_linkTo + '.link_id' not in processed_fields:
-            processed_fields.append(default_linkTo + '.link_id')
-        if default_linkTo + '.display_title' not in processed_fields:
-            processed_fields.append(default_linkTo + '.display_title')
+    # also find subobjects and embed those
+    schema_default_embeds = find_default_embeds_for_schema('', schema)
+    for default_embed in schema_default_embeds:
+        # add fully embedded subobjects:
+        if default_embed[-2:] == '.*':
+            if default_embed not in processed_fields:
+                processed_fields.append(default_embed)
+            continue
+        # add link_id and display_title for default_embed if not already there
+        if default_embed + '.link_id' not in processed_fields:
+            processed_fields.append(default_embed + '.link_id')
+        if default_embed + '.display_title' not in processed_fields:
+            processed_fields.append(default_embed + '.display_title')
     return processed_fields
 
 
-def check_for_linkTo(path_thus_far, subschema):
+def find_default_embeds_for_schema(path_thus_far, subschema):
     """
     For a given field and that field's subschema, return the an array of paths
     to the linkTo's in that subschema. Usually, this will just be one linkTo
     (array of length 1). Recursive function.
+    Additionally, add default embeds to add functionality for automatically
+    getting fields in subobjects.
     """
     linkTo_paths = []
     if subschema.get('type', None) == 'array' and 'items' in subschema:
-        items_linkTos = check_for_linkTo(path_thus_far, subschema['items'])
+        items_linkTos = find_default_embeds_for_schema(path_thus_far, subschema['items'])
         linkTo_paths += items_linkTos
     if subschema.get('type', None) == 'object' and 'properties' in subschema:
-        props_linkTos = check_for_linkTo(path_thus_far, subschema['properties'])
+        # we found an object in the schema. embed all its fields
+        linkTo_paths.append(path_thus_far + '.*')
+        props_linkTos = find_default_embeds_for_schema(path_thus_far, subschema['properties'])
         linkTo_paths += props_linkTos
     for key, val in subschema.items():
         if key == 'items' or key == 'properties':
@@ -69,15 +79,15 @@ def check_for_linkTo(path_thus_far, subschema):
             linkTo_paths.append(path_thus_far)
         elif isinstance(val, dict):
             updated_path = key if path_thus_far == '' else path_thus_far + '.' + key
-            item_linkTos = check_for_linkTo(updated_path, val)
+            item_linkTos = find_default_embeds_for_schema(updated_path, val)
             linkTo_paths += item_linkTos
     return linkTo_paths
 
 
 def confirm_embed_with_schemas(item_type, types, split_path, schema):
     """
-    Take an  split embed path without the last term, such as
-    [biosample, biosource] (which could have originally been:
+    Take an  split embed path, such a [biosample, biosource, *]
+    (which could have originally been:
     biosample.biosource.*) and confirm that each item in the path has a valid
     schema. Start at the highest level.
     Returns True if valid, False otherwise. If False, it means that your
@@ -87,14 +97,24 @@ def confirm_embed_with_schemas(item_type, types, split_path, schema):
     error_message = None
     for idx in range(len(split_path)):
         element = split_path[idx]
-        if element in schema_cursor:
-            schema_cursor = schema_cursor[element]
+        if element in schema_cursor or element == '*':
+            if element != '*':
+                schema_cursor = schema_cursor[element]
             # drill into 'items' or 'properties'
             # always check 'items' before 'properties'
             if schema_cursor.get('type', None) == 'array' and 'items' in schema_cursor:
                 schema_cursor = schema_cursor['items']
             if schema_cursor.get('type', None) == 'object' and 'properties' in schema_cursor:
+                # test for *, which means there need to be multiple fields present
+                # this equates to being and object with 'properties'
+                if element == '*':
+                    if idx == len(split_path) - 1:
+                        return True, error_message
+                    else:
+                        error_message = '{} has a bad embed: * can only be at the end of an embed.'.format(item_type)
+                        return False, error_message
                 schema_cursor = schema_cursor['properties']
+
             # if we hit a linkTo, pull in the new schema of the linkTo type
             if 'linkTo' in schema_cursor:
                 linkTo = schema_cursor['linkTo']
