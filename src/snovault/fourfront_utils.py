@@ -28,7 +28,7 @@ def add_default_embeds(item_type, types, embeds, schema={}):
             embed_path = '.'.join(split_field[:-1])
             # last part of split_field should a specific fieldname or *
             # if *, then display_title and link_id are taken care of
-            if split_field[-1] == '*':
+            if split_field[-2:] == '.*':
                 already_processed.append(embed_path)
                 continue
             if embed_path not in already_processed:
@@ -39,28 +39,38 @@ def add_default_embeds(item_type, types, embeds, schema={}):
                     processed_fields.append(embed_path + '.display_title')
 
     # automatically embed top level linkTo's not already embedded
-    schema_default_linkTos = check_for_linkTo('', schema)
-    for default_linkTo in schema_default_linkTos:
-        # add link_id and display_title for default_linkTo if not already there
-        if default_linkTo + '.link_id' not in processed_fields:
-            processed_fields.append(default_linkTo + '.link_id')
-        if default_linkTo + '.display_title' not in processed_fields:
-            processed_fields.append(default_linkTo + '.display_title')
+    # also find subobjects and embed those
+    schema_default_embeds = find_default_embeds_for_schema('', schema)
+    for default_embed in schema_default_embeds:
+        # add fully embedded subobjects:
+        if default_embed[-2:] == '.*':
+            if default_embed not in processed_fields:
+                processed_fields.append(default_embed)
+            continue
+        # add link_id and display_title for default_embed if not already there
+        if default_embed + '.link_id' not in processed_fields:
+            processed_fields.append(default_embed + '.link_id')
+        if default_embed + '.display_title' not in processed_fields:
+            processed_fields.append(default_embed + '.display_title')
     return processed_fields
 
 
-def check_for_linkTo(path_thus_far, subschema):
+def find_default_embeds_for_schema(path_thus_far, subschema):
     """
     For a given field and that field's subschema, return the an array of paths
     to the linkTo's in that subschema. Usually, this will just be one linkTo
     (array of length 1). Recursive function.
+    Additionally, add default embeds to add functionality for automatically
+    getting fields in subobjects.
     """
     linkTo_paths = []
     if subschema.get('type', None) == 'array' and 'items' in subschema:
-        items_linkTos = check_for_linkTo(path_thus_far, subschema['items'])
+        items_linkTos = find_default_embeds_for_schema(path_thus_far, subschema['items'])
         linkTo_paths += items_linkTos
     if subschema.get('type', None) == 'object' and 'properties' in subschema:
-        props_linkTos = check_for_linkTo(path_thus_far, subschema['properties'])
+        # we found an object in the schema. embed all its fields
+        linkTo_paths.append(path_thus_far + '.*')
+        props_linkTos = find_default_embeds_for_schema(path_thus_far, subschema['properties'])
         linkTo_paths += props_linkTos
     for key, val in subschema.items():
         if key == 'items' or key == 'properties':
@@ -69,7 +79,7 @@ def check_for_linkTo(path_thus_far, subschema):
             linkTo_paths.append(path_thus_far)
         elif isinstance(val, dict):
             updated_path = key if path_thus_far == '' else path_thus_far + '.' + key
-            item_linkTos = check_for_linkTo(updated_path, val)
+            item_linkTos = find_default_embeds_for_schema(updated_path, val)
             linkTo_paths += item_linkTos
     return linkTo_paths
 
