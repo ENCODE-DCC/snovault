@@ -92,11 +92,6 @@ def schema_mapping(name, schema, field='*', top_level=False):
                 'include_in_all': True,
                 'properties': properties,
             }
-        elif properties == {}:
-            # needed because ES will eliminate empty properties by default
-            return {
-                'type': 'object',
-            }
         else:
             return {
                 'properties': properties,
@@ -522,8 +517,6 @@ def type_mapping(types, item_type, embed=True):
 
             # see if there's already a mapping associated with this embed:
             # multiple subobjects may be embedded, so be careful here
-            if 'properties' not in curr_m:
-                continue
             if curr_p in curr_m['properties'] and 'properties' in curr_m['properties'][curr_p]:
                 mapped = schema_mapping(curr_p, curr_s, field)
                 if 'properties' in mapped:
@@ -570,14 +563,19 @@ def type_mapping(types, item_type, embed=True):
     return mapping
 
 
-def sortOD(od):
+def sort_dict_recursively(od):
     """
-    Little function to recursively sort dictionaries
+    Little function to recursively sort dictionaries.
+    Makes one small mapping-specific transformation
     """
     res = OrderedDict()
+    # hardcode to go around ES behavior
+    # turn {properties: {}} to {type: object}
+    if od.get('properties', None) == {}:
+        return OrderedDict({'type': 'object'})
     for k, v in sorted(od.items()):
         if isinstance(v, dict):
-            res[k] = sortOD(v)
+            res[k] = sort_dict_recursively(v)
         else:
             res[k] = v
     return res
@@ -609,12 +607,16 @@ def build_index(es, in_type, mapping, dry_run, check_first):
                 # test to see if the index needs to be re-created based on mapping
                 # this should only occur when schema-based changes affect the
                 # embedded, mapping, so compare that between old and current mappings
-                prev_compare =  sortOD(prev_mapping['properties']['embedded']['properties'])
-                curr_compare = sortOD(mapping['properties']['embedded']['properties'])
+                prev_od = OrderedDict(prev_mapping['properties']['embedded']['properties'])
+                curr_od = OrderedDict(mapping['properties']['embedded']['properties'])
+                prev_compare =  sort_dict_recursively(prev_od)
+                curr_compare = sort_dict_recursively(curr_od)
             else:
                 # properties not available for the meta index
-                prev_compare = sortOD(prev_mapping)
-                curr_compare = sortOD(mapping)
+                prev_od = OrderedDict(prev_mapping)
+                curr_od = OrderedDict(mapping)
+                prev_compare = sort_dict_recursively(prev_mapping)
+                curr_compare = sort_dict_recursively(mapping)
             if prev_compare == curr_compare:
                 print("index %s already exists no need to create mapping" % (in_type))
                 return
