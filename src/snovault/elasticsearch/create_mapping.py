@@ -21,6 +21,7 @@ from .interfaces import ELASTIC_SEARCH
 import collections
 import json
 import logging
+from collections import OrderedDict
 
 
 
@@ -43,8 +44,8 @@ META_MAPPING = {
             'store_generic': {
                 'match': '*',
                 'mapping': {
-                    'index': 'no',
-                    'store': 'yes',
+                    'index': False,
+                    'store': True,
                 },
             },
         },
@@ -63,7 +64,7 @@ def sorted_dict(d):
     return json.loads(json.dumps(d), object_pairs_hook=sorted_pairs_hook)
 
 
-def schema_mapping(name, schema, field='*'):
+def schema_mapping(name, schema, field='*', top_level=False):
     """
     Create the mapping for a given schema. Defaults to using all fields for
     objects (*), but can handle specific fields using the field parameter.
@@ -85,22 +86,30 @@ def schema_mapping(name, schema, field='*'):
             if mapping is not None:
                 if field == '*' or k == field:
                     properties[k] = mapping
-        return {
-            'type': 'object',
-            'include_in_all': True,
-            'properties': properties,
-        }
+        if top_level:
+            # only include include_in_all: True in top level
+            return {
+                'include_in_all': True,
+                'properties': properties,
+            }
+        elif properties == {}:
+            # needed because ES will eliminate empty properties by default
+            return {
+                'type': 'object',
+            }
+        else:
+            return {
+                'properties': properties,
+            }
 
     # hardcode fields with dates for now
     if name == 'date_created':
         return {
             'type': 'date',
             'format':"yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",
-            'index': True,
             'fields': {
                 'raw': {
-                    'type': 'keyword',
-                    'index': True
+                    'type': 'keyword'
                 },
                 'lower_case_sort': {
                     'type': 'text',
@@ -117,15 +126,13 @@ def schema_mapping(name, schema, field='*'):
     if type_ == ["number", "string"]:
         return {
             'type': 'text',
-            'index': True,
             'fields': {
                 'value': {
                     'type': 'float',
                     'ignore_malformed': True,
                 },
                 'raw': {
-                    'type': 'keyword',
-                    'index': True
+                    'type': 'keyword'
                 },
                 'lower_case_sort': {
                     'type': 'text',
@@ -142,11 +149,9 @@ def schema_mapping(name, schema, field='*'):
     if type_ == 'boolean':
         return {
             'type': 'text',
-            'store': True,
             'fields': {
                 'raw': {
-                    'type': 'keyword',
-                    'index': True
+                    'type': 'keyword'
                 },
                 'lower_case_sort': {
                     'type': 'text',
@@ -167,11 +172,9 @@ def schema_mapping(name, schema, field='*'):
 
         sub_mapping = {
             'type': 'text',
-            'store': True,
             'fields': {
                 'raw': {
-                    'type': 'keyword',
-                    'index': True
+                    'type': 'keyword'
                 },
                 'lower_case_sort': {
                     'type': 'text',
@@ -188,18 +191,14 @@ def schema_mapping(name, schema, field='*'):
         if name in NON_SUBSTRING_FIELDS:
             if name in PATH_FIELDS:
                 sub_mapping['analyzer'] = 'snovault_path_analyzer'
-            else:
-                sub_mapping['index'] = True
         return sub_mapping
 
     if type_ == 'number':
         return {
             'type': 'float',
-            'store': True,
             'fields': {
                 'raw': {
-                    'type': 'keyword',
-                    'index': True
+                    'type': 'keyword'
                 },
                 'lower_case_sort': {
                     'type': 'text',
@@ -216,11 +215,9 @@ def schema_mapping(name, schema, field='*'):
     if type_ == 'integer':
         return {
             'type': 'long',
-            'store': True,
             'fields': {
                 'raw': {
-                    'type': 'keyword',
-                    'index': True
+                    'type': 'keyword'
                 },
                 'lower_case_sort': {
                     'type': 'text',
@@ -311,7 +308,6 @@ def audit_mapping():
     return {
         'category': {
             'type': 'text',
-            'index': True,
             'fields': {
                 'raw': {
                     'type': 'keyword'
@@ -320,7 +316,6 @@ def audit_mapping():
         },
         'detail': {
             'type': 'text',
-            'index': 'analyzed',
             'fields': {
                 'raw': {
                     'type': 'keyword'
@@ -329,7 +324,6 @@ def audit_mapping():
         },
         'level_name': {
             'type': 'text',
-            'index': True,
             'fields': {
                 'raw': {
                     'type': 'keyword'
@@ -381,17 +375,14 @@ def es_mapping(mapping):
         'properties': {
             'uuid': {
                 'type': 'text',
-                'index': True,
                 'include_in_all': False,
             },
             'tid': {
                 'type': 'text',
-                'index': True,
                 'include_in_all': False,
             },
             'item_type': {
                 'type': 'text',
-                'index': True
             },
             'embedded': mapping,
             'object': {
@@ -414,60 +405,47 @@ def es_mapping(mapping):
                 'include_in_all': False,
                 'properties': {
                     'view': {
-                        'type': 'keyword',
-                        'index': True
+                        'type': 'keyword'
                     },
                     'edit': {
-                        'type': 'keyword',
-                        'index': True
+                        'type': 'keyword'
                     },
                     'audit': {
-                        'type': 'keyword',
-                        'index': True
+                        'type': 'keyword'
                     }
                 }
             },
             'embedded_uuids': {
                 'type': 'text',
-                'include_in_all': False,
-                'index': True
+                'include_in_all': False
             },
             'linked_uuids': {
                 'type': 'text',
-                'include_in_all': False,
-                'index': True
+                'include_in_all': False
             },
             'unique_keys': {
-                'type': 'object',
-                'include_in_all': False,
+                'type': 'object'
             },
             'links': {
-                'type': 'object',
-                'include_in_all': False,
+                'type': 'object'
             },
             'paths': {
                 'type': 'text',
-                'include_in_all': False,
-                'index': True
+                'include_in_all': False
             },
             'audit': {
-                'type': 'object',
                 'include_in_all': False,
                 'properties': {
                     'ERROR': {
-                        'type': 'object',
                         'properties': audit_mapping()
                     },
                     'NOT_COMPLIANT': {
-                        'type': 'object',
                         'properties': audit_mapping()
                     },
                     'WARNING': {
-                        'type': 'object',
                         'properties': audit_mapping()
                     },
                     'INTERNAL_ACTION': {
-                        'type': 'object',
                         'properties': audit_mapping()
                     },
                 },
@@ -493,7 +471,8 @@ def type_mapping(types, item_type, embed=True):
     """
     type_info = types[item_type]
     schema = type_info.schema
-    mapping = schema_mapping(item_type, schema)
+    # use top_level parameter here for schema_mapping
+    mapping = schema_mapping(item_type, schema, '*', True)
     embeds = add_default_embeds(item_type, types, type_info.embedded, schema)
     if not embed:
         return mapping
@@ -543,9 +522,14 @@ def type_mapping(types, item_type, embed=True):
 
             # see if there's already a mapping associated with this embed:
             # multiple subobjects may be embedded, so be careful here
-            if curr_p in curr_m['properties'] and curr_m['properties'][curr_p]['type'] == 'object':
+            if 'properties' not in curr_m:
+                continue
+            if curr_p in curr_m['properties'] and 'properties' in curr_m['properties'][curr_p]:
                 mapped = schema_mapping(curr_p, curr_s, field)
-                curr_m['properties'][curr_p]['properties'].update(mapped['properties'])
+                if 'properties' in mapped:
+                    curr_m['properties'][curr_p]['properties'].update(mapped['properties'])
+                else:
+                    curr_m['properties'][curr_p] = mapped
             else:
                 curr_m['properties'][curr_p] = schema_mapping(curr_p, curr_s, field)
 
@@ -586,6 +570,19 @@ def type_mapping(types, item_type, embed=True):
     return mapping
 
 
+def sortOD(od):
+    """
+    Little function to recursively sort dictionaries
+    """
+    res = OrderedDict()
+    for k, v in sorted(od.items()):
+        if isinstance(v, dict):
+            res[k] = sortOD(v)
+        else:
+            res[k] = v
+    return res
+
+
 def create_mapping_by_type(in_type, registry):
     """
     Return a full mapping for a given doc_type of in_type
@@ -599,6 +596,7 @@ def create_mapping_by_type(in_type, registry):
 
 def build_index(es, in_type, mapping, dry_run, check_first):
     this_index = Index(in_type, using=es)
+    check_first = True
     if(this_index.exists() and check_first):
         # compare previous mapping and current mapping to see if we need
         # to update. if not, return to save indexing
@@ -607,10 +605,19 @@ def build_index(es, in_type, mapping, dry_run, check_first):
         except KeyError:
             pass
         else:
-            if prev_mapping == mapping:
+            if 'properties' in mapping and 'properties' in prev_mapping:
+                # test to see if the index needs to be re-created based on mapping
+                # this should only occur when schema-based changes affect the
+                # embedded, mapping, so compare that between old and current mappings
+                prev_compare =  sortOD(prev_mapping['properties']['embedded']['properties'])
+                curr_compare = sortOD(mapping['properties']['embedded']['properties'])
+            else:
+                # properties not available for the meta index
+                prev_compare = sortOD(prev_mapping)
+                curr_compare = sortOD(mapping)
+            if prev_compare == curr_compare:
                 print("index %s already exists no need to create mapping" % (in_type))
                 return
-        return
     # delete the index, ignore if it doesn't exist
     this_index.delete(ignore=404)
     this_index.settings(**index_settings())
