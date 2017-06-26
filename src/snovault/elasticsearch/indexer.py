@@ -23,6 +23,11 @@ import logging
 import pytz
 import time
 import copy
+from pprint import pprint as pp
+
+import sys
+import pdb
+
 
 
 log = logging.getLogger(__name__)
@@ -66,15 +71,22 @@ def index(request):
 
     first_txn = None
     last_xmin = None
+
+    es_log_settings = {"transient": {"logger._root": "DEBUG"}}
+    es.cluster.put_settings(es_log_settings)
+
     if 'last_xmin' in request.json:
         last_xmin = request.json['last_xmin']
     else:
-        try:
-            status = es.get(index=INDEX, doc_type='meta', id='indexing')
-        except NotFoundError:
-            interval_settings = {"index": {"refresh_interval": "30s"}}
-            es.indices.put_settings(index=INDEX, body=interval_settings)
-            pass
+        status = es.get(index=INDEX, doc_type='meta', id='indexing', ignore=[400, 404])
+        if not status['found']:
+            interval_settings = {
+                "index": {
+                    "refresh_interval": "30s",
+                    "max_result_window": SEARCH_MAX,
+                }
+            }
+            es.indices.put_settings(index='_all', body=interval_settings)
         else:
             last_xmin = status['_source']['xmin']
 
@@ -111,24 +123,25 @@ def index(request):
         result['txn_count'] = txn_count
         if txn_count == 0:
             return result
-
         es.indices.refresh(index=INDEX)
         res = es.search(index=INDEX, size=SEARCH_MAX, body={
-            'filter': {
-                'or': [
-                    {
-                        'terms': {
-                            'embedded_uuids': updated,
-                            '_cache': False,
+            'query': {
+                'bool': {
+                    'should': [
+                        {
+                            'terms': {
+                                'embedded_uuids': updated,
+                                '_cache': False,
+                            },
                         },
-                    },
-                    {
-                        'terms': {
-                            'linked_uuids': renamed,
-                            '_cache': False,
+                        {
+                            'terms': {
+                                'linked_uuids': renamed,
+                                '_cache': False,
+                            },
                         },
-                    },
-                ],
+                    ],
+                },
             },
             '_source': False,
         })
@@ -155,13 +168,16 @@ def index(request):
         snapshot_id = None
         if not recovery:
             snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
-
+        print('before indexer.update_objects')
         result['errors'] = indexer.update_objects(request, invalidated, xmin, snapshot_id)
+        print('after indexer.update_objects')
         result['indexed'] = len(invalidated)
 
         if record:
             try:
+                print('before putting in meta object')
                 es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
+                print('after putting in meta object')
             except:
                 error_messages = copy.deepcopy(result['errors'])
                 del result['errors']
@@ -173,9 +189,9 @@ def index(request):
                 result['errors'] = error_messages
 
 
-            if es.indices.get_settings(index=INDEX)[INDEX]['settings']['index'].get('refresh_interval', '') != '1s':
-                interval_settings = {"index": {"refresh_interval": "1s"}}
-                es.indices.put_settings(index=INDEX, body=interval_settings)
+            # if es.indices.get_settings(index=INDEX)[INDEX]['settings']['index'].get('refresh_interval', '') != '1s':
+            #     interval_settings = {"index": {"refresh_interval": "1s"}}
+            #     es.indices.put_settings(index=INDEX, body=interval_settings)
 
         es.indices.refresh(index=INDEX)
 
@@ -220,6 +236,7 @@ class Indexer(object):
     def update_objects(self, request, uuids, xmin, snapshot_id):
         errors = []
         for i, uuid in enumerate(uuids):
+            print('set trace here again')
             error = self.update_object(request, uuid, xmin)
             if error is not None:
                 errors.append(error)
@@ -238,7 +255,6 @@ class Indexer(object):
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             timestamp = datetime.datetime.now().isoformat()
             return {'error_message': repr(e), 'timestamp': timestamp, 'uuid': str(uuid)}
-
         last_exc = None
         for backoff in [0, 10, 20, 40, 80]:
             time.sleep(backoff)
@@ -249,6 +265,7 @@ class Indexer(object):
                     request_timeout=30,
                 )
             except StatementError:
+                print('statement error')
                 # Can't reconnect until invalid transaction is rolled back
                 raise
             except ConflictError:

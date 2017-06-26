@@ -8,6 +8,8 @@ from .interfaces import (
     ICachedItem,
 )
 
+import pdb
+
 SEARCH_MAX = (2 ** 31) - 1
 
 
@@ -137,7 +139,9 @@ class ElasticSearchStorage(object):
     def get_by_unique_key(self, unique_key, name):
         term = 'unique_keys.' + unique_key
         query = {
-            'filter': {'term': {term: name}},
+            'query': {
+                'term': {term: name}
+            },
             'version': True,
         }
         return self._one(query)

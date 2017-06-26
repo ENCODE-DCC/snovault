@@ -462,17 +462,30 @@ def type_mapping(types, item_type, embed=True):
     return mapping
 
 
+def create_elasticsearch_index(es, index, body):
+    try:
+        es.indices.create(index=index, body=body)
+    except RequestError:
+        if collections is None:
+            es.indices.delete(index=index)
+            es.indices.create(index=index, body=body)
+
+def set_index_mapping(es, index, doc_type, mapping):
+    try:
+        es.indices.put_mapping(index=index, doc_type=doc_type, body=mapping)
+    except:
+        log.exception("Could not create mapping for the collection %s", doc_type)
+    else:
+        es.indices.refresh(index=index)
+
+
+
+
 def run(app, collections=None, dry_run=False):
     index = app.registry.settings['snovault.elasticsearch.index']
     registry = app.registry
     if not dry_run:
         es = app.registry[ELASTIC_SEARCH]
-        try:
-            es.indices.create(index=index, body=index_settings())
-        except RequestError:
-            if collections is None:
-                es.indices.delete(index=index)
-                es.indices.create(index=index, body=index_settings())
 
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
@@ -480,11 +493,11 @@ def run(app, collections=None, dry_run=False):
     for collection_name in collections:
         if collection_name == 'meta':
             doc_type = 'meta'
-            mapping = META_MAPPING
+            mapping = es_mapping(META_MAPPING)
         else:
-            doc_type = collection_name
+            index = doc_type = collection_name
             collection = registry[COLLECTIONS].by_item_type[collection_name]
-            mapping = type_mapping(registry[TYPES], collection.type_info.item_type)
+            mapping = es_mapping(type_mapping(registry[TYPES], collection.type_info.item_type))
 
         if mapping is None:
             continue  # Testing collections
@@ -492,15 +505,11 @@ def run(app, collections=None, dry_run=False):
             print(json.dumps(sorted_dict({index: {doc_type: mapping}}), indent=4))
             continue
 
-        if collection_name is not 'meta':
-            mapping = es_mapping(mapping)
+        create_elasticsearch_index(es, index, index_settings())
+        set_index_mapping(es, index, doc_type, mapping)
 
-        try:
-            es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping})
-        except:
-            log.exception("Could not create mapping for the collection %s", doc_type)
-        else:
-            es.indices.refresh(index=index)
+
+
 
 
 def main():
