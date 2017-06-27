@@ -456,7 +456,7 @@ def run(app, collections=None, dry_run=False):
             continue
 
         create_elasticsearch_index(es, index, index_settings())
-        set_index_mapping(es, index, doc_type, mapping)
+        set_index_mapping(es, index, doc_type, {doc_type: mapping})
 
 
 def main():
