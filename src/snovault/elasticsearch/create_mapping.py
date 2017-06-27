@@ -594,10 +594,13 @@ def create_mapping_by_type(in_type, registry):
 
 def build_index(es, in_type, mapping, dry_run, check_first):
     this_index = Index(in_type, using=es)
-    check_first = True
-    if(this_index.exists() and check_first):
+    if this_index.exists() and check_first:
+        # always keep the meta index on check_first == True
+        if in_type == 'meta':
+            print("MAPPING: existing index %s is used by default" % (in_type))
+            return
         # compare previous mapping and current mapping to see if we need
-        # to update. if not, return to save indexing
+        # to update. if not, use the existing mapping to prevent re-indexing
         try:
             prev_mapping = this_index.get_mapping()[in_type]['mappings'][in_type]
         except KeyError:
@@ -611,15 +614,9 @@ def build_index(es, in_type, mapping, dry_run, check_first):
                 curr_od = OrderedDict(mapping['properties']['embedded']['properties'])
                 prev_compare =  sort_dict_recursively(prev_od)
                 curr_compare = sort_dict_recursively(curr_od)
-            else:
-                # properties not available for the meta index
-                prev_od = OrderedDict(prev_mapping)
-                curr_od = OrderedDict(mapping)
-                prev_compare = sort_dict_recursively(prev_mapping)
-                curr_compare = sort_dict_recursively(mapping)
-            if prev_compare == curr_compare:
-                print("index %s already exists no need to create mapping" % (in_type))
-                return
+                if prev_compare == curr_compare:
+                    print("MAPPING: index %s already exists, no need to create mapping" % (in_type))
+                    return
     # delete the index, ignore if it doesn't exist
     this_index.delete(ignore=404)
     this_index.settings(**index_settings())
