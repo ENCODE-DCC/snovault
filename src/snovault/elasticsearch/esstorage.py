@@ -8,7 +8,6 @@ from .interfaces import (
     ICachedItem,
 )
 
-import pdb
 
 SEARCH_MAX = (2 ** 31) - 1
 
@@ -17,7 +16,7 @@ def includeme(config):
     from snovault import STORAGE
     registry = config.registry
     es = registry[ELASTIC_SEARCH]
-    es_index = registry.settings['snovault.elasticsearch.index']
+    es_index = '_all'
     wrapped_storage = registry[STORAGE]
     registry[STORAGE] = PickStorage(ElasticSearchStorage(es, es_index), wrapped_storage)
 

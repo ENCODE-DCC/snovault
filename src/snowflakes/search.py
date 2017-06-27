@@ -599,7 +599,7 @@ def search(context, request, search_type=None, return_generator=False):
     }
     principals = effective_principals(request)
     es = request.registry[ELASTIC_SEARCH]
-    es_index = request.registry.settings['snovault.elasticsearch.index']
+    es_index = '_all'
     search_audit = request.has_permission('search_audit')
 
 
