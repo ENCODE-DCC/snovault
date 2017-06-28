@@ -245,10 +245,14 @@ class Indexer(object):
         for backoff in [0, 10, 20, 40, 80]:
             time.sleep(backoff)
             try:
+                # self.es.index(
+                #     index=result['item_type'], doc_type=result['item_type'], body=result,
+                #     id=str(uuid), version=xmin, version_type='external_gte',
+                #     request_timeout=30,
+                # )
                 self.es.index(
                     index=result['item_type'], doc_type=result['item_type'], body=result,
-                    id=str(uuid), version=xmin, version_type='external_gte',
-                    request_timeout=30,
+                    id=str(uuid), request_timeout=30,
                 )
             except StatementError:
                 # Can't reconnect until invalid transaction is rolled back
