@@ -103,18 +103,15 @@ class RDBStorage(object):
         else:
             return key.resource
 
-
     def get_by_json(self, key, value, item_type, default=None):
         session = self.DBSession()
         try:
-            # baked query seem to not work with json 
-            query = (session.query(PropertySheet)
-                    .join(PropertySheet.resource)
-                    .filter(Resource.item_type == item_type,
-                            PropertySheet.properties[key].astext == value)
-                    .distinct(PropertySheet.resource)
-                    )
-
+            # baked query seem to not work with json
+            query = (session.query(CurrentPropertySheet)
+                     .join(CurrentPropertySheet.propsheet, CurrentPropertySheet.resource)
+                     .filter(Resource.item_type == item_type,
+                             PropertySheet.properties[key].astext == value)
+                     )
             data = query.one()
             return data.resource
         except (NoResultFound, MultipleResultsFound):
