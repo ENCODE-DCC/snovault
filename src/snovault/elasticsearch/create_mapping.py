@@ -262,6 +262,14 @@ def es_mapping(mapping):
                     },
                 },
             },
+            {
+                'template_links': {
+                    'path_match': "links.*",
+                    'mapping': {
+                        'type': 'keyword',
+                    },
+                },
+            }
         ],
         'properties': {
             'uuid': {
@@ -443,7 +451,7 @@ def run(app, collections=None, dry_run=False):
     for collection_name in collections:
         if collection_name == 'meta':
             doc_type = 'meta'
-            mapping = es_mapping(META_MAPPING)
+            mapping = META_MAPPING
         else:
             index = doc_type = collection_name
             collection = registry[COLLECTIONS].by_item_type[collection_name]
