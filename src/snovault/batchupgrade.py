@@ -119,7 +119,7 @@ def batch_upgrade(request):
             if errors:
                 # redmine 5161 sometimes error.path has an int
                 errortext = [
-                    '%s: %s' % ('/'.join([x or '<root>' for x in error.path]), error.message)
+                    '%s: %s' % ('/'.join([str(x) or '<root>' for x in error.path]), error.message)
                     for error in errors]
                 logger.error(
                     'Validation failure: /%s/%s\n%s', item_type, uuid, '\n'.join(errortext))
