@@ -337,8 +337,8 @@ def es_mapping(mapping):
                 'template_principals_allowed': {
                     'path_match': "principals_allowed.*",
                     'mapping': {
-                        'type': 'text',
                         'index': True,
+                        'type': 'text',
                     },
                 },
             },
@@ -346,8 +346,8 @@ def es_mapping(mapping):
                 'template_unique_keys': {
                     'path_match': "unique_keys.*",
                     'mapping': {
-                        'type': 'text',
                         'index': True,
+                        'type': 'text',
                     },
                 },
             },
@@ -355,8 +355,8 @@ def es_mapping(mapping):
                 'template_links': {
                     'path_match': "links.*",
                     'mapping': {
-                        'type': 'text',
                         'index': True,
+                        'type': 'text',
                     },
                 },
             },
@@ -390,7 +390,6 @@ def es_mapping(mapping):
                 'include_in_all': False,
             },
             'principals_allowed': {
-                'type': 'object',
                 'include_in_all': False,
                 'properties': {
                     'view': {
@@ -602,12 +601,8 @@ def build_index(es, in_type, mapping, dry_run, check_first):
         else:
             if 'properties' in mapping and 'properties' in prev_mapping:
                 # test to see if the index needs to be re-created based on mapping
-                # this should only occur when schema-based changes affect the
-                # embedded, mapping, so compare that between old and current mappings
-                prev_od = OrderedDict(prev_mapping['properties']['embedded']['properties'])
-                curr_od = OrderedDict(mapping['properties']['embedded']['properties'])
-                prev_compare =  sort_dict_recursively(prev_od)
-                curr_compare = sort_dict_recursively(curr_od)
+                prev_compare =  sort_dict_recursively(OrderedDict(prev_mapping))
+                curr_compare = sort_dict_recursively(OrderedDict(mapping))
                 if prev_compare == curr_compare:
                     print("MAPPING: index %s already exists, no need to create mapping" % (in_type))
                     return
