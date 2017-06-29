@@ -1,5 +1,5 @@
 language: python
-sudo: true 
+sudo: true
 cache:
   directories:
   - eggs
@@ -71,6 +71,6 @@ before_script:
 - sudo service elasticsearch stop
 script:
 - if test -n "$UNIT"; then bin/test -v -v --timeout=400 -m "not bdd and setone" --cov
-  src/encoded; fi
+  src/snovault; fi
 - if test -n "$UNIT"; then bin/test -v -v --timeout=400 -m "working and not setone"
-  --cov src/encoded; fi
+  --cov src/snovault; fi
