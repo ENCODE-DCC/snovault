@@ -19,6 +19,8 @@ import collections
 import json
 import logging
 
+import pdb
+
 
 
 log = logging.getLogger(__name__)
@@ -456,6 +458,7 @@ def run(app, collections=None, dry_run=False):
             index = doc_type = collection_name
             collection = registry[COLLECTIONS].by_item_type[collection_name]
             mapping = es_mapping(type_mapping(registry[TYPES], collection.type_info.item_type))
+            print(collection.type_info.item_type)
 
         if mapping is None:
             continue  # Testing collections

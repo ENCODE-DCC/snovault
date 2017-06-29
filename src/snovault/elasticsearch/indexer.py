@@ -189,10 +189,6 @@ def index(request):
                 result['errors'] = error_messages
 
 
-            # if es.indices.get_settings(index=INDEX)[INDEX]['settings']['index'].get('refresh_interval', '') != '1s':
-            #     interval_settings = {"index": {"refresh_interval": "1s"}}
-            #     es.indices.put_settings(index=INDEX, body=interval_settings)
-
         es.indices.refresh(index=INDEX)
 
         if flush:
@@ -231,7 +227,6 @@ def all_uuids(registry, types=None):
 class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
-        self.index = registry.settings['snovault.elasticsearch.index']
 
     def update_objects(self, request, uuids, xmin, snapshot_id):
         errors = []
@@ -260,7 +255,7 @@ class Indexer(object):
             time.sleep(backoff)
             try:
                 self.es.index(
-                    index=self.index, doc_type=result['item_type'], body=result,
+                    index=result['item_type'], doc_type=result['item_type'], body=result,
                     id=str(uuid), version=xmin, version_type='external_gte',
                     request_timeout=30,
                 )
