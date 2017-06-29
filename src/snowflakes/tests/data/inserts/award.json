@@ -9,11 +9,12 @@
         "viewing_group": "ENCODE"
     },
     {
+        "schema_version": "1",
         "name": "ENCODE2-Mouse",
         "project": "ENCODE",
         "rfa": "ENCODE2-Mouse",
-        "status": "deleted",
-        "title": "blank",
+        "status": "current",
+        "title": "Mousey-Mouse",
         "uuid": "21a3b2bc-49b5-4781-bd5f-14b7beee245a",
         "viewing_group": "ENCODE"
     },

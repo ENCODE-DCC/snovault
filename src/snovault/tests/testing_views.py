@@ -197,9 +197,18 @@ class TestingServerDefault(Item):
     schema = {
         'type': 'object',
         'properties': {
-            'uuid': {
-                'serverDefault': 'uuid4',
-                'type': 'string',
+            "schema_version": {
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)*$",
+                "requestMethod": [],
+            },
+            "uuid": {
+                "title": "UUID",
+                "description": "",
+                "type": "string",
+                "format": "uuid",
+                "permission": "import_items",
+                "requestMethod": "POST",
             },
             'user': {
                 'serverDefault': 'userid',
@@ -213,7 +222,49 @@ class TestingServerDefault(Item):
             },
             'accession': {
                 'serverDefault': 'accession',
-                'accessionType': 'AB',
+                'accessionType': 'SS',
+                'format': 'accession',
+                'type': 'string',
+            },
+        }
+    }
+
+
+@collection('testing-bad-accession')
+class TestingBadAccession(Item):
+    item_type = 'testing_bad_accession'
+    schema = {
+        'type': 'object',
+        'properties': {
+            "schema_version": {
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)*$",
+            },
+            "uuid": {
+                "title": "UUID",
+                "description": "",
+                "type": "string",
+                "format": "uuid",
+                "permission": "import_items",
+                "requestMethod": "POST",
+            },
+            'thing': {
+                'type': "number",
+                'default': 3,
+            },
+            'user': {
+                'serverDefault': 'userid',
+                'linkTo': 'User',
+                'type': 'string',
+            },
+            'now': {
+                'serverDefault': 'now',
+                'format': 'date-time',
+                'type': 'string',
+            },
+            'accession': {
+                'serverDefault': 'accession',
+                'accessionType': 'SS',
                 'format': 'accession',
                 'type': 'string',
             },
