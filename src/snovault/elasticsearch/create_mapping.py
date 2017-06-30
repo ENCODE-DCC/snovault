@@ -623,10 +623,10 @@ def build_index(es, in_type, mapping, dry_run, check_first):
             if 'properties' in mapping and 'properties' in prev_mapping:
                 # test to see if the index needs to be re-created based on mapping
                 # changes will occur if the schemas change
-                prev_properties = OrderedDict(prev_mapping['properties'])
-                curr_properties = OrderedDict(mapping['properties'])
-                prev_compare =  sort_dict_recursively(prev_properties)
-                curr_compare = sort_dict_recursively(curr_properties)
+                prev_embedded = OrderedDict(prev_mapping['properties']['embedded'])
+                curr_embedded = OrderedDict(mapping['properties']['embedded'])
+                prev_compare =  sort_dict_recursively(prev_embedded)
+                curr_compare = sort_dict_recursively(curr_embedded)
                 # see if the settings have changed since the last index
                 same_settings = True
                 all_settings_keys = list(set().union(list(curr_settings['index'].keys()) + list(prev_settings.keys())))
