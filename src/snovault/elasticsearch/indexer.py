@@ -26,7 +26,7 @@ import copy
 
 
 log = logging.getLogger(__name__)
-SEARCH_MAX = 9999  # OutOfMemoryError if too high
+SEARCH_MAX = 99999  # OutOfMemoryError if too high
 
 
 def includeme(config):
@@ -62,7 +62,6 @@ def index(request):
     # DEFERRABLE prevents query cancelling due to conflicts but requires SERIALIZABLE mode
     # which is not available in recovery.
     xmin = query.scalar()  # lowest xid that is still in progress
-
     first_txn = None
     last_xmin = None
     if 'last_xmin' in request.json:
