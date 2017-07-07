@@ -139,16 +139,6 @@ def attachment():
 
 
 @pytest.fixture
-def snowball(testapp, lab, award):
-    item = {
-        'award': award['@id'],
-        'lab': lab['@id'],
-        'method': 'hand-packed',
-    }
-    return testapp.post_json('/snowball', item).json['@graph'][0]
-
-
-@pytest.fixture
 def invalid_snowball(testapp, lab, award):
     item = {
         'award': award['uuid'],
@@ -174,12 +164,23 @@ def invalid_snowball2(testapp, lab, award):
 
 
 @pytest.fixture
+def snowball(testapp, lab, award):
+    item = {
+        'lab': lab['@id'],
+        'award': award['@id'],
+        "method": "scoop-formed",
+        "description": "example snowball",
+    }
+    return testapp.post_json('/snowball', item).json['@graph'][0]
+
+
+@pytest.fixture
 def snowflake(testapp, lab, award, snowball):
     item = {
         'snowset': snowball['@id'],
-        'type': 'fluffy',
-        'status': 'in progress',
-        'award': award['@id'],
+        "type":  "fluffy",
         'lab': lab['@id'],
+        'award': award['@id'],
+        'status': 'in progress',
     }
     return testapp.post_json('/snowflake', item).json['@graph'][0]

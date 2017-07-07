@@ -58,12 +58,10 @@
     },
     "facets": {
         "method": {
-            "title": "Method",
-            "type": "string"
+            "title": "Method"
         },
         "award.project": {
-            "title": "Project",
-            "type": "string"
+            "title": "Project"
         },
         "award.rfa": {
             "title": "RFA"
