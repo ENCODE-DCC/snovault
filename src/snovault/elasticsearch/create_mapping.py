@@ -19,7 +19,6 @@ import collections
 import json
 import logging
 
-import pdb
 
 
 
@@ -251,6 +250,7 @@ def es_mapping(mapping):
             {
                 'template_principals_allowed': {
                     'path_match': "principals_allowed.*",
+                    'match_mapping_type': "string",
                     'mapping': {
                         'type': 'keyword',
                     },
@@ -259,6 +259,7 @@ def es_mapping(mapping):
             {
                 'template_unique_keys': {
                     'path_match': "unique_keys.*",
+                    'match_mapping_type': "string",
                     'mapping': {
                         'type': 'keyword',
                     },
@@ -267,6 +268,7 @@ def es_mapping(mapping):
             {
                 'template_links': {
                     'path_match': "links.*",
+                    'match_mapping_type': "string",
                     'mapping': {
                         'type': 'keyword',
                     },
@@ -307,11 +309,6 @@ def es_mapping(mapping):
             },
             'linked_uuids': {
                 'type': 'keyword',
-                'include_in_all': False,
-            },
-            'links': {
-                'type': 'object',
-                'dynamic': True,
                 'include_in_all': False,
             },
             'paths': {
