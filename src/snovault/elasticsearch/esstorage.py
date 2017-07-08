@@ -8,6 +8,8 @@ from .interfaces import (
     ICachedItem,
 )
 
+import pdb
+from pprint import pprint as pp
 
 SEARCH_MAX = (2 ** 31) - 1
 
@@ -129,8 +131,16 @@ class ElasticSearchStorage(object):
         return model
 
     def get_by_uuid(self, uuid):
+        query = {
+            'query': {
+                'term': {
+                    'uuid': str(uuid)
+                }
+            }
+        }
         try:
-            hit = self.es.get(index=self.index, id=str(uuid))
+            result = self.es.search(index=self.index, body=query, _source=True, size=1)
+            hit = result['hits']['hits'][0]
         except elasticsearch.exceptions.NotFoundError:
             return None
         return CachedModel(hit)
@@ -148,23 +158,31 @@ class ElasticSearchStorage(object):
     def get_rev_links(self, model, rel, *item_types):
         filter_ = {'term': {'links.' + rel: str(model.uuid)}}
         if item_types:
-            filter_ = {'and': [
+            filter_ = [
                 filter_,
                 {'terms': {'item_type': item_types}},
-            ]}
+            ]
         query = {
-            'fields': [],
-            'filter': filter_,
+            'stored_fields': [],
+            'query': {
+                'bool': {
+                    'filter': filter_,
+                }
+            }
         }
-        data = self.es.search(index=self.index, body=query, size=SEARCH_MAX)
+
         return [
-            hit['_id'] for hit in data['hits']['hits']
+            hit['_id'] for hit in scan(self.es, query=query)
         ]
 
     def __iter__(self, *item_types):
         query = {
-            'fields': [],
-            'filter': {'terms': {'item_type': item_types}} if item_types else {'match_all': {}},
+            'stored_fields': [],
+            'query': {
+                'bool': {
+                    'filter': {'terms': {'item_type': item_types}} if item_types else {'match_all': {}}
+                }
+            }
         }
         for hit in scan(self.es, query=query):
             yield hit['_id']
