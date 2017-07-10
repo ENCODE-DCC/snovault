@@ -235,7 +235,7 @@ def index_settings():
             'max_result_window': 100000,
             'mapping' : {
                 'total_fields': {
-                    'limit': 3000
+                    'limit': 10000
                 }
             },
             'analysis': {
@@ -380,6 +380,7 @@ def es_mapping(mapping):
                 'type': 'text',
             },
             'embedded': mapping,
+            'embedded_reference': mapping,
             'object': {
                 'type': 'object',
                 'enabled': False,
@@ -623,9 +624,13 @@ def build_index(es, in_type, mapping, dry_run, check_first):
             if 'properties' in mapping and 'properties' in prev_mapping:
                 # test to see if the index needs to be re-created based on mapping
                 # changes will occur if the schemas change
-                prev_embedded = OrderedDict(prev_mapping['properties']['embedded'])
+                if 'embedded_reference' in prev_mapping['properties']:
+                    prev_mapping_reference = prev_mapping['properties']['embedded_reference']
+                else:
+                    prev_mapping_reference = prev_mapping['properties']['embedded']
+                prev_embedded = OrderedDict(prev_mapping_reference)
                 curr_embedded = OrderedDict(mapping['properties']['embedded'])
-                prev_compare =  sort_dict_recursively(prev_embedded)
+                prev_compare = sort_dict_recursively(prev_embedded)
                 curr_compare = sort_dict_recursively(curr_embedded)
                 # see if the settings have changed since the last index
                 same_settings = True
@@ -644,7 +649,6 @@ def build_index(es, in_type, mapping, dry_run, check_first):
                     if isinstance(prev_index_settings, dict):
                         prev_od = OrderedDict(prev_index_settings)
                         prev_index_settings = sort_dict_recursively(prev_od)
-
                     else:
                         prev_index_settings = py_to_es_transform(prev_index_settings)
                     if isinstance(curr_index_settings, dict):
@@ -659,8 +663,8 @@ def build_index(es, in_type, mapping, dry_run, check_first):
                 if prev_compare == curr_compare and same_settings:
                     print("MAPPING: index %s already exists, no need to create mapping" % (in_type))
                     return
-    # delete the index, ignore if it doesn't exist
-    this_index.delete(ignore=404)
+    # delete the index, ignore if it doesn't exist or already exists
+    this_index.delete(ignore=[400,404])
     this_index.settings(**curr_settings)
     if dry_run:
         print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
