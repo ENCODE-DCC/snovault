@@ -138,11 +138,10 @@ class ElasticSearchStorage(object):
                 }
             }
         }
-        try:
-            result = self.es.search(index=self.index, body=query, _source=True, size=1)
-            hit = result['hits']['hits'][0]
-        except elasticsearch.exceptions.NotFoundError:
+        result = self.es.search(index=self.index, body=query, _source=True, size=1)
+        if result['hits']['total'] == 0:
             return None
+        hit = result['hits']['hits'][0]
         return CachedModel(hit)
 
     def get_by_unique_key(self, unique_key, name):
