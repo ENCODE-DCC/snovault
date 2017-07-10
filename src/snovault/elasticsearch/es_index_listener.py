@@ -50,6 +50,8 @@ def run(testapp, timeout=DEFAULT_TIMEOUT, dry_run=False, path='/index', control=
         es = testapp.app.registry['snp_search']
     else:
         es = testapp.app.registry[ELASTIC_SEARCH]
+    # Wait until cluster comes up
+    es.cluster.health(wait_for_status='yellow', timeout=60)
     es.info()
 
     max_xid = 0

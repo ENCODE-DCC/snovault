@@ -166,6 +166,8 @@ def index_settings():
     return {
         'settings': {
             'index.mapping.total_fields.limit': 5000,
+            'index.number_of_shards': 1,
+            'index.number_of_replicas': 2,
             'analysis': {
                 'filter': {
                     'substring': {
@@ -424,9 +426,8 @@ def create_elasticsearch_index(es, index, body):
     try:
         es.indices.create(index=index, body=body)
     except RequestError:
-        if collections is None:
-            es.indices.delete(index=index)
-            es.indices.create(index=index, body=body)
+        es.indices.delete(index=index)
+        es.indices.create(index=index, body=body)
 
 
 def set_index_mapping(es, index, doc_type, mapping):
@@ -455,7 +456,6 @@ def run(app, collections=None, dry_run=False):
             index = doc_type = collection_name
             collection = registry[COLLECTIONS].by_item_type[collection_name]
             mapping = es_mapping(type_mapping(registry[TYPES], collection.type_info.item_type))
-            print(collection.type_info.item_type)
 
         if mapping is None:
             continue  # Testing collections
