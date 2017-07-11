@@ -72,7 +72,5 @@ install:
 before_script:
 - sudo service elasticsearch stop
 script:
-- if test -n "$UNIT"; then bin/test -v -v --timeout=400 --cov
+- if test -n "$UNIT"; then bin/test -v -v --timeout=400 -m "not bdd" --cov
   src/snovault; fi
-- if test -n "$UNIT"; then bin/test -v -v --timeout=400
-  --cov src/snovault; fi
