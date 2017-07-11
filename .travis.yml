@@ -1,6 +1,7 @@
 language: python
 sudo: true
 cache:
+  pip: true
   directories:
   - eggs
   - .npm
@@ -10,7 +11,8 @@ addons:
     packages:
     - oracle-java8-set-default
     - bsdtar
-    - elasticsearch
+    - build-essential
+    - make
     - graphviz
   postgresql: "9.4"
 env:
@@ -48,7 +50,7 @@ env:
       EYc4biKIhqDc=
 matrix:
   include:
-  - python: '3.5'
+  - python: '3.4'
     env: UNIT=Test
 notifications:
   slack:
