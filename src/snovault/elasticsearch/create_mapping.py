@@ -8,6 +8,12 @@ To load the initial data:
 """
 from pyramid.paster import get_app
 from elasticsearch import RequestError
+from elasticsearch.exceptions import (
+    ConflictError,
+    ConnectionError,
+    NotFoundError,
+    TransportError,
+)
 from elasticsearch_dsl import Index
 from elasticsearch_dsl.connections import connections
 from functools import reduce
@@ -22,6 +28,7 @@ import collections
 import json
 import logging
 from collections import OrderedDict
+from snovault.commands.es_index_data import run as run_indexing
 
 
 
@@ -227,15 +234,22 @@ def schema_mapping(name, schema, field='*', top_level=False):
         }
 
 
-def index_settings():
+def index_settings(in_type):
+    if in_type == 'meta':
+        field_limit = 1000000
+    else:
+        field_limit = 3000
     return {
         'index': {
             'number_of_shards': 3,
             'number_of_replicas': 1,
             'max_result_window': 100000,
-            'mapping' : {
+            'mapping': {
                 'total_fields': {
-                    'limit': 10000
+                    'limit': field_limit
+                },
+                'depth': {
+                    'limit': 30
                 }
             },
             'analysis': {
@@ -331,6 +345,14 @@ def audit_mapping():
     }
 
 
+# generate an index record, which contains a mapping and settings
+def build_index_record(mapping, in_type):
+    return {
+        'mapping': mapping,
+        'settings': index_settings(in_type)
+    }
+
+
 def es_mapping(mapping):
     return {
         '_all': {
@@ -380,7 +402,6 @@ def es_mapping(mapping):
                 'type': 'text',
             },
             'embedded': mapping,
-            'embedded_reference': mapping,
             'object': {
                 'type': 'object',
                 'enabled': False,
@@ -530,68 +551,7 @@ def type_mapping(types, item_type, embed=True):
                 break
             else:
                 curr_m = curr_m['properties'][curr_p]
-
-    # boost_values = schema.get('boost_values', None)
-    # if boost_values is None:
-    #     boost_values = {
-    #         prop_name: 1.0
-    #         for prop_name in ['@id', 'title']
-    #         if prop_name in mapping['properties']
-    #     }
-    # for name, boost in boost_values.items():
-    #     props = name.split('.')
-    #     last = props.pop()
-    #     new_mapping = mapping['properties']
-    #     for prop in props:
-    #         new_mapping = new_mapping[prop]['properties']
-    #     new_mapping[last]['boost'] = boost
-    #     if last in NON_SUBSTRING_FIELDS:
-    #         new_mapping[last]['include_in_all'] = False
-    #         if last in PATH_FIELDS:
-    #             new_mapping[last]['index_analyzer'] = 'snovault_path_analyzer'
-    #         else:
-    #             new_mapping[last]['index'] = True
-    #     else:
-    #         new_mapping[last]['index_analyzer'] = 'snovault_index_analyzer'
-    #         new_mapping[last]['search_analyzer'] = 'snovault_search_analyzer'
-    #         new_mapping[last]['include_in_all'] = True
-    #
-    # # Automatic boost for uuid
-    # if 'uuid' in mapping['properties']:
-    #     mapping['properties']['uuid']['index'] = True
-    #     mapping['properties']['uuid']['include_in_all'] = False
     return mapping
-
-
-def sort_dict_recursively(od):
-    """
-    Little function to recursively sort dictionaries.
-    Makes one small mapping-specific transformation
-    """
-    res = OrderedDict()
-    # hardcode to go around ES behavior
-    # change python mapping --> ES mapping
-    # e.g. turn {properties: {}} to {type: object} or True to 'true'
-    if od.get('properties', None) == {}:
-        return OrderedDict({'type': 'object'})
-    for k, v in sorted(od.items()):
-        if isinstance(v, dict):
-            res[k] = sort_dict_recursively(v)
-        else:
-            res[k] = py_to_es_transform(v)
-    return res
-
-
-def py_to_es_transform(val):
-    if isinstance(val, bool):
-        if val == True:
-            return 'true'
-        elif val == False:
-            return 'false'
-    elif isinstance(val, int):
-        return str(val)
-    else:
-        return val
 
 
 def create_mapping_by_type(in_type, registry):
@@ -605,76 +565,59 @@ def create_mapping_by_type(in_type, registry):
     return es_mapping(embed_mapping)
 
 
-def build_index(es, in_type, mapping, dry_run, check_first):
+def build_index(app, es, in_type, mapping, dry_run, check_first):
     this_index = Index(in_type, using=es)
-    curr_settings = index_settings()
+    this_index_record = build_index_record(mapping, in_type)
+
+    # if the index exists, we might not need to delete it
     if this_index.exists() and check_first:
-        # always keep the meta index on check_first == True
-        if in_type == 'meta':
-            print("MAPPING: existing index %s is used by default" % (in_type))
-            return
+        # Decide if we need to drop the index + reindex (no index/no meta record)
+        # OR
         # compare previous mapping and current mapping to see if we need
         # to update. if not, use the existing mapping to prevent re-indexing
         try:
-            prev_mapping = this_index.get_mapping()[in_type]['mappings'][in_type]
-            prev_settings = this_index.get_settings()[in_type]['settings']['index']
-        except KeyError:
+            prev_index_record = es.get(index='meta', doc_type='meta', id=in_type)
+        except:
             pass
         else:
-            if 'properties' in mapping and 'properties' in prev_mapping:
-                # test to see if the index needs to be re-created based on mapping
-                # changes will occur if the schemas change
-                if 'embedded_reference' in prev_mapping['properties']:
-                    prev_mapping_reference = prev_mapping['properties']['embedded_reference']
-                else:
-                    prev_mapping_reference = prev_mapping['properties']['embedded']
-                prev_embedded = OrderedDict(prev_mapping_reference)
-                curr_embedded = OrderedDict(mapping['properties']['embedded'])
-                prev_compare = sort_dict_recursively(prev_embedded)
-                curr_compare = sort_dict_recursively(curr_embedded)
-                # see if the settings have changed since the last index
-                same_settings = True
-                all_settings_keys = list(set().union(list(curr_settings['index'].keys()) + list(prev_settings.keys())))
-                for key in all_settings_keys:
-                    # these settings are automatically generated by es and
-                    # wont be present in curr_settings
-                    if key in ['provided_name', 'creation_date', 'uuid', 'version']:
-                        continue
-                    try:
-                        prev_index_settings = prev_settings[key]
-                        curr_index_settings = curr_settings['index'][key]
-                    except KeyError:
-                        same_settings = False
-                        break
-                    if isinstance(prev_index_settings, dict):
-                        prev_od = OrderedDict(prev_index_settings)
-                        prev_index_settings = sort_dict_recursively(prev_od)
-                    else:
-                        prev_index_settings = py_to_es_transform(prev_index_settings)
-                    if isinstance(curr_index_settings, dict):
-                        curr_od = OrderedDict(curr_index_settings)
-                        curr_index_settings = sort_dict_recursively(curr_od)
-                    else:
-                        curr_index_settings = py_to_es_transform(curr_index_settings)
-                    if prev_index_settings != curr_index_settings:
-                        same_settings = False
-                        break
-                # check mapping equivalency
-                if prev_compare == curr_compare and same_settings:
-                    print("MAPPING: index %s already exists, no need to create mapping" % (in_type))
-                    return
+            if this_index_record == prev_index_record['_source']:
+                print("MAPPING: index %s already exists, no need to create mapping" % (in_type))
+                return
+
     # delete the index, ignore if it doesn't exist or already exists
     this_index.delete(ignore=[400,404])
-    this_index.settings(**curr_settings)
+    this_index.settings(**index_settings(in_type))
     if dry_run:
         print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
     else:
-        this_index.create(request_timeout=30)
+        # first, create the mapping
+        this_index.create(request_timeout=30, ignore=400)
         print('MAPPING: new index created for %s' % (in_type))
+
+        # if 'indexing' doc exists within meta, then re-index for this type
+        indexing_xmin = None
+        try:
+            status = es.get(index='meta', doc_type='meta', id='indexing')
+        except:
+            pass
+        else:
+            indexing_xmin = status['_source']['xmin']
+        if indexing_xmin is not None:
+            import pdb; pdb.set_trace()
+            print('MAPPING: re-indexing all items in the collection %s' % (in_type))
+            run_indexing(app, [in_type])
+
+        # put the type mapping into the new index
         try:
             this_index.put_mapping(doc_type=in_type, body={in_type: mapping})
         except:
             print("MAPPING: could not create mapping for the collection %s" % (in_type))
+
+        # put index_record in meta
+        try:
+            es.index(index='meta', doc_type='meta', body=this_index_record, id=in_type)
+        except:
+            print("MAPPING: index record failed for the collection %s" % (in_type))
 
 
 def snovault_cleanup(es, registry):
@@ -691,18 +634,18 @@ def snovault_cleanup(es, registry):
 
 def run(app, collections=None, dry_run=False, check_first=True):
     registry = app.registry
+    es = app.registry[ELASTIC_SEARCH]
     if not dry_run:
-        es = app.registry[ELASTIC_SEARCH]
         snovault_cleanup(es, registry)
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
     for collection_name in collections:
         if collection_name == 'meta':
             # meta mapping just contains settings
-            build_index(es, collection_name, META_MAPPING, dry_run, check_first)
+            build_index(app, es, collection_name, META_MAPPING, dry_run, check_first)
         else:
             mapping = create_mapping_by_type(collection_name, registry)
-            build_index(es, collection_name, mapping, dry_run, check_first)
+            build_index(app, es, collection_name, mapping, dry_run, check_first)
 
 
 def main():
