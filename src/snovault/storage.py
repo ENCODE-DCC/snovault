@@ -197,7 +197,7 @@ class RDBStorage(object):
             sp.commit()
         except Exception as e:
             sp.rollback()
-        raise e
+            raise e
 
     def _update_properties(self, model, properties, sheets=None):
         if properties is not None:

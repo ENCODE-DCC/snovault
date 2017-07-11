@@ -133,7 +133,7 @@ def test_get_by_json(session):
              )
 
     data = query.one()
-    assert data.resource.properties == props2
+    assert data.propsheet.properties == props2
 
 
 def test_delete_simple(session, storage):
