@@ -68,9 +68,6 @@ def index(request):
     first_txn = None
     last_xmin = None
 
-    es_log_settings = {"transient": {"logger._root": "DEBUG"}}
-    es.cluster.put_settings(es_log_settings)
-
     if 'last_xmin' in request.json:
         last_xmin = request.json['last_xmin']
     else:
@@ -185,7 +182,7 @@ def index(request):
                 result['errors'] = error_messages
 
 
-        es.indices.refresh(index=INDEX)
+        es.indices.refresh()
 
         if flush:
             try:

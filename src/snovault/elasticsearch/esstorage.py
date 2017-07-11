@@ -1,4 +1,3 @@
-import elasticsearch.exceptions
 from snovault.util import get_root_request
 from elasticsearch.helpers import scan
 from pyramid.threadlocal import get_current_request
@@ -8,8 +7,6 @@ from .interfaces import (
     ICachedItem,
 )
 
-import pdb
-from pprint import pprint as pp
 
 SEARCH_MAX = (2 ** 31) - 1
 
