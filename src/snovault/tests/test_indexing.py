@@ -54,20 +54,6 @@ def DBSession(app):
     return app.registry[DBSESSION]
 
 
-def test_elasticsearch_meta(app):
-    es = app.registry['elasticsearch']
-    indexing_doc = es.get(index='meta', doc_type='meta', id='indexing')
-    indexing_source = indexing_doc['_source']
-    assert 'xmin' in indexing_source
-    assert 'last_xmin' in indexing_source
-    assert 'indexed' in indexing_source
-    assert indexing_source['xmin'] >= indexing_source['last_xmin']
-    testing_ppp_meta = es.get(index='meta', doc_type='meta', id='testing_post_put_patch')
-    testing_ppp_source = testing_ppp_meta['_source']
-    assert 'mapping' in testing_ppp_source
-    assert 'settings' in testing_ppp_source
-
-
 @pytest.fixture(autouse=True)
 def teardown(app, dbapi_conn):
     from snovault.elasticsearch import create_mapping
@@ -95,7 +81,7 @@ def listening_conn(dbapi_conn):
     cursor.close()
 
 
-def test_indexing_simple(testapp, indexer_testapp):
+def test_indexing_simple(app, testapp, indexer_testapp):
     # First post a single item so that subsequent indexing is incremental
     testapp.post_json('/testing-post-put-patch/', {'required': ''})
     res = indexer_testapp.post_json('/index', {'record': True})
@@ -118,6 +104,18 @@ def test_indexing_simple(testapp, indexer_testapp):
         count += 1
     assert res.json['total'] >= 2
     assert uuid in uuids
+    # test the meta index
+    es = app.registry['elasticsearch']
+    indexing_doc = es.get(index='meta', doc_type='meta', id='indexing')
+    indexing_source = indexing_doc['_source']
+    assert 'xmin' in indexing_source
+    assert 'last_xmin' in indexing_source
+    assert 'indexed' in indexing_source
+    assert indexing_source['xmin'] >= indexing_source['last_xmin']
+    testing_ppp_meta = es.get(index='meta', doc_type='meta', id='testing_post_put_patch')
+    testing_ppp_source = testing_ppp_meta['_source']
+    assert 'mapping' in testing_ppp_source
+    assert 'settings' in testing_ppp_source
 
 
 def test_listening(testapp, listening_conn):
