@@ -1,5 +1,5 @@
 language: python
-sudo: required
+sudo: true
 cache:
   directories:
   - eggs
@@ -7,8 +7,10 @@ cache:
 addons:
   apt:
     packages:
+    - oracle-java8-set-default
     - bsdtar
     - graphviz
+    - elasticsearch
 env:
   global:
 
@@ -38,9 +40,10 @@ env:
       C0cq1ad+T3gAsxRdvIgWrU86QMLNxlgyNW+eijTZH5XDvYtVjBovyuf2zZ2P4
       7F+UQNsSLGGLVORcsmBG7ByCMYljVk8i14rWonrXVjPP1fuwIp2AIZzNK6KrJ
       tQzLeb5gEy3A=
-  - PATH="/usr/share/elasticsearch/bin:/usr/lib/postgresql/9.3/bin:$PATH"
   - JAVA_HOME=/usr/lib/jvm/java-8-oracle
-  - JRE_HOME=/usr/lib/jvm/java-8-oracle/jre
+  - ES_VERSION=5.4.1
+  - ES_DOWNLOAD_URL=https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-${ES_VERSION}.deb
+  - PATH="/usr/share/elasticsearch/bin:/usr/lib/postgresql/9.3/bin:$PATH"
 matrix:
   include:
   - python: '2.7'
@@ -50,15 +53,14 @@ matrix:
   - python: '3.4'
     env: BROWSER=
 before_install:
-- sudo apt-get install oracle-java8-set-default
 - postgres --version
 - initdb --version
-- curl -O https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-5.4.0.deb && sudo dpkg -i --force-confnew elasticsearch-5.4.0.deb
 - nvm install 4
 - node --version
 - npm config set python /usr/bin/python2.7
-- sudo chmod -R a+r /etc/elasticsearch /usr/share/elasticsearch
 install:
+- curl -O  ${ES_DOWNLOAD_URL}
+- sudo dpkg -i --force-confnew elasticsearch-${ES_VERSION}.deb
 - python bootstrap.py --buildout-version 2.4.1 --setuptools-version 18.5
 - bin/buildout -c buildout-travis.cfg || (echo "Retrying buildout" && bin/buildout
   -c buildout-travis.cfg)
