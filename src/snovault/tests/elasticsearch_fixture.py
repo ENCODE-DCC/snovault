@@ -12,7 +12,7 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
         '-Enetwork.host=%s' % host,
         '-Ehttp.port=%d' % port,
         '-Epath.logs=%s' % os.path.join(datadir, 'logs'),
-        '-Epath.logs=%s' % os.path.join(datadir, 'data'),
+        '-Epath.data=%s' % os.path.join(datadir, 'data'),
     ]
     if os.environ.get('TRAVIS'):
         echo=True
