@@ -28,10 +28,12 @@ def server_process(datadir, host='127.0.0.1', port=9300, prefix='', echo=False):
         os.path.join(prefix, 'elasticsearch'),
         '-Enetwork.host=%s' % host,
         '-Ehttp.port=%d' % port,
+        '-Epath.data=%s' % os.path.join(datadir, 'data'),
+        '-Epath.logs=%s' % os.path.join(datadir, 'logs'),
     ]
     # elasticsearch for travis
     if os.environ.get('TRAVIS'):
-        echo=True
+        echo = True
         args.append('-Epath.conf=%s/deploy' % os.environ['TRAVIS_BUILD_DIR'])
     elif os.path.exists('/etc/elasticsearch'):
         # elasticsearch.deb setup

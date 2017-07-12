@@ -6,6 +6,7 @@ Does not include data dependent tests
 """
 
 import pytest
+import time
 
 pytestmark = [pytest.mark.indexing]
 
@@ -94,11 +95,18 @@ def test_indexing_simple(testapp, indexer_testapp):
     assert res.json['txn_count'] == 1
     assert res.json['updated'] == [uuid]
     res = testapp.get('/search/?type=TestingPostPutPatch')
-    assert res.json['total'] == 2
+    uuids = [indv_res['uuid'] for indv_res in res.json['@graph']]
+    count = 0
+    while uuid not in uuids and count < 20:
+        time.sleep(1)
+        res = testapp.get('/search/?type=TestingPostPutPatch')
+        uuids = [indv_res['uuid'] for indv_res in res.json['@graph']]
+        count += 1
+    assert res.json['total'] >= 2
+    assert uuid in uuids
 
 
 def test_listening(testapp, listening_conn):
-    import time
     testapp.post_json('/testing-post-put-patch/', {'required': ''})
     time.sleep(1)
     listening_conn.poll()
