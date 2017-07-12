@@ -5,7 +5,7 @@ from .features.conftest import app_settings, app, workbook
 def test_search_view(workbook, testapp):
     res = testapp.get('/search/?type=Item').json
     assert res['@type'] == ['Search']
-    assert res['@id'] == '/search/'
+    assert res['@id'] == '/search/?type=Item'
     assert res['@context'] == '/terms/'
     assert res['notification'] == 'Success'
     assert res['title'] == 'Search'
@@ -22,6 +22,7 @@ def test_selective_embedding(workbook, testapp):
     # Check the embedding /types/snow.py entry for Snowflakes; test ensures
     # that the actual embedding matches that
     test_json = [flake for flake in res['@graph'] if flake['accession'] == 'SNOFL001RIC']
+    import pdb; pdb.set_trace()
     assert test_json[0]['lab']['uuid'] == 'cfb789b8-46f3-4d59-a2b3-adc39e7df93a'
     # this specific field should be embedded ('lab.awards.project')
     assert test_json[0]['lab']['awards'][0]['project'] == 'ENCODE'
@@ -37,4 +38,4 @@ def test_selective_embedding(workbook, testapp):
     # (removed @id-like field)
     assert 'pi' not in test_json[0]['award']
     # @id-like field that should still be embedded (not a valid @id)
-    assert test_json[0]['lab']['city'] == '/Stanford/USA/'
+    assert test_json[0]['lab']['city'] == 'Stanford/USA/'
