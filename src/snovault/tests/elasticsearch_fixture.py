@@ -15,10 +15,12 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
         '-Ehttp.port=%d' % port,
         '-Dlog4j2.disable.jmx=true'
     ]
-    # elasticsearch.deb setup
-    print(args)
-    if os.path.exists('/etc/elasticsearch'):
-        args.append('-E.path.conf=/etc/elasticsearch')
+    if os.environ.get('TRAVIS'):
+        echo=True
+        args.append('-Epath.conf=%s/deploy' % os.environ['TRAVIS_BUILD_DIR'])
+    elif os.path.exists('/etc/elasticsearch'):
+        # elasticsearch.deb setup
+        args.append('-Epath.conf=/etc/elasticsearch')
     process = subprocess.Popen(
         args,
         close_fds=True,
