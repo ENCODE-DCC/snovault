@@ -19,9 +19,7 @@ from sqlalchemy.ext import baked
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import (
     collections,
-    scoped_session,
-    sessionmaker,
-    contains_eager
+    backref
 )
 from sqlalchemy.orm.exc import (
     FlushError,
@@ -33,9 +31,7 @@ from .interfaces import (
     DBSESSION,
     STORAGE,
 )
-from .json_renderer import json_renderer
 import boto
-import json
 import transaction
 import uuid
 
@@ -183,6 +179,25 @@ class RDBStorage(object):
         assert conflicts
         msg = 'Keys conflict: %r' % conflicts
         raise HTTPConflict(msg)
+
+    def delete_by_uuid(self, rid):
+        # WARNING USE WITH CARE PERMANENTLY DELETES RESOURCES
+        session = self.DBSession()
+        sp = session.begin_nested()
+        model = self.get_by_uuid(rid)
+        try:
+            for current_propsheet in model.data.values():
+                # delete the propsheet history
+                for propsheet in current_propsheet.history:
+                    session.delete(propsheet)
+                    # now delete the currentPropsheet
+                    session.delete(current_propsheet)
+                # now delete the resource, keys and links(via cascade)
+            session.delete(model)
+            sp.commit()
+        except Exception as e:
+            sp.rollback()
+            raise e
 
     def _update_properties(self, model, properties, sheets=None):
         if properties is not None:
@@ -334,38 +349,6 @@ class S3BlobStorage(object):
         key_obj = bucket.get_key(key, validate=False)
         return key_obj.get_contents_as_string()
 
-'''
-class JSON(types.TypeDecorator):
-    """Represents an immutable structure as a json-encoded string.
-    """
-
-    impl = types.Text
-    using_native_json = False
-
-    def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
-            if dialect.server_version_info >= (9, 4):
-                self.using_native_json = True
-                return dialect.type_descriptor(postgresql.JSONB())
-            if dialect.server_version_info >= (9, 2):
-                self.using_native_json = True
-                return dialect.type_descriptor(postgresql.JSON())
-        return dialect.type_descriptor(types.Text())
-
-    def process_bind_param(self, value, dialect):
-        if self.using_native_json:
-            return value
-        if value is None:
-            return value
-        return json_renderer.dumps(value)/
-    def process_result_value(self, value, dialect):
-        if self.using_native_json:
-            return value
-        if value is None:
-            return value
-        return json.loads(value)
-'''
-
 
 class Key(Base):
     ''' indexed unique tables for accessions and other unique keys
@@ -382,7 +365,8 @@ class Key(Base):
                  nullable=False, index=True)
 
     # Be explicit about dependencies to the ORM layer
-    resource = orm.relationship('Resource', backref='unique_keys')
+    resource = orm.relationship('Resource',
+                                backref=backref('unique_keys', cascade='all, delete-orphan'))
 
 
 class Link(Base):
@@ -397,9 +381,11 @@ class Link(Base):
         index=True)  # Single column index for reverse lookup
 
     source = orm.relationship(
-        'Resource', foreign_keys=[source_rid], backref='rels')
+        'Resource', foreign_keys=[source_rid], backref=backref('rels',
+                                                               cascade='all, delete-orphan'))
     target = orm.relationship(
-        'Resource', foreign_keys=[target_rid], backref='revs')
+        'Resource', foreign_keys=[target_rid], backref=backref('revs',
+                                                               cascade='all, delete-orphan'))
 
 
 class PropertySheet(Base):
@@ -451,6 +437,7 @@ class CurrentPropertySheet(Base):
         viewonly=True,
     )
     resource = orm.relationship('Resource')
+    __mapper_args__ = {'confirm_deleted_rows': False}
 
 
 class Resource(Base):

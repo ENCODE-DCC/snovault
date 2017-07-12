@@ -383,7 +383,10 @@ def attachment(path):
     filename = os.path.basename(path)
     mime_type, encoding = mimetypes.guess_type(path)
     major, minor = mime_type.split('/')
-    detected_type = magic.from_file(path, mime=True).decode('ascii')
+    try:
+        detected_type = magic.from_file(path, mime=True).decode('ascii')
+    except AttributeError:
+        detected_type = magic.from_file(path, mime=True)
 
     # XXX This validation logic should move server-side.
     if not (detected_type == mime_type or
@@ -529,4 +532,3 @@ def load_test_data(app):
     transaction.commit()
 
     print ("all %s users get the password Steve" % (count))
-

@@ -6,6 +6,7 @@ Does not include data dependent tests
 """
 
 import pytest
+import time
 
 pytestmark = [pytest.mark.indexing]
 
@@ -80,7 +81,7 @@ def listening_conn(dbapi_conn):
     cursor.close()
 
 
-def test_indexing_simple(testapp, indexer_testapp):
+def test_indexing_simple(app, testapp, indexer_testapp):
     # First post a single item so that subsequent indexing is incremental
     testapp.post_json('/testing-post-put-patch/', {'required': ''})
     res = indexer_testapp.post_json('/index', {'record': True})
@@ -94,11 +95,30 @@ def test_indexing_simple(testapp, indexer_testapp):
     assert res.json['txn_count'] == 1
     assert res.json['updated'] == [uuid]
     res = testapp.get('/search/?type=TestingPostPutPatch')
-    assert res.json['total'] == 2
+    uuids = [indv_res['uuid'] for indv_res in res.json['@graph']]
+    count = 0
+    while uuid not in uuids and count < 20:
+        time.sleep(1)
+        res = testapp.get('/search/?type=TestingPostPutPatch')
+        uuids = [indv_res['uuid'] for indv_res in res.json['@graph']]
+        count += 1
+    assert res.json['total'] >= 2
+    assert uuid in uuids
+    # test the meta index
+    es = app.registry['elasticsearch']
+    indexing_doc = es.get(index='meta', doc_type='meta', id='indexing')
+    indexing_source = indexing_doc['_source']
+    assert 'xmin' in indexing_source
+    assert 'last_xmin' in indexing_source
+    assert 'indexed' in indexing_source
+    assert indexing_source['xmin'] >= indexing_source['last_xmin']
+    testing_ppp_meta = es.get(index='meta', doc_type='meta', id='testing_post_put_patch')
+    testing_ppp_source = testing_ppp_meta['_source']
+    assert 'mapping' in testing_ppp_source
+    assert 'settings' in testing_ppp_source
 
 
 def test_listening(testapp, listening_conn):
-    import time
     testapp.post_json('/testing-post-put-patch/', {'required': ''})
     time.sleep(1)
     listening_conn.poll()
