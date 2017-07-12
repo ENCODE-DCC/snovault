@@ -525,7 +525,11 @@ def type_mapping(types, item_type, embed=True):
             if ref_types is None:
                 curr_s = subschema
             else:
-                curr_s = reduce(combine_schemas, (types[t].schema for t in ref_types))
+                embedded_types = [types[t].schema for t in ref_types
+                                  if t in types.all]
+                if not embedded_types:
+                    continue
+                curr_s = reduce(combine_schemas, embedded_types)
             # Check if we're at the end of a hierarchy of embeds
             if len(prop.split('.')) > 1 and curr_p == prop.split('.')[-2]:
                 # See if the next (last) field is an object
