@@ -3,7 +3,7 @@ from .features.conftest import app_settings, app, workbook
 
 
 def test_search_view(workbook, testapp):
-    res = testapp.get('/search/').json
+    res = testapp.get('/search/?type=Item').json
     assert res['@type'] == ['Search']
     assert res['@id'] == '/search/'
     assert res['@context'] == '/terms/'
