@@ -108,7 +108,7 @@ def schema_mapping(name, schema, field='*', top_level=False):
     if name == 'date_created':
         return {
             'type': 'date',
-            'format':"yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",
+            'format': "date_optional_time",
             'fields': {
                 'raw': {
                     'type': 'keyword'
