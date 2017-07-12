@@ -54,6 +54,20 @@ def DBSession(app):
     return app.registry[DBSESSION]
 
 
+def test_elasticsearch_meta(app):
+    es = app.registry['elasticsearch']
+    indexing_doc = es.get(index='meta', doc_type='meta', id='indexing')
+    indexing_source = indexing_doc['_source']
+    assert 'xmin' in indexing_source
+    assert 'last_xmin' in indexing_source
+    assert 'indexed' in indexing_source
+    assert indexing_source['xmin'] >= indexing_source['last_xmin']
+    testing_ppp_meta = es.get(index='meta', doc_type='meta', id='testing_post_put_patch')
+    testing_ppp_source = testing_ppp_meta['_source']
+    assert 'mapping' in testing_ppp_source
+    assert 'settings' in testing_ppp_source
+
+
 @pytest.fixture(autouse=True)
 def teardown(app, dbapi_conn):
     from snovault.elasticsearch import create_mapping
