@@ -72,12 +72,15 @@ def main():
     datadir = os.path.abspath(args.datadir)
     pgdata = os.path.join(datadir, 'pgdata')
     esdata = os.path.join(datadir, 'esdata')
+    ### comment out from HERE...
     if args.clear:
         for dirname in [pgdata, esdata]:
             if os.path.exists(dirname):
                 shutil.rmtree(dirname)
     if args.init:
         postgresql_fixture.initdb(pgdata, echo=True)
+    ### ... to HERE to disable recreation of test db
+    ### may have to `rm /tmp/snovault/pgdata/postmaster.pid`
 
     postgres = postgresql_fixture.server_process(pgdata, echo=True)
     elasticsearch = elasticsearch_fixture.server_process(esdata, echo=True)

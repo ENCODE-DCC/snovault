@@ -84,7 +84,6 @@ def index(request):
     flush = False
     if last_xmin is None:
         result['types'] = types = request.json.get('types', None)
-        import pdb; pdb.set_trace()
         invalidated = list(all_uuids(request.registry, types))
         flush = True
     else:
@@ -202,8 +201,8 @@ def all_uuids(registry, types=None):
     for collection_name in initial:
         collection = collections.by_item_type.get(collection_name, [])
         # for snovault test application, there are no users or keys
-        # if types is not None and collection_name not in types:
-        #     continue
+        if types is not None and collection_name not in types:
+            continue
         for uuid in collection:
             yield str(uuid)
     for collection_name in sorted(collections.by_item_type):

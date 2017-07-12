@@ -27,7 +27,7 @@ from .interfaces import ELASTIC_SEARCH
 import collections
 import json
 import logging
-from collections import OrderedDict
+import time
 from snovault.commands.es_index_data import run as run_indexing
 
 
@@ -568,17 +568,28 @@ def create_mapping_by_type(in_type, registry):
 def build_index(app, es, in_type, mapping, dry_run, check_first):
     this_index = Index(in_type, using=es)
     this_index_record = build_index_record(mapping, in_type)
-
+    # sometimes it takes a while to find the index on local
+    # this is important for meta
+    if check_first and in_type == 'meta':
+        for wait in [3,6,9,27]:
+            if not this_index.exists():
+                time.sleep(wait)
     # if the index exists, we might not need to delete it
     if this_index.exists() and check_first:
         # Decide if we need to drop the index + reindex (no index/no meta record)
         # OR
-        # compare previous mapping and current mapping to see if we need
+        # compare previous mapping and current mapping + settings to see if we need
         # to update. if not, use the existing mapping to prevent re-indexing
         try:
             prev_index_record = es.get(index='meta', doc_type='meta', id=in_type)
-        except:
-            pass
+        except TransportError as excp:
+            if excp.info.get('status') == 503:
+                es.indices.refresh(index='meta')
+                time.sleep(3)
+                try:
+                    prev_index_record = es.get(index='meta', doc_type='meta', id=in_type)
+                except:
+                    pass
         else:
             if this_index_record == prev_index_record['_source']:
                 print("MAPPING: index %s already exists, no need to create mapping" % (in_type))
@@ -594,24 +605,23 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
         this_index.create(request_timeout=30, ignore=400)
         print('MAPPING: new index created for %s' % (in_type))
 
-        # if 'indexing' doc exists within meta, then re-index for this type
-        indexing_xmin = None
-        try:
-            status = es.get(index='meta', doc_type='meta', id='indexing')
-        except:
-            pass
-        else:
-            indexing_xmin = status['_source']['xmin']
-        if indexing_xmin is not None:
-            import pdb; pdb.set_trace()
-            print('MAPPING: re-indexing all items in the collection %s' % (in_type))
-            run_indexing(app, [in_type])
-
         # put the type mapping into the new index
         try:
             this_index.put_mapping(doc_type=in_type, body={in_type: mapping})
         except:
             print("MAPPING: could not create mapping for the collection %s" % (in_type))
+
+        # if 'indexing' doc exists within meta, then re-index for this type
+        indexing_xmin = None
+        try:
+            status = es.get(index='meta', doc_type='meta', id='indexing')
+        except:
+            print('MAPPING: indexing record not found in meta for collection %s' % (in_type))
+        else:
+            indexing_xmin = status['_source']['xmin']
+        if indexing_xmin is not None:
+            print('MAPPING: re-indexing all items in the collection %s' % (in_type))
+            run_indexing(app, [in_type])
 
         # put index_record in meta
         try:
