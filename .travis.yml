@@ -10,7 +10,6 @@ addons:
     - oracle-java8-set-default
     - bsdtar
     - graphviz
-    - elasticsearch
 env:
   global:
 
@@ -66,6 +65,7 @@ install:
 - bin/buildout -c buildout-travis.cfg || (echo "Retrying buildout" && bin/buildout
   -c buildout-travis.cfg)
 before_script:
+- sudo service elasticsearch stop
 - |
   if test -n "$BROWSER"; then
     CONNECT_URL=https://saucelabs.com/downloads/sc-4.4.4-linux.tar.gz
