@@ -12,7 +12,8 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
         '-Epath.data=%s' % os.path.join(datadir, 'data'),
         '-Epath.logs=%s' % os.path.join(datadir, 'logs'),
         '-Enetwork.host=%s' % host,
-        '-Ehttp.port=%d' % port
+        '-Ehttp.port=%d' % port,
+        '-Dlog4j2.disable.jmx=true'
     ]
     # elasticsearch.deb setup
     print(args)
