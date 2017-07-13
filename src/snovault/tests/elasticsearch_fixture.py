@@ -4,6 +4,7 @@ try:
     import subprocess32 as subprocess
 except ImportError:
     import subprocess
+import time
 
 
 def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
@@ -24,6 +25,8 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
+    time.sleep(10)
+    print('START 30s SLEEP')
 
     SUCCESS_LINE = b'started\n'
 
