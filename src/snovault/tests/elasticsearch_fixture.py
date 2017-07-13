@@ -10,7 +10,8 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
     args = [
         os.path.join(prefix, 'elasticsearch'),
         '-Enetwork.host=%s' % host,
-        '-Ehttp.port=%d' % port
+        '-Ehttp.port=%d' % port,
+        '-Dlog4j2.disable.jmx=true'
         # '-Epath.logs=%s' % os.path.join(datadir, 'logs'),
         # '-Epath.data=%s' % os.path.join(datadir, 'data'),
     ]
