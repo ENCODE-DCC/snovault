@@ -468,7 +468,7 @@ def set_sort_order(request, search, search_term, types, doc_types, result):
             order = 'asc'
         sort['embedded.' + name + '.lower_case_sort.keyword'] = result_sort[name] = {
             'order': order,
-            'unmapped_type': 'long',
+            'unmapped_type': 'keyword',
         }
     # Otherwise we use a default sort only when there's no text search to be ranked
     if not sort and search_term == '*':
@@ -484,12 +484,12 @@ def set_sort_order(request, search, search_term, types, doc_types, result):
         if not sort:
             sort['embedded.date_created.raw'] = result_sort['date_created'] = {
                 'order': 'desc',
-                'ignore_unmapped': True,
+                'unmapped_type': 'keyword',
             }
             sort['embedded.label.raw'] = result_sort['label'] = {
                 'order': 'asc',
                 'missing': '_last',
-                'ignore_unmapped': True,
+                'unmapped_type': 'keyword',
             }
     if sort and result_sort:
         result['sort'] = result_sort
