@@ -628,11 +628,11 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
         # if 'indexing' doc exists within meta, then re-index for this type
         indexing_xmin = None
         try:
-            status = es.get(index='meta', doc_type='meta', id='indexing')
+            status = es.get(index='meta', doc_type='meta', id='indexing', ignore=404)
         except:
             print('MAPPING: indexing record not found in meta for collection %s' % (in_type))
         else:
-            indexing_xmin = status['_source']['xmin']
+            indexing_xmin = status.get('_source', {}).get('xmin')
         if indexing_xmin is not None:
             print('MAPPING: re-indexing all items in the new index %s' % (in_type))
             run_indexing(app, [in_type])
@@ -656,7 +656,7 @@ def snovault_cleanup(es, registry):
             snovault_index.delete(ignore=404)
 
 
-def run(app, collections=None, dry_run=False, check_first=True):
+def run(app, collections=None, dry_run=False, check_first=False):
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
     if not dry_run:
