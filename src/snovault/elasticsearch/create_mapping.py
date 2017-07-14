@@ -575,7 +575,7 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
     # sometimes it takes a while to find the index on local
     # this is important for meta
     if check_first and in_type == 'meta':
-        for wait in [3,6,9,27]:
+        for wait in [3,6,9]:
             if not this_index.exists():
                 time.sleep(wait)
     # if the index exists, we might not need to delete it
@@ -596,7 +596,17 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
                     pass
         else:
             if this_index_record == prev_index_record['_source']:
-                print("MAPPING: index %s already exists, no need to create mapping" % (in_type))
+                if in_type != 'meta':
+                    # lastly, check to make sure the item count for the existing
+                    # index matches the database document count. If not, reindex
+                    count_res = es.count(index=in_type, doc_type=in_type)
+                    es_count = count_res.get('count')
+                    collection = app.registry[COLLECTIONS].get(in_type)
+                    db_count = len(collection) if collection is not None else None
+                    if es_count is None or es_count != db_count:
+                        print('MAPPING: re-indexing all items in the existing index %s' % (in_type))
+                        run_indexing(app, [in_type])
+                print('MAPPING: using existing index for collection %s' % (in_type))
                 return
 
     # delete the index, ignore if it doesn't exist or already exists
@@ -624,7 +634,7 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
         else:
             indexing_xmin = status['_source']['xmin']
         if indexing_xmin is not None:
-            print('MAPPING: re-indexing all items in the collection %s' % (in_type))
+            print('MAPPING: re-indexing all items in the new index %s' % (in_type))
             run_indexing(app, [in_type])
 
         # put index_record in meta
