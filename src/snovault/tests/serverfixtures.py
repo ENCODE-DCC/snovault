@@ -65,10 +65,12 @@ def elasticsearch_host_port():
 @pytest.yield_fixture(scope='session')
 def elasticsearch_server(request, elasticsearch_host_port):
     from .elasticsearch_fixture import server_process
+    import time
     host, port = elasticsearch_host_port
     tmpdir = request.config._tmpdirhandler.mktemp('elasticsearch', numbered=True)
     tmpdir = str(tmpdir)
     process = server_process(str(tmpdir), host=host, port=port)
+    time.sleep(20)
 
     yield 'http://%s:%d' % (host, port)
 
