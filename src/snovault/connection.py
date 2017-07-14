@@ -52,6 +52,8 @@ class Connection(object):
 
     def get_by_uuid(self, uuid, default=None):
         if isinstance(uuid, basestring):
+            # some times we get @id type things here
+            uuid = uuid.split("/")[-1]
             try:
                 uuid = UUID(uuid)
             except ValueError:
