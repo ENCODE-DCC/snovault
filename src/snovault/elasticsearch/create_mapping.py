@@ -609,8 +609,9 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
                 print('MAPPING: using existing index for collection %s' % (in_type))
                 return
 
-    # delete the index, ignore if it doesn't exist or already exists
-    this_index.delete(ignore=[400,404])
+    # delete the index
+    if this_index.exists():
+        this_index.delete(ignore=[400,404])
     this_index.settings(**index_settings(in_type))
     if dry_run:
         print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
