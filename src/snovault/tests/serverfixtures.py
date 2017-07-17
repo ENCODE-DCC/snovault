@@ -65,9 +65,7 @@ def elasticsearch_host_port():
 @pytest.yield_fixture(scope='session')
 def elasticsearch_server(request, elasticsearch_host_port):
     from .elasticsearch_fixture import server_process
-    # host, port = elasticsearch_host_port
-    host = '127.0.0.1'
-    port = 37029
+    host, port = elasticsearch_host_port
     tmpdir = request.config._tmpdirhandler.mktemp('elasticsearch', numbered=True)
     tmpdir = str(tmpdir)
     process = server_process(str(tmpdir), host=host, port=port)
