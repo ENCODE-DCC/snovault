@@ -622,7 +622,7 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
 
         # put the type mapping into the new index
         try:
-            this_index.put_mapping(doc_type=in_type, body={in_type: mapping})
+            this_index.put_mapping(doc_type=in_type, body={in_type: mapping}, request_timeout=30))
         except:
             print("MAPPING: could not create mapping for the collection %s" % (in_type))
 
