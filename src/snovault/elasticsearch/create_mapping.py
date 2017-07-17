@@ -643,7 +643,7 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
         # if 'indexing' doc exists within meta, then re-index for this type
         indexing_xmin = None
         try:
-            status = es.get(index='meta', doc_type='meta', id='indexing', ignore=404)
+            status = es.get(index='meta', doc_type='meta', id='indexing', ignore=[404])
         except:
             print('MAPPING: indexing record not found in meta for %s' % (in_type))
         else:

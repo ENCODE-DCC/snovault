@@ -110,47 +110,55 @@ def index(request):
         if txn_count == 0:
             return result
 
-        es.indices.refresh(index='_all')
-        res = es.search(index='_all', size=SEARCH_MAX, body={
-            'query': {
-                'bool': {
-                    'filter': {
-                        'bool': {
-                            'should': [
-                                {
-                                    'terms': {
-                                        'embedded_uuids': updated,
-                                        '_cache': False,
+        # iterate through all indices and find items with matching embedded uuids
+        referencing = set()
+        indices = list(request.registry[COLLECTIONS].by_item_type.keys())
+        for es_index in indices:
+            this_index_exists = es.indices.exists(index=es_index)
+            if not this_index_exists:
+                continue
+            es.indices.refresh(index=es_index)
+            res = es.search(index=es_index, size=SEARCH_MAX, body={
+                'query': {
+                    'bool': {
+                        'filter': {
+                            'bool': {
+                                'should': [
+                                    {
+                                        'terms': {
+                                            'embedded_uuids': updated,
+                                            '_cache': False,
+                                        },
                                     },
-                                },
-                                {
-                                    'terms': {
-                                        'linked_uuids': renamed,
-                                        '_cache': False,
+                                    {
+                                        'terms': {
+                                            'linked_uuids': renamed,
+                                            '_cache': False,
+                                        },
                                     },
-                                },
-                            ],
+                                ],
+                            },
                         },
                     },
                 },
-            },
-            '_source': False,
-        })
-        if res['hits']['total'] > SEARCH_MAX:
-            invalidated = list(all_uuids(request.registry))
-            flush = True
-        else:
-            referencing = {hit['_id'] for hit in res['hits']['hits']}
-            invalidated = referencing | updated
-            result.update(
-                max_xid=max_xid,
-                renamed=renamed,
-                updated=updated,
-                referencing=len(referencing),
-                invalidated=len(invalidated),
-                txn_count=txn_count,
-                first_txn_timestamp=first_txn.isoformat(),
-            )
+                '_source': False,
+            })
+            if res['hits']['total'] > SEARCH_MAX:
+                referencing = list(all_uuids(request.registry))
+                flush = True
+                break
+            else:
+                referencing= referencing | {hit['_id'] for hit in res['hits']['hits']}
+        invalidated = referencing | updated
+        result.update(
+            max_xid=max_xid,
+            renamed=renamed,
+            updated=updated,
+            referencing=len(referencing),
+            invalidated=len(invalidated),
+            txn_count=txn_count,
+            first_txn_timestamp=first_txn.isoformat(),
+        )
     if invalidated and not dry_run:
         # Exporting a snapshot mints a new xid, so only do so when required.
         # Not yet possible to export a snapshot on a standby server:
