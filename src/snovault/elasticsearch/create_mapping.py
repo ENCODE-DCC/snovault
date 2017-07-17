@@ -13,6 +13,7 @@ from elasticsearch.exceptions import (
     ConnectionError,
     NotFoundError,
     TransportError,
+    ConnectionTimeout
 )
 from elasticsearch_dsl import Index
 from elasticsearch_dsl.connections import connections
@@ -617,21 +618,25 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
         print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
     else:
         # first, create the mapping
-        this_index.create(request_timeout=30)
-        print('MAPPING: new index created for %s' % (in_type))
+        res = es_safe_execute(this_index.create, request_timeout=30)
+        if res:
+            print('MAPPING: new index created for %s' % (in_type))
+        else:
+            print('MAPPING: new index failed for %s' % (in_type))
 
         # put the type mapping into the new index
-        try:
-            this_index.put_mapping(doc_type=in_type, body={in_type: mapping}, request_timeout=30)
-        except:
-            print("MAPPING: could not create mapping for the collection %s" % (in_type))
+        res = es_safe_execute(this_index.put_mapping, doc_type=in_type, body={in_type: mapping}, request_timeout=30)
+        if res:
+            print("MAPPING: mapping created for %s" % (in_type))
+        else:
+            print("MAPPING: mapping failed for %s" % (in_type))
 
         # if 'indexing' doc exists within meta, then re-index for this type
         indexing_xmin = None
         try:
             status = es.get(index='meta', doc_type='meta', id='indexing', ignore=404)
         except:
-            print('MAPPING: indexing record not found in meta for collection %s' % (in_type))
+            print('MAPPING: indexing record not found in meta for %s' % (in_type))
         else:
             indexing_xmin = status.get('_source', {}).get('xmin')
         if indexing_xmin is not None:
@@ -639,10 +644,25 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
             run_indexing(app, [in_type])
 
         # put index_record in meta
+        res = es_safe_execute(es.index, index='meta', doc_type='meta', body=this_index_record, id=in_type)
+        if res:
+            print("MAPPING: index record created for %s" % (in_type))
+        else:
+            print("MAPPING: index record failed for %s" % (in_type))
+
+
+def es_safe_execute(function, **kwargs):
+    exec_count = 0
+    while exec_count < 10:
         try:
-            es.index(index='meta', doc_type='meta', body=this_index_record, id=in_type)
-        except:
-            print("MAPPING: index record failed for the collection %s" % (in_type))
+            function(**kwargs)
+        except ConnectionTimeout:
+            exec_count += 1
+            time.sleep(3)
+        else:
+            return True
+    return False
+
 
 
 def snovault_cleanup(es, registry):
