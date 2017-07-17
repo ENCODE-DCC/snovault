@@ -23,6 +23,7 @@ import logging
 import pytz
 import time
 import copy
+import tracemalloc
 
 
 log = logging.getLogger(__name__)
@@ -64,6 +65,7 @@ def index(request):
     # which is not available in recovery.
     xmin = query.scalar()  # lowest xid that is still in progress
 
+    tracemalloc.start()
     first_txn = None
     last_xmin = None
     if 'last_xmin' in request.json:
@@ -216,6 +218,7 @@ class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
         self.index = registry.settings['snovault.elasticsearch.index']
+        tracemalloc.start()
 
     def update_objects(self, request, uuids, xmin, snapshot_id):
         errors = []
@@ -229,6 +232,8 @@ class Indexer(object):
         return errors
 
     def update_object(self, request, uuid, xmin):
+        log.debug("Indexing %s" % uuid)
+        memsnapshot1 = tracemalloc.take_snapshot()
         try:
             result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
         except StatementError:
@@ -238,7 +243,11 @@ class Indexer(object):
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             timestamp = datetime.datetime.now().isoformat()
             return {'error_message': repr(e), 'timestamp': timestamp, 'uuid': str(uuid)}
-
+        memsnapshot2 = tracemalloc.take_snapshot()
+        memstats = memsnapshot2.compare_to(memsnapshot1, 'lineno')
+        log.debug("Top RAM differences")
+        for stat in memstats:
+            log.debug(stat)
         last_exc = None
         for backoff in [0, 10, 20, 40, 80]:
             time.sleep(backoff)
