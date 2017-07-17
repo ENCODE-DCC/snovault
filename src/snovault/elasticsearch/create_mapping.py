@@ -617,7 +617,7 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
         print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
     else:
         # first, create the mapping
-        this_index.create(request_timeout=30, ignore=400)
+        this_index.create(request_timeout=30)
         print('MAPPING: new index created for %s' % (in_type))
 
         # put the type mapping into the new index
@@ -629,7 +629,7 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
         # if 'indexing' doc exists within meta, then re-index for this type
         indexing_xmin = None
         try:
-            status = es.get(index='meta', doc_type='meta', id='indexing', ignore=404)
+            status = es.get(index='meta', doc_type='meta', id='indexing')
         except:
             print('MAPPING: indexing record not found in meta for collection %s' % (in_type))
         else:
