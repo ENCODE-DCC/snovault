@@ -350,7 +350,7 @@ def audit_mapping():
 # generate an index record, which contains a mapping and settings
 def build_index_record(mapping, in_type):
     return {
-        'mapping': mapping,
+        'mappings': mapping,
         'settings': index_settings(in_type)
     }
 
@@ -572,16 +572,21 @@ def create_mapping_by_type(in_type, registry):
 
 
 def build_index(app, es, in_type, mapping, dry_run, check_first):
-    this_index = Index(in_type, using=es)
+    # determine if index already exists for this type
+    try:
+        this_index_exists = es.indices.exists(index=in_type)
+    except ConnectionTimeout:
+        this_index_exists = False
     this_index_record = build_index_record(mapping, in_type)
-    # sometimes it takes a while to find the index on local
-    # this is important for meta
+
     if check_first and in_type == 'meta':
-        for wait in [3,6,9,27]:
-            if not this_index.exists():
+        for wait in [3,6,9,12]:
+            if not this_index_exists:
                 time.sleep(wait)
+                this_index_exists = es.indices.exists(index=in_type)
+
     # if the index exists, we might not need to delete it
-    if this_index.exists() and check_first:
+    if this_index_exists and check_first:
         # Decide if we need to drop the index + reindex (no index/no meta record)
         # OR
         # compare previous mapping and current mapping + settings to see if we need
@@ -610,27 +615,30 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
                         run_indexing(app, [in_type])
                 print('MAPPING: using existing index for collection %s' % (in_type))
                 return
-
     # delete the index
-    if this_index.exists():
-        this_index.delete(ignore=[400,404], request_timeout=30)
-    this_index.settings(**index_settings(in_type))
+    if this_index_exists:
+        res = es_safe_execute(es.indices.delete, index=in_type, ignore=[400,404], request_timeout=30)
+        if res:
+            print('MAPPING: index successfully deleted for %s' % (in_type))
+        else:
+            print('MAPPING: could not delete index for %s' % (in_type))
     if dry_run:
         print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
     else:
-        # first, create the mapping
-        res = es_safe_execute(this_index.create, request_timeout=30)
+        # first, create the mapping. adds settings in the body
+        put_settings = this_index_record['settings']
+        res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, request_timeout=30)
         if res:
             print('MAPPING: new index created for %s' % (in_type))
         else:
             print('MAPPING: new index failed for %s' % (in_type))
 
-        # put the type mapping into the new index
-        res = es_safe_execute(this_index.put_mapping, doc_type=in_type, body={in_type: mapping}, request_timeout=30)
+        # update with mapping
+        res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, request_timeout=30)
         if res:
-            print("MAPPING: mapping created for %s" % (in_type))
+            print('MAPPING: mapping successfully added for %s' % (in_type))
         else:
-            print("MAPPING: mapping failed for %s" % (in_type))
+            print('MAPPING: mapping failed for %s' % (in_type))
 
         # if 'indexing' doc exists within meta, then re-index for this type
         indexing_xmin = None
@@ -686,6 +694,8 @@ def run(app, collections=None, dry_run=False, check_first=False):
         snovault_cleanup(es, registry)
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
+    elif collections and 'meta' not in collections:
+        collections = ['meta'] + collections
     for collection_name in collections:
         if collection_name == 'meta':
             # meta mapping just contains settings
