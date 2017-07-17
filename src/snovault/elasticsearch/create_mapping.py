@@ -29,6 +29,7 @@ import collections
 import json
 import logging
 import time
+import sys
 from snovault.commands.es_index_data import run as run_indexing
 
 
@@ -658,6 +659,7 @@ def es_safe_execute(function, **kwargs):
             function(**kwargs)
         except ConnectionTimeout:
             exec_count += 1
+            print('ES connection issue! Retrying.', file=sys.stderr)
             time.sleep(3)
         else:
             return True
