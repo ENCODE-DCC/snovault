@@ -137,7 +137,7 @@ class MPIndexer(Indexer):
         chunkiness = int((uuid_count - 1) / workers) + 1
         if chunkiness > self.chunksize:
             chunkiness = self.chunksize
-
+        log.debug("MP indexing %s uuids with chunkiness %s across %s workers" % (uuid_count, chunkiness, workers))
         tasks = [(uuid, xmin, snapshot_id) for uuid in uuids]
         errors = []
         try:
