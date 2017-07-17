@@ -611,18 +611,18 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
 
     # delete the index
     if this_index.exists():
-        this_index.delete(ignore=[400,404], request_timeout=30)
+        this_index.delete(ignore=[400,404], timeout=30)
     this_index.settings(**index_settings(in_type))
     if dry_run:
         print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
     else:
         # first, create the mapping
-        this_index.create(request_timeout=30)
+        this_index.create(timeout=30)
         print('MAPPING: new index created for %s' % (in_type))
 
         # put the type mapping into the new index
         try:
-            this_index.put_mapping(doc_type=in_type, body={in_type: mapping}, request_timeout=30)
+            this_index.put_mapping(doc_type=in_type, body={in_type: mapping}, timeout=30)
         except:
             print("MAPPING: could not create mapping for the collection %s" % (in_type))
 
