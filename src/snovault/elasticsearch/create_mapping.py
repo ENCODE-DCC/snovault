@@ -575,7 +575,7 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
     # sometimes it takes a while to find the index on local
     # this is important for meta
     if check_first and in_type == 'meta':
-        for wait in [3,6,9]:
+        for wait in [3,6,9,27]:
             if not this_index.exists():
                 time.sleep(wait)
     # if the index exists, we might not need to delete it
