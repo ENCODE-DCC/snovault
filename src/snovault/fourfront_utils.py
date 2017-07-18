@@ -155,7 +155,7 @@ def confirm_embed_with_schemas(item_type, types, split_path, schema):
                 if idx == len(split_path) - 1:
                     # if there is only one field (and it's not a linkTo)
                     # this is a invalid top-level field embed
-                    if len(split_path == 1):
+                    if len(split_path) == 1:
                         error_message = '{} has a bad embed: {} is a top-level field and should not be embedded.'.format(item_type, element)
                     # if len(split) > 1 but this is still a non-linkTo,
                     # return False because we don't want to add default embeds
