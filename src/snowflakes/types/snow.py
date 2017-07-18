@@ -93,7 +93,8 @@ class Snowflake(Item):
         'lab.awards.project',
         'lab.awards.title',
         'submitted_by.*',
-        'award.*'
+        'award.*',
+        'snowset.*'
     ]
     audit_inherit = [
         'lab',
