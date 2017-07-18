@@ -29,7 +29,7 @@ def add_default_embeds(item_type, types, embeds, schema={}):
                 # check error_message rather than is_valid because there can
                 # be cases of fields that are not valid for default embeds
                 # but are still themselves valid fields
-                a.remove(field)
+                processed_fields.remove(field)
                 print(error_message, file=sys.stderr)
             continue
         if terminal_linkTo:
