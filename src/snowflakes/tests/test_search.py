@@ -22,7 +22,6 @@ def test_selective_embedding(workbook, testapp):
     # Check the embedding /types/snow.py entry for Snowflakes; test ensures
     # that the actual embedding matches that
     test_json = [flake for flake in res['@graph'] if flake['accession'] == 'SNOFL001RIC']
-    test_json = [flake for flake in res['@graph'] if flake['accession'] == 'SNOFL001MXD']
     assert test_json[0]['lab']['uuid'] == 'cfb789b8-46f3-4d59-a2b3-adc39e7df93a'
     # this specific field should be embedded ('lab.awards.project')
     assert test_json[0]['lab']['awards'][0]['project'] == 'ENCODE'
