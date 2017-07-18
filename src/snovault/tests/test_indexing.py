@@ -114,7 +114,7 @@ def test_indexing_simple(app, testapp, indexer_testapp):
     assert indexing_source['xmin'] >= indexing_source['last_xmin']
     testing_ppp_meta = es.get(index='meta', doc_type='meta', id='testing_post_put_patch')
     testing_ppp_source = testing_ppp_meta['_source']
-    assert 'mapping' in testing_ppp_source
+    assert 'mappings' in testing_ppp_source
     assert 'settings' in testing_ppp_source
 
 
