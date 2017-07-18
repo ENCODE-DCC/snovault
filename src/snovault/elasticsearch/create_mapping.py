@@ -444,6 +444,8 @@ def run(app, collections=None, dry_run=False):
     registry = app.registry
     if not dry_run:
         es = app.registry[ELASTIC_SEARCH]
+        print(es)
+        print('CREATE MAPPING RUNNING')
 
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())

@@ -65,14 +65,12 @@ def elasticsearch_host_port():
 @pytest.yield_fixture(scope='session')
 def elasticsearch_server(request, elasticsearch_host_port):
     from .elasticsearch_fixture import server_process
-    import time
     host, port = elasticsearch_host_port
     tmpdir = request.config._tmpdirhandler.mktemp('elasticsearch', numbered=True)
     tmpdir = str(tmpdir)
-    process = server_process(str(tmpdir), host=host, port=port)
-    time.sleep(20)
-
-    yield 'http://%s:%d' % (host, port)
+    process = server_process(str(tmpdir), host=host, port=9200)
+    print('PORT CHANGED')
+    yield 'http://%s:%d' % (host, 9200)
 
     if process.poll() is None:
         process.terminate()
@@ -358,6 +356,7 @@ def wsgi_server(request, wsgi_server_app, wsgi_server_host_port):
         expose_tracebacks=True,
     )
     assert server.wait()
+    print("wsgi server port {}".format(port))
 
     yield 'http://%s:%s' % wsgi_server_host_port
 
