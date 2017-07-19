@@ -38,17 +38,18 @@ def add_default_embeds(item_type, types, embeds, schema={}):
             embed_path = '.'.join(split_field)
         else:
             embed_path = '.'.join(split_field[:-1])
+        # last part of split_field should a specific fieldname or *
+        if split_field[-1] == '*':
+            # if *, then display_title and link_id are taken care of
+            already_processed.append(embed_path)
+            # run find_default_embeds_for_schema on linked objects
+            # with * embedded, since we want display_title and link_id
+            # for all objects linked to the * object
+            import pdb; pdb.set_trace()
+            schema_default_embeds = find_default_embeds_for_schema(embed_path, schema)
+            continue
         if embed_path not in already_processed:
             already_processed.append(embed_path)
-            # last part of split_field should a specific fieldname or *
-            # if *, then display_title and link_id are taken care of
-            if split_field[-1] == '*':
-                # run find_default_embeds_for_schema on linked objects
-                # with * embedded, since we want display_title and link_id
-                # for all objects linked to the * object
-                import pdb; pdb.set_trace()
-                schema_default_embeds = find_default_embeds_for_schema(embed_path, schema)
-                continue
             if embed_path + '.link_id' not in processed_fields:
                 processed_fields.append(embed_path + '.link_id')
             if embed_path + '.display_title' not in processed_fields:
