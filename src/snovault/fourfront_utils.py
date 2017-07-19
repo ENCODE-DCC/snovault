@@ -102,7 +102,7 @@ def confirm_embed_with_schemas(item_type, types, split_path, schema):
     error_message = None
     linkTo_path = '.'.join(split_path)
     if len(split_path) == 1:
-        error_message = '{} has a bad embed: {} is a top-level field and should not be embedded.'.format(item_type, element)
+        error_message = '{} has a bad embed: {} is a top-level field and should not be embedded.'.format(item_type, split_path[0])
     for idx in range(len(split_path)):
         element = split_path[idx]
         # schema_cursor should always be a dictionary if we have more split_fields
