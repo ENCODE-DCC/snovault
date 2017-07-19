@@ -1,6 +1,7 @@
 # Basic fourfront-specific utilities that seem to have a good home in snovault
 
 import sys
+from copy import deepcopy
 
 def add_default_embeds(item_type, types, embeds, schema={}):
     """Perform default processing on the embeds list.
@@ -19,57 +20,38 @@ def add_default_embeds(item_type, types, embeds, schema={}):
     if 'properties' in schema:
         schema = schema['properties']
     processed_fields = embeds[:] if len(embeds) > 0 else []
-    already_processed = []
-    # find pre-existing fields
+    processed_fields = set(processed_fields)
+    embeds_to_add = []
+    # First, verify existing embeds (defined in types file) and add link_id and
+    # display_title to those paths if needed
+    # Handles the use of a terminal '*' in the embeds
     for field in embeds:
         split_field = field.strip().split('.')
         # ensure that the embed is valid
-        is_valid, error_message, terminal_linkTo = confirm_embed_with_schemas(item_type, types, split_field, schema)
-        if not is_valid:
-            if error_message:
-                # remove bad embeds
-                # check error_message rather than is_valid because there can
-                # be cases of fields that are not valid for default embeds
-                # but are still themselves valid fields
-                processed_fields.remove(field)
-                print(error_message, file=sys.stderr)
-            continue
-        if terminal_linkTo:
-            embed_path = '.'.join(split_field)
+        error_message, field_embeds_to_add = confirm_embed_with_schemas(item_type, types, split_field, schema)
+        if error_message:
+            # remove bad embeds
+            # check error_message rather than is_valid because there can
+            # be cases of fields that are not valid for default embeds
+            # but are still themselves valid fields
+            processed_fields.remove(field)
+            print(error_message, file=sys.stderr)
         else:
-            embed_path = '.'.join(split_field[:-1])
-        # last part of split_field should a specific fieldname or *
-        if split_field[-1] == '*':
-            # if *, then display_title and link_id are taken care of
-            already_processed.append(embed_path)
-            # run find_default_embeds_for_schema on linked objects
-            # with * embedded, since we want display_title and link_id
-            # for all objects linked to the * object
-            import pdb; pdb.set_trace()
-            schema_default_embeds = find_default_embeds_for_schema(embed_path, schema)
-            continue
-        if embed_path not in already_processed:
-            already_processed.append(embed_path)
-            if embed_path + '.link_id' not in processed_fields:
-                processed_fields.append(embed_path + '.link_id')
-            if embed_path + '.display_title' not in processed_fields:
-                processed_fields.append(embed_path + '.display_title')
+            embeds_to_add.extend(field_embeds_to_add)
 
     # automatically embed top level linkTo's not already embedded
     # also find subobjects and embed those
-    schema_default_embeds = find_default_embeds_for_schema('', schema)
-    for default_embed in schema_default_embeds:
-        # add fully embedded subobjects:
-        if default_embed[-2:] == '.*':
-            if default_embed not in processed_fields:
-                processed_fields.append(default_embed)
-            continue
-        # add link_id and display_title for default_embed if not already there
-        if default_embed + '.link_id' not in processed_fields:
-            processed_fields.append(default_embed + '.link_id')
-        if default_embed + '.display_title' not in processed_fields:
-            processed_fields.append(default_embed + '.display_title')
-    return processed_fields
+    embeds_to_add.extend(find_default_embeds_for_schema('', schema))
+    for add_embed in embeds_to_add:
+        if add_embed[-2:] == '.*':
+            processed_fields.add(add_embed)
+        else:
+            # for neatness' sake, ensure redundant embeds are getting added
+            check_wildcard = add_embed + '.*'
+            if check_wildcard not in processed_fields and check_wildcard not in embeds_to_add:
+                processed_fields.add(add_embed + '.link_id')
+                processed_fields.add(add_embed + '.display_title')
+    return list(processed_fields)
 
 
 def find_default_embeds_for_schema(path_thus_far, subschema):
@@ -110,25 +92,39 @@ def confirm_embed_with_schemas(item_type, types, split_path, schema):
     If split path only has one element, it is either a top level field/subobjects
     (invalid) or a linked object (valid).
     Return values:
-    1. True if valid, False otherwise. If False, it means that your
-    embedded list needs to be fixed.
-    2. error_message. Either None for no errors or a string to describe the error
-    3. terminal_linkTo. Default False, True if the last item in the embedded
-    is a linkTo. Behavior is to automatically add display_title and link_id
-    in this case.
+    1. error_message. Either None for no errors or a string to describe the error
+    2. embeds_to_add. Since link_id and display_title are added automatically
+    for all linked objects, return these for any valid object embed. Also, in
+    the case '*' is used, add default embeds at the relative level.
     """
     schema_cursor = schema
+    embeds_to_add = []
     error_message = None
+    linkTo_path = '.'.join(split_path)
+    if len(split_path) == 1:
+        error_message = '{} has a bad embed: {} is a top-level field and should not be embedded.'.format(item_type, element)
     for idx in range(len(split_path)):
         element = split_path[idx]
         # schema_cursor should always be a dictionary if we have more split_fields
         if not isinstance(schema_cursor, dict):
-            join_path = '.'.join(split_path)
-            error_message = '{} has a bad embed: {} does not have valid schemas throughout.'.format(item_type, join_path)
-            return False, error_message, False
+            error_message = '{} has a bad embed: {} does not have valid schemas throughout.'.format(item_type, linkTo_path)
+            return error_message, embeds_to_add
+        # if this a valid field in the current schema_mapping
         if element in schema_cursor or element == '*':
+            # save prev_schema_cursor in case where last split_path is a non-linkTo field
             if element != '*':
+                prev_schema_cursor = deepcopy(schema_cursor)
                 schema_cursor = schema_cursor[element]
+            else:
+                # handle *
+                linkTo_path = '.'.join(split_path[:-1])
+                if idx != len(split_path) - 1:
+                    error_message = '{} has a bad embed: * can only be at the end of an embed.'.format(item_type)
+                if 'link_id' in schema_cursor and 'display_title' in schema_cursor:
+                    # add default linkTos for the '*' object
+                    embeds_to_add.extend(find_default_embeds_for_schema(linkTo_path, schema_cursor))
+                return error_message, embeds_to_add
+
             # drill into 'items' or 'properties'
             # always check 'items' before 'properties'
             if schema_cursor.get('type', None) == 'array' and 'items' in schema_cursor:
@@ -136,12 +132,6 @@ def confirm_embed_with_schemas(item_type, types, split_path, schema):
             if schema_cursor.get('type', None) == 'object' and 'properties' in schema_cursor:
                 # test for *, which means there need to be multiple fields present
                 # this equates to being and object with 'properties'
-                if element == '*':
-                    if idx == len(split_path) - 1:
-                        return True, error_message, False
-                    else:
-                        error_message = '{} has a bad embed: * can only be at the end of an embed.'.format(item_type)
-                        return False, error_message, False
                 schema_cursor = schema_cursor['properties']
 
             # if we hit a linkTo, pull in the new schema of the linkTo type
@@ -151,24 +141,28 @@ def confirm_embed_with_schemas(item_type, types, split_path, schema):
                     linkTo_type = types.all[linkTo]
                 except KeyError:
                     error_message = '{} has a bad embed: {} is not a valid type.'.format(item_type, linkTo)
-                    return False, error_message, False
+                    return error_message, embeds_to_add
+                # we found a terminal linkTo embed
                 if idx == len(split_path) - 1:
-                    # terminal part of embed is a linkTo (terminal_linkTo)
-                    return True, error_message, True
+                    if 'link_id' not in schema_cursor or 'display_title' not in schema_cursor:
+                        error_message = '{} has a bad embed: {}; terminal object does not have link_id/display_title.'.format(item_type, linkTo_path)
+                    else:
+                        embeds_to_add.append(linkTo_path)
+                    return error_message, embeds_to_add
                 linkTo_schema = linkTo_type.schema
                 schema_cursor = linkTo_schema['properties'] if 'properties' in linkTo_schema else linkTo_schema
-            else:
-                # check if last element in path
+            else: # not a linkTo
+                # check if this is the last element in path
                 if idx == len(split_path) - 1:
-                    # if there is only one field (and it's not a linkTo)
-                    # this is a invalid top-level field embed
-                    if len(split_path) == 1:
-                        error_message = '{} has a bad embed: {} is a top-level field and should not be embedded.'.format(item_type, element)
-                    # if len(split) > 1 but this is still a non-linkTo,
-                    # return False because we don't want to add default embeds
-                    # but don't set error_message
-                    return False, error_message, False
+                    # in this case, the last element in the embed is a field
+                    # remove that from linkTo_path
+                    linkTo_path = '.'.join(split_path[:-1])
+                    if 'link_id' in prev_schema_cursor and 'display_title' in prev_schema_cursor:
+                        embeds_to_add.append(linkTo_path)
+                    return error_message, embeds_to_add
         else:
-            error_message = '{} has a bad embed: {} is not contained within the parent schema.'.format(item_type, element)
-            return False, error_message, False
-    return True, error_message, False
+            error_message = '{} has a bad embed: {} is not contained within the parent schema. See {}.'.format(item_type, element, linkTo_path)
+            return error_message, embeds_to_add
+
+    # really shouldn't hit this return, but leave as a back up
+    return error_message, embeds_to_add
