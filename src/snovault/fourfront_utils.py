@@ -9,6 +9,8 @@ def add_default_embeds(item_type, types, embeds, schema={}):
     Also adds display_title and link_id embed paths for any linkTo's in the
     top-level schema that are not already present. This allows for a minimal
     amount of information to be searched on/shown for every field.
+    Lastly, for any embed with a .* at the end, add display_title and link_id
+    for all linked objects at that level, as well as all fields at that level.
     Used in fourfront/../types/base.py AND snovault create mapping
     """
     # remove duplicate embeds
@@ -36,13 +38,17 @@ def add_default_embeds(item_type, types, embeds, schema={}):
             embed_path = '.'.join(split_field)
         else:
             embed_path = '.'.join(split_field[:-1])
-        # last part of split_field should a specific fieldname or *
-        # if *, then display_title and link_id are taken care of
-        if split_field[-1] == '*':
-            already_processed.append(embed_path)
-            continue
         if embed_path not in already_processed:
             already_processed.append(embed_path)
+            # last part of split_field should a specific fieldname or *
+            # if *, then display_title and link_id are taken care of
+            if split_field[-1] == '*':
+                # run find_default_embeds_for_schema on linked objects
+                # with * embedded, since we want display_title and link_id
+                # for all objects linked to the * object
+                import pdb; pdb.set_trace()
+                schema_default_embeds = find_default_embeds_for_schema(embed_path, schema)
+                continue
             if embed_path + '.link_id' not in processed_fields:
                 processed_fields.append(embed_path + '.link_id')
             if embed_path + '.display_title' not in processed_fields:
