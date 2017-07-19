@@ -14,7 +14,6 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
     ]
     if os.environ.get('TRAVIS'):
         echo=True
-        args.append('-Epath.conf=%s/conf' % os.environ['TRAVIS_BUILD_DIR'])
     elif os.path.exists('/etc/elasticsearch'):
         # elasticsearch.deb setup
         args.append('-Epath.conf=/etc/elasticsearch')
