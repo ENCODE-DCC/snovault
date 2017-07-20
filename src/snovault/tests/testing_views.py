@@ -122,7 +122,7 @@ class TestingLinkTarget(Item):
         'reverse': ('TestingLinkSource', 'target'),
     }
     embedded = [
-        'reverse',
+        'reverse.*',
     ]
 
     @calculated_property(schema={
@@ -145,6 +145,7 @@ class TestingLinkTarget(Item):
 )
 class TestingPostPutPatch(Item):
     item_type = 'testing_post_put_patch'
+    embedded = ['protected_link.*']
     schema = {
         'required': ['required'],
         'type': 'object',

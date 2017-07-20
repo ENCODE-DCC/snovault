@@ -7,6 +7,11 @@ Does not include data dependent tests
 
 import pytest
 import time
+from snovault.elasticsearch.interfaces import ELASTIC_SEARCH
+from snovault import (
+    COLLECTIONS,
+    TYPES,
+)
 
 pytestmark = [pytest.mark.indexing]
 
@@ -105,7 +110,7 @@ def test_indexing_simple(app, testapp, indexer_testapp):
     assert res.json['total'] >= 2
     assert uuid in uuids
     # test the meta index
-    es = app.registry['elasticsearch']
+    es = app.registry[ELASTIC_SEARCH]
     indexing_doc = es.get(index='meta', doc_type='meta', id='indexing')
     indexing_source = indexing_doc['_source']
     assert 'xmin' in indexing_source
@@ -116,6 +121,50 @@ def test_indexing_simple(app, testapp, indexer_testapp):
     testing_ppp_source = testing_ppp_meta['_source']
     assert 'mappings' in testing_ppp_source
     assert 'settings' in testing_ppp_source
+
+
+def test_create_mapping_on_indexing(app, testapp, registry, elasticsearch):
+    """
+    Test overall create_mapping functionality using app.
+    Do this by checking es directly before and after running mapping.
+    Delete an index directly, run again to see if it recovers.
+    """
+    from snovault.elasticsearch.create_mapping import type_mapping, create_mapping_by_type, build_index_record
+    es = registry[ELASTIC_SEARCH]
+    item_types = registry[TYPES].by_item_type
+    # check that mappings and settings are in index
+    for item_type in item_types:
+        item_mapping = type_mapping(registry[TYPES], item_type)
+        try:
+            item_index = es.indices.get(index=item_type)
+        except:
+            assert False
+        found_index_mapping = item_index.get(item_type, {}).get('mappings').get(item_type, {}).get('properties', {}).get('embedded')
+        found_index_settings = item_index.get(item_type, {}).get('settings')
+        assert found_index_mapping
+        assert found_index_settings
+        # get the item record from meta and compare that
+        full_mapping = create_mapping_by_type(item_type, registry)
+        item_record = build_index_record(full_mapping, item_type)
+        try:
+            item_meta = es.get(index='meta', doc_type='meta', id=item_type)
+        except:
+            assert False
+        meta_record = item_meta.get('_source', None)
+        assert meta_record
+        assert item_record == meta_record
+
+
+# @pytest.mark.parametrize('item_type', ORDER)
+# def test_indexed_data(registry, item_type):
+#     """
+#     Get es results directly and test to make sure the _embedded results
+#     match with the embedded list in the types files.
+#     """
+#     from snovault import TYPES
+#     type_info = registry[TYPES].by_item_type[item_type]
+#     embedded = type_info.embedded
+#     assert True
 
 
 def test_listening(testapp, listening_conn):
