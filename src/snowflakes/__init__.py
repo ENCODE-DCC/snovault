@@ -6,20 +6,18 @@ try:
 except ImportError:
     import subprocess
 from pyramid.config import Configurator
-from snovault.app import (
+from snovault import (
     json_asset,
     app_version,
     session,
     configure_dbsession,
-    # static_resources,
     changelogs,
     json_from_path,
     )
 from pyramid.settings import (
-    aslist,
     asbool,
 )
-
+from snovault.json_renderer import json_renderer
 STATIC_MAX_AGE = 0
 
 
@@ -66,9 +64,6 @@ def main(global_config, **local_config):
     settings['snovault.jsonld.terms_namespace'] = 'https://www.encodeproject.org/terms/'
     settings['snovault.jsonld.terms_prefix'] = 'snowflake'
     settings['snovault.elasticsearch.index'] = 'snovault'
-    hostname_command = settings.get('hostname_command', '').strip()
-    if hostname_command:
-        hostname = subprocess.check_output(hostname_command, shell=True).strip()
 
     config = Configurator(settings=settings)
     from snovault.elasticsearch import APP_FACTORY
