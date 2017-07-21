@@ -12,9 +12,6 @@ from pyramid.security import effective_principals
 from urllib.parse import urlencode
 from collections import OrderedDict
 
-import pdb;
-from pprint import pprint as pp
-
 
 CHAR_COUNT = 32
 
@@ -69,6 +66,7 @@ def get_filtered_query(term, search_fields, result_fields, principals, doc_types
                         'operator': 'and'
                     }
                 },
+                'must_not': [],
                 'filter': [
                     {
                         'terms': {
@@ -252,48 +250,48 @@ def list_result_fields(request, doc_types):
     return fields
 
 
-def build_terms_filter(field, terms):
+def build_terms_filter(query_filters, field, terms, query):
     if field.endswith('!'):
         field = field[:-1]
         if not field.startswith('audit'):
             field = 'embedded.' + field
         # Setting not filter instead of terms filter
         if terms == ['*']:
-            return {
+            filter_condition = {
                 'missing': {
                     'field': field,
                 }
             }
         else:
-            return {
-                'not': {
-                    'term': {
-                        field: terms,
-                    }
+            query_filters['must_not'].append({
+                'terms': {
+                    field: terms
                 }
-            }
+            })
+            return
     else:
         if not field.startswith('audit'):
             field = 'embedded.' + field
         if terms == ['*']:
-            return {
+            filter_condition = {
                 'exists': {
                     'field': field,
                 }
             }
         else:
-            return {
+            filter_condition = {
                 'terms': {
                     field: terms,
                 },
             }
+    query_filters['filter'].append(filter_condition)
 
 
 def set_filters(request, query, result, static_items=None):
     """
     Sets filters in the query
     """
-    query_filters = query['query']['bool']['filter']
+    query_filters = query['query']['bool']
     used_filters = {}
     if static_items is None:
         static_items = []
@@ -343,11 +341,7 @@ def set_filters(request, query, result, static_items=None):
         used_filters[field] = terms
 
         # Add filter to query
-        query_filters.append(build_terms_filter(field, terms))
-    # pp('used and query filters ')
-    # pp(used_filters)
-    # pp('')
-    # pp(query_filters)
+        build_terms_filter(query_filters, field, terms, query)
 
     return used_filters
 
@@ -404,6 +398,7 @@ def set_facets(facets, used_filters, principals, doc_types):
             {'terms': {'principals_allowed.view': principals}},
             {'terms': {'embedded.@type': doc_types}},
         ]
+        negative_filters = []
         # Also apply any filters NOT from the same field as the facet
         for field, terms in used_filters.items():
             if field.endswith('!'):
@@ -423,7 +418,7 @@ def set_facets(facets, used_filters, principals, doc_types):
                 if terms == ['*']:
                     filters.append({'missing': {'field': query_field}})
                 else:
-                    filters.append({'not': {'terms': {query_field: terms}}})
+                    negative_filters.append({'terms': {query_field: terms}})
             else:
                 if terms == ['*']:
                     filters.append({'exists': {'field': query_field}})
@@ -438,6 +433,7 @@ def set_facets(facets, used_filters, principals, doc_types):
             'filter': {
                 'bool': {
                     'must': filters,
+                    'must_not': negative_filters
                 },
             },
         }
