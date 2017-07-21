@@ -165,7 +165,7 @@ def test_listening(testapp, listening_conn):
     assert int(notify.payload) > 0
 
 
-def test_indexing_es(app, testapp, indexer_testapp, capsys):
+def test_indexing_es(app, testapp, indexer_testapp):
     """
     Get es results directly and test to make sure the _embedded results
     match with the embedded list in the types files.
