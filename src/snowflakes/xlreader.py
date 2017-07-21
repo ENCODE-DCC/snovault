@@ -36,13 +36,12 @@ def cell_value(cell, datemode):
     raise ValueError(repr(cell), 'unknown cell type')
 
 
-
 def reader(stream, sheetname=None):
     """ Read named sheet or first and only sheet from xlsx file
     """
     book = xlrd.open_workbook(file_contents=stream.read())
     if sheetname is None:
-        sheet, = book.sheets()        
+        sheet, = book.sheets()
     else:
         try:
             sheet = book.sheet_by_name(sheetname)
@@ -109,7 +108,7 @@ class DictReader:
 def zipfile_to_csv(zipfilename, outpath, ext='.csv', dialect='excel', **fmtparams):
     """ For Google Drive download zips
     """
-    zf = ZipFile(zipfilename)
+    zf = zipfile.ZipFile(zipfilename)
     for name in zf.namelist():
         subpath, entry_ext = os.path.splitext(name)
         if entry_ext.lower() != '.xlsx':
@@ -120,4 +119,3 @@ def zipfile_to_csv(zipfilename, outpath, ext='.csv', dialect='excel', **fmtparam
         csvfile = open(os.path.join(outpath, subpath + ext), 'w')
         wr = csv.writer(csvfile, dialect=dialect, **fmtparams)
         wr.writerows(list(reader(sheet)))
-
