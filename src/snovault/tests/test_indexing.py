@@ -223,3 +223,4 @@ def test_indexing_es(app, testapp, indexer_testapp):
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     # doc_count will have updated due to indexing in create_mapping
     assert doc_count == 2
+    res = indexer_testapp.post_json('/index', {'record': True})
