@@ -590,7 +590,7 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
         # Decide if we need to drop the index + reindex (no index/no meta record)
         # OR
         # compare previous mapping and current mapping + settings to see if we need
-        # to update. if not, use the existing mapping to prevent re-indexing
+        # to update. if not, use the existing mapping to prevent re-indexing.
         try:
             prev_index_record = es.get(index='meta', doc_type='meta', id=in_type)
         except TransportError as excp:

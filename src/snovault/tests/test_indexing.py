@@ -123,18 +123,18 @@ def test_indexing_simple(app, testapp, indexer_testapp):
     assert 'settings' in testing_ppp_source
 
 
-def test_create_mapping_on_indexing(app, testapp, registry, elasticsearch):
+def test_es_indices(app, elasticsearch):
     """
     Test overall create_mapping functionality using app.
     Do this by checking es directly before and after running mapping.
     Delete an index directly, run again to see if it recovers.
     """
     from snovault.elasticsearch.create_mapping import type_mapping, create_mapping_by_type, build_index_record
-    es = registry[ELASTIC_SEARCH]
-    item_types = registry[TYPES].by_item_type
+    es = app.registry[ELASTIC_SEARCH]
+    item_types = app.registry[TYPES].by_item_type
     # check that mappings and settings are in index
     for item_type in item_types:
-        item_mapping = type_mapping(registry[TYPES], item_type)
+        item_mapping = type_mapping(app.registry[TYPES], item_type)
         try:
             item_index = es.indices.get(index=item_type)
         except:
@@ -144,7 +144,7 @@ def test_create_mapping_on_indexing(app, testapp, registry, elasticsearch):
         assert found_index_mapping
         assert found_index_settings
         # get the item record from meta and compare that
-        full_mapping = create_mapping_by_type(item_type, registry)
+        full_mapping = create_mapping_by_type(item_type, app.registry)
         item_record = build_index_record(full_mapping, item_type)
         try:
             item_meta = es.get(index='meta', doc_type='meta', id=item_type)
@@ -155,18 +155,6 @@ def test_create_mapping_on_indexing(app, testapp, registry, elasticsearch):
         assert item_record == meta_record
 
 
-# @pytest.mark.parametrize('item_type', ORDER)
-# def test_indexed_data(registry, item_type):
-#     """
-#     Get es results directly and test to make sure the _embedded results
-#     match with the embedded list in the types files.
-#     """
-#     from snovault import TYPES
-#     type_info = registry[TYPES].by_item_type[item_type]
-#     embedded = type_info.embedded
-#     assert True
-
-
 def test_listening(testapp, listening_conn):
     testapp.post_json('/testing-post-put-patch/', {'required': ''})
     time.sleep(1)
@@ -175,3 +163,63 @@ def test_listening(testapp, listening_conn):
     notify = listening_conn.notifies.pop()
     assert notify.channel == 'snovault.transaction'
     assert int(notify.payload) > 0
+
+
+def test_indexing_es(app, testapp, indexer_testapp, capsys):
+    """
+    Get es results directly and test to make sure the _embedded results
+    match with the embedded list in the types files.
+    """
+    from snovault.elasticsearch import create_mapping
+    from elasticsearch.exceptions import NotFoundError
+    es = app.registry[ELASTIC_SEARCH]
+    test_type = 'testing_post_put_patch'
+    # no documents added yet
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 0
+    # post a document but do not yet index
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 0
+    # indexing record should not yet exist (expect error)
+    with pytest.raises(NotFoundError):
+        es.get(index='meta', doc_type='meta', id='indexing')
+    res = indexer_testapp.post_json('/index', {'record': True})
+    # let indexer do its thing
+    time.sleep(2)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 1
+    indexing_record = es.get(index='meta', doc_type='meta', id='indexing')
+    assert indexing_record.get('_source', {}).get('indexed') == 1
+    # run create_mapping with check_first=False (do not expect a re-index)
+    create_mapping.run(app)
+    time.sleep(2)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 0
+    with pytest.raises(NotFoundError):
+        es.get(index='meta', doc_type='meta', id='indexing')
+    # index to create the indexing doc
+    res = indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(2)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 1
+    indexing_record = es.get(index='meta', doc_type='meta', id='indexing')
+    assert indexing_record.get('_source', {}).get('indexed') == 1
+    # delete index and re-run create_mapping; should re-index the single index
+    es.indices.delete(index=test_type)
+    create_mapping.run(app, check_first=True)
+    time.sleep(2)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 1
+    # post second item to database but do not index (don't load into es)
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    time.sleep(2)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    # doc_count has not yet updated
+    assert doc_count == 1
+    # run create mapping with check_first=True, expect test index to re-index
+    create_mapping.run(app, check_first=True)
+    time.sleep(2)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    # doc_count will have updated due to indexing in create_mapping
+    assert doc_count == 2
