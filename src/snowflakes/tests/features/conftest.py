@@ -19,36 +19,19 @@ def external_tx():
 
 @pytest.fixture(scope='session')
 def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server):
-    from snovault.tests.testappfixtures import _app_settings
-    settings = _app_settings.copy()
-    settings['create_tables'] = True
-    settings['elasticsearch.server'] = elasticsearch_server
-    settings['sqlalchemy.url'] = postgresql_server
-    settings['collection_datastore'] = 'elasticsearch'
-    settings['item_datastore'] = 'elasticsearch'
-    settings['snovault.elasticsearch.index'] = 'snovault'
-    settings['indexer'] = True
-    settings['indexer.processes'] = 2
-    return settings
+    from .. import test_indexing
+    return test_indexing.app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server)
 
 
 @pytest.yield_fixture(scope='session')
 def app(app_settings):
-    from snowflakes import main
+    import time
+    from .. import test_indexing
     from snovault.elasticsearch import create_mapping
-    app = main({}, **app_settings)
-
-    create_mapping.run(app)
-    yield app
-
-    # Shutdown multiprocessing pool to close db conns.
-    from snovault.elasticsearch import INDEXER
-    app.registry[INDEXER].shutdown()
-
-    from snovault import DBSESSION
-    DBSession = app.registry[DBSESSION]
-    # Dispose connections so postgres can tear down.
-    DBSession.bind.pool.dispose()
+    for app in test_indexing.app(app_settings):
+        create_mapping.run(app)
+        time.sleep(20)
+        yield app
 
 
 @pytest.mark.fixture_cost(500)
