@@ -179,14 +179,14 @@ def test_indexing_max_result_window(app, testapp, indexer_testapp):
     es = app.registry[ELASTIC_SEARCH]
     curr_settings = es.indices.get_settings(index=test_type)
     found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
-    assert found_max_window == max_result_window
+    assert int(found_max_window) == max_result_window
     # change the setting and ensure the change took
     new_max = 15
     window_settings = {'index': {'max_result_window': new_max}}
     es.indices.put_settings(index=test_type, body=window_settings)
     curr_settings = es.indices.get_settings(index=test_type)
     found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
-    assert found_max_window == new_max
+    assert int(found_max_window) == new_max
     # post a new item and index
     res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
     res = indexer_testapp.post_json('/index', {'record': True})
@@ -194,7 +194,7 @@ def test_indexing_max_result_window(app, testapp, indexer_testapp):
     # check to see if settings have reverted
     curr_settings = es.indices.get_settings(index=test_type)
     found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
-    assert found_max_window == max_result_window
+    assert int(found_max_window) == max_result_window
     # delete index settings by putting an empty dict
     es.indices.put_settings(index=test_type, body={})
     curr_settings = es.indices.get_settings(index=test_type)
@@ -207,8 +207,8 @@ def test_indexing_max_result_window(app, testapp, indexer_testapp):
     # check to see if settings have reverted
     curr_settings = es.indices.get_settings(index=test_type)
     found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
-    assert found_max_window == max_result_window
-    
+    assert int(found_max_window) == max_result_window
+
 
 def test_indexing_es(app, testapp, indexer_testapp):
     """
