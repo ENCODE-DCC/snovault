@@ -176,6 +176,11 @@ def test_indexing_max_result_window(app, testapp, indexer_testapp):
     test_type = 'testing_post_put_patch'
     es_settings = index_settings(test_type)
     max_result_window = es_settings['index']['max_result_window']
+    # preform some initial indexing to build meta
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    res = indexer_testapp.post_json('/index', {'record': True})
+    # need to make sure an xmin was generated for the following to work
+    assert 'xmin' in res.json
     es = app.registry[ELASTIC_SEARCH]
     curr_settings = es.indices.get_settings(index=test_type)
     found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
@@ -195,8 +200,9 @@ def test_indexing_max_result_window(app, testapp, indexer_testapp):
     curr_settings = es.indices.get_settings(index=test_type)
     found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
     assert int(found_max_window) == max_result_window
-    # delete index settings by putting an empty dict
-    es.indices.put_settings(index=test_type, body={})
+    # delete index setting
+    window_settings = {'index': {'max_result_window': None}}
+    es.indices.put_settings(index=test_type, body=window_settings)
     curr_settings = es.indices.get_settings(index=test_type)
     found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
     assert found_max_window is None
