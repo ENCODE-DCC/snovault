@@ -165,6 +165,51 @@ def test_listening(testapp, listening_conn):
     assert int(notify.payload) > 0
 
 
+def test_indexing_max_result_window(app, testapp, indexer_testapp):
+    """
+    index.max_result_window is set for each index in elasticsearch/indexer.py,
+    if it's not there or equal to the create_mapping setting.
+    For this test, manually change/delete the setting and run indexing
+    to ensure it recovers.
+    """
+    from snovault.elasticsearch.create_mapping import index_settings
+    test_type = 'testing_post_put_patch'
+    es_settings = index_settings(test_type)
+    max_result_window = es_settings['index']['max_result_window']
+    es = app.registry[ELASTIC_SEARCH]
+    curr_settings = es.indices.get_settings(index=test_type)
+    found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
+    assert found_max_window == max_result_window
+    # change the setting and ensure the change took
+    new_max = 15
+    window_settings = {'index': {'max_result_window': new_max}}
+    es.indices.put_settings(index=test_type, body=window_settings)
+    curr_settings = es.indices.get_settings(index=test_type)
+    found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
+    assert found_max_window == new_max
+    # post a new item and index
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    res = indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(2)
+    # check to see if settings have reverted
+    curr_settings = es.indices.get_settings(index=test_type)
+    found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
+    assert found_max_window == max_result_window
+    # delete index settings by putting an empty dict
+    es.indices.put_settings(index=test_type, body={})
+    curr_settings = es.indices.get_settings(index=test_type)
+    found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
+    assert found_max_window is None
+    # post a new item and index
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    res = indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(2)
+    # check to see if settings have reverted
+    curr_settings = es.indices.get_settings(index=test_type)
+    found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
+    assert found_max_window == max_result_window
+    
+
 def test_indexing_es(app, testapp, indexer_testapp):
     """
     Get es results directly and test to make sure the _embedded results
