@@ -552,6 +552,8 @@ def update_mapping_by_embed(curr_m, curr_e, curr_s):
     if curr_e == '*':
         if 'properties' in mapped:
             curr_m['properties'].update(mapped['properties'])
+        else:
+            curr_m['properties'] = mapped
     elif curr_e in curr_m['properties'] and 'properties' in curr_m['properties'][curr_e]:
         if 'properties' in mapped:
             curr_m['properties'][curr_e]['properties'].update(mapped['properties'])
