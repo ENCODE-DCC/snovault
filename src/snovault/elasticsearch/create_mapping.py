@@ -75,7 +75,7 @@ def sorted_dict(d):
 
 def schema_mapping(field, schema, top_level=False):
     """
-    Create the mapping for a given schema. Defaults to using all fields for
+    Create the mapping for a given schema. Can handle using all fields for
     objects (*), but can handle specific fields using the field parameter.
     This allows for the mapping to match the selective embedding.
     """
@@ -91,7 +91,7 @@ def schema_mapping(field, schema, top_level=False):
     if type_ == 'object':
         properties = {}
         for k, v in schema.get('properties', {}).items():
-            mapping = schema_mapping('*', v)
+            mapping = schema_mapping(k, v)
             if mapping is not None:
                 if field == '*' or k == field:
                     properties[k] = mapping
@@ -500,30 +500,14 @@ def type_mapping(types, item_type, embed=True):
         curr_m = mapping
         split_embed_path = prop.split('.')
         for curr_e in split_embed_path:
-            # drill into the schemas. if no the embed is not found, break
-            subschema = curr_s.get('properties', {}).get(curr_e, None)
-            if not subschema:
-                break
-            curr_s = merge_schemas(subschema, types)
+            # if we want to map all fields (*), do not drill into schema
+            if curr_e != '*':
+                # drill into the schemas. if no the embed is not found, break
+                subschema = curr_s.get('properties', {}).get(curr_e, None)
+                curr_s = merge_schemas(subschema, types)
             if not curr_s:
                 break
-            # Check if we're at the end of a hierarchy of embeds
-            if len(split_embed_path) > 1:
-                final_obj = check_remaining_embed_path(curr_e, split_embed_path, subschema)
-                if final_obj:
-                    # we're at the final object, so get the last field
-                    curr_e = split_embed_path[-1]
-            else:
-                # if a valid obj embed and len(split_embed_path == 1),
-                # the only option is that the field must be *
-                curr_e = '*'
-                final_obj = False
             curr_m = update_mapping_by_embed(curr_m, curr_e, curr_s)
-            # if final_obj is True, we are at the end of the embed.
-            # otherwise, drill into the next level of curr_m and proceed
-            if final_obj:
-                break
-            curr_m = curr_m['properties'][curr_e]
     return mapping
 
 
@@ -531,6 +515,8 @@ def merge_schemas(subschema, types):
     """
     Merge any linked schemas into the current one. Return None if none present
     """
+    if not subschema:
+        return None
     # handle arrays by simply jumping into them
     # we don't care that they're flattened during mapping
     ref_types = None
@@ -557,35 +543,25 @@ def update_mapping_by_embed(curr_m, curr_e, curr_s):
     """
     Update the mapping based on the current mapping (curr_m), the current embed
     element (curr_e), and the processed schemas (curr_s).
+    when curr_e = '*', it is a special case where all properties are added
+    to the object that was previously mapped.
     """
     # see if there's already a mapping associated with this embed:
     # multiple subobjects may be embedded, so be careful here
-    if curr_e in curr_m['properties'] and 'properties' in curr_m['properties'][curr_e]:
-        mapped = schema_mapping(curr_e, curr_s)
+    mapped = schema_mapping(curr_e, curr_s)
+    if curr_e == '*':
+        if 'properties' in mapped:
+            curr_m['properties'].update(mapped['properties'])
+    elif curr_e in curr_m['properties'] and 'properties' in curr_m['properties'][curr_e]:
         if 'properties' in mapped:
             curr_m['properties'][curr_e]['properties'].update(mapped['properties'])
         else:
             curr_m['properties'][curr_e] = mapped
+        curr_m = curr_m['properties'][curr_e]
     else:
-        curr_m['properties'][curr_e] = schema_mapping(curr_e, curr_s)
+        curr_m['properties'][curr_e] = mapped
+        curr_m = curr_m['properties'][curr_e]
     return curr_m
-
-
-def check_remaining_embed_path(curr_e, split_embed_path, subschema):
-    """
-    Use the split_embed_path along with the current element and subschema to
-    determine if this is the last linked object in the series of embeds.
-    If so, set return True. Otherwise, False.
-
-    """
-    if curr_e == split_embed_path[-2]:
-        # See if the next (last) field is an object
-        # if not (which is proper), then this is the ultimate obj
-        next_subschema = subschema.get('properties', {}).get(split_embed_path[-1], None)
-        # if subschema is none ()
-        if not next_subschema:
-            return True
-    return False
 
 
 def create_mapping_by_type(in_type, registry):

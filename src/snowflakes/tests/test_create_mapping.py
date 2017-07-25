@@ -28,8 +28,10 @@ def test_merge_schemas(registry):
     assert res != test_subschema
     assert 'title' in res and res['title'] == 'Lab'
 
-def test_update_mapping_by_embed():
+def test_update_mapping_by_embed(registry):
     from snovault.elasticsearch.create_mapping import update_mapping_by_embed
+    from snovault import TYPES
+    # first, test with dummy data
     curr_s = {'title': 'Test', 'type': 'string'}
     curr_e = 'test'
     curr_m = {'properties': {}}
@@ -39,16 +41,12 @@ def test_update_mapping_by_embed():
     assert field_mapping['type'] == 'text'
     assert 'raw' in field_mapping['fields']
     assert 'lower_case_sort' in field_mapping['fields']
-
-def test_check_remaining_embed_path(registry):
-    from snovault.elasticsearch.create_mapping import check_remaining_embed_path
-    from snovault import TYPES
+    # then test with real data and wildcard (*)
     test_schema = registry[TYPES][unit_test_type].schema
     test_subschema = test_schema['properties']['lab']
-    test_split_embed = 'lab.awards.title'.split('.')
-    test_e_1 = 'awards'
-    ultimate_obj = check_remaining_embed_path(test_e_1, test_split_embed, test_subschema)
-    assert ultimate_obj == True
-    test_e_2 = 'lab'
-    ultimate_obj = check_remaining_embed_path(test_e_2, test_split_embed, test_subschema)
-    assert ultimate_obj == False
+    curr_s = merge_schemas(test_subschema, registry[TYPES])
+    curr_e = '*'
+    curr_m = {'properties': {}}
+    new_m = update_mapping_by_embed(curr_m, curr_e, curr_s)
+    for s_key in curr_s['properties']:
+        assert s_key in new_m['properties']
