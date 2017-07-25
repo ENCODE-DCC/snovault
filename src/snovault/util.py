@@ -1,5 +1,6 @@
 from past.builtins import basestring
 from pyramid.threadlocal import manager as threadlocal_manager
+from pyramid.httpexceptions import HTTPForbidden
 
 
 def includeme(config):
@@ -35,6 +36,19 @@ def simple_path_ids(obj, path):
             yield result
 
 
+def secure_embed(request, item_path, addition='@@object'):
+    res = ''
+    try:
+        # if empty item_path reqeust.embed returns just addition as a string
+        if item_path:
+            res = request.embed(item_path, addition, as_user=True)
+        return res
+    except HTTPForbidden:
+        print("you don't have access to this object")
+
+    return res
+
+
 def expand_path(request, obj, path):
     if isinstance(path, basestring):
         path = path.split('.')
@@ -48,12 +62,16 @@ def expand_path(request, obj, path):
     if isinstance(value, list):
         for index, member in enumerate(value):
             if not isinstance(member, dict):
-                member = value[index] = request.embed(member, '@@object')
-            expand_path(request, member, remaining)
+                res = secure_embed(request, member, '@@object')
+                member = value[index] = res
+                if res:
+                    expand_path(request, member, remaining)
     else:
         if not isinstance(value, dict):
-            value = obj[name] = request.embed(value, '@@object')
-        expand_path(request, value, remaining)
+            res = secure_embed(request, value, '@@object')
+            value = obj[name] = res
+            if res:
+                expand_path(request, value, remaining)
 
 
 def select_distinct_values(request, value_path, *from_paths):

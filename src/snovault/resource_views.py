@@ -76,6 +76,7 @@ def home(context, request):
 @view_config(context=Root, request_method='GET', name='object')
 @view_config(context=AbstractCollection, permission='list', request_method='GET', name='object')
 def collection_view_object(context, request):
+
     properties = context.__json__(request)
     calculated = calculate_properties(context, request, properties)
     properties.update(calculated)
@@ -175,7 +176,7 @@ def item_view_object(context, request):
              name='embedded')
 def item_view_embedded(context, request):
     item_path = request.resource_path(context)
-    properties = request.embed(item_path, '@@object')
+    properties = request.embed(item_path, '@@object', as_user=True)
     for path in context.embedded:
         expand_path(request, properties, path)
     return properties
@@ -185,7 +186,7 @@ def item_view_embedded(context, request):
              name='page')
 def item_view_page(context, request):
     item_path = request.resource_path(context)
-    properties = request.embed(item_path, '@@embedded')
+    properties = request.embed(item_path, '@@embedded', as_user=True)
     calculated = calculate_properties(context, request, properties, category='page')
     properties.update(calculated)
     return properties
@@ -195,7 +196,7 @@ def item_view_page(context, request):
              name='expand')
 def item_view_expand(context, request):
     path = request.resource_path(context)
-    properties = request.embed(path, '@@object')
+    properties = request.embed(path, '@@object', as_user=True)
     for path in request.params.getall('expand'):
         expand_path(request, properties, path)
     return properties
