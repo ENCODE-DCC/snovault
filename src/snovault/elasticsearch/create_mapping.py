@@ -240,7 +240,7 @@ def index_settings(in_type):
     if in_type == 'meta':
         field_limit = 1000000
     else:
-        field_limit = 3000
+        field_limit = 4000
     return {
         'index': {
             'number_of_shards': 3,
