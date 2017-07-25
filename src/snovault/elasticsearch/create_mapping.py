@@ -509,7 +509,7 @@ def type_mapping(types, item_type, embed=True):
                 break
             # Check if we're at the end of a hierarchy of embeds
             if len(split_embed_path) > 1:
-                ultimate_obj = check_remaining_embed_path(curr_e, split_embed_path, subschema)
+                ultimate_obj = check_remaining_embed_path(curr_e, split_embed_path, curr_s)
             else:
                 # if a valid obj embed and len(split_embed_path == 1),
                 # the only option is that the field must be *
