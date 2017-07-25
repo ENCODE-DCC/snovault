@@ -509,19 +509,21 @@ def type_mapping(types, item_type, embed=True):
                 break
             # Check if we're at the end of a hierarchy of embeds
             if len(split_embed_path) > 1:
-                ultimate_obj = check_remaining_embed_path(curr_e, split_embed_path, curr_s)
+                final_obj = check_remaining_embed_path(curr_e, split_embed_path, subschema)
+                if final_obj:
+                    # we're at the final object, so get the last field
+                    curr_e = split_embed_path[-1]
             else:
                 # if a valid obj embed and len(split_embed_path == 1),
                 # the only option is that the field must be *
                 curr_e = '*'
-                ultimate_obj = False
+                final_obj = False
             curr_m = update_mapping_by_embed(curr_m, curr_e, curr_s)
-            # if ultimate_obj is True, we are at the end of the embed.
+            # if final_obj is True, we are at the end of the embed.
             # otherwise, drill into the next level of curr_m and proceed
-            if ultimate_obj:
+            if final_obj:
                 break
-            else:
-                curr_m = curr_m['properties'][curr_e]
+            curr_m = curr_m['properties'][curr_e]
     return mapping
 
 
@@ -582,8 +584,6 @@ def check_remaining_embed_path(curr_e, split_embed_path, subschema):
         next_subschema = subschema.get('properties', {}).get(split_embed_path[-1], None)
         # if subschema is none ()
         if not next_subschema:
-            # we've already drilled into the object, now get the final field
-            curr_e = split_embed_path[-1]
             return True
     return False
 
