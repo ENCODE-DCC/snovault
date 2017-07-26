@@ -600,6 +600,7 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
             check_and_reindex_existing(app, es, in_type)
         print('MAPPING: using existing index for collection %s' % (in_type))
         return
+
     # delete the index
     if this_index_exists:
         res = es_safe_execute(es.indices.delete, index=in_type, ignore=[400,404], request_timeout=30)
