@@ -275,3 +275,49 @@ def test_indexing_es(app, testapp, indexer_testapp):
     # doc_count will have updated due to indexing in create_mapping
     assert doc_count == 2
     res = indexer_testapp.post_json('/index', {'record': True})
+
+
+# some unit tests associated with build_index in create_mapping
+def test_check_if_index_exists(app):
+    from snovault.elasticsearch.create_mapping import check_if_index_exists
+    es = app.registry[ELASTIC_SEARCH]
+    test_type = 'testing_post_put_patch'
+    exists = check_if_index_exists(es, test_type, True)
+    assert exists
+    # delete index
+    es.indices.delete(index=test_type)
+    exists = check_if_index_exists(es, test_type, True)
+    assert not exists
+
+
+def test_get_previous_index_record(app):
+    from snovault.elasticsearch.create_mapping import get_previous_index_record
+    es = app.registry[ELASTIC_SEARCH]
+    test_type = 'testing_post_put_patch'
+    record = get_previous_index_record(True, True, es, test_type)
+    assert record
+    assert 'mappings' in record
+    assert 'settings' in record
+    # remove index record
+    es.delete(index='meta', doc_type='meta', id=test_type)
+    record = get_previous_index_record(True, True, es, test_type)
+    assert record is None
+
+
+def test_check_and_reindex_existing(app, testapp):
+    from snovault.elasticsearch.create_mapping import check_and_reindex_existing
+    es = app.registry[ELASTIC_SEARCH]
+    test_type = 'testing_post_put_patch'
+    # post an item but don't reindex
+    # this will cause the testing-ppp index to reindex when we call
+    # check_and_reindex_existing
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    time.sleep(2)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    # doc_count has not yet updated
+    assert doc_count == 0
+    check_and_reindex_existing(app, es, test_type)
+    time.sleep(2)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    # reindexing has occured
+    assert doc_count == 1

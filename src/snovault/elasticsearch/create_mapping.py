@@ -666,6 +666,7 @@ def get_previous_index_record(this_index_exists, check_first, es, in_type):
     compare previous mapping and current mapping + settings to see if we need
     to update. if not, use the existing mapping to prevent re-indexing.
     """
+    prev_index_hit = {}
     if this_index_exists and check_first:
         try:
             prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type)
