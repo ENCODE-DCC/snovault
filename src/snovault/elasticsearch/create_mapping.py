@@ -579,49 +579,27 @@ def create_mapping_by_type(in_type, registry):
 
 
 def build_index(app, es, in_type, mapping, dry_run, check_first):
+    """
+    Creates an es index for the given in_type with the given mapping and
+    settings defined by item_settings(). If check_first == True, attempting
+    to see if the index exists and is unchanged from the previous mapping.
+    If so, do not delete and re-create the index to save on indexing.
+    This function will trigger a reindexing of the in_type index if
+    the old index is kept but the es doc count differs from the db doc count.
+    Will also trigger a re-index for a newly created index if the indexing
+    document in meta exists and has an xmin.
+    """
     # determine if index already exists for this type
-    try:
-        this_index_exists = es.indices.exists(index=in_type)
-    except ConnectionTimeout:
-        this_index_exists = False
     this_index_record = build_index_record(mapping, in_type)
-
-    if check_first and in_type == 'meta':
-        for wait in [3,6,9,12]:
-            if not this_index_exists:
-                time.sleep(wait)
-                this_index_exists = es.indices.exists(index=in_type)
+    this_index_exists = check_if_index_exists(es, in_type, check_first)
 
     # if the index exists, we might not need to delete it
-    if this_index_exists and check_first:
-        # Decide if we need to drop the index + reindex (no index/no meta record)
-        # OR
-        # compare previous mapping and current mapping + settings to see if we need
-        # to update. if not, use the existing mapping to prevent re-indexing.
-        try:
-            prev_index_record = es.get(index='meta', doc_type='meta', id=in_type)
-        except TransportError as excp:
-            if excp.info.get('status') == 503:
-                es.indices.refresh(index='meta')
-                time.sleep(3)
-                try:
-                    prev_index_record = es.get(index='meta', doc_type='meta', id=in_type)
-                except:
-                    pass
-        else:
-            if this_index_record == prev_index_record['_source']:
-                if in_type != 'meta':
-                    # lastly, check to make sure the item count for the existing
-                    # index matches the database document count. If not, reindex
-                    count_res = es.count(index=in_type, doc_type=in_type)
-                    es_count = count_res.get('count')
-                    collection = app.registry[COLLECTIONS].get(in_type)
-                    db_count = len(collection) if collection is not None else None
-                    if es_count is None or es_count != db_count:
-                        print('MAPPING: re-indexing all items in the existing index %s' % (in_type))
-                        run_indexing(app, [in_type])
-                print('MAPPING: using existing index for collection %s' % (in_type))
-                return
+    prev_index_record = get_previous_index_record(this_index_exists, check_first, es, in_type)
+    if prev_index_record is not None and this_index_record == prev_index_record:
+        if in_type != 'meta':
+            check_and_reindex_existing(app, es, in_type)
+        print('MAPPING: using existing index for collection %s' % (in_type))
+        return
     # delete the index
     if this_index_exists:
         res = es_safe_execute(es.indices.delete, index=in_type, ignore=[400,404], request_timeout=30)
@@ -667,6 +645,55 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
             print("MAPPING: index record failed for %s" % (in_type))
 
 
+def check_if_index_exists(es, in_type, check_first):
+    try:
+        this_index_exists = es.indices.exists(index=in_type)
+    except ConnectionTimeout:
+        this_index_exists = False
+    if check_first and in_type == 'meta':
+        for wait in [3,6,9,12]:
+            if not this_index_exists:
+                time.sleep(wait)
+                this_index_exists = es.indices.exists(index=in_type)
+    return this_index_exists
+
+
+def get_previous_index_record(this_index_exists, check_first, es, in_type):
+    """
+    Decide if we need to drop the index + reindex (no index/no meta record)
+    OR
+    compare previous mapping and current mapping + settings to see if we need
+    to update. if not, use the existing mapping to prevent re-indexing.
+    """
+    if this_index_exists and check_first:
+        try:
+            prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type)
+        except TransportError as excp:
+            if excp.info.get('status') == 503:
+                es.indices.refresh(index='meta')
+                time.sleep(3)
+                try:
+                    prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type)
+                except:
+                    return None
+        prev_index_record = prev_index_hit.get('_source')
+        return prev_index_record
+    else:
+        return None
+
+
+def check_and_reindex_existing(app, es, in_type):
+    # lastly, check to make sure the item count for the existing
+    # index matches the database document count. If not, reindex
+    count_res = es.count(index=in_type, doc_type=in_type)
+    es_count = count_res.get('count')
+    collection = app.registry[COLLECTIONS].get(in_type)
+    db_count = len(collection) if collection is not None else None
+    if es_count is None or es_count != db_count:
+        print('MAPPING: re-indexing all items in the existing index %s' % (in_type))
+        run_indexing(app, [in_type])
+
+
 def es_safe_execute(function, **kwargs):
     exec_count = 0
     while exec_count < 10:
@@ -679,7 +706,6 @@ def es_safe_execute(function, **kwargs):
         else:
             return True
     return False
-
 
 
 def snovault_cleanup(es, registry):
