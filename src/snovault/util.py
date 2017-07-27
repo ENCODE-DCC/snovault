@@ -64,14 +64,12 @@ def expand_path(request, obj, path):
             if not isinstance(member, dict):
                 res = secure_embed(request, member, '@@object')
                 member = value[index] = res
-                if res:
-                    expand_path(request, member, remaining)
+            expand_path(request, member, remaining)
     else:
         if not isinstance(value, dict):
             res = secure_embed(request, value, '@@object')
             value = obj[name] = res
-            if res:
-                expand_path(request, value, remaining)
+        expand_path(request, value, remaining)
 
 
 def select_distinct_values(request, value_path, *from_paths):
