@@ -49,8 +49,10 @@ def add_default_embeds(item_type, types, embeds, schema={}):
             # for neatness' sake, ensure redundant embeds are getting added
             check_wildcard = add_embed + '.*'
             if check_wildcard not in processed_fields and check_wildcard not in embeds_to_add:
+                # default embeds to add
                 processed_fields.add(add_embed + '.link_id')
                 processed_fields.add(add_embed + '.display_title')
+                processed_fields.add(add_embed + '.uuid')
     return list(processed_fields)
 
 
