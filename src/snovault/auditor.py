@@ -194,9 +194,10 @@ def traversed_path_ids(request, obj, path):
         path = path.split('.')
     if not path:
         # handle embedding subobjects that aren't actually in the DB
-        if isinstance(obj, dict) and '@id' not in obj.keys():
-            return
-        yield obj if isinstance(obj, basestring) else obj['@id']
+        if isinstance(obj, dict) and '@id' in obj.keys():
+            yield obj['@id']
+        if isinstance(obj, basestring):
+            yield obj
         return
     name = path[0]
     remaining = path[1:]
