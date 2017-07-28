@@ -52,7 +52,8 @@ def expand_path(request, obj, path):
             expand_path(request, member, remaining)
     else:
         if not isinstance(value, dict):
-            value = obj[name] = request.embed(value, '@@object')
+            if isinstance(value, basestring):
+                value = obj[name] = request.embed(value, '@@object')
         expand_path(request, value, remaining)
 
 
