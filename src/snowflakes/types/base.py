@@ -170,6 +170,46 @@ class Item(snovault.Item):
             keys['accession'].append(properties['accession'])
         return keys
 
+    @snovault.calculated_property(schema={
+        "title": "Display Title",
+        "description": "A calculated title for every object in 4DN",
+        "type": "string"
+    },)
+    def display_title(self):
+        """create a display_title field."""
+        display_title = ""
+        look_for = [
+            "title",
+            "name",
+            "location_description",
+            "accession",
+        ]
+        for field in look_for:
+            # special case for user: concatenate first and last names
+            display_title = self.properties.get(field, None)
+            if display_title:
+                return display_title
+        # if none of the existing terms are available, use @type + date_created
+        try:
+            type_date = self.__class__.__name__ + " from " + self.properties.get("date_created", None)[:10]
+            return type_date
+        # last resort, use uuid
+        except:
+            return self.properties.get('uuid', None)
+
+    @snovault.calculated_property(schema={
+        "title": "link_id",
+        "description": "A copy of @id that can be embedded. Uses ~ instead of /",
+        "type": "string"
+    },)
+    def link_id(self, request):
+        """create the link_id field, which is a copy of @id using ~ instead of /"""
+        id_str = str(self).split(' at ')
+        path_str = id_str[-1].strip('>')
+        path_split = path_str.split('/')
+        path_str = '~'.join(path_split) + '~'
+        return path_str
+
 
 class SharedItem(Item):
     ''' An Item visible to all authenticated users while "proposed" or "in progress".

@@ -63,7 +63,7 @@
             "title": "Snowset",
             "description": "The snowset (ball, fort, etc.) the snowflake belongs to.",
             "type": "string",
-            "linkTo": ["Snowset", "Snowball", "Snowfort"]
+            "linkTo": "Snowset"
         }
     },
     "columns": {

@@ -27,12 +27,12 @@ def item_is_revoked(request, path):
 class Snowset(Item):
     base_types = ['Snowset'] + Item.base_types
     embedded = [
-        'snowflakes',
-        'snowflakes.submitted_by',
-        'snowflakes.lab',
-        'submitted_by',
-        'lab',
-        'award',
+        'snowflakes.*',
+        'snowflakes.submitted_by.*',
+        'snowflakes.lab.*',
+        'submitted_by.*',
+        'lab.*',
+        'award.*',
     ]
     audit_inherit = [
         'snowflakes',
@@ -41,9 +41,6 @@ class Snowset(Item):
         'award',
     ]
     name_key = 'accession'
-    rev = {
-        'snowflakes': ('Snowflake', 'snowset'),
-    }
 
     @calculated_property(condition='date_released', schema={
         "title": "Month released",
@@ -51,17 +48,6 @@ class Snowset(Item):
     })
     def month_released(self, date_released):
         return datetime.datetime.strptime(date_released, '%Y-%m-%d').strftime('%B, %Y')
-
-    @calculated_property(schema={
-        "title": "snowflakes",
-        "type": "array",
-        "items": {
-            "type": ['string', 'object'],
-            "linkFrom": "Snowflake.snowset",
-        },
-    })
-    def snowflakes(self, request, snowflakes):
-        return paths_filtered_by_status(request, snowflakes)
 
 
 @collection(
@@ -74,6 +60,7 @@ class Snowset(Item):
 class Snowball(Snowset):
     item_type = 'snowball'
     schema = load_schema('snowflakes:schemas/snowball.json')
+    embedded = []
 
 
 @collection(
@@ -86,6 +73,7 @@ class Snowball(Snowset):
 class Snowfort(Snowset):
     item_type = 'snowfort'
     schema = load_schema('snowflakes:schemas/snowfort.json')
+    embedded = []
 
 
 @collection(
@@ -101,11 +89,12 @@ class Snowflake(Item):
     name_key = 'accession'
 
     embedded = [
-        'lab',
+        'lab.*',
         'lab.awards.project',
         'lab.awards.title',
-        'submitted_by',
-        'award'
+        'submitted_by.*',
+        'award.*',
+        'snowset.*'
     ]
     audit_inherit = [
         'lab',

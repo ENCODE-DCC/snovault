@@ -73,9 +73,9 @@ def sorted_dict(d):
     return json.loads(json.dumps(d), object_pairs_hook=sorted_pairs_hook)
 
 
-def schema_mapping(name, schema, field='*', top_level=False):
+def schema_mapping(field, schema, top_level=False):
     """
-    Create the mapping for a given schema. Defaults to using all fields for
+    Create the mapping for a given schema. Can handle using all fields for
     objects (*), but can handle specific fields using the field parameter.
     This allows for the mapping to match the selective embedding.
     """
@@ -86,12 +86,12 @@ def schema_mapping(name, schema, field='*', top_level=False):
 
     # Elasticsearch handles multiple values for a field
     if type_ == 'array' and schema['items']:
-        return schema_mapping(name, schema['items'], field)
+        return schema_mapping(field, schema['items'])
 
     if type_ == 'object':
         properties = {}
         for k, v in schema.get('properties', {}).items():
-            mapping = schema_mapping(k, v, '*')
+            mapping = schema_mapping(k, v)
             if mapping is not None:
                 if field == '*' or k == field:
                     properties[k] = mapping
@@ -107,7 +107,7 @@ def schema_mapping(name, schema, field='*', top_level=False):
             }
 
     # hardcode fields with dates for now
-    if name == 'date_created':
+    if field == 'date_created':
         return {
             'type': 'date',
             'format': "date_optional_time",
@@ -192,8 +192,8 @@ def schema_mapping(name, schema, field='*', top_level=False):
             }
         }
 
-        if name in NON_SUBSTRING_FIELDS:
-            if name in PATH_FIELDS:
+        if field in NON_SUBSTRING_FIELDS:
+            if field in PATH_FIELDS:
                 sub_mapping['analyzer'] = 'snovault_path_analyzer'
         return sub_mapping
 
@@ -240,7 +240,7 @@ def index_settings(in_type):
     if in_type == 'meta':
         field_limit = 1000000
     else:
-        field_limit = 3000
+        field_limit = 5000
     return {
         'index': {
             'number_of_shards': 3,
@@ -490,74 +490,81 @@ def type_mapping(types, item_type, embed=True):
     type_info = types[item_type]
     schema = type_info.schema
     # use top_level parameter here for schema_mapping
-    mapping = schema_mapping(item_type, schema, '*', True)
+    mapping = schema_mapping('*', schema, True)
     embeds = add_default_embeds(item_type, types, type_info.embedded, schema)
+    embeds.sort()
     if not embed:
         return mapping
     for prop in embeds:
         single_embed = {}
         curr_s = schema
         curr_m = mapping
-        for curr_p in prop.split('.'):
-            ref_types = None
-            subschema = None
-            ultimate_obj = False # set to true if on last level of embedding
-            field = '*'
-            # Check if only an object was given. Embed fully (leave field = *)
-            if len(prop.split('.')) == 1:
-                subschema = curr_s.get('properties', {}).get(curr_p, None)
-                # if a non-obj field, return (no embedding is going on)
-                if not subschema:
-                    break
-            else:
-                subschema = curr_s.get('properties', {}).get(curr_p, None)
-                field = curr_p
-                if not subschema:
-                    break
-            # handle arrays by simply jumping into them
-            # we don't care that they're flattened during mapping
-            subschema = subschema.get('items', subschema)
-            if 'linkFrom' in subschema:
-                _ref_type, _ = subschema['linkFrom'].split('.', 1)
-                ref_types = [_ref_type]
-            elif 'linkTo' in subschema:
-                ref_types = subschema['linkTo']
-                if not isinstance(ref_types, list):
-                    ref_types = [ref_types]
-            if ref_types is None:
-                curr_s = subschema
-            else:
-                embedded_types = [types[t].schema for t in ref_types
-                                  if t in types.all]
-                if not embedded_types:
-                    continue
-                curr_s = reduce(combine_schemas, embedded_types)
-            # Check if we're at the end of a hierarchy of embeds
-            if len(prop.split('.')) > 1 and curr_p == prop.split('.')[-2]:
-                # See if the next (last) field is an object
-                # if not (which is proper), then this is the ultimate obj
-                next_subschema = subschema.get('properties', {}).get(prop.split('.')[-1], None)
-                # if subschema is none ()
-                if not next_subschema:
-                    ultimate_obj = True
-                    field = prop.split('.')[-1]
-
-            # see if there's already a mapping associated with this embed:
-            # multiple subobjects may be embedded, so be careful here
-            if curr_p in curr_m['properties'] and 'properties' in curr_m['properties'][curr_p]:
-                mapped = schema_mapping(curr_p, curr_s, field)
-                if 'properties' in mapped:
-                    curr_m['properties'][curr_p]['properties'].update(mapped['properties'])
-                else:
-                    curr_m['properties'][curr_p] = mapped
-            else:
-                curr_m['properties'][curr_p] = schema_mapping(curr_p, curr_s, field)
-
-            if ultimate_obj: # this means we're at the at the end of an embed
+        split_embed_path = prop.split('.')
+        for curr_e in split_embed_path:
+            # if we want to map all fields (*), do not drill into schema
+            if curr_e != '*':
+                # drill into the schemas. if no the embed is not found, break
+                subschema = curr_s.get('properties', {}).get(curr_e, None)
+                curr_s = merge_schemas(subschema, types)
+            if not curr_s:
                 break
-            else:
-                curr_m = curr_m['properties'][curr_p]
+            curr_m = update_mapping_by_embed(curr_m, curr_e, curr_s)
     return mapping
+
+
+def merge_schemas(subschema, types):
+    """
+    Merge any linked schemas into the current one. Return None if none present
+    """
+    if not subschema:
+        return None
+    # handle arrays by simply jumping into them
+    # we don't care that they're flattened during mapping
+    ref_types = None
+    subschema = subschema.get('items', subschema)
+    if 'linkFrom' in subschema:
+        _ref_type, _ = subschema['linkFrom'].split('.', 1)
+        ref_types = [_ref_type]
+    elif 'linkTo' in subschema:
+        ref_types = subschema['linkTo']
+        if not isinstance(ref_types, list):
+            ref_types = [ref_types]
+    if ref_types is None:
+        curr_s = subschema
+    else:
+        embedded_types = [types[t].schema for t in ref_types
+                          if t in types.all]
+        if not embedded_types:
+            return None
+        curr_s = reduce(combine_schemas, embedded_types)
+    return curr_s
+
+
+def update_mapping_by_embed(curr_m, curr_e, curr_s):
+    """
+    Update the mapping based on the current mapping (curr_m), the current embed
+    element (curr_e), and the processed schemas (curr_s).
+    when curr_e = '*', it is a special case where all properties are added
+    to the object that was previously mapped.
+    """
+    # see if there's already a mapping associated with this embed:
+    # multiple subobjects may be embedded, so be careful here
+    mapped = schema_mapping(curr_e, curr_s)
+    if curr_e == '*':
+        if 'properties' in mapped:
+            curr_m['properties'].update(mapped['properties'])
+        else:
+            curr_m['properties'] = mapped
+    elif curr_e in curr_m['properties'] and 'properties' in curr_m['properties'][curr_e]:
+        if 'properties' in mapped:
+            curr_m['properties'][curr_e]['properties'].update(mapped['properties'])
+        else:
+            curr_m['properties'][curr_e] = mapped
+        curr_m = curr_m['properties'][curr_e]
+    else:
+        curr_m['properties'][curr_e] = mapped
+        curr_m = curr_m['properties'][curr_e]
+    return curr_m
 
 
 def create_mapping_by_type(in_type, registry):
@@ -572,49 +579,28 @@ def create_mapping_by_type(in_type, registry):
 
 
 def build_index(app, es, in_type, mapping, dry_run, check_first):
+    """
+    Creates an es index for the given in_type with the given mapping and
+    settings defined by item_settings(). If check_first == True, attempting
+    to see if the index exists and is unchanged from the previous mapping.
+    If so, do not delete and re-create the index to save on indexing.
+    This function will trigger a reindexing of the in_type index if
+    the old index is kept but the es doc count differs from the db doc count.
+    Will also trigger a re-index for a newly created index if the indexing
+    document in meta exists and has an xmin.
+    """
     # determine if index already exists for this type
-    try:
-        this_index_exists = es.indices.exists(index=in_type)
-    except ConnectionTimeout:
-        this_index_exists = False
     this_index_record = build_index_record(mapping, in_type)
-
-    if check_first and in_type == 'meta':
-        for wait in [3,6,9,12]:
-            if not this_index_exists:
-                time.sleep(wait)
-                this_index_exists = es.indices.exists(index=in_type)
+    this_index_exists = check_if_index_exists(es, in_type, check_first)
 
     # if the index exists, we might not need to delete it
-    if this_index_exists and check_first:
-        # Decide if we need to drop the index + reindex (no index/no meta record)
-        # OR
-        # compare previous mapping and current mapping + settings to see if we need
-        # to update. if not, use the existing mapping to prevent re-indexing
-        try:
-            prev_index_record = es.get(index='meta', doc_type='meta', id=in_type)
-        except TransportError as excp:
-            if excp.info.get('status') == 503:
-                es.indices.refresh(index='meta')
-                time.sleep(3)
-                try:
-                    prev_index_record = es.get(index='meta', doc_type='meta', id=in_type)
-                except:
-                    pass
-        else:
-            if this_index_record == prev_index_record['_source']:
-                if in_type != 'meta':
-                    # lastly, check to make sure the item count for the existing
-                    # index matches the database document count. If not, reindex
-                    count_res = es.count(index=in_type, doc_type=in_type)
-                    es_count = count_res.get('count')
-                    collection = app.registry[COLLECTIONS].get(in_type)
-                    db_count = len(collection) if collection is not None else None
-                    if es_count is None or es_count != db_count:
-                        print('MAPPING: re-indexing all items in the existing index %s' % (in_type))
-                        run_indexing(app, [in_type])
-                print('MAPPING: using existing index for collection %s' % (in_type))
-                return
+    prev_index_record = get_previous_index_record(this_index_exists, check_first, es, in_type)
+    if prev_index_record is not None and this_index_record == prev_index_record:
+        if in_type != 'meta':
+            check_and_reindex_existing(app, es, in_type)
+        print('MAPPING: using existing index for collection %s' % (in_type))
+        return
+
     # delete the index
     if this_index_exists:
         res = es_safe_execute(es.indices.delete, index=in_type, ignore=[400,404], request_timeout=30)
@@ -660,6 +646,56 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
             print("MAPPING: index record failed for %s" % (in_type))
 
 
+def check_if_index_exists(es, in_type, check_first):
+    try:
+        this_index_exists = es.indices.exists(index=in_type)
+    except ConnectionTimeout:
+        this_index_exists = False
+    if check_first and in_type == 'meta':
+        for wait in [3,6,9,12]:
+            if not this_index_exists:
+                time.sleep(wait)
+                this_index_exists = es.indices.exists(index=in_type)
+    return this_index_exists
+
+
+def get_previous_index_record(this_index_exists, check_first, es, in_type):
+    """
+    Decide if we need to drop the index + reindex (no index/no meta record)
+    OR
+    compare previous mapping and current mapping + settings to see if we need
+    to update. if not, use the existing mapping to prevent re-indexing.
+    """
+    prev_index_hit = {}
+    if this_index_exists and check_first:
+        try:
+            prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type)
+        except TransportError as excp:
+            if excp.info.get('status') == 503:
+                es.indices.refresh(index='meta')
+                time.sleep(3)
+                try:
+                    prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type)
+                except:
+                    return None
+        prev_index_record = prev_index_hit.get('_source')
+        return prev_index_record
+    else:
+        return None
+
+
+def check_and_reindex_existing(app, es, in_type):
+    # lastly, check to make sure the item count for the existing
+    # index matches the database document count. If not, reindex
+    count_res = es.count(index=in_type, doc_type=in_type)
+    es_count = count_res.get('count')
+    collection = app.registry[COLLECTIONS].get(in_type)
+    db_count = len(collection) if collection is not None else None
+    if es_count is None or es_count != db_count:
+        print('MAPPING: re-indexing all items in the existing index %s' % (in_type))
+        run_indexing(app, [in_type])
+
+
 def es_safe_execute(function, **kwargs):
     exec_count = 0
     while exec_count < 10:
@@ -672,7 +708,6 @@ def es_safe_execute(function, **kwargs):
         else:
             return True
     return False
-
 
 
 def snovault_cleanup(es, registry):
