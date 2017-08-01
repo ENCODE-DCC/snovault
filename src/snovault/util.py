@@ -37,7 +37,7 @@ def simple_path_ids(obj, path):
 
 
 def secure_embed(request, item_path, addition='@@object'):
-    res = ''
+    res = {'error': 'no view permissions'}
     try:
         # if empty item_path reqeust.embed returns just addition as a string
         if item_path:

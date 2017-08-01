@@ -17,12 +17,10 @@ def cached_view_embedded(context, request):
     allowed = set(source['principals_allowed']['view'])
     if allowed.isdisjoint(request.effective_principals):
         raise HTTPForbidden()
-    return source['embedded']
+    return filter_embedded(source['embedded'], request.effective_principals)
 
 
 _skip_fields = ['@type', 'principals_allowed']
-
-
 def filter_embedded(embedded, effective_principals):
     # handle dictionary
     if isinstance(embedded, dict):
