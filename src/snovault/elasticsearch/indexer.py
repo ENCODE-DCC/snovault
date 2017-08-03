@@ -16,14 +16,15 @@ from snovault.storage import (
 from urllib3.exceptions import ReadTimeoutError
 from .interfaces import (
     ELASTIC_SEARCH,
-    INDEXER,
+    INDEXER
 )
+from snovault import CONNECTION
 import datetime
 import logging
 import pytz
 import time
 import copy
-
+from redis import Redis
 
 log = logging.getLogger(__name__)
 SEARCH_MAX = 99999  # OutOfMemoryError if too high
@@ -155,8 +156,17 @@ def index(request):
         snapshot_id = None
         if not recovery:
             snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
-
-        result['errors'] = indexer.update_objects(request, invalidated, xmin, snapshot_id)
+        redis_client = Redis(charset="utf-8", decode_responses=True)
+        # Store unfinished set after updating it
+        if len(redis_client.sdiff("invalidated", "indexed")) > 0:
+            redis_client.sadd('invalidated', *set(invalidated))
+        else:
+            redis_client.delete('indexed', 'failed', 'invalidated')
+            redis_client.sadd('invalidated', *set(invalidated))
+            
+        # Re-initiate invalidated set   
+        remaining_invalidated = list(redis_client.sdiff('invalidated', 'indexed'))
+        result['errors'] = indexer.update_objects(request, remaining_invalidated, xmin, snapshot_id)
         result['indexed'] = len(invalidated)
 
         if record:
@@ -216,7 +226,7 @@ class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
         self.index = registry.settings['snovault.elasticsearch.index']
-
+        self.redis = Redis(connection_pool=registry[CONNECTION].redis_pool, charset="utf-8", decode_responses=True)
     def update_objects(self, request, uuids, xmin, snapshot_id):
         errors = []
         for i, uuid in enumerate(uuids):
@@ -229,6 +239,7 @@ class Indexer(object):
         return errors
 
     def update_object(self, request, uuid, xmin):
+        self.redis.sadd("failed", uuid)
         try:
             result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
         except StatementError:
@@ -248,6 +259,8 @@ class Indexer(object):
                     id=str(uuid), version=xmin, version_type='external_gte',
                     request_timeout=30,
                 )
+                self.redis.sadd("indexed", uuid)
+                self.redis.srem("failed", uuid)
             except StatementError:
                 # Can't reconnect until invalid transaction is rolled back
                 raise
