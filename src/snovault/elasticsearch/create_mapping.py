@@ -759,7 +759,7 @@ def main():
     app = get_app(args.config_uri, args.app_name)
 
     # Loading app will have configured from config file. Reconfigure here:
-    logging.getLogger('snovault').setLevel(logging.DEBUG)
+    logging.getLogger('snovault').setLevel(logging.WARN)
 
     return run(app, args.item_type, args.dry_run, args.check_first)
 
