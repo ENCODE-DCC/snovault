@@ -708,7 +708,7 @@ def check_and_reindex_existing(app, es, in_type):
 
 def es_safe_execute(function, **kwargs):
     exec_count = 0
-    while exec_count < 10:
+    while exec_count < 3:
         try:
             function(**kwargs)
         except ConnectionTimeout:
