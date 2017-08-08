@@ -23,7 +23,7 @@ from snovault import (
     TYPES,
 )
 from snovault.schema_utils import combine_schemas
-from snovault.fourfront_utils import add_default_embeds
+from snovault.fourfront_utils import add_default_embeds, get_jsonld_types_from_collection_type
 from .interfaces import ELASTIC_SEARCH
 import collections
 import json
@@ -689,8 +689,18 @@ def check_and_reindex_existing(app, es, in_type):
     # index matches the database document count. If not, reindex
     count_res = es.count(index=in_type, doc_type=in_type)
     es_count = count_res.get('count')
-    collection = app.registry[COLLECTIONS].get(in_type)
-    db_count = len(collection) if collection is not None else None
+
+    # must handle collections that have children inheriting from them
+    # use specific collections and adjust if necessary
+    db_count = 0
+    check_collections = get_jsonld_types_from_collection_type(app, in_type, [in_type])
+    for coll_type in check_collections:
+        collection = app.registry[COLLECTIONS].get(coll_type)
+        coll_count = len(collection) if collection is not None else 0
+        if coll_type == in_type:
+            db_count += coll_count
+        else:
+            db_count -= coll_count
     if es_count is None or es_count != db_count:
         print('MAPPING: re-indexing all items in the existing index %s' % (in_type))
         run_indexing(app, [in_type])
