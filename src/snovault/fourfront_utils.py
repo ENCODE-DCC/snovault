@@ -171,3 +171,27 @@ def crawl_schemas_by_embeds(item_type, types, split_path, schema):
 
     # really shouldn't hit this return, but leave as a back up
     return error_message, embeds_to_add
+
+
+def get_jsonld_types_from_collection_type(request, doc_type, types_covered=[]):
+    """
+    Recursively find item types using a given type registry
+    Request may also be app (just needs to have registry)
+    """
+    types_found = []
+    try:
+        registry_type = request.registry['types'][doc_type]
+    except KeyError:
+        return [] # no types found
+    # add the item_type of this collection if applicable
+    if hasattr(registry_type, 'item_type'):
+        if registry_type.name not in types_covered:
+            types_found.append(registry_type.item_type)
+        types_covered.append(registry_type.name)
+    # see if we're dealing with an abstract type
+    if hasattr(registry_type, 'subtypes'):
+        subtypes = registry_type.subtypes
+        for subtype in subtypes:
+            if subtype not in types_covered:
+                types_found.extend(get_jsonld_types_from_collection_type(request, subtype, types_covered))
+    return types_found

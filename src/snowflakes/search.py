@@ -7,6 +7,7 @@ from snovault import (
 )
 from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.resource_views import collection_view_listing_db
+from snovault.fourfront_utils import get_jsonld_types_from_collection_type
 from elasticsearch.helpers import scan
 from elasticsearch_dsl import Search
 from pyramid.httpexceptions import HTTPBadRequest
@@ -31,7 +32,7 @@ def search(context, request, search_type=None, return_generator=False, forced_ty
     """
     types = request.registry[TYPES]
     search_base = normalize_query(request, search_type)
-    ### INITIALIZE RESULT
+    ### INITIALIZE RESULT.
     result = {
         '@context': request.route_path('jsonld_context'),
         '@id': '/' + forced_type.lower() + '/' + search_base,
@@ -59,6 +60,7 @@ def search(context, request, search_type=None, return_generator=False, forced_ty
     prepared_terms = prepare_search_term(request)
 
     doc_types = set_doc_types(request, types, search_type)
+    schemas = (types[item_type].schema for item_type in doc_types)
 
     # set ES index based on doc_type (one type per index)
     # if doc_type is item, search all indexes by setting es_index to None
@@ -78,7 +80,7 @@ def search(context, request, search_type=None, return_generator=False, forced_ty
     build_type_filters(result, request, doc_types, types)
 
     # get the fields that will be used as source for the search
-    # currently, supports frame=raw/obnject but live faceting does not work
+    # currently, supports frame=raw/object but live faceting does not work
     # this is okay because the only non-embedded access will be programmatic
     source_fields = sorted(list_source_fields(request, doc_types, search_frame))
 
@@ -94,7 +96,7 @@ def search(context, request, search_type=None, return_generator=False, forced_ty
     search, query_filters, used_filters = set_filters(request, search, result, principals, doc_types, before_date, after_date)
 
     ### Set starting facets
-    facets = initialize_facets(types, doc_types, search_audit, principals)
+    facets = initialize_facets(types, doc_types, search_audit, principals, prepared_terms, schemas)
 
     ### Adding facets to the query
     search = set_facets(search, facets, query_filters, string_query)
@@ -112,8 +114,6 @@ def search(context, request, search_type=None, return_generator=False, forced_ty
 
     ### Record total number of hits
     result['total'] = total = es_results['hits']['total']
-
-    schemas = (types[item_type].schema for item_type in doc_types)
     result['facets'] = format_facets(es_results, facets, used_filters, schemas, total, search_frame)
 
     # Add batch actions
@@ -180,8 +180,10 @@ def get_available_facets(context, request, search_type=None):
 
     types = request.registry[TYPES]
     doc_types = set_doc_types(request, types, search_type)
+    schemas = (types[item_type].schema for item_type in doc_types)
     principals = effective_principals(request)
-    facets = initialize_facets(types, doc_types, request.has_permission('search_audit'), principals)
+    prepared_terms = prepare_search_term(request)
+    facets = initialize_facets(types, doc_types, request.has_permission('search_audit'), principals, prepared_terms, schemas)
 
     ### Mini version of format_facets
     result = []
@@ -331,8 +333,8 @@ def prepare_search_term(request):
             if 'embedded.' + field not in prepared_terms.keys():
                 prepared_terms['embedded.' + field] = []
             prepared_terms['embedded.' + field].append(val)
-        if 'q' in prepared_terms:
-            prepared_terms['q'] = process_query_string(prepared_terms['q'])
+    if 'q' in prepared_terms:
+        prepared_terms['q'] = process_query_string(prepared_terms['q'])
     return prepared_terms
 
 
@@ -340,15 +342,13 @@ def process_query_string(search_query):
     from antlr4 import IllegalStateException
     from lucenequery.prefixfields import prefixfields
     from lucenequery import dialects
-
     if search_query == '*':
         return search_query
-
     # avoid interpreting slashes as regular expressions
     search_query = search_query.replace('/', r'\/')
     try:
         query = prefixfields('embedded.', search_query, dialects.elasticsearch)
-    except IllegalStateException:
+    except (IllegalStateException):
         msg = "Invalid query: {}".format(search_query)
         raise HTTPBadRequest(explanation=msg)
     else:
@@ -424,7 +424,7 @@ def list_source_fields(request, doc_types, frame):
 
 def build_query(search, prepared_terms, source_fields):
     """
-    Prepare the query within the Search object
+    Prepare the query within the Search object.
     """
     query_info = {}
     string_query = None
@@ -434,6 +434,7 @@ def build_query(search, prepared_terms, source_fields):
     for field, value in prepared_terms.items():
         if field == 'q':
             query_info['query'] = value
+            query_info['lenient'] = True
             break
     if query_info != {}:
         string_query = {'must': {'query_string': query_info}}
@@ -469,6 +470,7 @@ def set_sort_order(request, search, search_term, types, doc_types, result):
         sort['embedded.' + name + '.lower_case_sort.keyword'] = result_sort[name] = {
             'order': order,
             'unmapped_type': 'keyword',
+            'missing': '_last'
         }
     # Otherwise we use a default sort only when there's no text search to be ranked
     if not sort and search_term == '*':
@@ -542,7 +544,7 @@ def set_filters(request, search, result, principals, doc_types, before_date=None
 
         # Add filter to query
         if field.startswith('audit'):
-            query_field = field
+            query_field = field + '.raw'
         elif field == 'type':
             query_field = 'embedded.@type.raw'
         else:
@@ -589,10 +591,11 @@ def set_filters(request, search, result, principals, doc_types, before_date=None
     return search, final_filters, used_filters
 
 
-def initialize_facets(types, doc_types, search_audit, principals):
+def initialize_facets(types, doc_types, search_audit, principals, prepared_terms, schemas):
     """
     Initialize the facets used for the search. If searching across multiple
-    doc_types, only use the swfault 'Data Type' and 'Status' facets.
+    doc_types, only use the default 'Data Type' and 'Status' facets.
+    Add facets for custom url filters whether or not they're in the schema
     """
     facets = [
         ('type', {'title': 'Data Type'})
@@ -606,12 +609,30 @@ def initialize_facets(types, doc_types, search_audit, principals):
     if len(doc_types) == 1 and doc_types[0] != 'Item' and 'facets' in types[doc_types[0]].schema:
         facets.extend(types[doc_types[0]].schema['facets'].items())
 
-    facets.append(('status', {'title': 'Status'}))
+    used_facets = [facet[0] for facet in facets]
+    # add status to used_facets, which will be added to facets later
+    used_facets.append('status')
 
-    # Display all audits if logged in, or all but INTERNAL_ACTION if logged out
+    # add facets for any non-schema fields that are requested in the search
+    for field in prepared_terms:
+        if field.startswith('embedded'):
+            split_field = field.strip().split('.')
+            use_field = '.'.join(split_field[1:])
+            # use the last part of the split field to get the title
+            title_field = split_field[-1]
+            if title_field in used_facets:
+                continue
+            for schema in schemas:
+                if title_field in schema['properties']:
+                    title_field = schema['properties'][title_field].get('title', title_field)
+                    break
+            facets.append((use_field, {'title': title_field}))
+
+    # append status and audit facets automatically
+    facets.append(('status', {'title': 'Status'}))
     for audit_facet in audit_facets:
-        if search_audit and 'group.submitter' in principals or 'INTERNAL_ACTION' not in audit_facet[0]:
-            facets.append(audit_facet)
+        facets.append(audit_facet)
+
     return facets
 
 
@@ -622,7 +643,7 @@ def set_facets(search, facets, final_filters, string_query):
 
     :param facets: A list of tuples containing (0) field in object dot notation,  and (1) a dict or OrderedDict with title property.
     :param final_filters: Dict of filters which are set for the ES query in set_filters
-    :param string_query: Dict holding the query_string used in the search.
+    :param string_query: Dict holding the query_string used in the search
     """
     aggs = {}
     facet_fields = dict(facets).keys() # List of first entry of tuples in facets list.
@@ -746,23 +767,6 @@ def format_facets(es_results, facets, used_filters, schemas, total, search_frame
 
         result.append(resultFacet)
 
-    # Show any filters that aren't facets as a fake facet with one entry,
-    # so that the filter can be viewed and removed
-    # ignore must_not filters for now
-    for field, values in used_filters['must'].items():
-        if field not in used_facets:
-            title = field
-            for schema in schemas:
-                if field in schema['properties']:
-                    title = schema['properties'][field].get('title', field)
-                    break
-            result.append({
-                'field': field,
-                'title': title,
-                'terms': [{'key': v} for v in values],
-                'total': total,
-                })
-
     return result
 
 def format_results(request, hits, search_frame):
@@ -810,29 +814,6 @@ def find_index_by_doc_types(request, doc_types, ignore):
     indexes = list(set(indexes))
     index_string = ','.join(indexes)
     return index_string
-
-
-def get_jsonld_types_from_collection_type(request, doc_type, types_covered=[]):
-    """
-    Recursively find item types using a given type registry
-    """
-    types_found = []
-    try:
-        registry_type = request.registry['types'][doc_type]
-    except KeyError:
-        return [] # no types found
-    # add the item_type of this collection if applicable
-    if hasattr(registry_type, 'item_type'):
-        if registry_type.name not in types_covered:
-            types_found.append(registry_type.item_type)
-        types_covered.append(registry_type.name)
-    # see if we're dealing with an abstract type
-    if hasattr(registry_type, 'subtypes'):
-        subtypes = registry_type.subtypes
-        for subtype in subtypes:
-            if subtype not in types_covered:
-                types_found.extend(get_jsonld_types_from_collection_type(request, subtype, types_covered))
-    return types_found
 
 
 ### stupid things to remove; had to add because of other fxns importing
