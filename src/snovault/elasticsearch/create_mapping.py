@@ -30,8 +30,23 @@ import json
 import logging
 import time
 import sys
-from snovault.commands.es_index_data import run as run_indexing
+from snovault.commands.es_index_data import run2 as run_indexing_real
+import transaction
+import os
+import argparse
 
+
+# keep args global so we can use them in our forks that do the 
+# indexing
+args = None
+def run_indexing(app, in_type_list):
+    # ensure open transactions are closed so SQLAlchemy doesn't complain
+    transaction.commit()
+    
+    #fork
+    child_pid = os.fork()
+    if child_pid == 0: # the child
+        run_indexing_real(args.app_nam, args.config_uri, in_type_list)
 
 
 log = logging.getLogger(__name__)
@@ -63,6 +78,9 @@ META_MAPPING = {
 
 PATH_FIELDS = ['submitted_file_name']
 NON_SUBSTRING_FIELDS = ['uuid', '@id', 'submitted_by', 'md5sum', 'references', 'submitted_file_name']
+
+
+
 
 
 def sorted_pairs_hook(pairs):
@@ -750,8 +768,8 @@ def run(app, collections=None, dry_run=False, check_first=False):
             build_index(app, es, collection_name, mapping, dry_run, check_first)
 
 
+args = None
 def main():
-    import argparse
     parser = argparse.ArgumentParser(
         description="Create Elasticsearch mapping", epilog=EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -763,6 +781,7 @@ def main():
     parser.add_argument('config_uri', help="path to configfile")
     parser.add_argument('--check-first', action='store_true',
                         help="check if index exists first before attempting creation")
+    global args
     args = parser.parse_args()
 
     logging.basicConfig()

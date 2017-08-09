@@ -21,6 +21,18 @@ def run(app, collections=None, record=False):
     )
 
 
+def run2(app_name, config_uri, collections=None, record=False):
+    options = {
+        'embed_cache.capacity': '5000',
+        'indexer': 'true',
+    }
+    app = get_app(config_uri, app_name, options)
+
+    # Loading app will have configured from config file. Reconfigure here:
+    logging.getLogger('snovault').setLevel(logging.DEBUG)
+    return run(app, collections, record)
+
+
 def main():
     ''' Indexes app data loaded to elasticsearch '''
 
