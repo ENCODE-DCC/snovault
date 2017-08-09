@@ -36,17 +36,17 @@ import os
 import argparse
 
 
-# keep args global so we can use them in our forks that do the 
+# keep args global so we can use them in our forks that do the
 # indexing
 args = None
 def run_indexing(app, in_type_list):
     # ensure open transactions are closed so SQLAlchemy doesn't complain
     transaction.commit()
-    
+
     #fork
     child_pid = os.fork()
     if child_pid == 0: # the child
-        run_indexing_real(args.app_nam, args.config_uri, in_type_list)
+        run_indexing_real(args.app_name, args.config_uri, in_type_list)
 
 
 log = logging.getLogger(__name__)
