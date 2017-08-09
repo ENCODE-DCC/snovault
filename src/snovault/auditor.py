@@ -3,7 +3,8 @@
 Schema validation allows for checking values within a single object.
 We also need to perform higher order checking between linked objects.
 """
-
+from collections import Counter
+import pprint
 import logging
 import venusian
 from past.builtins import basestring
@@ -67,6 +68,7 @@ class AuditFailure(Exception):
             'name': self.name,
         }
 
+audit_counter = Counter()
 
 class Auditor(object):
     """ Data audit manager
@@ -240,8 +242,11 @@ def item_view_audit_self(context, request):
              name='audit')
 def item_view_audit(context, request):
     path = request.resource_path(context)
+    audit_counter.update([path])
     properties = request.embed(path, '@@object')
     audit = inherit_audits(request, properties, context.audit_inherit or context.embedded)
+    pprint.pprint(audit_counter)
+    audit_counter.clear()
     return {
         '@id': path,
         'audit': audit,
