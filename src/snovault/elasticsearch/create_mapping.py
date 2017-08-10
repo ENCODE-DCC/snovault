@@ -30,23 +30,29 @@ import json
 import logging
 import time
 import sys
-from snovault.commands.es_index_data import run2 as run_indexing_real
+from snovault.commands.es_index_data import run as run_index_data
+from snovault.commands.es_index_data import create_app_and_run
 import transaction
 import os
 import argparse
 
-
-# keep args global so we can use them in our forks that do the
-# indexing
 args = None
-def run_indexing(app, in_type_list):
-    # ensure open transactions are closed so SQLAlchemy doesn't complain
-    transaction.commit()
 
-    #fork
-    child_pid = os.fork()
-    if child_pid == 0: # the child
-        run_indexing_real(args.app_name, args.config_uri, in_type_list)
+
+def run_indexing(app, in_type_list):
+    # if no global args provided, run indexing using the provided app
+    if args is None:
+        # set last_xmin to 0 to competely re-index
+        run_index_data(app, in_type_list, 0)
+    else:
+        # ensure open transactions are closed so SQLAlchemy doesn't complain
+        transaction.commit()
+
+        #fork
+        child_pid = os.fork()
+        if child_pid == 0: # the child
+            # set last_xmin to 0 to competely re-index
+            create_app_and_run(args.app_name, args.config_uri, in_type_list, 0)
 
 
 log = logging.getLogger(__name__)
@@ -750,14 +756,14 @@ def snovault_cleanup(es, registry):
             snovault_index.delete(ignore=404)
 
 
-def run(app, collections=None, dry_run=False, check_first=False):
+def run(app, collections=None, dry_run=False, check_first=False, no_meta=False):
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
     if not dry_run:
         snovault_cleanup(es, registry)
     if not collections:
-        collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
-    elif collections and 'meta' not in collections:
+        collections = list(registry[COLLECTIONS].by_item_type.keys())
+    if not no_meta:
         collections = ['meta'] + collections
     for collection_name in collections:
         if collection_name == 'meta':
@@ -768,7 +774,6 @@ def run(app, collections=None, dry_run=False, check_first=False):
             build_index(app, es, collection_name, mapping, dry_run, check_first)
 
 
-args = None
 def main():
     parser = argparse.ArgumentParser(
         description="Create Elasticsearch mapping", epilog=EPILOG,
@@ -781,6 +786,8 @@ def main():
     parser.add_argument('config_uri', help="path to configfile")
     parser.add_argument('--check-first', action='store_true',
                         help="check if index exists first before attempting creation")
+    parser.add_argument('--no-meta', action='store_true',
+                        help="if set, do not leave the meta index alone for this run")
     global args
     args = parser.parse_args()
 
@@ -790,7 +797,7 @@ def main():
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.WARN)
 
-    return run(app, args.item_type, args.dry_run, args.check_first)
+    return run(app, args.item_type, args.dry_run, args.check_first, args.no_meta)
 
 
 if __name__ == '__main__':
