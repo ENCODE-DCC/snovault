@@ -231,6 +231,7 @@ def inherit_audits(request, embedded, embedded_paths):
              name='audit-self')
 def item_view_audit_self(context, request):
     path = request.resource_path(context)
+    audit_counter.update([path])
     types = [context.type_info.name] + context.type_info.base_types
     return {
         '@id': path,
@@ -242,10 +243,11 @@ def item_view_audit_self(context, request):
              name='audit')
 def item_view_audit(context, request):
     path = request.resource_path(context)
-    audit_counter.update([path])
     properties = request.embed(path, '@@object')
     audit = inherit_audits(request, properties, context.audit_inherit or context.embedded)
+    print (path)
     pprint.pprint(audit_counter)
+    print ()
     audit_counter.clear()
     return {
         '@id': path,
