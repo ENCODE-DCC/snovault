@@ -167,7 +167,7 @@ def identify_invalid_embed(request, path, select_embedded_uuids, use_literal=Fal
         try:
             found_uuid = str(find_attempt.uuid)
         except AttributeError:
-            return invalid_return_val
+            return 'valid'
         else:
             if select_embedded_uuids is not None:
                 select_embedded_uuids.add(found_uuid)
