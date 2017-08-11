@@ -167,11 +167,13 @@ def identify_invalid_embed(request, path, select_embedded_uuids, use_literal=Fal
         try:
             found_uuid = str(find_attempt.uuid)
         except AttributeError:
+            # no uuid found, but the path still worked with mapper
             return 'valid'
         else:
             if select_embedded_uuids is not None:
+                # a uuid was found for this path
                 select_embedded_uuids.add(found_uuid)
-            return 'valid' # this obj can be embedded (a valid resource path)
+            return 'valid'
 
 
 def parse_embedded_result(request, result, fields_to_embed):
@@ -276,7 +278,7 @@ def handle_string_embed(request, key, val, embedded_model):
     or a non-object related string.
     Allow @@download strings regardless of format for things like links
     """
-    if key == '@id' or key == 'uuid':
+    if key in ['@type', '@id', 'uuid']:
         identify_invalid_embed(request, val, select_embedded_uuids, True)
         return val
     elif identify_invalid_embed(request, val, select_embedded_uuids, True) != 'valid':
