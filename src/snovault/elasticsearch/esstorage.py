@@ -168,9 +168,7 @@ class ElasticSearchStorage(object):
         if item_types:
             search = search.filter('terms', item_type=item_types)
         hits = search.execute()
-        return [
-            hit.to_dict().get('_id') for hit in hits if hit.to_dict().get('_id')
-        ]
+        return [hit.to_dict().get('uuid', hit.to_dict().get('_id')) for hit in hits]
 
     def __iter__(self, *item_types):
         query = {
@@ -178,7 +176,7 @@ class ElasticSearchStorage(object):
             'filter': {'terms': {'item_type': item_types}} if item_types else {'match_all': {}},
         }
         for hit in scan(self.es, query=query):
-            yield hit['_id']
+            yield hit.get('uuid', hit.get('_id'))
 
     def __len__(self, *item_types):
         query = {
