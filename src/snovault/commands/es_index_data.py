@@ -7,7 +7,7 @@ index = 'snovault'
 EPILOG = __doc__
 
 
-def run(app, collections=None, last_xmin=None, record=False):
+def run(app, collections=None, last_xmin=None):
     environ = {
         'HTTP_ACCEPT': 'application/json',
         'REMOTE_USER': 'INDEXER',
@@ -21,7 +21,9 @@ def run(app, collections=None, last_xmin=None, record=False):
     )
 
 
-def create_app_and_run(app_name, config_uri, collections=None, last_xmin=None, record=False):
+def create_app_and_run(app_name, config_uri, collections=None, last_xmin=None):
+    print('_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_')
+    print('collections:', collections, '  last_xmin:', last_xmin)
     options = {
         'embed_cache.capacity': '5000',
         'indexer': 'true',
@@ -30,7 +32,7 @@ def create_app_and_run(app_name, config_uri, collections=None, last_xmin=None, r
 
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.DEBUG)
-    return run(app, collections, last_xmin, record)
+    return run(app, collections, last_xmin)
 
 
 def main():
@@ -42,7 +44,6 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument('--item-type', action='append', help="Item type")
-    parser.add_argument('--record', default=False, action='store_true', help="Record the xmin in ES meta")
     parser.add_argument('--app-name', help="Pyramid app name in configfile")
     parser.add_argument('config_uri', help="path to configfile")
     args = parser.parse_args()
@@ -56,7 +57,7 @@ def main():
 
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.DEBUG)
-    return run(app, args.item_type, args.record)
+    return run(app, args.item_type)
 
 
 if __name__ == '__main__':

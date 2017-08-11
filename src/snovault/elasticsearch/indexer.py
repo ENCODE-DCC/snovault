@@ -86,14 +86,15 @@ def index(request):
     flush = False
     if last_xmin is None:
         result['types'] = types = request.json.get('types', None)
-        invalidated = list(all_uuids(request.registry, types))
+        indices = list(request.registry[COLLECTIONS].by_item_type.keys())
+        updated = set(list(all_uuids(request.registry, types)))
+        invalidated, referencing = find_associated_uuids(indices, es, updated, updated)
         flush = True
     else:
         txns = session.query(TransactionRecord).filter(
             TransactionRecord.xid >= last_xmin,
         )
 
-        invalidated = set()
         updated = set()
         renamed = set()
         max_xid = 0
@@ -113,57 +114,8 @@ def index(request):
             return result
 
         # iterate through all indices and find items with matching embedded uuids
-        referencing = set()
         indices = list(request.registry[COLLECTIONS].by_item_type.keys())
-        for es_index in indices:
-            this_index_exists = es.indices.exists(index=es_index)
-            if not this_index_exists:
-                continue
-            # update max_result_window setting if not in place
-            es_settings = index_settings(es_index)
-            es_result_window = es_settings['index']['max_result_window']
-            window_settings = {'index': {'max_result_window': es_result_window}}
-            try:
-                settings = es.indices.get_settings(index=es_index)
-            except NotFoundError:
-                es.indices.put_settings(index=es_index, body=window_settings)
-            else:
-                max_window = settings.get(es_index, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
-                if not max_window or max_window != es_result_window:
-                    es.indices.put_settings(index=es_index, body=window_settings)
-            es.indices.refresh(index=es_index)
-            res = es.search(index=es_index, size=SEARCH_MAX, body={
-                'query': {
-                    'bool': {
-                        'filter': {
-                            'bool': {
-                                'should': [
-                                    {
-                                        'terms': {
-                                            'embedded_uuids': updated,
-                                            '_cache': False,
-                                        },
-                                    },
-                                    {
-                                        'terms': {
-                                            'linked_uuids': renamed,
-                                            '_cache': False,
-                                        },
-                                    },
-                                ],
-                            },
-                        },
-                    },
-                },
-                '_source': False,
-            })
-            if res['hits']['total'] > SEARCH_MAX:
-                referencing = list(all_uuids(request.registry))
-                flush = True
-                break
-            else:
-                referencing= referencing | {hit['_id'] for hit in res['hits']['hits']}
-        invalidated = referencing | updated
+        invalidated, referencing = find_associated_uuids(indices, es, updated, renamed)
         result.update(
             max_xid=max_xid,
             renamed=renamed,
@@ -173,6 +125,9 @@ def index(request):
             txn_count=txn_count,
             first_txn_timestamp=first_txn.isoformat(),
         )
+    print('ORIGINAL:')
+    print('------>', len(updated))
+    print('RE-INDEXING:', invalidated)
     if invalidated and not dry_run:
         # Exporting a snapshot mints a new xid, so only do so when required.
         # Not yet possible to export a snapshot on a standby server:
@@ -214,6 +169,69 @@ def index(request):
         result['lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
 
     return result
+
+
+def find_associated_uuids(indices, es, updated, renamed):
+    """
+    Run a search to find uuids of objects with embedded uuids in updated
+    or linked uuids in renamed. Only runs over the given indices.
+    """
+    invalidated = set()
+    referencing = set()
+    for es_index in indices:
+        this_index_exists = es.indices.exists(index=es_index)
+        if not this_index_exists:
+            continue
+        # update max_result_window setting if not in place
+        es_settings = index_settings(es_index)
+        es_result_window = es_settings['index']['max_result_window']
+        window_settings = {'index': {'max_result_window': es_result_window}}
+        try:
+            settings = es.indices.get_settings(index=es_index)
+        except NotFoundError:
+            es.indices.put_settings(index=es_index, body=window_settings)
+        else:
+            max_window = settings.get(es_index, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
+            if not max_window or max_window != es_result_window:
+                es.indices.put_settings(index=es_index, body=window_settings)
+        es.indices.refresh(index=es_index)
+        res = es.search(index=es_index, size=SEARCH_MAX, body={
+            'query': {
+                'bool': {
+                    'filter': {
+                        'bool': {
+                            'should': [
+                                {
+                                    'terms': {
+                                        'embedded_uuids': list(updated),
+                                        '_cache': False,
+                                    },
+                                },
+                                {
+                                    'terms': {
+                                        'linked_uuids': list(renamed),
+                                        '_cache': False,
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                },
+            },
+            '_source': False,
+        })
+        print('....', es_index)
+        print('======>>>>', res['hits']['total'])
+        if res['hits']['total'] > SEARCH_MAX:
+            referencing = list(all_uuids(request.registry))
+            flush = True
+            break
+        else:
+            found_uuids = {hit['_id'] for hit in res['hits']['hits']}
+            print('UUIDS:', found_uuids)
+            referencing= referencing | found_uuids
+    invalidated = referencing | updated
+    return invalidated, referencing
 
 
 def all_uuids(registry, types=None):

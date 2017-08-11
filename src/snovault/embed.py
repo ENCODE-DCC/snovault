@@ -71,26 +71,31 @@ def embed(request, *elements, **kw):
     path = join(*elements)
     path = unquote_bytes_to_wsgi(native_(path))
     # check to see if this embed is a non-object field
-    invalid_check = identify_invalid_embed(request, path)
+    invalid_check = identify_invalid_embed(request, path, None)
     if invalid_check != 'valid':
         return invalid_check
     if as_user is not None:
-        result, embedded, linked = _embed(request, path, as_user)
+        result, embedded_uuids, linked_uuids = _embed(request, path, as_user)
     else:
         # Carl: caching restarts at every call to _embed. This is not the problem
         cached = embed_cache.get(path, None)
         if cached is None:
             cached = _embed(request, path)
             embed_cache[path] = cached
-        result, embedded, linked = cached
+        result, embedded_uuids, linked_uuids = cached
         result = deepcopy(result)
     log.debug('embed: %s', path)
-    request._embedded_uuids.update(embedded)
-    request._linked_uuids.update(linked)
+    # request._embedded_uuids.update(embedded)
+    # request._linked_uuids.update(linked)
     # if we have a list of fields to embed, @@embebded is being called.
     # parse and trim fully embedded obj according to the fields to embed.
     if fields_to_embed is not None:
+        global select_embedded_uuids
+        select_embedded_uuids = set()
         p_result = parse_embedded_result(request, result, fields_to_embed)
+        request._embedded_uuids.update(select_embedded_uuids)
+        processed_linked_uuids = linked_uuids.difference(embedded_uuids)
+        request._linked_uuids.update(processed_linked_uuids)
         return p_result
     return result
 
@@ -116,7 +121,7 @@ def _embed(request, path, as_user='EMBED'):
     return result, subreq._embedded_uuids, subreq._linked_uuids
 
 
-def identify_invalid_embed(request, path, use_literal=False):
+def identify_invalid_embed(request, path, select_embedded_uuids, use_literal=False):
     """
     With new embedding system, we might attempt to embed something that doesn't
     have a fully formed path (i.e. uuid/@@object instead of /type/uuid/@@object)
@@ -145,8 +150,8 @@ def identify_invalid_embed(request, path, use_literal=False):
         invalid_return_val = path[:-9] if path[-9:] == '/@@object' else split_path[0]
         proc_path = [sub for sub in split_path if sub[:2] != '@@']
         use_path = '/'.join(proc_path)
-    if len(path) == 0 or path[0] != '/':
-        return invalid_return_val
+        if len(path) == 0 or path[0] != '/':
+            return invalid_return_val
     mapper = request.registry.queryUtility(IRoutesMapper)
     if mapper.get_route(path.strip('/')):
         return 'valid'
@@ -158,7 +163,15 @@ def identify_invalid_embed(request, path, use_literal=False):
     # Known issues: ':' in path (pyramid interprets as scheme)
     except TypeError:
         return invalid_return_val
-    return 'valid' # this obj can be embedded (a valid resource path)
+    else:
+        try:
+            found_uuid = str(find_attempt.uuid)
+        except AttributeError:
+            return invalid_return_val
+        else:
+            if select_embedded_uuids is not None:
+                select_embedded_uuids.add(found_uuid)
+            return 'valid' # this obj can be embedded (a valid resource path)
 
 
 def parse_embedded_result(request, result, fields_to_embed):
@@ -264,8 +277,9 @@ def handle_string_embed(request, key, val, embedded_model):
     Allow @@download strings regardless of format for things like links
     """
     if key == '@id' or key == 'uuid':
+        identify_invalid_embed(request, val, select_embedded_uuids, True)
         return val
-    elif identify_invalid_embed(request, val, True) != 'valid':
+    elif identify_invalid_embed(request, val, select_embedded_uuids, True) != 'valid':
         return val
     else:
         return None
