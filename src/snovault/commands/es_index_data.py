@@ -2,8 +2,6 @@ from pyramid.paster import get_app
 import logging
 from webtest import TestApp
 
-index = 'snovault'
-
 EPILOG = __doc__
 
 
