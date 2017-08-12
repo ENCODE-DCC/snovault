@@ -71,7 +71,7 @@ def embed(request, *elements, **kw):
     path = join(*elements)
     path = unquote_bytes_to_wsgi(native_(path))
     # check to see if this embed is a non-object field
-    invalid_check = identify_invalid_embed(request, path, None)
+    invalid_check = identify_invalid_embed(request, path)
     if invalid_check != 'valid':
         return invalid_check
     if as_user is not None:
@@ -121,7 +121,7 @@ def _embed(request, path, as_user='EMBED'):
     return result, subreq._embedded_uuids, subreq._linked_uuids
 
 
-def identify_invalid_embed(request, path, select_embedded_uuids, use_literal=False):
+def identify_invalid_embed(request, path):
     """
     With new embedding system, we might attempt to embed something that doesn't
     have a fully formed path (i.e. uuid/@@object instead of /type/uuid/@@object)
@@ -130,28 +130,19 @@ def identify_invalid_embed(request, path, select_embedded_uuids, use_literal=Fal
     the object needed for that field will already be handled.
     Return the value of the non-obj field, else 'valid' if obj can be embedded
 
-    This function is used in two ways:
-    1. to differentiate from legitimate objects vs fields in the embedded
-    subrequest chain (as explained above)
-    2. to identify object paths in the parsing of fully embedded objects when
-    given a string value (see handle_string_embed). In this case, use_literal
-    should be true
+    This function is used in to differentiate from legitimate objects vs fields in the embedded
+    subrequest chain
     """
     split_path = path.split('/')
     invalid_return_val = None
-    use_path = None
-    if use_literal:
-        invalid_return_val = path
-        use_path = path
-    else:
-        # non-literal path is used, which means remove any @@ subelements.
-        # Specifically, remove /@@object, which gets appended to fields as part
-        # of the subrequest chain in embeddeding
-        invalid_return_val = path[:-9] if path[-9:] == '/@@object' else split_path[0]
-        proc_path = [sub for sub in split_path if sub[:2] != '@@']
-        use_path = '/'.join(proc_path)
-        if len(path) == 0 or path[0] != '/':
-            return invalid_return_val
+    # remove any @@ subelements.
+    # Specifically, remove /@@object, which gets appended to fields as part
+    # of the subrequest chain in embeddeding
+    invalid_return_val = path[:-9] if path[-9:] == '/@@object' else split_path[0]
+    proc_path = [sub for sub in split_path if sub[:2] != '@@']
+    use_path = '/'.join(proc_path)
+    if len(path) == 0 or path[0] != '/':
+        return invalid_return_val
     mapper = request.registry.queryUtility(IRoutesMapper)
     if mapper.get_route(path.strip('/')):
         return 'valid'
@@ -164,16 +155,30 @@ def identify_invalid_embed(request, path, select_embedded_uuids, use_literal=Fal
     except TypeError:
         return invalid_return_val
     else:
+        return 'valid'
+
+
+def test_if_string_is_uuid_embed(request, use_path):
+    """
+    See if string is valid path. If so, add it to select_embedded_uuids
+    """
+    try:
+        find_attempt = find_resource(request.root, use_path)
+    except KeyError: # KeyError is due to path not found
+        return
+    # TypeErrors come from certain formatting issues
+    # Known issues: ':' in path (pyramid interprets as scheme)
+    except TypeError:
+        return
+    else:
         try:
             found_uuid = str(find_attempt.uuid)
         except AttributeError:
-            # no uuid found, but the path still worked with mapper
-            return 'valid'
+            return
         else:
             if select_embedded_uuids is not None:
                 # a uuid was found for this path
                 select_embedded_uuids.add(found_uuid)
-            return 'valid'
 
 
 def parse_embedded_result(request, result, fields_to_embed):
@@ -278,13 +283,9 @@ def handle_string_embed(request, key, val, embedded_model):
     or a non-object related string.
     Allow @@download strings regardless of format for things like links
     """
-    if key in ['@type', '@id', 'uuid']:
-        identify_invalid_embed(request, val, select_embedded_uuids, True)
-        return val
-    elif identify_invalid_embed(request, val, select_embedded_uuids, True) != 'valid':
-        return val
-    else:
-        return None
+    if key == 'uuid':
+        test_if_string_is_uuid_embed(request, val)
+    return val
 
 
 def handle_list_embed(request, key, val, embedded_model):
