@@ -65,7 +65,6 @@ def test_embedded_uuids_real(workbook, testapp, app):
     embedded_uuids of the es result
     """
     from snovault.elasticsearch.interfaces import ELASTIC_SEARCH
-    import pdb; pdb.set_trace()
     es = app.registry[ELASTIC_SEARCH]
     res = testapp.get('/search/?type=Snowflake&limit=all').json
     test_case = res['@graph'][0]
