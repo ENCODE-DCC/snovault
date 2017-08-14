@@ -94,7 +94,7 @@ def embed(request, *elements, **kw):
         select_embedded_uuids = set()
         p_result = parse_embedded_result(request, result, fields_to_embed)
         request._embedded_uuids.update(select_embedded_uuids)
-        processed_linked_uuids = linked_uuids.difference(embedded_uuids)
+        processed_linked_uuids = linked_uuids.difference(select_embedded_uuids)
         request._linked_uuids.update(processed_linked_uuids)
         return p_result
     return result
@@ -283,8 +283,7 @@ def handle_string_embed(request, key, val, embedded_model):
     or a non-object related string.
     Allow @@download strings regardless of format for things like links
     """
-    if key == 'uuid':
-        test_if_string_is_uuid_embed(request, val)
+    test_if_string_is_uuid_embed(request, val)
     return val
 
 
