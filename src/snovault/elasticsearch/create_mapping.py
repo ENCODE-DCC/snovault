@@ -30,23 +30,33 @@ import json
 import logging
 import time
 import sys
-from snovault.commands.es_index_data import run2 as run_indexing_real
+from snovault.commands.es_index_data import run as run_index_data
+from snovault.commands.es_index_data import create_app_and_run
 import transaction
 import os
 import argparse
 
 
-# keep args global so we can use them in our forks that do the 
+# keep args global so we can use them in our forks that do the
 # indexing
 args = None
 def run_indexing(app, in_type_list):
-    # ensure open transactions are closed so SQLAlchemy doesn't complain
-    transaction.commit()
-    
-    #fork
-    child_pid = os.fork()
-    if child_pid == 0: # the child
-        run_indexing_real(args.app_nam, args.config_uri, in_type_list)
+    # if no global args provided, run indexing using the provided app
+    if args is None:
+        # set last_xmin to 0 to competely re-index
+        run_index_data(app, in_type_list, last_xmin=None)
+    else:
+        # ensure open transactions are closed so SQLAlchemy doesn't complain
+        transaction.commit()
+
+        #fork
+        child_pid = os.fork()
+        if child_pid == 0: # the child
+            # set last_xmin to 0 to competely re-index
+            create_app_and_run(args.app_name, args.config_uri, in_type_list, last_xmin=None)
+
+
+log = logging.getLogger(__name__)
 
 
 log = logging.getLogger(__name__)
@@ -632,14 +642,14 @@ def build_index(app, es, in_type, mapping, dry_run, check_first, print_count_onl
     else:
         # first, create the mapping. adds settings in the body
         put_settings = this_index_record['settings']
-        res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, request_timeout=30)
+        res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, ignore=[400], request_timeout=30)
         if res:
             print('MAPPING: new index created for %s' % (in_type))
         else:
             print('MAPPING: new index failed for %s' % (in_type))
 
         # update with mapping
-        res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, request_timeout=30)
+        res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, ignore=[400], request_timeout=30)
         if res:
             print('MAPPING: mapping successfully added for %s' % (in_type))
         else:
