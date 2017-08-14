@@ -641,14 +641,14 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
     else:
         # first, create the mapping. adds settings in the body
         put_settings = this_index_record['settings']
-        res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, request_timeout=30)
+        res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, ignore=[400], request_timeout=30)
         if res:
             print('MAPPING: new index created for %s' % (in_type))
         else:
             print('MAPPING: new index failed for %s' % (in_type))
 
         # update with mapping
-        res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, request_timeout=30)
+        res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, ignore=[400], request_timeout=30)
         if res:
             print('MAPPING: mapping successfully added for %s' % (in_type))
         else:
