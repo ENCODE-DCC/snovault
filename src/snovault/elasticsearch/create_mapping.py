@@ -596,7 +596,7 @@ def create_mapping_by_type(in_type, registry):
     return es_mapping(embed_mapping)
 
 
-def build_index(app, es, in_type, mapping, dry_run, check_first):
+def build_index(app, es, in_type, mapping, dry_run, check_first, print_count_only=False):
     """
     Creates an es index for the given in_type with the given mapping and
     settings defined by item_settings(). If check_first == True, attempting
@@ -615,19 +615,20 @@ def build_index(app, es, in_type, mapping, dry_run, check_first):
     prev_index_record = get_previous_index_record(this_index_exists, check_first, es, in_type)
     if prev_index_record is not None and this_index_record == prev_index_record:
         if in_type != 'meta':
-            check_and_reindex_existing(app, es, in_type)
+            check_and_reindex_existing(app, es, in_type, print_count_only)
         print('MAPPING: using existing index for collection %s' % (in_type))
         return
 
     # delete the index
-    if this_index_exists:
+    if this_index_exists and not dry_run:
         res = es_safe_execute(es.indices.delete, index=in_type, ignore=[400,404], request_timeout=30)
         if res:
             print('MAPPING: index successfully deleted for %s' % (in_type))
         else:
             print('MAPPING: could not delete index for %s' % (in_type))
     if dry_run:
-        print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
+        pass
+        # print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
     else:
         # first, create the mapping. adds settings in the body
         put_settings = this_index_record['settings']
@@ -702,7 +703,7 @@ def get_previous_index_record(this_index_exists, check_first, es, in_type):
         return None
 
 
-def check_and_reindex_existing(app, es, in_type):
+def check_and_reindex_existing(app, es, in_type, dry_run=False):
     # lastly, check to make sure the item count for the existing
     # index matches the database document count. If not, reindex
     count_res = es.count(index=in_type, doc_type=in_type)
@@ -719,6 +720,10 @@ def check_and_reindex_existing(app, es, in_type):
             db_count += coll_count
         else:
             db_count -= coll_count
+    if dry_run:
+        log.warn("Db count is %s and ES count is %s for index: %s" %
+                 (db_count, str(es_count), in_type))
+        return
     if es_count is None or es_count != db_count:
         print('MAPPING: re-indexing all items in the existing index %s' % (in_type))
         run_indexing(app, [in_type])
@@ -750,7 +755,8 @@ def snovault_cleanup(es, registry):
             snovault_index.delete(ignore=404)
 
 
-def run(app, collections=None, dry_run=False, check_first=False):
+def run(app, collections=None, dry_run=False, check_first=False,
+       print_count_only=False):
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
     if not dry_run:
@@ -762,13 +768,17 @@ def run(app, collections=None, dry_run=False, check_first=False):
     for collection_name in collections:
         if collection_name == 'meta':
             # meta mapping just contains settings
-            build_index(app, es, collection_name, META_MAPPING, dry_run, check_first)
+            build_index(app, es, collection_name, META_MAPPING, dry_run,
+                        check_first, print_count_only)
         else:
             mapping = create_mapping_by_type(collection_name, registry)
-            build_index(app, es, collection_name, mapping, dry_run, check_first)
+            build_index(app, es, collection_name, mapping, dry_run,
+                        check_first, print_count_only)
 
 
 args = None
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Create Elasticsearch mapping", epilog=EPILOG,
@@ -781,6 +791,8 @@ def main():
     parser.add_argument('config_uri', help="path to configfile")
     parser.add_argument('--check-first', action='store_true',
                         help="check if index exists first before attempting creation")
+    parser.add_argument('--print-count-only', action='store_true',
+                        help="use with check_first to only print counts")
     global args
     args = parser.parse_args()
 
@@ -790,7 +802,8 @@ def main():
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.WARN)
 
-    return run(app, args.item_type, args.dry_run, args.check_first)
+    return run(app, args.item_type, args.dry_run, args.check_first,
+               args.print_count_only)
 
 
 if __name__ == '__main__':
