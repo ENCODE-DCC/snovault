@@ -48,3 +48,28 @@ def test_selective_embedding(workbook, testapp):
     assert 'pi' not in test_json[0]['award']
     # @id-like field that should still be embedded (not a valid @id)
     assert test_json[0]['lab']['city'] == 'Stanford/USA/'
+
+
+def recursively_find_uuids(json, uuids):
+    for key, val in json.items():
+        if key == 'uuid':
+            uuids.add(val)
+        elif isinstance(val, dict):
+            uuids = recursively_find_uuids(val, uuids)
+    return uuids
+
+
+def test_embedded_uuids_real(workbook, testapp, app):
+    """
+    Find all uuids from a search result and ensure they match the
+    embedded_uuids of the es result
+    """
+    from snovault.elasticsearch.interfaces import ELASTIC_SEARCH
+    import pdb; pdb.set_trace()
+    es = app.registry[ELASTIC_SEARCH]
+    res = testapp.get('/search/?type=Snowflake&limit=all').json
+    test_case = res['@graph'][0]
+    test_uuids = recursively_find_uuids(test_case, set())
+    test_doc = es.get(index='snowflake', doc_type='snowflake', id=test_case['uuid'])
+    embedded_uuids = set(test_doc['_source']['embedded_uuids'])
+    assert test_uuids == embedded_uuids
