@@ -23,6 +23,7 @@ from .config import (  # noqa
     root,
 )
 from .interfaces import *  # noqa
+
 from .resources import (  # noqa
     AbstractCollection,
     Collection,
@@ -32,7 +33,7 @@ from .resources import (  # noqa
 )
 from .schema_utils import load_schema  # noqa
 from .upgrader import upgrade_step  # noqa
-from .app import (
+from .app import ( # noqa
     app_version,
     session,
     configure_dbsession,
@@ -51,7 +52,6 @@ def includeme(config):
     config.include('.config')
     config.include('.connection')
     config.include('.embed')
-    config.include('.json_renderer')
     config.include('.validation')
     config.include('.predicates')
     config.include('.invalidation')
