@@ -259,7 +259,7 @@ def test_indexing_es(app, testapp, indexer_testapp):
     # delete index and re-run create_mapping; should re-index the single index
     es.indices.delete(index=test_type)
     create_mapping.run(app, check_first=True)
-    time.sleep(2)
+    time.sleep(5)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
     # post second item to database but do not index (don't load into es)
@@ -270,7 +270,7 @@ def test_indexing_es(app, testapp, indexer_testapp):
     assert doc_count == 1
     # run create mapping with check_first=True, expect test index to re-index
     create_mapping.run(app, check_first=True)
-    time.sleep(2)
+    time.sleep(5)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     # doc_count will have updated due to indexing in create_mapping
     assert doc_count == 2

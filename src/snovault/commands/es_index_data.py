@@ -5,23 +5,24 @@ from webtest import TestApp
 EPILOG = __doc__
 
 
-def run(app, collections=None, last_xmin=None):
+def run(app, collections=None, last_xmin=None, uuids=None):
     environ = {
         'HTTP_ACCEPT': 'application/json',
         'REMOTE_USER': 'INDEXER',
     }
     testapp = TestApp(app, environ)
-    testapp.post_json('/index', {
+    post_body = {
         'last_xmin': last_xmin,
         'types': collections,
         'recovery': True
-        }
-    )
+    }
+    if uuids:
+        # uuids are in set and must be list to be json serializable
+        post_body['uuids'] = list(uuids)
+    testapp.post_json('/index', post_body)
 
 
-def create_app_and_run(app_name, config_uri, collections=None, last_xmin=None):
-    print('_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_')
-    print('collections:', collections, '  last_xmin:', last_xmin)
+def create_app_and_run(app_name, config_uri, collections=None, last_xmin=None, uuids=None):
     options = {
         'embed_cache.capacity': '5000',
         'indexer': 'true',
@@ -30,7 +31,7 @@ def create_app_and_run(app_name, config_uri, collections=None, last_xmin=None):
 
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.DEBUG)
-    return run(app, collections, last_xmin)
+    return run(app, collections, last_xmin, uuids)
 
 
 def main():
