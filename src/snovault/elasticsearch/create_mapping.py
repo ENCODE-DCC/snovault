@@ -40,6 +40,7 @@ import argparse
 # keep args global so we can use them in our forks that do the
 # indexing
 args = None
+
 def run_indexing(app, in_type_list):
     # if no global args provided, run indexing using the provided app
     if args is None:
@@ -54,12 +55,6 @@ def run_indexing(app, in_type_list):
         if child_pid == 0: # the child
             # set last_xmin to 0 to competely re-index
             create_app_and_run(args.app_name, args.config_uri, in_type_list, last_xmin=None)
-
-
-log = logging.getLogger(__name__)
-
-
-log = logging.getLogger(__name__)
 
 
 EPILOG = __doc__
@@ -606,7 +601,7 @@ def create_mapping_by_type(in_type, registry):
     return es_mapping(embed_mapping)
 
 
-def build_index(app, es, in_type, mapping, dry_run, check_first, print_count_only=False):
+def build_index(app, es, in_type, mapping, dry_run, check_first, force=False, print_count_only=False):
     """
     Creates an es index for the given in_type with the given mapping and
     settings defined by item_settings(). If check_first == True, attempting
@@ -620,14 +615,17 @@ def build_index(app, es, in_type, mapping, dry_run, check_first, print_count_onl
     # determine if index already exists for this type
     this_index_record = build_index_record(mapping, in_type)
     this_index_exists = check_if_index_exists(es, in_type, check_first)
+    meta_exists = check_if_index_exists(es, 'meta', check_first) if in_type != 'meta' else True
 
     # if the index exists, we might not need to delete it
-    prev_index_record = get_previous_index_record(this_index_exists, check_first, es, in_type)
-    if prev_index_record is not None and this_index_record == prev_index_record:
-        if in_type != 'meta':
-            check_and_reindex_existing(app, es, in_type, print_count_only)
-        print('MAPPING: using existing index for collection %s' % (in_type))
-        return
+    # if force is provided, check_first does not matter
+    if not force:
+        prev_index_record = get_previous_index_record(this_index_exists, check_first, es, in_type)
+        if prev_index_record is not None and this_index_record == prev_index_record:
+            if in_type != 'meta':
+                check_and_reindex_existing(app, es, in_type, print_count_only)
+            print('MAPPING: using existing index for collection %s' % (in_type))
+            return
 
     # delete the index
     if this_index_exists and not dry_run:
@@ -655,24 +653,30 @@ def build_index(app, es, in_type, mapping, dry_run, check_first, print_count_onl
         else:
             print('MAPPING: mapping failed for %s' % (in_type))
 
-        # if 'indexing' doc exists within meta, then re-index for this type
-        indexing_xmin = None
-        try:
-            status = es.get(index='meta', doc_type='meta', id='indexing', ignore=[404])
-        except:
-            print('MAPPING: indexing record not found in meta for %s' % (in_type))
-        else:
-            indexing_xmin = status.get('_source', {}).get('xmin')
-        if indexing_xmin is not None:
-            print('MAPPING: re-indexing all items in the new index %s' % (in_type))
+        # force means we want to forcibly re-index
+        if force:
+            print('MAPPING: forcibly re-indexing all items in the new index %s' % (in_type))
             run_indexing(app, [in_type])
+        else:
+            # if 'indexing' doc exists within meta, then re-index for this type
+            indexing_xmin = None
+            try:
+                status = es.get(index='meta', doc_type='meta', id='indexing', ignore=[404])
+            except:
+                print('MAPPING: indexing record not found in meta for %s' % (in_type))
+            else:
+                indexing_xmin = status.get('_source', {}).get('xmin')
+            if indexing_xmin is not None:
+                print('MAPPING: re-indexing all items in the new index %s' % (in_type))
+                run_indexing(app, [in_type])
 
         # put index_record in meta
-        res = es_safe_execute(es.index, index='meta', doc_type='meta', body=this_index_record, id=in_type)
-        if res:
-            print("MAPPING: index record created for %s" % (in_type))
-        else:
-            print("MAPPING: index record failed for %s" % (in_type))
+        if meta_exists:
+            res = es_safe_execute(es.index, index='meta', doc_type='meta', body=this_index_record, id=in_type)
+            if res:
+                print("MAPPING: index record created for %s" % (in_type))
+            else:
+                print("MAPPING: index record failed for %s" % (in_type))
 
 
 def check_if_index_exists(es, in_type, check_first):
@@ -698,13 +702,13 @@ def get_previous_index_record(this_index_exists, check_first, es, in_type):
     prev_index_hit = {}
     if this_index_exists and check_first:
         try:
-            prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type)
+            prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type, ignore=[404])
         except TransportError as excp:
             if excp.info.get('status') == 503:
                 es.indices.refresh(index='meta')
                 time.sleep(3)
                 try:
-                    prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type)
+                    prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type, ignore=[404])
                 except:
                     return None
         prev_index_record = prev_index_hit.get('_source')
@@ -713,7 +717,7 @@ def get_previous_index_record(this_index_exists, check_first, es, in_type):
         return None
 
 
-def check_and_reindex_existing(app, es, in_type, dry_run=False):
+def check_and_reindex_existing(app, es, in_type, print_counts=False):
     # lastly, check to make sure the item count for the existing
     # index matches the database document count. If not, reindex
     count_res = es.count(index=in_type, doc_type=in_type)
@@ -730,9 +734,9 @@ def check_and_reindex_existing(app, es, in_type, dry_run=False):
             db_count += coll_count
         else:
             db_count -= coll_count
-    if dry_run:
-        log.warn("Db count is %s and ES count is %s for index: %s" %
-                 (db_count, str(es_count), in_type))
+    if print_counts:
+        log.warn("DB count is %s and ES count is %s for index: %s" %
+                 (str(db_count), str(es_count), in_type))
         return
     if es_count is None or es_count != db_count:
         print('MAPPING: re-indexing all items in the existing index %s' % (in_type))
@@ -765,28 +769,23 @@ def snovault_cleanup(es, registry):
             snovault_index.delete(ignore=404)
 
 
-def run(app, collections=None, dry_run=False, check_first=False,
-       print_count_only=False):
+def run(app, collections=None, dry_run=False, check_first=False, force=False, print_count_only=False):
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
     if not dry_run:
         snovault_cleanup(es, registry)
     if not collections:
-        collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
-    elif collections and 'meta' not in collections:
+        collections = list(registry[COLLECTIONS].by_item_type.keys())
+    if not force:
         collections = ['meta'] + collections
     for collection_name in collections:
         if collection_name == 'meta':
             # meta mapping just contains settings
             build_index(app, es, collection_name, META_MAPPING, dry_run,
-                        check_first, print_count_only)
+                        check_first, force, print_count_only)
         else:
             mapping = create_mapping_by_type(collection_name, registry)
-            build_index(app, es, collection_name, mapping, dry_run,
-                        check_first, print_count_only)
-
-
-args = None
+            build_index(app, es, collection_name, mapping, dry_run, check_first, force, print_count_only)
 
 
 def main():
@@ -801,6 +800,8 @@ def main():
     parser.add_argument('config_uri', help="path to configfile")
     parser.add_argument('--check-first', action='store_true',
                         help="check if index exists first before attempting creation")
+    parser.add_argument('--force', action='store_true',
+                        help="set this to ignore meta and force new mapping and reindexing of all/given collections")
     parser.add_argument('--print-count-only', action='store_true',
                         help="use with check_first to only print counts")
     global args
@@ -812,7 +813,7 @@ def main():
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.WARN)
 
-    return run(app, args.item_type, args.dry_run, args.check_first,
+    return run(app, args.item_type, args.dry_run, args.check_first, args.force,
                args.print_count_only)
 
 

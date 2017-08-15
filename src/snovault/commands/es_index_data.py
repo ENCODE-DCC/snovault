@@ -20,6 +20,8 @@ def run(app, collections=None, last_xmin=None):
 
 
 def create_app_and_run(app_name, config_uri, collections=None, last_xmin=None):
+    print('_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_')
+    print('collections:', collections, '  last_xmin:', last_xmin)
     options = {
         'embed_cache.capacity': '5000',
         'indexer': 'true',

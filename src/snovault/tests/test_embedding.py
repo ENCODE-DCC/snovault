@@ -38,18 +38,33 @@ def content(testapp):
 
 
 def test_embedded_uuids_object(content, dummy_request, threadlocals):
+    # _embedded_uuids and_linked_uuids are only added to a request with fields_to_embed defined
     dummy_request.embed('/testing-link-sources/', sources[0]['uuid'], '@@object')
-    assert dummy_request._embedded_uuids == {sources[0]['uuid']}
+    assert dummy_request._embedded_uuids == set()
+    assert dummy_request._linked_uuids == set()
 
 
-def test_linked_uuids_object(content, dummy_request, threadlocals):
-    dummy_request.embed('/testing-link-sources/', sources[0]['uuid'], '@@object')
-    assert dummy_request._linked_uuids == {sources[0]['uuid'], targets[0]['uuid']}
+def test_embedded_uuids_embedded_no_fields(content, dummy_request, threadlocals):
+    dummy_request.embed('/testing-link-sources/', sources[0]['uuid'], '@@embedded')
+    assert dummy_request._embedded_uuids == set()
+    assert dummy_request._linked_uuids == set()
+
+
+def test_embedded_uuids_embedded(content, dummy_request, threadlocals):
+    dummy_request.embed('/testing-link-sources/', sources[0]['uuid'], '@@embedded', fields_to_embed=['*', 'target.uuid'])
+    assert dummy_request._embedded_uuids == {sources[0]['uuid'], targets[0]['uuid']}
+    assert dummy_request._linked_uuids == set()
 
 
 def test_embedded_uuids_expand_target(content, dummy_request, threadlocals):
     dummy_request.embed('/testing-link-sources/', sources[0]['uuid'], '@@expand?expand=target')
-    assert dummy_request._embedded_uuids == {sources[0]['uuid'], targets[0]['uuid']}
+    # assert dummy_request._embedded_uuids == {sources[0]['uuid'], targets[0]['uuid']}
+    # the @@expand?expand=target arg causes the body to be built as expected,
+    # but not we only return _embedded_uuids and _linked_uuids when
+    # we're calling @@index-data, which corresponds to @@embedded with
+    # field_to_embed defined
+    assert dummy_request._embedded_uuids == set()
+    assert dummy_request._linked_uuids == set()
 
 
 def test_updated_source(content, testapp):
