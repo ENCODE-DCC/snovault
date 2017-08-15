@@ -769,7 +769,7 @@ def snovault_cleanup(es, registry):
             snovault_index.delete(ignore=404)
 
 
-def run(app, collections=None, dry_run=False, check_first=False, force=False, print_count_only=False)):
+def run(app, collections=None, dry_run=False, check_first=False, force=False, print_count_only=False):
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
     if not dry_run:

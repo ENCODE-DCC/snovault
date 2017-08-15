@@ -88,8 +88,8 @@ def index(request):
         result['types'] = types = request.json.get('types', None)
         indices = list(request.registry[COLLECTIONS].by_item_type.keys())
         updated = set(list(all_uuids(request.registry, types)))
-        invalidated, referencing = find_associated_uuids(indices, es, updated, updated)
         flush = True
+        invalidated, referencing, flush = find_associated_uuids(indices, es, updated, updated, flush)
     else:
         txns = session.query(TransactionRecord).filter(
             TransactionRecord.xid >= last_xmin,
@@ -115,7 +115,7 @@ def index(request):
 
         # iterate through all indices and find items with matching embedded uuids
         indices = list(request.registry[COLLECTIONS].by_item_type.keys())
-        invalidated, referencing = find_associated_uuids(indices, es, updated, renamed)
+        invalidated, referencing, flush = find_associated_uuids(indices, es, updated, renamed)
         result.update(
             max_xid=max_xid,
             renamed=renamed,
@@ -125,9 +125,8 @@ def index(request):
             txn_count=txn_count,
             first_txn_timestamp=first_txn.isoformat(),
         )
-    print('ORIGINAL:')
-    print('------>', len(updated))
-    print('RE-INDEXING:', invalidated)
+    log.debug("Indexing %s items in main run; %s of primary type" %
+             (str(len(invalidated)), str(len(updated))))
     if invalidated and not dry_run:
         # Exporting a snapshot mints a new xid, so only do so when required.
         # Not yet possible to export a snapshot on a standby server:
@@ -171,7 +170,7 @@ def index(request):
     return result
 
 
-def find_associated_uuids(indices, es, updated, renamed):
+def find_associated_uuids(indices, es, updated, renamed, flush=False):
     """
     Run a search to find uuids of objects with embedded uuids in updated
     or linked uuids in renamed. Only runs over the given indices.
@@ -220,18 +219,17 @@ def find_associated_uuids(indices, es, updated, renamed):
             },
             '_source': False,
         })
-        print('....', es_index)
-        print('======>>>>', res['hits']['total'])
+        log.debug("Found %s items of type %s for indexing" %
+                 (str(res['hits']['total']), es_index))
         if res['hits']['total'] > SEARCH_MAX:
             referencing = list(all_uuids(request.registry))
             flush = True
             break
         else:
             found_uuids = {hit['_id'] for hit in res['hits']['hits']}
-            print('UUIDS:', found_uuids)
             referencing= referencing | found_uuids
     invalidated = referencing | updated
-    return invalidated, referencing
+    return invalidated, referencing, flush
 
 
 def all_uuids(registry, types=None):
