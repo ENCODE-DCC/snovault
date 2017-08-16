@@ -1,6 +1,7 @@
 import pytest
 from ..loadxl import ORDER
 
+
 @pytest.mark.parametrize('item_type', ORDER)
 def test_add_default_embeds(registry, item_type):
     """

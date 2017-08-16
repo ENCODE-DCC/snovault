@@ -158,10 +158,15 @@ def identify_invalid_embed(request, path):
         return 'valid'
 
 
-def test_if_string_is_uuid_embed(request, use_path):
+def test_if_string_is_uuid_embed(request, use_path, embedded_uuids):
     """
-    See if string is valid path. If so, add it to select_embedded_uuids
+    See if string is valid path. If so, add it to embedded_uuids
+    First test if path is ascii-encodeable. If not, return
     """
+    try:
+        ascii_path = use_path.encode('ascii')
+    except UnicodeEncodeError:
+        return
     try:
         find_attempt = find_resource(request.root, use_path)
     except KeyError: # KeyError is due to path not found
@@ -176,9 +181,9 @@ def test_if_string_is_uuid_embed(request, use_path):
         except AttributeError:
             return
         else:
-            if select_embedded_uuids is not None:
+            if embedded_uuids is not None:
                 # a uuid was found for this path
-                select_embedded_uuids.add(found_uuid)
+                embedded_uuids.add(found_uuid)
 
 
 def parse_embedded_result(request, result, fields_to_embed):
@@ -283,7 +288,7 @@ def handle_string_embed(request, key, val, embedded_model):
     or a non-object related string.
     Allow @@download strings regardless of format for things like links
     """
-    test_if_string_is_uuid_embed(request, val)
+    test_if_string_is_uuid_embed(request, val, select_embedded_uuids)
     return val
 
 
