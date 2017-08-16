@@ -72,3 +72,23 @@ def test_embedded_uuids_real(workbook, testapp, app):
     test_doc = es.get(index='snowflake', doc_type='snowflake', id=test_case['uuid'])
     embedded_uuids = set(test_doc['_source']['embedded_uuids'])
     assert test_uuids == embedded_uuids
+
+
+def test_test_if_string_is_uuid_embed(dummy_request, workbook, testapp):
+    from snovault.embed import test_if_string_is_uuid_embed
+    embedded_uuids = set()
+    # request.root = root
+    res = testapp.get('/search/?type=Item').json
+    test_item_1 = res['@graph'][0]
+    test_item_2 = res['@graph'][1]
+    test_if_string_is_uuid_embed(dummy_request, test_item_1['uuid'], embedded_uuids)
+    assert len(embedded_uuids) == 1
+    test_if_string_is_uuid_embed(dummy_request, test_item_2['@id'], embedded_uuids)
+    assert len(embedded_uuids) == 2
+    # these should not be added
+    test_str_1 = 'Lab'
+    test_str_2 = u'Chédiak-Higashi syndrome' # non-ascii
+    test_if_string_is_uuid_embed(dummy_request, test_str_1, embedded_uuids)
+    assert len(embedded_uuids) == 2
+    test_if_string_is_uuid_embed(dummy_request, test_str_2, embedded_uuids)
+    assert len(embedded_uuids) == 2

@@ -52,7 +52,6 @@ def postgresql_server(request):
 
     if process.poll() is None:
         process.terminate()
-        process.wait()
 
 
 @pytest.fixture(scope='session')
