@@ -728,9 +728,7 @@ def check_and_reindex_existing(app, es, in_type, uuids_to_index, print_counts=Fa
     # lastly, check to make sure the item count for the existing
     # index matches the database document count. If not, queue the uuids_to_index
     # in the index for reindexing.
-    count_res = es.count(index=in_type, doc_type=in_type)
-    es_count = count_res.get('count')
-    db_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
+    db_count, es_count, coll_uuids = get_db_es_counts_and_db_uuids(app, es, in_type)
     if print_counts:
         log.warn("DB count is %s and ES count is %s for index: %s" %
                  (str(db_count), str(es_count), in_type))
@@ -738,6 +736,28 @@ def check_and_reindex_existing(app, es, in_type, uuids_to_index, print_counts=Fa
     if es_count is None or es_count != db_count:
         print('MAPPING: queueing all items in the existing index %s for reindexing' % (in_type))
         uuids_to_index.update(coll_uuids)
+
+
+def get_db_es_counts_and_db_uuids(app, es, in_type):
+    if check_if_index_exists(es, in_type, False):
+        count_res = es.count(index=in_type, doc_type=in_type)
+        es_count = count_res.get('count')
+    else:
+        es_count = 0
+    # logic for datastore
+    datastore = None
+    try:
+        datastore = app.datastore
+    except AttributeError:
+        pass
+    else:
+        if datastore == 'elasticsearch':
+            app.datastore = 'database'
+    db_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
+    # reset datastore
+    if datastore:
+        app.datastore = datastore
+    return db_count, es_count, coll_uuids
 
 
 def get_collection_uuids_and_count(app, in_type):
