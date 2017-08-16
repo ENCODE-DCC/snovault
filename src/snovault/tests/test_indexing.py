@@ -316,8 +316,10 @@ def test_check_and_reindex_existing(app, testapp):
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     # doc_count has not yet updated
     assert doc_count == 0
-    check_and_reindex_existing(app, es, test_type)
+    test_uuids = set()
+    check_and_reindex_existing(app, es, test_type, test_uuids)
     time.sleep(2)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     # reindexing has occured
     assert doc_count == 1
+    assert(len(test_uuids)) == 1
