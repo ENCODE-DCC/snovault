@@ -1,6 +1,6 @@
 import pytest
 from ..loadxl import ORDER
-from .features.conftest import app_settings, app, workbook
+
 
 @pytest.mark.parametrize('item_type', ORDER)
 def test_add_default_embeds(registry, item_type):
@@ -32,22 +32,3 @@ def test_manual_embeds(registry, item_type):
         split_embed = embed.strip().split('.')
         error, added_embeds = crawl_schemas_by_embeds(item_type, registry[TYPES], split_embed, schema['properties'])
         assert error is None
-
-
-def test_test_if_string_is_uuid_embed(request, workbook, testapp):
-    from snovault.embed import test_if_string_is_uuid_embed
-    embedded_uuids = set()
-    res = testapp.get('/search/?type=Item').json
-    test_item_1 = res['@graph'][0]
-    test_item_2 = res['@graph'][1]
-    test_if_string_is_uuid_embed(request, test_item_1['uuid'], embedded_uuids)
-    assert len(embedded_uuids) == 1
-    test_if_string_is_uuid_embed(request, test_item_2['@id'], embedded_uuids)
-    assert len(embedded_uuids) == 2
-    # these should not be added
-    test_str_1 = 'Lab'
-    test_str_2 = 'Chédiak-Higashi syndrome' # non-ascii
-    test_if_string_is_uuid_embed(request, test_str_1, embedded_uuids)
-    assert len(embedded_uuids) == 2
-    test_if_string_is_uuid_embed(request, test_str_2, embedded_uuids)
-    assert len(embedded_uuids) == 2
