@@ -720,20 +720,6 @@ def get_previous_index_record(this_index_exists, check_first, es, in_type):
 def check_and_reindex_existing(app, es, in_type, print_counts=False):
     # lastly, check to make sure the item count for the existing
     # index matches the database document count. If not, reindex
-    db_count, es_count = get_db_es_doc_counts(app, es, in_type)
-    if print_counts:
-        log.warn("DB count is %s and ES count is %s for index: %s" %
-                 (str(db_count), str(es_count), in_type))
-        return
-    if es_count is None or es_count != db_count:
-        print('MAPPING: re-indexing all items in the existing index %s' % (in_type))
-        run_indexing(app, [in_type])
-
-
-def get_db_es_doc_counts(app, es, in_type):
-    """
-    Get db and es counts for a single item type
-    """
     count_res = es.count(index=in_type, doc_type=in_type)
     es_count = count_res.get('count')
 
@@ -748,7 +734,13 @@ def get_db_es_doc_counts(app, es, in_type):
             db_count += coll_count
         else:
             db_count -= coll_count
-    return db_count, es_count
+    if print_counts:
+        log.warn("DB count is %s and ES count is %s for index: %s" %
+                 (str(db_count), str(es_count), in_type))
+        return
+    if es_count is None or es_count != db_count:
+        print('MAPPING: re-indexing all items in the existing index %s' % (in_type))
+        run_indexing(app, [in_type])
 
 
 def es_safe_execute(function, **kwargs):
