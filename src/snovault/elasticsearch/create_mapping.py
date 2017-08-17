@@ -60,6 +60,8 @@ def run_indexing(app, indexing_uuids):
         if child_pid == 0: # the child
             # set last_xmin to 0 to competely re-index
             create_app_and_run(args.app_name, args.config_uri, uuids=indexing_uuids)
+        else:
+            os._exit(0) # exit the parent process (create-mapping is done)
 
 
 EPILOG = __doc__
