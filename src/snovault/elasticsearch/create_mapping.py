@@ -67,7 +67,6 @@ def run_indexing(app, indexing_uuids):
             sys.exit(1)
 
         # decouple from parent environment
-        os.chdir("/")
         os.setsid()
         os.umask(0)
 
