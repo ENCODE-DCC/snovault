@@ -55,13 +55,33 @@ def run_indexing(app, indexing_uuids):
         # ensure open transactions are closed so SQLAlchemy doesn't complain
         transaction.commit()
 
-        #fork
-        child_pid = os.fork()
-        if child_pid == 0: # the child
-            # set last_xmin to 0 to competely re-index
-            create_app_and_run(args.app_name, args.config_uri, uuids=indexing_uuids)
-        else:
-            os._exit(0) # exit the parent process (create-mapping is done)
+        # double fork
+        # see: http://code.activestate.com/recipes/66012-fork-a-daemon-process-on-unix/
+        try:
+            pid = os.fork()
+            if pid > 0:
+                print("First parent with PID %d successfully exited" % pid)
+                sys.exit(0)
+        except OSError as e:
+            print("Fork #1 failed: %d (%s)" % (e.errno, e.strerror), file=sys.stderr)
+            sys.exit(1)
+
+        # decouple from parent environment
+        os.chdir("/")
+        os.setsid()
+        os.umask(0)
+
+        try:
+            pid = os.fork()
+            if pid > 0:
+                # exit from second parent, print eventual PID before
+                print("Second parent with PID %d successfully exited" % pid)
+                sys.exit(0)
+        except OSError as e:
+            print("Fork #2 failed: %d (%s)" % (e.errno, e.strerror), file=sys.stderr)
+            sys.exit(1)
+
+        create_app_and_run(args.app_name, args.config_uri, uuids=indexing_uuids)
 
 
 EPILOG = __doc__
