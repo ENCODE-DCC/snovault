@@ -68,7 +68,6 @@ def run_indexing(app, indexing_uuids):
 
         # decouple from parent environment
         os.setsid()
-        os.umask(0)
 
         try:
             pid = os.fork()
@@ -81,6 +80,7 @@ def run_indexing(app, indexing_uuids):
             sys.exit(1)
 
         create_app_and_run(args.app_name, args.config_uri, uuids=indexing_uuids)
+        os._exit(os.EX_OK)
 
 
 EPILOG = __doc__
