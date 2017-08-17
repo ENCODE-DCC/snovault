@@ -7,6 +7,7 @@ from pyramid.compat import (
     unquote_bytes_to_wsgi,
 )
 from pyramid.httpexceptions import HTTPNotFound
+from pyramid.exceptions import URLDecodeError
 from pyramid.traversal import find_resource
 from pyramid.interfaces import IRoutesMapper
 import logging
