@@ -819,7 +819,8 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, pr
             build_index(app, es, collection_name, mapping, uuids_to_index,
                         dry_run, check_first, force, print_count_only)
     # indexing. for now just use one process
-    if uuids_to_index:
+    ### TEMPORARY: only index for force
+    if uuids_to_index and force:
         # find associated uuids
         final_uuids, _, _ = find_uuids_for_indexing(all_collections, es, uuids_to_index, uuids_to_index, log)
         run_indexing(app, final_uuids)

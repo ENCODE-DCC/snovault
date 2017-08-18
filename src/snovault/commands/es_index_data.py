@@ -1,7 +1,6 @@
 from pyramid.paster import get_app
 import logging
 from webtest import TestApp
-import os
 
 EPILOG = __doc__
 
@@ -20,33 +19,6 @@ def run(app, collections=None, last_xmin=None, uuids=None):
     if uuids:
         # uuids are in set and must be list to be json serializable
         post_body['uuids'] = list(uuids)
-
-    # ensure open transactions are closed so SQLAlchemy doesn't complain
-    transaction.commit()
-
-    # double fork
-    # see: http://code.activestate.com/recipes/66012-fork-a-daemon-process-on-unix/
-    try:
-        pid = os.fork()
-        if pid > 0:
-            print("First parent with PID %d successfully exited" % pid)
-            sys.exit(0)
-    except OSError as e:
-        print("Fork #1 failed: %d (%s)" % (e.errno, e.strerror), file=sys.stderr)
-        sys.exit(1)
-
-    # decouple from parent environment
-    os.setsid()
-
-    try:
-        pid = os.fork()
-        if pid > 0:
-            # exit from second parent, print eventual PID before
-            print("Second parent with PID %d successfully exited" % pid)
-            sys.exit(0)
-    except OSError as e:
-        print("Fork #2 failed: %d (%s)" % (e.errno, e.strerror), file=sys.stderr)
-        sys.exit(1)
     testapp.post_json('/index', post_body)
 
 
