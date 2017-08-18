@@ -842,8 +842,9 @@ def main():
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.WARN)
 
-    return run(app, args.item_type, args.dry_run, args.check_first, args.force,
+    uuids = run(app, args.item_type, args.dry_run, args.check_first, args.force,
                args.print_count_only)
+    return
 
 
 if __name__ == '__main__':
