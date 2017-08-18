@@ -169,6 +169,7 @@ def test_index_settings(app, testapp, indexer_testapp):
     from snovault.elasticsearch.create_mapping import index_settings
     test_type = 'testing_post_put_patch'
     es_settings = index_settings(test_type)
+    max_result_window = es_settings['index']['max_result_window']
     # preform some initial indexing to build meta
     res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
     res = indexer_testapp.post_json('/index', {'record': True})
@@ -176,8 +177,9 @@ def test_index_settings(app, testapp, indexer_testapp):
     assert 'xmin' in res.json
     es = app.registry[ELASTIC_SEARCH]
     curr_settings = es.indices.get_settings(index=test_type)
-    found_settings = curr_settings.get(test_type, {}).get('settings', None)
-    assert es_settings == found_settings
+    found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
+    # test one important setting
+    assert int(found_max_window) == max_result_window
 
 
 def test_indexing_es(app, testapp, indexer_testapp):
