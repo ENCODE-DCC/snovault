@@ -812,10 +812,11 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, pr
     # only index (synchronously) if --force option is used
     # otherwise, store uuids for later indexing (TODO)
     if uuids_to_index and force:
+        # use only the uuids from the index if strict and item-type provided
         if strict and collections:
-            final_uuids, _, _ = find_uuids_for_indexing(all_collections, es, uuids_to_index, uuids_to_index, log)
-        else:
             final_uuids = uuids_to_index
+        else:
+            final_uuids, _, _ = find_uuids_for_indexing(all_collections, es, uuids_to_index, uuids_to_index, log)
         print("MAPPING: indexing %s items" % (str(len(final_uuids))))
         run_indexing(app, final_uuids)
     return uuids_to_index
