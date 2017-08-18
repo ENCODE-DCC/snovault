@@ -12,18 +12,6 @@ def find_uuids_for_indexing(indices, es, updated, renamed, log):
         this_index_exists = es.indices.exists(index=es_index)
         if not this_index_exists:
             continue
-        # update max_result_window setting if not in place
-        es_settings = index_settings(es_index)
-        es_result_window = es_settings['index']['max_result_window']
-        window_settings = {'index': {'max_result_window': es_result_window}}
-        try:
-            settings = es.indices.get_settings(index=es_index)
-        except NotFoundError:
-            es.indices.put_settings(index=es_index, body=window_settings)
-        else:
-            max_window = settings.get(es_index, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
-            if not max_window or max_window != es_result_window:
-                es.indices.put_settings(index=es_index, body=window_settings)
         es.indices.refresh(index=es_index)
         res = es.search(index=es_index, size=SEARCH_MAX, body={
             'query': {

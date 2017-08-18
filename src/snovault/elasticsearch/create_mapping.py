@@ -787,7 +787,7 @@ def run_indexing(app, indexing_uuids):
     run_index_data(app, uuids=indexing_uuids)
 
 
-def run(app, collections=None, dry_run=False, check_first=False, force=False, print_count_only=False):
+def run(app, collections=None, dry_run=False, check_first=False, force=False, print_count_only=False, strict=False):
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
     all_collections = list(registry[COLLECTIONS].by_item_type.keys())
@@ -812,8 +812,11 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, pr
     # only index (synchronously) if --force option is used
     # otherwise, store uuids for later indexing (TODO)
     if uuids_to_index and force:
-        # find associated uuids
-        final_uuids, _, _ = find_uuids_for_indexing(all_collections, es, uuids_to_index, uuids_to_index, log)
+        if strict and collections:
+            final_uuids, _, _ = find_uuids_for_indexing(all_collections, es, uuids_to_index, uuids_to_index, log)
+        else:
+            final_uuids = uuids_to_index
+        print("MAPPING: indexing %s items" % (str(len(final_uuids))))
         run_indexing(app, final_uuids)
     return uuids_to_index
 
@@ -834,6 +837,8 @@ def main():
                         help="set this to ignore meta and force new mapping and reindexing of all/given collections")
     parser.add_argument('--print-count-only', action='store_true',
                         help="use with check_first to only print counts")
+    parser.add_argument('--strict', action='store_true',
+                        help="used with force and item_type. Only index the given types. Advanced users only")
     args = parser.parse_args()
 
     logging.basicConfig()
@@ -843,7 +848,7 @@ def main():
     logging.getLogger('snovault').setLevel(logging.WARN)
 
     uuids = run(app, args.item_type, args.dry_run, args.check_first, args.force,
-               args.print_count_only)
+               args.print_count_only, args.strict)
     return
 
 
