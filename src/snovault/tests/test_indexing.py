@@ -165,13 +165,7 @@ def test_listening(testapp, listening_conn):
     assert int(notify.payload) > 0
 
 
-def test_indexing_max_result_window(app, testapp, indexer_testapp):
-    """
-    index.max_result_window is set for each index in elasticsearch/indexer.py,
-    if it's not there or equal to the create_mapping setting.
-    For this test, manually change/delete the setting and run indexing
-    to ensure it recovers.
-    """
+def test_index_settings(app, testapp, indexer_testapp):
     from snovault.elasticsearch.create_mapping import index_settings
     test_type = 'testing_post_put_patch'
     es_settings = index_settings(test_type)
@@ -184,35 +178,7 @@ def test_indexing_max_result_window(app, testapp, indexer_testapp):
     es = app.registry[ELASTIC_SEARCH]
     curr_settings = es.indices.get_settings(index=test_type)
     found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
-    assert int(found_max_window) == max_result_window
-    # change the setting and ensure the change took
-    new_max = 15
-    window_settings = {'index': {'max_result_window': new_max}}
-    es.indices.put_settings(index=test_type, body=window_settings)
-    curr_settings = es.indices.get_settings(index=test_type)
-    found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
-    assert int(found_max_window) == new_max
-    # post a new item and index
-    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
-    res = indexer_testapp.post_json('/index', {'record': True})
-    time.sleep(2)
-    # check to see if settings have reverted
-    curr_settings = es.indices.get_settings(index=test_type)
-    found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
-    assert int(found_max_window) == max_result_window
-    # delete index setting
-    window_settings = {'index': {'max_result_window': None}}
-    es.indices.put_settings(index=test_type, body=window_settings)
-    curr_settings = es.indices.get_settings(index=test_type)
-    found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
-    assert found_max_window is None
-    # post a new item and index
-    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
-    res = indexer_testapp.post_json('/index', {'record': True})
-    time.sleep(2)
-    # check to see if settings have reverted
-    curr_settings = es.indices.get_settings(index=test_type)
-    found_max_window = curr_settings.get(test_type, {}).get('settings', {}).get('index', {}).get('max_result_window', None)
+    # test one important setting
     assert int(found_max_window) == max_result_window
 
 
@@ -243,10 +209,11 @@ def test_indexing_es(app, testapp, indexer_testapp):
     indexing_record = es.get(index='meta', doc_type='meta', id='indexing')
     assert indexing_record.get('_source', {}).get('indexed') == 1
     # run create_mapping with check_first=False (do not expect a re-index)
-    create_mapping.run(app)
+    reindex_uuids = create_mapping.run(app)
     time.sleep(2)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 0
+    assert len(reindex_uuids) == 0
     with pytest.raises(NotFoundError):
         es.get(index='meta', doc_type='meta', id='indexing')
     # index to create the indexing doc
@@ -256,21 +223,26 @@ def test_indexing_es(app, testapp, indexer_testapp):
     assert doc_count == 1
     indexing_record = es.get(index='meta', doc_type='meta', id='indexing')
     assert indexing_record.get('_source', {}).get('indexed') == 1
-    # delete index and re-run create_mapping; should re-index the single index
+    # delete index and re-run create_mapping; should queue the single uuid for indexing
     es.indices.delete(index=test_type)
-    create_mapping.run(app, check_first=True)
-    time.sleep(2)
+    reindex_uuids = create_mapping.run(app, check_first=True)
+    assert len(reindex_uuids) == 1
+    # reindex with --force
+    reindex_uuids = create_mapping.run(app, force=True)
+    time.sleep(5)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
+    assert len(reindex_uuids) == 1
     # post second item to database but do not index (don't load into es)
     res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
     time.sleep(2)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     # doc_count has not yet updated
     assert doc_count == 1
-    # run create mapping with check_first=True, expect test index to re-index
-    create_mapping.run(app, check_first=True)
-    time.sleep(2)
+    # run create mapping with force=True, expect test index to re-index
+    reindex_uuids = create_mapping.run(app, force=True)
+    assert len(reindex_uuids) == 2
+    time.sleep(5)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     # doc_count will have updated due to indexing in create_mapping
     assert doc_count == 2
@@ -316,8 +288,6 @@ def test_check_and_reindex_existing(app, testapp):
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     # doc_count has not yet updated
     assert doc_count == 0
-    check_and_reindex_existing(app, es, test_type)
-    time.sleep(2)
-    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
-    # reindexing has occured
-    assert doc_count == 1
+    test_uuids = set()
+    check_and_reindex_existing(app, es, test_type, test_uuids)
+    assert(len(test_uuids)) == 1

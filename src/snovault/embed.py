@@ -7,6 +7,7 @@ from pyramid.compat import (
     unquote_bytes_to_wsgi,
 )
 from pyramid.httpexceptions import HTTPNotFound
+from pyramid.exceptions import URLDecodeError
 from pyramid.traversal import find_resource
 from pyramid.interfaces import IRoutesMapper
 import logging
@@ -164,16 +165,12 @@ def test_if_string_is_uuid_embed(request, use_path, embedded_uuids):
     First test if path is ascii-encodeable. If not, return
     """
     try:
-        ascii_path = use_path.encode('ascii')
-    except UnicodeEncodeError:
-        return
-    try:
         find_attempt = find_resource(request.root, use_path)
-    except KeyError: # KeyError is due to path not found
-        return
+    # KeyError is due to path not found
     # TypeErrors come from certain formatting issues
     # Known issues: ':' in path (pyramid interprets as scheme)
-    except TypeError:
+    # UnicodeEncodeError and URLDecodeError are from str content
+    except (KeyError, TypeError, UnicodeEncodeError, URLDecodeError):
         return
     else:
         try:
