@@ -31,28 +31,10 @@ import logging
 import time
 import sys
 from snovault.commands.es_index_data import run as run_index_data
-from snovault.commands.es_index_data import create_app_and_run
 from .indexer_utils import find_uuids_for_indexing
 import transaction
 import os
 import argparse
-
-
-# keep args global so we can use them in our forks that do the
-# indexing
-args = None
-
-def run_indexing(app, indexing_uuids):
-    """
-    indexing_uuids is a set of uuids that should be reindexed. If global args
-    are available, then this will spawn a new process to run indexing with.
-    Otherwise, run with the current INDEXER
-    """
-    # if no global args provided, run indexing using the provided app
-    if args is None:
-        run_index_data(app, uuids=indexing_uuids)
-    else:
-        create_app_and_run(args.app_name, args.config_uri, uuids=indexing_uuids)
 
 
 EPILOG = __doc__
@@ -796,6 +778,15 @@ def snovault_cleanup(es, registry):
             snovault_index.delete(ignore=404)
 
 
+def run_indexing(app, indexing_uuids):
+    """
+    indexing_uuids is a set of uuids that should be reindexed. If global args
+    are available, then this will spawn a new process to run indexing with.
+    Otherwise, run with the current INDEXER
+    """
+    run_index_data(app, uuids=indexing_uuids)
+
+
 def run(app, collections=None, dry_run=False, check_first=False, force=False, print_count_only=False):
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
@@ -818,12 +809,13 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, pr
             mapping = create_mapping_by_type(collection_name, registry)
             build_index(app, es, collection_name, mapping, uuids_to_index,
                         dry_run, check_first, force, print_count_only)
-    # indexing. for now just use one process
-    ### TEMPORARY: only index for force
+    # only index (synchronously) if --force option is used
+    # otherwise, store uuids for later indexing (TODO)
     if uuids_to_index and force:
         # find associated uuids
         final_uuids, _, _ = find_uuids_for_indexing(all_collections, es, uuids_to_index, uuids_to_index, log)
         run_indexing(app, final_uuids)
+    return uuids_to_index
 
 
 def main():
@@ -842,7 +834,6 @@ def main():
                         help="set this to ignore meta and force new mapping and reindexing of all/given collections")
     parser.add_argument('--print-count-only', action='store_true',
                         help="use with check_first to only print counts")
-    global args
     args = parser.parse_args()
 
     logging.basicConfig()

@@ -243,10 +243,11 @@ def test_indexing_es(app, testapp, indexer_testapp):
     indexing_record = es.get(index='meta', doc_type='meta', id='indexing')
     assert indexing_record.get('_source', {}).get('indexed') == 1
     # run create_mapping with check_first=False (do not expect a re-index)
-    create_mapping.run(app)
+    reindex_uuids = create_mapping.run(app)
     time.sleep(2)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 0
+    assert len(reindex_uuids) == 0
     with pytest.raises(NotFoundError):
         es.get(index='meta', doc_type='meta', id='indexing')
     # index to create the indexing doc
@@ -256,20 +257,25 @@ def test_indexing_es(app, testapp, indexer_testapp):
     assert doc_count == 1
     indexing_record = es.get(index='meta', doc_type='meta', id='indexing')
     assert indexing_record.get('_source', {}).get('indexed') == 1
-    # delete index and re-run create_mapping; should re-index the single index
+    # delete index and re-run create_mapping; should queue the single uuid for indexing
     es.indices.delete(index=test_type)
-    create_mapping.run(app, check_first=True)
+    reindex_uuids = create_mapping.run(app, check_first=True)
+    assert len(reindex_uuids) == 1
+    # reindex with --force
+    reindex_uuids = create_mapping.run(app, force=True)
     time.sleep(5)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
+    assert len(reindex_uuids) == 1
     # post second item to database but do not index (don't load into es)
     res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
     time.sleep(2)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     # doc_count has not yet updated
     assert doc_count == 1
-    # run create mapping with check_first=True, expect test index to re-index
-    create_mapping.run(app, check_first=True)
+    # run create mapping with force=True, expect test index to re-index
+    reindex_uuids = create_mapping.run(app, force=True)
+    assert len(reindex_uuids) == 2
     time.sleep(5)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     # doc_count will have updated due to indexing in create_mapping
