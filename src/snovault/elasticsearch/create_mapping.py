@@ -740,6 +740,7 @@ def get_collection_uuids_and_count(app, in_type):
     # use specific collections and adjust if necessary
     db_count = 0
     coll_uuids = []
+    non_coll_uuids = []
     check_collections = get_jsonld_types_from_collection_type(app, in_type, [in_type])
     for coll_type in check_collections:
         collection = app.registry[COLLECTIONS].get(coll_type)
@@ -749,7 +750,10 @@ def get_collection_uuids_and_count(app, in_type):
             coll_uuids.extend([str(uuid) for uuid in collection])
         else:
             db_count -= coll_count
-    return db_count, coll_uuids
+            non_coll_uuids.extend([str(uuid) for uuid in collection])
+    # remove uuids that aren't from the set we need
+    final_uuids = [uuid for uuid in coll_uuids if uuid not in non_coll_uuids]
+    return db_count, final_uuids
 
 
 def es_safe_execute(function, **kwargs):
