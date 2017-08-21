@@ -75,3 +75,23 @@ def get_uuids_for_types(registry, types=None):
         collection = collections.by_item_type[collection_name]
         for uuid in collection:
             yield str(uuid)
+
+
+def get_xmin_from_es(es):
+    try:
+        status = es.get(index='meta', doc_type='meta', id='indexing')
+    except NotFoundError:
+        interval_settings = {"index": {"refresh_interval": "30s"}}
+        es.indices.put_settings(index='meta', body=interval_settings)
+        return None
+    else:
+        return status['_source']['xmin']
+
+
+def get_xmin_from_es(es):
+    try:
+        status = es.get(index='meta', doc_type='meta', id='uuid_store')
+    except NotFoundError:
+        return None
+    else:
+        return status['_source']['uuids']

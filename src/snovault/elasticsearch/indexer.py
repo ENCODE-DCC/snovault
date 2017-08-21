@@ -24,7 +24,11 @@ import pytz
 import time
 import copy
 
-from .indexer_utils import find_uuids_for_indexing, get_uuids_for_types
+from .indexer_utils import (
+    find_uuids_for_indexing,
+    get_uuids_for_types,
+    get_xmin_from_es
+)
 
 
 log = logging.getLogger(__name__)
@@ -66,17 +70,18 @@ def index(request):
     xmin = query.scalar()  # lowest xid that is still in progress
     first_txn = None
     last_xmin = None
+    # hold results from uuid index store, if applicable
+    uuid_store = None
+    # when given last_xmin in request, we know where to begin indexing
     if 'last_xmin' in request.json:
         last_xmin = request.json['last_xmin']
+    # with xmin not provided, see if a uuid index store exists in ES
+    # if not, attempt to get last_xmin from meta.
+    # if that fails, re-index everything (last_xmin = None)
     else:
-        try:
-            status = es.get(index='meta', doc_type='meta', id='indexing')
-        except NotFoundError:
-            interval_settings = {"index": {"refresh_interval": "30s"}}
-            es.indices.put_settings(index='meta', body=interval_settings)
-            pass
-        else:
-            last_xmin = status['_source']['xmin']
+        uuid_store = get_uuid_store_from_es(es)
+        if uuid_store is None:
+            last_xmin = get_xmin_from_es(es)
 
     result = {
         'xmin': xmin,
