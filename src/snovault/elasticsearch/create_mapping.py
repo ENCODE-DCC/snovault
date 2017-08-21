@@ -283,6 +283,19 @@ def es_mapping(mapping):
                         'type': 'keyword',
                     },
                 },
+            },
+            {
+                'integers': {
+                    'match_mapping_type': "long",
+                    'mapping': {
+                        'type': 'long',
+                        'fields': {
+                            'raw': {
+                                'type': 'keyword'
+                            }
+                        }
+                    },
+                },
             }
         ],
         'properties': {
