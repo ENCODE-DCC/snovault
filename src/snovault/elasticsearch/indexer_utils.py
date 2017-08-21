@@ -88,7 +88,7 @@ def get_xmin_from_es(es):
         return status['_source']['xmin']
 
 
-def get_xmin_from_es(es):
+def get_uuid_store_from_es(es):
     try:
         status = es.get(index='meta', doc_type='meta', id='uuid_store')
     except NotFoundError:

@@ -27,7 +27,8 @@ import copy
 from .indexer_utils import (
     find_uuids_for_indexing,
     get_uuids_for_types,
-    get_xmin_from_es
+    get_xmin_from_es,
+    get_uuid_store_from_es
 )
 
 
@@ -70,18 +71,18 @@ def index(request):
     xmin = query.scalar()  # lowest xid that is still in progress
     first_txn = None
     last_xmin = None
-    # hold results from uuid index store, if applicable
-    uuid_store = None
+    if req_uuids is not None:
+        pass
     # when given last_xmin in request, we know where to begin indexing
-    if 'last_xmin' in request.json:
+    elif 'last_xmin' in request.json:
         last_xmin = request.json['last_xmin']
     # with xmin not provided, see if a uuid index store exists in ES
-    # if not, attempt to get last_xmin from meta.
+    # if not, get last_xmin from meta and re-index based on that.
     # if that fails, re-index everything (last_xmin = None)
     else:
-        uuid_store = get_uuid_store_from_es(es)
-        if uuid_store is None:
-            last_xmin = get_xmin_from_es(es)
+        # set the specifically requested uuids to those held in the store
+        req_uuids = get_uuid_store_from_es(es)
+        last_xmin = get_xmin_from_es(es)
 
     result = {
         'xmin': xmin,

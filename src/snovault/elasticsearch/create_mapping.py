@@ -29,6 +29,7 @@ import collections
 import json
 import logging
 import time
+import datetime
 import sys
 from snovault.commands.es_index_data import run as run_index_data
 from .indexer_utils import find_uuids_for_indexing
@@ -791,6 +792,18 @@ def run_indexing(app, indexing_uuids):
     run_index_data(app, uuids=indexing_uuids)
 
 
+def set_es_uuid_store(es, indexing_uuids):
+    timestamp = datetime.datetime.now().isoformat()
+    record = {}
+    record['timestamp'] = timestamp
+    record['uuids'] = list(indexing_uuids)
+    res = es_safe_execute(es.index, index='meta', doc_type='meta', body=record, id='uuid_store')
+    if res:
+        print("MAPPING: uuids to index were NOT stored succesfully.")
+    else:
+        print("MAPPING: uuids to index were stored succesfully.")
+
+
 def run(app, collections=None, dry_run=False, check_first=False, force=False, print_count_only=False, strict=False):
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
@@ -814,15 +827,19 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, pr
             build_index(app, es, collection_name, mapping, uuids_to_index,
                         dry_run, check_first, force, print_count_only)
     # only index (synchronously) if --force option is used
-    # otherwise, store uuids for later indexing (TODO)
-    if uuids_to_index and force:
-        # use only the uuids from the index if strict and item-type provided
-        if strict and collections:
-            final_uuids = uuids_to_index
+    # otherwise, store uuids for later indexing in ES uuid_store document
+    if uuids_to_index:
+        if force:
+            # use only the uuids from the index if strict and item-type provided
+            if strict and collections:
+                final_uuids = uuids_to_index
+            else:
+                final_uuids, _, _ = find_uuids_for_indexing(all_collections, es, uuids_to_index, uuids_to_index, log)
+            print("MAPPING: indexing %s items" % (str(len(final_uuids))))
+            run_indexing(app, final_uuids)
         else:
-            final_uuids, _, _ = find_uuids_for_indexing(all_collections, es, uuids_to_index, uuids_to_index, log)
-        print("MAPPING: indexing %s items" % (str(len(final_uuids))))
-        run_indexing(app, final_uuids)
+            print("MAPPING: storing %s items for reindexing..." % (str(len(final_uuids))))
+            set_es_uuid_store(es, indexing_uuids)
     return uuids_to_index
 
 
