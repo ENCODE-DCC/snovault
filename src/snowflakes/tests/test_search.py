@@ -4,6 +4,18 @@ from webob.multidict import MultiDict
 import pytest
 
 
+def null_query():
+    return {
+        'query': {
+            'bool': {
+                'filter': [],
+                'must_not': [],
+                'must': [],
+            },
+        },
+    }
+
+
 def test_search_view(workbook, testapp):
     res = testapp.get('/search/').json
     assert res['@type'] == ['Search']
@@ -47,13 +59,7 @@ def test_set_filters():
     request = FakeRequest((
         ('field1', 'value1'),
     ))
-    query = {
-        'query': {
-            'bool': {
-                'filter': [],
-            },
-        },
-    }
+    query = null_query()
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
 
@@ -61,6 +67,8 @@ def test_set_filters():
     assert query == {
         'query': {
             'bool': {
+                'must': [],
+                'must_not': [],
                 'filter': [
                     {
                         'terms': {
@@ -88,13 +96,7 @@ def test_set_filters_searchTerm():
     request = FakeRequest((
         ('searchTerm', 'value1'),
     ))
-    query = {
-        'query': {
-            'bool': {
-                'filter': [],
-            },
-        },
-    }
+    query = null_query()
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
 
@@ -102,6 +104,8 @@ def test_set_filters_searchTerm():
     assert query == {
         'query': {
             'bool': {
+                'must': [],
+                'must_not': [],
                 'filter': [],
             },
         },
@@ -127,13 +131,7 @@ def test_set_filters_reserved_params(param):
     request = FakeRequest((
         (param, 'foo'),
     ))
-    query = {
-        'query': {
-            'bool': {
-                'filter': [],
-            },
-        },
-    }
+    query = null_query()
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
 
@@ -141,6 +139,8 @@ def test_set_filters_reserved_params(param):
     assert query == {
         'query': {
             'bool': {
+                'must': [],
+                'must_not': [],
                 'filter': [],
             },
         },
@@ -157,13 +157,7 @@ def test_set_filters_multivalued():
         ('field1', 'value1'),
         ('field1', 'value2'),
     ))
-    query = {
-        'query': {
-            'bool': {
-                'filter': [],
-            },
-        },
-    }
+    query = null_query()
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
 
@@ -171,6 +165,8 @@ def test_set_filters_multivalued():
     assert query == {
         'query': {
             'bool': {
+                'must': [],
+                'must_not': [],
                 'filter': [
                     {
                         'terms': {
@@ -203,13 +199,7 @@ def test_set_filters_negated():
     request = FakeRequest((
         ('field1!', 'value1'),
     ))
-    query = {
-        'query': {
-            'bool': {
-                'filter': [],
-            },
-        },
-    }
+    query = null_query()
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
 
@@ -217,17 +207,15 @@ def test_set_filters_negated():
     assert query == {
         'query': {
             'bool': {
-                'filter': [
+                'must': [],
+                'must_not': [],
+                'filter': [{'not':
                     {
-                        'not': {
-                            'term': {
-                                'embedded.field1': ['value1'],
-                            },
-                        },
-                    },
-                ],
-            },
-        },
+                        'term': {'embedded.field1': ['value1']}
+                    }
+                }]
+            }
+        }
     }
     assert result == {
         'filters': [
@@ -246,13 +234,7 @@ def test_set_filters_audit():
     request = FakeRequest((
         ('audit.foo', 'value1'),
     ))
-    query = {
-        'query': {
-            'bool': {
-                'filter': [],
-            },
-        },
-    }
+    query = null_query()
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
 
@@ -260,6 +242,8 @@ def test_set_filters_audit():
     assert query == {
         'query': {
             'bool': {
+                'must': [],
+                'must_not': [],
                 'filter': [
                     {
                         'terms': {
@@ -288,13 +272,7 @@ def test_set_filters_exists_missing():
         ('field1', '*'),
         ('field2!', '*'),
     ))
-    query = {
-        'query': {
-            'bool': {
-                'filter': [],
-            },
-        },
-    }
+    query = null_query()
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
 
@@ -305,6 +283,8 @@ def test_set_filters_exists_missing():
     assert query == {
         'query': {
             'bool': {
+                'must': [],
+                'must_not': [],
                 'filter': [
                     {
                         'exists': {
@@ -432,7 +412,7 @@ def test_set_facets_negated_filter():
     doc_types = ['Snowball']
     aggs = set_facets(facets, used_filters, principals, doc_types)
 
-    assert {
+    expected = {
         'facet1': {
             'aggs': {
                 'facet1': {
@@ -446,14 +426,17 @@ def test_set_facets_negated_filter():
             'filter': {
                 'bool': {
                     'must': [
-                        {'terms': {'principals_allowed.view': ['group.admin']}},
-                        {'terms': {'embedded.@type': ['Snowball']}},
-                        {'not': {'terms': {'embedded.field2': ['value1']}}},
-                    ],
+                            {'terms': {'principals_allowed.view': ['group.admin']}},
+                            {'terms': {'embedded.@type': ['Snowball']}},
+                            {'not':
+                                {'terms': {'embedded.field2': ['value1']}},
+                            },
+                        ],
                 },
             },
         }
-    } == aggs
+    }
+    assert expected == aggs
 
 
 def test_set_facets_type_exists():
@@ -471,7 +454,7 @@ def test_set_facets_type_exists():
     doc_types = ['Snowball']
     aggs = set_facets(facets, used_filters, principals, doc_types)
 
-    assert {
+    expected = {
         'field1': {
             'aggs': {
                 'field1': {
@@ -522,7 +505,8 @@ def test_set_facets_type_exists():
                 },
             },
         },
-    } == aggs
+    }
+    assert expected == aggs
 
 
 def test_format_facets():
