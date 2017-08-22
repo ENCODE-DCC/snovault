@@ -1,7 +1,6 @@
 from elasticsearch.exceptions import (
     ConflictError,
     ConnectionError,
-    NotFoundError,
     TransportError,
 )
 from pyramid.view import view_config
@@ -76,13 +75,16 @@ def index(request):
     # when given last_xmin in request, we know where to begin indexing
     elif 'last_xmin' in request.json:
         last_xmin = request.json['last_xmin']
-    # with xmin not provided, see if a uuid index store exists in ES
-    # if not, get last_xmin from meta and re-index based on that.
-    # if that fails, re-index everything (last_xmin = None)
+    # if no last_xmin provided, try to find the most recent from meta
+    # see if a uuid index store exists in ES and re-index based on that.
+    # if that fails, re-index everything (last_xmin = None).
     else:
-        # set the specifically requested uuids to those held in the store
-        req_uuids = get_uuid_store_from_es(es)
+        # it's important to check last_xmin before req_uuids because otherwise
+        # db transactions could be overwritten by the stored uuids and lost
         last_xmin = get_xmin_from_es(es)
+        if last_xmin is None:
+            # set the specifically requested uuids to those held in the store
+            req_uuids = get_uuid_store_from_es(es)
 
     result = {
         'xmin': xmin,
@@ -123,9 +125,8 @@ def index(request):
         if txn_count == 0:
             return result
 
-        # iterate through all indices and find items with matching embedded uuids
-        indices = list(request.registry[COLLECTIONS].by_item_type.keys())
-        invalidated, referencing, flush = find_uuids_for_indexing(indices, es, updated, renamed, log)
+        # look through all indices and find items with matching embedded uuids
+        invalidated, referencing, flush = find_uuids_for_indexing(es, updated, renamed, log)
         result.update(
             max_xid=max_xid,
             renamed=renamed,

@@ -372,7 +372,7 @@ def es_mapping(mapping):
                     'path_match': "principals_allowed.*",
                     'mapping': {
                         'index': True,
-                        'type': 'text',
+                        'type': 'keyword',
                     },
                 },
             },
@@ -381,7 +381,7 @@ def es_mapping(mapping):
                     'path_match': "unique_keys.*",
                     'mapping': {
                         'index': True,
-                        'type': 'text',
+                        'type': 'keyword',
                     },
                 },
             },
@@ -390,7 +390,7 @@ def es_mapping(mapping):
                     'path_match': "links.*",
                     'mapping': {
                         'index': True,
-                        'type': 'text',
+                        'type': 'keyword',
                     },
                 },
             },
@@ -799,22 +799,21 @@ def set_es_uuid_store(es, indexing_uuids):
     record['uuids'] = list(indexing_uuids)
     res = es_safe_execute(es.index, index='meta', doc_type='meta', body=record, id='uuid_store')
     if res:
-        print("MAPPING: uuids to index were NOT stored succesfully.")
-    else:
         print("MAPPING: uuids to index were stored succesfully.")
+    else:
+        print("MAPPING: uuids to index were NOT stored succesfully.")
 
 
 def run(app, collections=None, dry_run=False, check_first=False, force=False, print_count_only=False, strict=False):
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
-    all_collections = list(registry[COLLECTIONS].by_item_type.keys())
     # keep a set of all uuids to be reindexed, which occurs after all indices
     # are created
     uuids_to_index = set()
     if not dry_run:
         snovault_cleanup(es, registry)
     if not collections:
-        collections = all_collections
+        collections = list(registry[COLLECTIONS].by_item_type.keys())
     if not force:
         collections = ['meta'] + collections
     for collection_name in collections:
@@ -829,17 +828,19 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, pr
     # only index (synchronously) if --force option is used
     # otherwise, store uuids for later indexing in ES uuid_store document
     if uuids_to_index:
+        # if strict option and we have an item-type(s) provided,
+        # find associated uuids for indexing
+        if strict and collections:
+            uuids_to_index = uuids_to_index
+        else:
+            uuids_to_index, _, _ = find_uuids_for_indexing(es, uuids_to_index, uuids_to_index, log)
         if force:
             # use only the uuids from the index if strict and item-type provided
-            if strict and collections:
-                final_uuids = uuids_to_index
-            else:
-                final_uuids, _, _ = find_uuids_for_indexing(all_collections, es, uuids_to_index, uuids_to_index, log)
-            print("MAPPING: indexing %s items" % (str(len(final_uuids))))
-            run_indexing(app, final_uuids)
+            print("MAPPING: indexing %s items" % (str(len(uuids_to_index))))
+            run_indexing(app, uuids_to_index)
         else:
-            print("MAPPING: storing %s items for reindexing..." % (str(len(final_uuids))))
-            set_es_uuid_store(es, indexing_uuids)
+            print("MAPPING: storing %s items for reindexing..." % (str(len(uuids_to_index))))
+            set_es_uuid_store(es, uuids_to_index)
     return uuids_to_index
 
 
@@ -860,7 +861,7 @@ def main():
     parser.add_argument('--print-count-only', action='store_true',
                         help="use with check_first to only print counts")
     parser.add_argument('--strict', action='store_true',
-                        help="used with force and item_type. Only index the given types. Advanced users only")
+                        help="used with force or check_first in combination with item-type. Only index the given types (ignore associated items). Advanced users only")
     args = parser.parse_args()
 
     logging.basicConfig()
