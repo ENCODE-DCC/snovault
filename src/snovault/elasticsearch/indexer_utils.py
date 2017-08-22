@@ -12,7 +12,7 @@ def find_uuids_for_indexing(es, updated, renamed, log):
     # if meta does not exist (shouldn't ever happen on deploy)
     # invalidate all uuids to avoid errors
     meta_exists = es.indices.exists(index='meta')
-    if not meta_exists:
+    if not meta_exists or len(updated) > SEARCH_MAX:
         referencing = list(all_uuids(request.registry))
         invalidated = referencing | updated
         return invalidated, referencing, True
