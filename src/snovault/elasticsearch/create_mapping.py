@@ -773,7 +773,8 @@ def es_safe_execute(function, **kwargs):
 
 def snovault_cleanup(es, registry):
     """
-    Simple function to delete old unused snovault index if it's present
+    Simple function to delete old unused snovault index if it's present.
+    Also removes any current uuid_store
     """
     # see if the old snovault index exists
     sno_index_name = registry.settings.get('snovault.elasticsearch.index', None)
@@ -781,6 +782,9 @@ def snovault_cleanup(es, registry):
         snovault_index = Index(sno_index_name, using=es)
         if snovault_index.exists():
             snovault_index.delete(ignore=404)
+    res = es_safe_execute(es.delete, index='meta', doc_type='meta', id='uuid_store', ignore=[404])
+    if res:
+        print('MAPPING: removed previous UUID store from ES.')
 
 
 def run_indexing(app, indexing_uuids):

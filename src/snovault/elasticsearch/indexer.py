@@ -70,6 +70,7 @@ def index(request):
     xmin = query.scalar()  # lowest xid that is still in progress
     first_txn = None
     last_xmin = None
+    stored_uuids = None
     if req_uuids is not None:
         pass
     # when given last_xmin in request, we know where to begin indexing
@@ -79,12 +80,9 @@ def index(request):
     # see if a uuid index store exists in ES and re-index based on that.
     # if that fails, re-index everything (last_xmin = None).
     else:
-        # it's important to check last_xmin before req_uuids because otherwise
-        # db transactions could be overwritten by the stored uuids and lost
         last_xmin = get_xmin_from_es(es)
-        if last_xmin is None:
-            # set the specifically requested uuids to those held in the store
-            req_uuids = get_uuid_store_from_es(es)
+        # set the specifically requested uuids to those held in the store
+        stored_uuids = get_uuid_store_from_es(es)
 
     result = {
         'xmin': xmin,
@@ -123,7 +121,11 @@ def index(request):
 
         result['txn_count'] = txn_count
         if txn_count == 0:
-            return result
+            # only exit indexing if there are no stored_uuids
+            if stored_uuids is None:
+                return result
+        else:
+            result['first_txn_timestamp'] = first_txn.isoformat()
 
         # look through all indices and find items with matching embedded uuids
         invalidated, referencing, flush = find_uuids_for_indexing(es, updated, renamed, log)
@@ -133,9 +135,12 @@ def index(request):
             updated=updated,
             referencing=len(referencing),
             invalidated=len(invalidated),
-            txn_count=txn_count,
-            first_txn_timestamp=first_txn.isoformat(),
+            txn_count=txn_count
         )
+    # add stored uuids, if applicable
+    if stored_uuids is not None:
+        invalidated = invalidated | set(stored_uuids)
+        result['found_from_uuid_store'] = stored_uuids
     log.debug("Indexing %s total items; %s primary items" %
              (str(len(invalidated)), str(len(updated))))
     if invalidated and not dry_run:
