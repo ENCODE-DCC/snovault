@@ -20,7 +20,7 @@ def run(app, collections=None, last_xmin=None, uuids=None):
         # uuids are in set and must be list to be json serializable
         post_body['uuids'] = list(uuids)
     testapp.post_json('/index', post_body)
-    
+
 
 def main():
     ''' Indexes app data loaded to elasticsearch '''
