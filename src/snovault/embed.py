@@ -1,5 +1,5 @@
 from copy import deepcopy
-from .cache import ManagerLRUCache
+from .interfaces import CONNECTION
 from past.builtins import basestring
 from posixpath import join
 from pyramid.compat import (
@@ -48,8 +48,6 @@ def make_subrequest(request, path):
     return subreq
 
 
-embed_cache = ManagerLRUCache('embed_cache')
-
 # Carl: embed is called on any request.embed (config.add_request_method(embed, 'embed'))
 #       indexing_views calls embeds with a field_to_embed parameter (my change)
 #       Currently, subrequests are recursively calling embed by going through
@@ -67,6 +65,7 @@ def embed(request, *elements, **kw):
     """
     # Should really be more careful about what gets included instead.
     # Cache cut response time from ~800ms to ~420ms.
+    embed_cache = request.registry[CONNECTION].embed_cache
     fields_to_embed = kw.get('fields_to_embed')
     as_user = kw.get('as_user')
     path = join(*elements)
