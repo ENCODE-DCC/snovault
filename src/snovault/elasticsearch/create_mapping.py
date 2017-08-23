@@ -275,27 +275,6 @@ def es_mapping(mapping):
                         'type': 'keyword',
                     },
                 },
-            },
-            {
-                'strings': {
-                    'match_mapping_type': "string",
-                    'mapping': {
-                        'type': 'keyword',
-                    },
-                },
-            },
-            {
-                'integers': {
-                    'match_mapping_type': "long",
-                    'mapping': {
-                        'type': 'long',
-                        'fields': {
-                            'raw': {
-                                'type': 'keyword'
-                            }
-                        }
-                    },
-                },
             }
         ],
         'properties': {
@@ -467,7 +446,6 @@ def run(app, collections=None, dry_run=False):
         es = app.registry[ELASTIC_SEARCH]
         print(es)
         print('CREATE MAPPING RUNNING')
-        es.indices.delete(index='_all')
 
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
@@ -486,8 +464,7 @@ def run(app, collections=None, dry_run=False):
         if dry_run:
             print(json.dumps(sorted_dict({index: {doc_type: mapping}}), indent=4))
             continue
-        import pprint
-        pprint.pprint(mapping)
+
         create_elasticsearch_index(es, index, index_settings())
         set_index_mapping(es, index, doc_type, {doc_type: mapping})
 
