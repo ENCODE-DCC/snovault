@@ -587,7 +587,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     Creates an es index for the given in_type with the given mapping and
     settings defined by item_settings(). If check_first == True, attempting
     to see if the index exists and is unchanged from the previous mapping.
-    If so, do not delete and re-create the index to save on indexing.
+    If so, do not delete and recreate the index to save on indexing.
     This function will trigger a reindexing of the in_type index if
     the old index is kept but the es doc count differs from the db doc count.
     Will also trigger a re-index for a newly created index if the indexing
@@ -608,58 +608,58 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
             print('MAPPING: using existing index for collection %s' % (in_type))
             return
 
+    if dry_run:
+        return
+
     # delete the index
-    if this_index_exists and not dry_run:
+    if this_index_exists:
         res = es_safe_execute(es.indices.delete, index=in_type, ignore=[400,404], request_timeout=30)
         if res:
             print('MAPPING: index successfully deleted for %s' % (in_type))
         else:
             print('MAPPING: could not delete index for %s' % (in_type))
-    if dry_run:
-        pass
-        # print(json.dumps(sorted_dict({in_type: {in_type: mapping}}), indent=4))
+
+    # first, create the mapping. adds settings in the body
+    put_settings = this_index_record['settings']
+    res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, ignore=[400], request_timeout=30)
+    if res:
+        print('MAPPING: new index created for %s' % (in_type))
     else:
-        # first, create the mapping. adds settings in the body
-        put_settings = this_index_record['settings']
-        res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, ignore=[400], request_timeout=30)
-        if res:
-            print('MAPPING: new index created for %s' % (in_type))
-        else:
-            print('MAPPING: new index failed for %s' % (in_type))
+        print('MAPPING: new index failed for %s' % (in_type))
 
-        # update with mapping
-        res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, ignore=[400], request_timeout=30)
-        if res:
-            print('MAPPING: mapping successfully added for %s' % (in_type))
-        else:
-            print('MAPPING: mapping failed for %s' % (in_type))
+    # update with mapping
+    res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, ignore=[400], request_timeout=30)
+    if res:
+        print('MAPPING: mapping successfully added for %s' % (in_type))
+    else:
+        print('MAPPING: mapping failed for %s' % (in_type))
 
-        # force means we want to forcibly re-index
-        if force:
+    # force means we want to forcibly re-index
+    if force:
+        coll_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
+        uuids_to_index.update(coll_uuids)
+        print('MAPPING: forcibly queueing all items in the new index %s for reindexing' % (in_type))
+    else:
+        # if 'indexing' doc exists within meta, then re-index for this type
+        indexing_xmin = None
+        try:
+            status = es.get(index='meta', doc_type='meta', id='indexing', ignore=[404])
+        except:
+            print('MAPPING: indexing record not found in meta for %s' % (in_type))
+        else:
+            indexing_xmin = status.get('_source', {}).get('xmin')
+        if indexing_xmin is not None:
             coll_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
             uuids_to_index.update(coll_uuids)
-            print('MAPPING: forcibly queueing all items in the new index %s for reindexing' % (in_type))
-        else:
-            # if 'indexing' doc exists within meta, then re-index for this type
-            indexing_xmin = None
-            try:
-                status = es.get(index='meta', doc_type='meta', id='indexing', ignore=[404])
-            except:
-                print('MAPPING: indexing record not found in meta for %s' % (in_type))
-            else:
-                indexing_xmin = status.get('_source', {}).get('xmin')
-            if indexing_xmin is not None:
-                coll_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
-                uuids_to_index.update(coll_uuids)
-                print('MAPPING: queueing all items in the new index %s for reindexing' % (in_type))
+            print('MAPPING: queueing all items in the new index %s for reindexing' % (in_type))
 
-        # put index_record in meta
-        if meta_exists:
-            res = es_safe_execute(es.index, index='meta', doc_type='meta', body=this_index_record, id=in_type)
-            if res:
-                print("MAPPING: index record created for %s" % (in_type))
-            else:
-                print("MAPPING: index record failed for %s" % (in_type))
+    # put index_record in meta
+    if meta_exists:
+        res = es_safe_execute(es.index, index='meta', doc_type='meta', body=this_index_record, id=in_type)
+        if res:
+            print("MAPPING: index record created for %s" % (in_type))
+        else:
+            print("MAPPING: index record failed for %s" % (in_type))
 
 
 def check_if_index_exists(es, in_type, check_first):
@@ -701,9 +701,11 @@ def get_previous_index_record(this_index_exists, check_first, es, in_type):
 
 
 def check_and_reindex_existing(app, es, in_type, uuids_to_index, print_counts=False):
-    # lastly, check to make sure the item count for the existing
-    # index matches the database document count. If not, queue the uuids_to_index
-    # in the index for reindexing.
+    """
+    lastly, check to make sure the item count for the existing
+    index matches the database document count. If not, queue the uuids_to_index
+    in the index for reindexing.
+    """
     db_count, es_count, coll_uuids = get_db_es_counts_and_db_uuids(app, es, in_type)
     if print_counts:
         log.warn("DB count is %s and ES count is %s for index: %s" %
@@ -715,6 +717,10 @@ def check_and_reindex_existing(app, es, in_type, uuids_to_index, print_counts=Fa
 
 
 def get_db_es_counts_and_db_uuids(app, es, in_type):
+    """
+    Return the database count and elasticsearch count for a given item type,
+    as well as a list of collection uuids from the database
+    """
     if check_if_index_exists(es, in_type, False):
         count_res = es.count(index=in_type, doc_type=in_type)
         es_count = count_res.get('count')
@@ -737,6 +743,12 @@ def get_db_es_counts_and_db_uuids(app, es, in_type):
 
 
 def get_collection_uuids_and_count(app, in_type):
+    """
+    Return a count of items in a collection and a list of the uuids of those
+    items. Returns only the items of the exact type specified, and not types
+    that inherit from it (for example, experiment_set_replicate count will
+    be subtracted from experiment_set count)
+    """
     # must handle collections that have children inheriting from them
     # use specific collections and adjust if necessary
     db_count = 0
@@ -797,6 +809,10 @@ def run_indexing(app, indexing_uuids):
 
 
 def set_es_uuid_store(es, indexing_uuids):
+    """
+    Takes a set of uuids to be indexed and puts them in the meta/meta/uuid_store
+    for later reindexing
+    """
     timestamp = datetime.datetime.now().isoformat()
     record = {}
     record['timestamp'] = timestamp
@@ -809,6 +825,20 @@ def set_es_uuid_store(es, indexing_uuids):
 
 
 def run(app, collections=None, dry_run=False, check_first=False, force=False, print_count_only=False, strict=False):
+    """
+    Run create_mapping. Has the following options:
+    collection: run create mapping for the given collections (indices) only
+    dry_run: if True, do not delete/create indices
+    check_first: if True, attempt to keep indices that have not changed mapping.
+        If the document counts in the index and db do not match, queue
+        the all items in the index for reindexing.
+    force: if True, automatically recreate indices and synchronously index
+        all items in them. Takes precedence over check_first
+    print_count_only: if True, print counts for existing indices instead of
+        queueing items for reindexing. Must to be used with check_first.
+    strict: if True, do not include associated items when considering what
+        items to reindex. Must be used with create_mapping or force.
+    """
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
     # keep a set of all uuids to be reindexed, which occurs after all indices
