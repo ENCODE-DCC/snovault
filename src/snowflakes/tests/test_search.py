@@ -88,7 +88,13 @@ def test_test_if_string_is_uuid_embed(dummy_request, workbook, testapp):
     # these should not be added
     test_str_1 = 'Lab'
     test_str_2 = u'Chédiak-Higashi syndrome' # non-ascii
+    test_str_3 = 'The food provided to the organism (e.g., chow, fertilizer, DEMM 10%FBS, etc.).'
+    test_str_4 = 'http://purl.obolibrary.org/obo/CHEBI_33284'
     test_if_string_is_uuid_embed(dummy_request, test_str_1, embedded_uuids)
     assert len(embedded_uuids) == 2
     test_if_string_is_uuid_embed(dummy_request, test_str_2, embedded_uuids)
+    assert len(embedded_uuids) == 2
+    test_if_string_is_uuid_embed(dummy_request, test_str_3, embedded_uuids)
+    assert len(embedded_uuids) == 2
+    test_if_string_is_uuid_embed(dummy_request, test_str_4, embedded_uuids)
     assert len(embedded_uuids) == 2
