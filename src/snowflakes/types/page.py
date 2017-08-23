@@ -35,7 +35,7 @@ class Page(SharedItem):
     schema = load_schema('snowflakes:schemas/page.json')
     name_key = 'name'
 
-    embedded = [
+    embedded_list = [
         'layout.blocks.image.*',
     ]
 

@@ -494,7 +494,7 @@ def type_mapping(types, item_type, embed=True):
     schema = type_info.schema
     # use top_level parameter here for schema_mapping
     mapping = schema_mapping('*', schema, True)
-    embeds = add_default_embeds(item_type, types, type_info.embedded, schema)
+    embeds = add_default_embeds(item_type, types, type_info.embedded_list, schema)
     embeds.sort()
     if not embed:
         return mapping

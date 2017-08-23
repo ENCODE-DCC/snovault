@@ -26,7 +26,7 @@ class Lab(Item):
     item_type = 'lab'
     schema = load_schema('snowflakes:schemas/lab.json')
     name_key = 'name'
-    embedded = ['awards.*', 'pi.last_name']
+    embedded_list = ['awards.*', 'pi.last_name']
 
 
 @collection(
@@ -40,4 +40,4 @@ class Award(Item):
     item_type = 'award'
     schema = load_schema('snowflakes:schemas/award.json')
     name_key = 'name'
-    embedded = ['pi.*']
+    embedded_list = ['pi.*']
