@@ -1,7 +1,6 @@
 from elasticsearch.exceptions import (
     ConflictError,
     ConnectionError,
-    NotFoundError,
     TransportError,
 )
 from pyramid.view import view_config
@@ -24,7 +23,12 @@ import pytz
 import time
 import copy
 
-from .indexer_utils import find_uuids_for_indexing, get_uuids_for_types
+from .indexer_utils import (
+    find_uuids_for_indexing,
+    get_uuids_for_types,
+    get_xmin_from_es,
+    get_uuid_store_from_es
+)
 
 
 log = logging.getLogger(__name__)
@@ -66,17 +70,19 @@ def index(request):
     xmin = query.scalar()  # lowest xid that is still in progress
     first_txn = None
     last_xmin = None
-    if 'last_xmin' in request.json:
+    stored_uuids = None
+    if req_uuids is not None:
+        pass
+    # when given last_xmin in request, we know where to begin indexing
+    elif 'last_xmin' in request.json:
         last_xmin = request.json['last_xmin']
+    # if no last_xmin provided, try to find the most recent from meta
+    # see if a uuid index store exists in ES and re-index based on that.
+    # if that fails, re-index everything (last_xmin = None).
     else:
-        try:
-            status = es.get(index='meta', doc_type='meta', id='indexing')
-        except NotFoundError:
-            interval_settings = {"index": {"refresh_interval": "30s"}}
-            es.indices.put_settings(index='meta', body=interval_settings)
-            pass
-        else:
-            last_xmin = status['_source']['xmin']
+        last_xmin = get_xmin_from_es(es)
+        # set the specifically requested uuids to those held in the store
+        stored_uuids = get_uuid_store_from_es(es)
 
     result = {
         'xmin': xmin,
@@ -115,20 +121,26 @@ def index(request):
 
         result['txn_count'] = txn_count
         if txn_count == 0:
-            return result
+            # only exit indexing if there are no stored_uuids
+            if stored_uuids is None:
+                return result
+        else:
+            result['first_txn_timestamp'] = first_txn.isoformat()
 
-        # iterate through all indices and find items with matching embedded uuids
-        indices = list(request.registry[COLLECTIONS].by_item_type.keys())
-        invalidated, referencing, flush = find_uuids_for_indexing(indices, es, updated, renamed, log)
+        # look through all indices and find items with matching embedded uuids
+        invalidated, referencing, flush = find_uuids_for_indexing(es, updated, renamed, log)
         result.update(
             max_xid=max_xid,
             renamed=renamed,
             updated=updated,
             referencing=len(referencing),
             invalidated=len(invalidated),
-            txn_count=txn_count,
-            first_txn_timestamp=first_txn.isoformat(),
+            txn_count=txn_count
         )
+    # add stored uuids, if applicable
+    if stored_uuids is not None:
+        invalidated = invalidated | set(stored_uuids)
+        result['found_from_uuid_store'] = stored_uuids
     log.debug("Indexing %s total items; %s primary items" %
              (str(len(invalidated)), str(len(updated))))
     if invalidated and not dry_run:
