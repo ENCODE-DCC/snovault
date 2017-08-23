@@ -486,8 +486,6 @@ def run(app, collections=None, dry_run=False):
         if dry_run:
             print(json.dumps(sorted_dict({index: {doc_type: mapping}}), indent=4))
             continue
-        import pprint
-        pprint.pprint(mapping)
         create_elasticsearch_index(es, index, index_settings())
         set_index_mapping(es, index, doc_type, {doc_type: mapping})
 
