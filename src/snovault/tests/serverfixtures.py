@@ -69,11 +69,12 @@ def elasticsearch_server(request, elasticsearch_host_port):
     host, port = elasticsearch_host_port
     tmpdir = request.config._tmpdirhandler.mktemp('elasticsearch', numbered=True)
     tmpdir = str(tmpdir)
-    process = server_process(str(tmpdir), host=host, port=9200)
+    if not os.environ.get('TRAVIS'):
+        process = server_process(str(tmpdir), host=host, port=9200)
     print('PORT CHANGED')
     yield 'http://%s:%d' % (host, 9200)
 
-    if 'process' in locals() and process.poll() is None:
+    if 'process' in locals() and process.poll() is None and not os.environ.get('TRAVIS'):
         process.terminate()
         process.wait()
 
