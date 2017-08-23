@@ -87,6 +87,7 @@ def listening_conn(dbapi_conn):
 
 
 def test_indexing_simple(app, testapp, indexer_testapp):
+    from snovault.elasticsearch import indexer_utils
     # First post a single item so that subsequent indexing is incremental
     testapp.post_json('/testing-post-put-patch/', {'required': ''})
     res = indexer_testapp.post_json('/index', {'record': True})
@@ -113,9 +114,11 @@ def test_indexing_simple(app, testapp, indexer_testapp):
     es = app.registry[ELASTIC_SEARCH]
     indexing_doc = es.get(index='meta', doc_type='meta', id='indexing')
     indexing_source = indexing_doc['_source']
+    utils_xmin = indexer_utils.get_xmin_from_es(es)
     assert 'xmin' in indexing_source
     assert 'last_xmin' in indexing_source
     assert 'indexed' in indexing_source
+    assert indexing_source['xmin'] == utils_xmin
     assert indexing_source['xmin'] >= indexing_source['last_xmin']
     testing_ppp_meta = es.get(index='meta', doc_type='meta', id='testing_post_put_patch')
     testing_ppp_source = testing_ppp_meta['_source']
@@ -187,7 +190,7 @@ def test_indexing_es(app, testapp, indexer_testapp):
     Get es results directly and test to make sure the _embedded results
     match with the embedded list in the types files.
     """
-    from snovault.elasticsearch import create_mapping
+    from snovault.elasticsearch import create_mapping, indexer_utils
     from elasticsearch.exceptions import NotFoundError
     es = app.registry[ELASTIC_SEARCH]
     test_type = 'testing_post_put_patch'
@@ -223,13 +226,17 @@ def test_indexing_es(app, testapp, indexer_testapp):
     assert doc_count == 1
     indexing_record = es.get(index='meta', doc_type='meta', id='indexing')
     assert indexing_record.get('_source', {}).get('indexed') == 1
-    # delete index and re-run create_mapping; should queue the single uuid for indexing
+    # delete index and re-run create_mapping
+    # should queue the single uuid for indexing in stored_uuids
     es.indices.delete(index=test_type)
     reindex_uuids = create_mapping.run(app, check_first=True)
+    time.sleep(3)
+    store_uuids = indexer_utils.get_uuid_store_from_es(es)
     assert len(reindex_uuids) == 1
+    assert reindex_uuids == set(store_uuids)
     # reindex with --force
     reindex_uuids = create_mapping.run(app, force=True)
-    time.sleep(5)
+    time.sleep(3)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
     assert len(reindex_uuids) == 1
@@ -242,7 +249,7 @@ def test_indexing_es(app, testapp, indexer_testapp):
     # run create mapping with force=True, expect test index to re-index
     reindex_uuids = create_mapping.run(app, force=True)
     assert len(reindex_uuids) == 2
-    time.sleep(5)
+    time.sleep(3)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     # doc_count will have updated due to indexing in create_mapping
     assert doc_count == 2
@@ -281,7 +288,7 @@ def test_check_and_reindex_existing(app, testapp):
     es = app.registry[ELASTIC_SEARCH]
     test_type = 'testing_post_put_patch'
     # post an item but don't reindex
-    # this will cause the testing-ppp index to reindex when we call
+    # this will cause the testing-ppp index to queue reindexing when we call
     # check_and_reindex_existing
     res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
     time.sleep(2)
