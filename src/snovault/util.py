@@ -42,6 +42,8 @@ def secure_embed(request, item_path, addition='@@object'):
         # if empty item_path reqeust.embed returns just addition as a string
         if item_path:
             res = request.embed(str(item_path), addition, as_user=True)
+        else:
+            res = ''
         return res
     except HTTPForbidden:
         print("you don't have access to this object")
