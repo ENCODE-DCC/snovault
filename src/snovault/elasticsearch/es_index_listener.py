@@ -53,6 +53,8 @@ def run(testapp, timeout=DEFAULT_TIMEOUT, dry_run=False, path='/index', control=
         es = testapp.app.registry[ELASTIC_SEARCH]
     es.info()
 
+    log.info('es_index_listener given path: ' + path)
+
     max_xid = 0
     DBSession = testapp.app.registry[STORAGE].write.DBSession
     engine = DBSession.bind  # DBSession.bind is configured by app init

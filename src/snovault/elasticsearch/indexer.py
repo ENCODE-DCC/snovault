@@ -156,16 +156,31 @@ def index(request):
         snapshot_id = None
         if not recovery:
             snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
-        redis_client = Redis(charset="utf-8", decode_responses=True)
         # Store unfinished set after updating it
-        if len(redis_client.sdiff("invalidated", "indexed")) > 0:
+        redis_client = Redis(charset="utf-8", decode_responses=True)
+        redis_pipe = redis_client.pipeline()
+        if len(redis_client.sdiff("invalidated", "indexed", "failed")) > 1:  # Bek says this should be 1 and not 0
             redis_client.sadd('invalidated', *set(invalidated))
         else:
-            redis_client.delete('indexed', 'failed', 'invalidated')
-            redis_client.sadd('invalidated', *set(invalidated))
-            
-        # Re-initiate invalidated set   
-        remaining_invalidated = list(redis_client.sdiff('invalidated', 'indexed'))
+            # Set up previously finished cycle for secondary_indexer
+            done_with = redis_client.lrange('wait-on-primary',0,-1)
+            if len(done_with) > 0:
+                redis_pipe.rpush('done-with-primary', *done_with).delete('wait-on-primary').execute()
+            #for val in redis_client.lpop('wait-on-primary'):
+            #    redis_pipe.rpush('done-with-primary', val)
+
+            troubled_uuids = redis_client.smembers('failed')
+            if len(troubled_uuids) > 0:
+                redis_pipe.rpush('troubled uuids', *list(troubled_uuids))
+            redis_pipe.delete('indexed', 'failed', 'invalidated', 'in progress')
+            redis_pipe.sadd('invalidated', *set(invalidated))
+            redis_pipe.execute()
+
+        # Set up future cycle for secondary indexer rpush keeps them in order
+        redis_pipe.rpush('wait-on-primary', "xmin:%s" % xmin).rpush('wait-on-primary', *list(invalidated)).execute()
+
+        # Re-initiate invalidated set
+        remaining_invalidated = list(redis_client.sdiff('invalidated', 'indexed', "failed"))
         result['errors'] = indexer.update_objects(request, remaining_invalidated, xmin, snapshot_id)
         result['indexed'] = len(invalidated)
 
@@ -188,6 +203,16 @@ def index(request):
                 es.indices.put_settings(index=INDEX, body=interval_settings)
 
         es.indices.refresh(index=INDEX)
+
+        # This is the end of the cycle.  If all were indexed then we can kick them to the secondary indexer
+        if len(redis_client.sdiff("invalidated", "indexed", "failed")) <= 1:
+            # Set up just finished cycle for secondary_indexer
+            done_with = redis_client.lrange('wait-on-primary',0,-1)
+            if len(done_with) > 0:
+                redis_pipe.rpush('done-with-primary', *done_with).delete('wait-on-primary').execute()
+            #for val in redis_client.lpop('wait-on-primary'):
+            #    redis_pipe.rpush('done-with-primary', val)
+            redis_pipe.execute()
 
         if flush:
             try:
@@ -226,7 +251,8 @@ class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
         self.index = registry.settings['snovault.elasticsearch.index']
-        self.redis = Redis(connection_pool=registry[CONNECTION].redis_pool, charset="utf-8", decode_responses=True)
+        self.redis_pipe = Redis(connection_pool=registry[CONNECTION].redis_pool, charset="utf-8", decode_responses=True).pipeline()
+
     def update_objects(self, request, uuids, xmin, snapshot_id):
         errors = []
         for i, uuid in enumerate(uuids):
@@ -238,45 +264,56 @@ class Indexer(object):
 
         return errors
 
+    def failed_uuid(self, uuid):
+        self.redis_pipe.sadd("failed", uuid).srem("in progress", uuid).execute()
+
+    def indexed_uuid(self, uuid):
+        self.redis_pipe.sadd("indexed", uuid).srem("in progress", uuid).execute()
+
     def update_object(self, request, uuid, xmin):
-        self.redis.sadd("failed", uuid)
+        self.redis_pipe.sadd("in-progress", uuid).execute()
+
+        last_exc = None
         try:
             result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
         except StatementError:
+            self.failed_uuid(uuid)
             # Can't reconnect until invalid transaction is rolled back
             raise
         except Exception as e:
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
-            timestamp = datetime.datetime.now().isoformat()
-            return {'error_message': repr(e), 'timestamp': timestamp, 'uuid': str(uuid)}
+            last_exc = repr(e)
 
-        last_exc = None
-        for backoff in [0, 10, 20, 40, 80]:
-            time.sleep(backoff)
-            try:
-                self.es.index(
-                    index=self.index, doc_type=result['item_type'], body=result,
-                    id=str(uuid), version=xmin, version_type='external_gte',
-                    request_timeout=30,
-                )
-                self.redis.sadd("indexed", uuid)
-                self.redis.srem("failed", uuid)
-            except StatementError:
-                # Can't reconnect until invalid transaction is rolled back
-                raise
-            except ConflictError:
-                log.warning('Conflict indexing %s at version %d', uuid, xmin)
-                return
-            except (ConnectionError, ReadTimeoutError, TransportError) as e:
-                log.warning('Retryable error indexing %s: %r', uuid, e)
-                last_exc = repr(e)
-            except Exception as e:
-                log.error('Error indexing %s', uuid, exc_info=True)
-                last_exc = repr(e)
-                break
-            else:
-                return
+        if last_exc is None:
+            for backoff in [0, 10, 20, 40, 80]:
+                time.sleep(backoff)
+                try:
+                    self.es.index(
+                        index=self.index, doc_type=result['item_type'], body=result,
+                        id=str(uuid), version=xmin, version_type='external_gte',
+                        request_timeout=30,
+                    )
+                except StatementError:
+                    self.failed_uuid(uuid)
+                    # Can't reconnect until invalid transaction is rolled back
+                    raise
+                except ConflictError:
+                    log.warning('Conflict indexing %s at version %d', uuid, xmin)
+                    self.failed_uuid(uuid)
+                    return
+                except (ConnectionError, ReadTimeoutError, TransportError) as e:
+                    log.warning('Retryable error indexing %s: %r', uuid, e)
+                    last_exc = repr(e)
+                except Exception as e:
+                    log.error('Error indexing %s', uuid, exc_info=True)
+                    last_exc = repr(e)
+                    break
+                else:
+                    # Get here on success and outside of try
+                    self.indexed_uuid(uuid)
+                    return
 
+        self.failed_uuid(uuid)
         timestamp = datetime.datetime.now().isoformat()
         return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
 
