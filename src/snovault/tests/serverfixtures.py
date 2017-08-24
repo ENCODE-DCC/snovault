@@ -75,7 +75,7 @@ def elasticsearch_server(request, elasticsearch_host_port):
     print('PORT CHANGED')
     yield 'http://%s:%d' % (host, 9200)
 
-    if 'process' in locals() and process.poll() is None:
+    if 'process' in locals() and process.poll() is None and not os.environ.get('TRAVIS'):
         process.terminate()
         process.wait()
 
