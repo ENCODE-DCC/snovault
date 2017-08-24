@@ -64,7 +64,7 @@
                     "venti",
                     "grande"
             ]
-           
+
         }
     },
     "facets": {
@@ -85,9 +85,6 @@
         },
         "status": {
             "title": "Snowball status"
-        },
-        "snowflakes.type": {
-            "title": "Flakes"
         },
         "month_released": {
             "title": "Date released"
@@ -114,16 +111,12 @@
         },
         "status": {
             "title": "Status"
-        },
-        "snowflakes.length": {
-            "title": "Number of snowflakes"
         }
     },
     "boost_values": {
         "accession": 1.0,
         "method": 1.0,
         "size": 1.0,
-        "snowflakes.type": 1.0,
         "award.title": 1.0,
         "award.project": 1.0,
         "submitted_by.email": 1.0,

@@ -27,15 +27,11 @@ def item_is_revoked(request, path):
 class Snowset(Item):
     base_types = ['Snowset'] + Item.base_types
     embedded_list = [
-        'snowflakes.*',
-        'snowflakes.submitted_by.*',
-        'snowflakes.lab.*',
         'submitted_by.*',
         'lab.*',
         'award.*',
     ]
     audit_inherit = [
-        'snowflakes',
         'submitted_by',
         'lab',
         'award',
