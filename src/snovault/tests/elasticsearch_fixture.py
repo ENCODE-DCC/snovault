@@ -15,6 +15,7 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
         '-Epath.logs=%s' % os.path.join(datadir, 'logs')
     ]
     if os.environ.get('TRAVIS'):
+        print('IN TRAVIS')
         echo=True
         args.append('-Epath.conf=%s/conf' % os.environ['TRAVIS_BUILD_DIR'])
     elif os.path.exists('/etc/elasticsearch'):
@@ -35,6 +36,7 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
             sys.stdout.write(line.decode('utf-8'))
         lines.append(line)
         if line.endswith(SUCCESS_LINE):
+            print('detected start, broke')
             break
     else:
         code = process.wait()
@@ -43,7 +45,7 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
 
     if not echo:
         process.stdout.close()
-
+    print('returning process')
     return process
 
 
