@@ -13,7 +13,8 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
         '-Ehttp.port=%d' % port,
     ]
     if os.environ.get('TRAVIS'):
-        echo=True
+        echo = True
+        args.append('-Epath.conf=conf')  # travis installs conf locally
     elif os.path.exists('/etc/elasticsearch'):
         # elasticsearch.deb setup
         args.append('-Epath.conf=/etc/elasticsearch')
