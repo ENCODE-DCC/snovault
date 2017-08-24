@@ -71,8 +71,7 @@ def elasticsearch_server(request, elasticsearch_host_port):
     tmpdir = str(tmpdir)
     #if not os.environ.get('TRAVIS'):
     process = server_process(str(tmpdir), host=host, port=9200)
-    print('Waiting 60 for ES server...')
-    import time; time.sleep(60)
+    print('ES server starts on %s' % str(tmpdir))
     print('PORT CHANGED')
     yield 'http://%s:%d' % (host, 9200)
 
