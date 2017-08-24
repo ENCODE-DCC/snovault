@@ -167,7 +167,7 @@ def index_settings():
         'settings': {
             'index.mapping.total_fields.limit': 5000,
             'index.number_of_shards': 1,
-            'index.number_of_replicas': 2,
+            'index.number_of_replicas': 0 ,
             'analysis': {
                 'filter': {
                     'substring': {
@@ -444,20 +444,22 @@ def type_mapping(types, item_type, embed=True):
 
 
 def create_elasticsearch_index(es, index, body):
-    try:
-        es.indices.create(index=index, body=body)
-    except RequestError:
-        es.indices.delete(index=index)
-        es.indices.create(index=index, body=body)
+    es.indices.create(index=index, body=body)
+    # try:
+    #     es.indices.create(index=index, body=body)
+    # except RequestError:
+    #     es.indices.delete(index=index)
+    #     es.indices.create(index=index, body=body)
 
 
 def set_index_mapping(es, index, doc_type, mapping):
-    try:
-        es.indices.put_mapping(index=index, doc_type=doc_type, body=mapping)
-    except:
-        log.exception("Could not create mapping for the collection %s", doc_type)
-    else:
-        es.indices.refresh(index=index)
+    es.indices.put_mapping(index=index, doc_type=doc_type, body=mapping)
+    # try:
+    #     es.indices.put_mapping(index=index, doc_type=doc_type, body=mapping)
+    # except:
+    #     log.exception("Could not create mapping for the collection %s", doc_type)
+    # else:
+    #     es.indices.refresh(index=index)
 
 
 def run(app, collections=None, dry_run=False):
@@ -465,9 +467,8 @@ def run(app, collections=None, dry_run=False):
     registry = app.registry
     if not dry_run:
         es = app.registry[ELASTIC_SEARCH]
-        print(es)
         print('CREATE MAPPING RUNNING')
-        es.indices.delete(index='_all')
+        # es.indices.delete(index='_all')
 
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
