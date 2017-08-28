@@ -671,7 +671,10 @@ def check_if_index_exists(es, in_type, check_first):
         for wait in [3,6,9,12]:
             if not this_index_exists:
                 time.sleep(wait)
-                this_index_exists = es.indices.exists(index=in_type)
+                try:
+                    this_index_exists = es.indices.exists(index=in_type)
+                except ConnectionTimeout:
+                    this_index_exists = False
     return this_index_exists
 
 
