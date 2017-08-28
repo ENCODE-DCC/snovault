@@ -94,18 +94,20 @@ def get_xmin_from_es(es):
 
 
 def get_uuid_store_from_es(es):
-    from elasticsearch.exceptions import NotFoundError
     try:
-        record = es.get(index='meta', doc_type='meta', id='uuid_store')
-    except NotFoundError:
+        record = es.get(index='meta', doc_type='meta', id='uuid_store', ignore=[404])
+    except:
         return None
     else:
-        uuids = record['_source']['uuids']
-        # remove the record
-        try:
-            es.delete(index='meta', doc_type='meta', id='uuid_store', refresh=True)
-        except:
-            # delete failed, return no uuids for now
-            return None
+        uuids = record.get('_source', {}).get('uuids', None)
+        if uuids:
+            # remove the record
+            try:
+                es.delete(index='meta', doc_type='meta', id='uuid_store', refresh=True)
+            except:
+                # delete failed, return no uuids for now
+                return None
+            else:
+                return uuids
         else:
-            return uuids
+            return None

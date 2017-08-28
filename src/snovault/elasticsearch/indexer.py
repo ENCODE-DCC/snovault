@@ -91,12 +91,14 @@ def index(request):
 
     flush = False
     if req_uuids is not None:
+        result['forcibly_indexed'] = req_uuids
         invalidated = updated = set(req_uuids)
     elif last_xmin is None:
         # this will invalidate only the uuids of given types and does not
         # consider embedded/linked uuids.
         # if types is not provided, all types will be used
-        result['types'] = types = request.json.get('types', None)
+        types = request.json.get('types', None)
+        result['types_indexed'] = types if types is not None else 'all'
         invalidated = list(get_uuids_for_types(request.registry, types))
         updated = invalidated
         flush = True
@@ -151,7 +153,12 @@ def index(request):
         if not recovery:
             snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
 
+        index_start_time = datetime.datetime.now()
+        result['indexing_started'] = index_start_time.isoformat()
         result['errors'] = indexer.update_objects(request, invalidated, xmin, snapshot_id)
+        index_finish_time = datetime.datetime.now()
+        result['indexing_finished'] = index_finish_time.isoformat()
+        result['indexing_elapsed'] = str(index_finish_time - index_start_time)
         result['indexed'] = len(invalidated)
 
         if record:

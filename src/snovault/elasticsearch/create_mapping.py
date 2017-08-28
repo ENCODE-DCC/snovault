@@ -613,7 +613,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
 
     # delete the index
     if this_index_exists:
-        res = es_safe_execute(es.indices.delete, index=in_type, ignore=[400,404], request_timeout=30)
+        res = es_safe_execute(es.indices.delete, index=in_type, ignore=[400,404])
         if res:
             print('MAPPING: index successfully deleted for %s' % (in_type))
         else:
@@ -621,14 +621,14 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
 
     # first, create the mapping. adds settings in the body
     put_settings = this_index_record['settings']
-    res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, ignore=[400], request_timeout=30)
+    res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, ignore=[400])
     if res:
         print('MAPPING: new index created for %s' % (in_type))
     else:
         print('MAPPING: new index failed for %s' % (in_type))
 
     # update with mapping
-    res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, ignore=[400], request_timeout=30)
+    res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, ignore=[400])
     if res:
         print('MAPPING: mapping successfully added for %s' % (in_type))
     else:
@@ -776,11 +776,11 @@ def es_safe_execute(function, **kwargs):
     exec_count = 0
     while exec_count < 3:
         try:
-            function(**kwargs)
+            # add request_timeout for all safe executions
+            function(**kwargs, request_timeout=10)
         except ConnectionTimeout:
             exec_count += 1
             print('ES connection issue! Retrying.', file=sys.stderr)
-            time.sleep(3)
         else:
             return True
     return False
