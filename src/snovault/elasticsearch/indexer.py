@@ -271,6 +271,7 @@ def index(request):
 
         # Do the work...
         result['errors'] = indexer.update_objects(request, invalidated, xmin, snapshot_id)
+        result["cycles"] = result.get("cycles",0) + 1
 
         result['successful'] = state.finish_cycle(result)
 
