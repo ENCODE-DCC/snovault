@@ -16,8 +16,7 @@ def find_uuids_for_indexing(registry, updated, renamed, log):
     # invalidate all uuids to avoid errors
     meta_exists = es.indices.exists(index='meta')
     if not meta_exists or len(updated) > SEARCH_MAX:
-        referencing = list(get_uuids_for_types(registry))
-        invalidated = referencing | updated
+        referencing = set(get_uuids_for_types(registry))
         return invalidated, referencing, True
 
     es.indices.refresh(index='_all')
@@ -49,18 +48,17 @@ def find_uuids_for_indexing(registry, updated, renamed, log):
         })
     except ConnectionTimeout:
         # on timeout, queue everything for reindexing to avoid errors
-        referencing = list(get_uuids_for_types(registry))
-        invalidated = referencing | updated
+        referencing = set(get_uuids_for_types(registry))
         return invalidated, referencing, True
     else:
         log.debug("Found %s associated items for indexing" %
                  (str(res['hits']['total'])))
         if res['hits']['total'] > SEARCH_MAX:
-            referencing = list(get_uuids_for_types(registry))
+            referencing = set(get_uuids_for_types(registry))
             flush = True
         else:
             found_uuids = {hit['_id'] for hit in res['hits']['hits']}
-            referencing= referencing | found_uuids
+            referencing = referencing | found_uuids
         invalidated = referencing | updated
         return invalidated, referencing, flush
 
@@ -69,7 +67,7 @@ def get_uuids_for_types(registry, types=None):
     from snovault import COLLECTIONS
     """
     Generator function to return uuids for all the given types. If no
-    types provided, uses all types.
+    types provided, uses all types (get all uuids).
     """
     # First index user and access_key so people can log in
     collections = registry[COLLECTIONS]

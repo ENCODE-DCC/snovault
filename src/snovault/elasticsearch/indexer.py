@@ -99,7 +99,7 @@ def index(request):
         # if types is not provided, all types will be used
         types = request.json.get('types', None)
         result['types_indexed'] = types if types is not None else 'all'
-        invalidated = list(get_uuids_for_types(request.registry, types))
+        invalidated = set(get_uuids_for_types(request.registry, types))
         updated = invalidated
         flush = True
     else:

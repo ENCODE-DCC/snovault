@@ -18,7 +18,6 @@ def run(app, collections=None, last_xmin=None, uuids=None):
         'record': True
     }
     if uuids:
-        # uuids are in set and must be list to be json serializable
         post_body['uuids'] = list(uuids)
     testapp.post_json('/index', post_body)
 
