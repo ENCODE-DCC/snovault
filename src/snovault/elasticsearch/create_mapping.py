@@ -850,8 +850,8 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, pr
         snovault_cleanup(es, registry)
     if not collections:
         collections = list(registry[COLLECTIONS].by_item_type.keys())
-    if not force:
-        collections = ['meta'] + collections
+        if not force:
+            collections = ['meta'] + collections
     for collection_name in collections:
         if collection_name == 'meta':
             # meta mapping just contains settings
