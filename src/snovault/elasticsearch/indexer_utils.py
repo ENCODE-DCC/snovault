@@ -1,5 +1,6 @@
 def find_uuids_for_indexing(es, updated, renamed, log):
     from .create_mapping import index_settings
+    from elasticsearch.exceptions import ConnectionTimeout
     SEARCH_MAX = 99999  # OutOfMemoryError if too high
     """
     Run a search to find uuids of objects with embedded uuids in updated
@@ -18,31 +19,37 @@ def find_uuids_for_indexing(es, updated, renamed, log):
         return invalidated, referencing, True
 
     es.indices.refresh(index='_all')
-    res = es.search(index='_all', size=SEARCH_MAX, body={
-        'query': {
-            'bool': {
-                'filter': {
-                    'bool': {
-                        'should': [
-                            {
-                                'terms': {
-                                    'embedded_uuids': list(updated),
-                                    '_cache': False,
+    try:
+        res = es.search(index='_all', size=SEARCH_MAX, body={
+            'query': {
+                'bool': {
+                    'filter': {
+                        'bool': {
+                            'should': [
+                                {
+                                    'terms': {
+                                        'embedded_uuids': list(updated),
+                                        '_cache': False,
+                                    },
                                 },
-                            },
-                            {
-                                'terms': {
-                                    'linked_uuids': list(renamed),
-                                    '_cache': False,
+                                {
+                                    'terms': {
+                                        'linked_uuids': list(renamed),
+                                        '_cache': False,
+                                    },
                                 },
-                            },
-                        ],
+                            ],
+                        },
                     },
                 },
             },
-        },
-        '_source': False,
-    })
+            '_source': False,
+        })
+    except ConnectionTimeout:
+        # on timeout, queue everything for reindexing to avoid errors
+        referencing = list(all_uuids(request.registry))
+        invalidated = referencing | updated
+        return invalidated, referencing, True
     log.debug("Found %s associated items for indexing" %
              (str(res['hits']['total'])))
     if res['hits']['total'] > SEARCH_MAX:
