@@ -14,7 +14,7 @@ def find_uuids_for_indexing(es, updated, renamed, log):
     # invalidate all uuids to avoid errors
     meta_exists = es.indices.exists(index='meta')
     if not meta_exists or len(updated) > SEARCH_MAX:
-        referencing = list(all_uuids(request.registry))
+        referencing = list(get_uuids_for_types(request.registry))
         invalidated = referencing | updated
         return invalidated, referencing, True
 
@@ -47,14 +47,14 @@ def find_uuids_for_indexing(es, updated, renamed, log):
         })
     except ConnectionTimeout:
         # on timeout, queue everything for reindexing to avoid errors
-        referencing = list(all_uuids(request.registry))
+        referencing = list(get_uuids_for_types(request.registry))
         invalidated = referencing | updated
         return invalidated, referencing, True
     else:
         log.debug("Found %s associated items for indexing" %
                  (str(res['hits']['total'])))
         if res['hits']['total'] > SEARCH_MAX:
-            referencing = list(all_uuids(request.registry))
+            referencing = list(get_uuids_for_types(request.registry))
             flush = True
         else:
             found_uuids = {hit['_id'] for hit in res['hits']['hits']}
