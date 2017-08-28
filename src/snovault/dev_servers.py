@@ -46,6 +46,16 @@ def nginx_server_process(prefix='', echo=False):
 
     return process
 
+def redis_daemon_start(echo=False):
+    subprocess.check_call(['redis-server', 'etc/redis-encoded.conf'])
+    if echo:
+        pong = subprocess.check_output(['redis-cli','ping'])
+        print("Started: redis-server %s" % str(pong))
+
+def redis_daemon_shutdown(echo=False):
+    subprocess.check_call(['redis-cli', 'shutdown'])
+    if echo:
+        print("Shotdown: redis-server")
 
 def main():
     import argparse
@@ -82,6 +92,8 @@ def main():
     nginx = nginx_server_process(echo=True)
     processes = [postgres, elasticsearch, nginx]
 
+    redis_daemon_start(echo=True)
+
     @atexit.register
     def cleanup_process():
         for process in processes:
@@ -94,6 +106,7 @@ def main():
             except IOError:
                 pass
             process.wait()
+        redis_daemon_shutdown(echo=True)
 
     if args.init:
         app = get_app(args.config_uri, args.app_name)
