@@ -1,6 +1,8 @@
-def find_uuids_for_indexing(es, updated, renamed, log):
+def find_uuids_for_indexing(registry, updated, renamed, log):
+    from snovault import ELASTIC_SEARCH
     from .create_mapping import index_settings
     from elasticsearch.exceptions import ConnectionTimeout
+    es = registry[ELASTIC_SEARCH]
     SEARCH_MAX = 99999  # OutOfMemoryError if too high
     """
     Run a search to find uuids of objects with embedded uuids in updated
@@ -14,7 +16,7 @@ def find_uuids_for_indexing(es, updated, renamed, log):
     # invalidate all uuids to avoid errors
     meta_exists = es.indices.exists(index='meta')
     if not meta_exists or len(updated) > SEARCH_MAX:
-        referencing = list(get_uuids_for_types(request.registry))
+        referencing = list(get_uuids_for_types(registry))
         invalidated = referencing | updated
         return invalidated, referencing, True
 
@@ -47,14 +49,14 @@ def find_uuids_for_indexing(es, updated, renamed, log):
         })
     except ConnectionTimeout:
         # on timeout, queue everything for reindexing to avoid errors
-        referencing = list(get_uuids_for_types(request.registry))
+        referencing = list(get_uuids_for_types(registry))
         invalidated = referencing | updated
         return invalidated, referencing, True
     else:
         log.debug("Found %s associated items for indexing" %
                  (str(res['hits']['total'])))
         if res['hits']['total'] > SEARCH_MAX:
-            referencing = list(get_uuids_for_types(request.registry))
+            referencing = list(get_uuids_for_types(registry))
             flush = True
         else:
             found_uuids = {hit['_id'] for hit in res['hits']['hits']}

@@ -869,7 +869,7 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, pr
         if strict:
             uuids_to_index = uuids_to_index
         else:
-            uuids_to_index, _, _ = find_uuids_for_indexing(es, uuids_to_index, uuids_to_index, log)
+            uuids_to_index, _, _ = find_uuids_for_indexing(app.registry, uuids_to_index, uuids_to_index, log)
         if force:
             # use only the uuids from the index if strict and item-type provided
             print("MAPPING: indexing %s items" % (str(len(uuids_to_index))))

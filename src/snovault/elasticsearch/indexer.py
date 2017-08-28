@@ -130,7 +130,7 @@ def index(request):
             result['first_txn_timestamp'] = first_txn.isoformat()
 
         # look through all indices and find items with matching embedded uuids
-        invalidated, referencing, flush = find_uuids_for_indexing(es, updated, renamed, log)
+        invalidated, referencing, flush = find_uuids_for_indexing(request.registry, updated, renamed, log)
         result.update(
             max_xid=max_xid,
             renamed=renamed,
