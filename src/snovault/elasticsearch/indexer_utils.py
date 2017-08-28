@@ -1,5 +1,5 @@
 def find_uuids_for_indexing(registry, updated, renamed, log):
-    from snovault import ELASTIC_SEARCH
+    from .interfaces import ELASTIC_SEARCH
     from .create_mapping import index_settings
     from elasticsearch.exceptions import ConnectionTimeout
     es = registry[ELASTIC_SEARCH]
