@@ -50,16 +50,17 @@ def find_uuids_for_indexing(es, updated, renamed, log):
         referencing = list(all_uuids(request.registry))
         invalidated = referencing | updated
         return invalidated, referencing, True
-    log.debug("Found %s associated items for indexing" %
-             (str(res['hits']['total'])))
-    if res['hits']['total'] > SEARCH_MAX:
-        referencing = list(all_uuids(request.registry))
-        flush = True
     else:
-        found_uuids = {hit['_id'] for hit in res['hits']['hits']}
-        referencing= referencing | found_uuids
-    invalidated = referencing | updated
-    return invalidated, referencing, flush
+        log.debug("Found %s associated items for indexing" %
+                 (str(res['hits']['total'])))
+        if res['hits']['total'] > SEARCH_MAX:
+            referencing = list(all_uuids(request.registry))
+            flush = True
+        else:
+            found_uuids = {hit['_id'] for hit in res['hits']['hits']}
+            referencing= referencing | found_uuids
+        invalidated = referencing | updated
+        return invalidated, referencing, flush
 
 
 def get_uuids_for_types(registry, types=None):
