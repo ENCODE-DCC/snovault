@@ -776,8 +776,7 @@ def es_safe_execute(function, **kwargs):
     exec_count = 0
     while exec_count < 3:
         try:
-            # add request_timeout for all safe executions
-            function(**kwargs, request_timeout=10)
+            function(**kwargs)
         except ConnectionTimeout:
             exec_count += 1
             print('ES connection issue! Retrying.', file=sys.stderr)
