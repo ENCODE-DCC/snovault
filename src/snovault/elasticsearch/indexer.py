@@ -159,8 +159,8 @@ def index(request):
         # create indexing record, with _id = indexing_start_time timestamp
         indexing_record = {
             'uuid': index_start_str,
-            'record': 'pending',
-            'status': 'started'
+            'indexing_record': None,
+            'indexing_status': 'started'
         }
         # index the indexing record
         if record:
@@ -175,8 +175,8 @@ def index(request):
         result['indexing_finished'] = index_finish_time.isoformat()
         result['indexing_elapsed'] = str(index_finish_time - index_start_time)
         result['indexed'] = len(invalidated)
-        indexing_record['record'] = result
-        indexing_record['status'] = 'finished'
+        indexing_record['indexing_record'] = result
+        indexing_record['indexing_status'] = 'finished'
 
         if record:
             try:
@@ -190,7 +190,7 @@ def index(request):
                         log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
                         item['error_message'] = "Error occured during indexing, check the logs"
                 result['errors'] = error_messages
-                indexing_record['status'] = 'errored'
+                indexing_record['indexing_status'] = 'errored'
 
             # update the indexing record
             try:

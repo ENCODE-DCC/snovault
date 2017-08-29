@@ -210,17 +210,21 @@ def test_indexing_es(app, testapp, indexer_testapp):
     time.sleep(2)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
-    indexing_record = es.get(index='meta', doc_type='meta', id='indexing')
-    indexing_record_source = indexing_record.get('_source', {})
-    assert indexing_record_source.get('indexed') == 1
-    # test timing in indexing record
-    assert indexing_record_source.get('indexing_elapsed')
-    indexing_start = indexing_record_source.get('indexing_started')
-    indexing_end = indexing_record_source.get('indexing_finished')
+    indexing_doc = es.get(index='meta', doc_type='meta', id='indexing')
+    indexing_doc_source = indexing_doc.get('_source', {})
+    assert indexing_doc_source.get('indexed') == 1
+    # test timing in indexing doc
+    assert indexing_doc_source.get('indexing_elapsed')
+    indexing_start = indexing_doc_source.get('indexing_started')
+    indexing_end = indexing_doc_source.get('indexing_finished')
     assert indexing_start and indexing_end
     time_start =  datetime.strptime(indexing_start, '%Y-%m-%dT%H:%M:%S.%f')
     time_done = datetime.strptime(indexing_end, '%Y-%m-%dT%H:%M:%S.%f')
     assert time_start < time_done
+    # get indexing record by start_time
+    indexing_record = es.get(index='meta', doc_type='meta', id=indexing_start)
+    assert indexing_record.get('indexing_status') == 'finished'
+    assert indexing_record.get('indexing_record') == indexing_doc_source
     # run create_mapping with check_first=False (do not expect a re-index)
     reindex_uuids = create_mapping.run(app)
     time.sleep(2)
@@ -234,8 +238,8 @@ def test_indexing_es(app, testapp, indexer_testapp):
     time.sleep(2)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
-    indexing_record = es.get(index='meta', doc_type='meta', id='indexing')
-    assert indexing_record.get('_source', {}).get('indexed') == 1
+    indexing_doc = es.get(index='meta', doc_type='meta', id='indexing')
+    assert indexing_doc.get('_source', {}).get('indexed') == 1
     # delete index and re-run create_mapping
     # should queue the single uuid for indexing in stored_uuids
     es.indices.delete(index=test_type)
@@ -251,9 +255,9 @@ def test_indexing_es(app, testapp, indexer_testapp):
     assert doc_count == 1
     assert len(reindex_uuids) == 1
     # check indexing record for 'forcibly_indexed'
-    indexing_record = es.get(index='meta', doc_type='meta', id='indexing')
-    assert indexing_record.get('_source', {}).get('indexed') == 1
-    forcibly_indexed = indexing_record.get('_source', {}).get('forcibly_indexed')
+    indexing_doc = es.get(index='meta', doc_type='meta', id='indexing')
+    assert indexing_doc.get('_source', {}).get('indexed') == 1
+    forcibly_indexed = indexing_doc.get('_source', {}).get('forcibly_indexed')
     assert len(forcibly_indexed) == 1
     # post second item to database but do not index (don't load into es)
     res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
