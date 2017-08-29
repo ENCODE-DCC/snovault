@@ -192,6 +192,7 @@ def test_indexing_es(app, testapp, indexer_testapp):
     """
     from snovault.elasticsearch import create_mapping, indexer_utils
     from elasticsearch.exceptions import NotFoundError
+    import datetime
     es = app.registry[ELASTIC_SEARCH]
     test_type = 'testing_post_put_patch'
     # no documents added yet
@@ -210,7 +211,14 @@ def test_indexing_es(app, testapp, indexer_testapp):
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
     indexing_record = es.get(index='meta', doc_type='meta', id='indexing')
-    assert indexing_record.get('_source', {}).get('indexed') == 1
+    indexing_record_source = indexing_record.get('_source', {})
+    assert indexing_record_source.get('indexed') == 1
+    # test timing in indexing record
+    assert indexing_record_source.get('indexing_elapsed')
+    indexing_start = indexing_record_source.get('indexing_started')
+    indexing_end = indexing_record_source.get('indexing_finished')
+    assert indexing_start and indexing_end
+    assert datetime.strptime(indexing_start) < datetime.strptime(indexing_end)
     # run create_mapping with check_first=False (do not expect a re-index)
     reindex_uuids = create_mapping.run(app)
     time.sleep(2)
@@ -234,12 +242,16 @@ def test_indexing_es(app, testapp, indexer_testapp):
     store_uuids = indexer_utils.get_uuid_store_from_es(es)
     assert len(reindex_uuids) == 1
     assert reindex_uuids == set(store_uuids)
-    # reindex with --force
-    reindex_uuids = create_mapping.run(app, force=True)
+    # reindex with --force and --item-type
+    reindex_uuids = create_mapping.run(app, collections=[test_type], force=True)
     time.sleep(3)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
     assert len(reindex_uuids) == 1
+    # check indexing record for 'types_indexed'
+    indexing_record = es.get(index='meta', doc_type='meta', id='indexing')
+    assert indexing_record.get('_source', {}).get('indexed') == 1
+    assert indexing_record.get('_source', {}).get('types_indexed') == [test_type]
     # post second item to database but do not index (don't load into es)
     res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
     time.sleep(2)
