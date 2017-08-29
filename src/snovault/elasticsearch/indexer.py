@@ -154,12 +154,29 @@ def index(request):
             snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
 
         index_start_time = datetime.datetime.now()
-        result['indexing_started'] = index_start_time.isoformat()
+        index_start_str = index_start_time.isoformat()
+
+        # create indexing record, with _id = indexing_start_time timestamp
+        indexing_record = {
+            'uuid': index_start_str,
+            'record': 'pending',
+            'status': 'started'
+        }
+        # index the indexing record
+        if record:
+            try:
+                es.index(index='meta', doc_type='meta', body=indexing_record, id=index_start_str)
+            except:
+                log.error('Could not initialize indexing record for %s.', index_start_str)
+
+        result['indexing_started'] = index_start_str
         result['errors'] = indexer.update_objects(request, invalidated, xmin, snapshot_id)
         index_finish_time = datetime.datetime.now()
         result['indexing_finished'] = index_finish_time.isoformat()
         result['indexing_elapsed'] = str(index_finish_time - index_start_time)
         result['indexed'] = len(invalidated)
+        indexing_record['record'] = result
+        indexing_record['status'] = 'finished'
 
         if record:
             try:
@@ -173,7 +190,13 @@ def index(request):
                         log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
                         item['error_message'] = "Error occured during indexing, check the logs"
                 result['errors'] = error_messages
+                indexing_record['status'] = 'errored'
 
+            # update the indexing record
+            try:
+                es.index(index='meta', doc_type='meta', body=indexing_record, id=index_start_str)
+            except:
+                log.error('Could not finalize indexing record for %s.', index_start_str)
 
             if es.indices.get_settings(index='meta')['meta']['settings']['index'].get('refresh_interval', '') != '1s':
                 interval_settings = {"index": {"refresh_interval": "1s"}}
