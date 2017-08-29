@@ -91,13 +91,15 @@ def index(request):
 
     flush = False
     if req_uuids is not None:
+        result['forcibly_indexed'] = req_uuids
         invalidated = updated = set(req_uuids)
     elif last_xmin is None:
         # this will invalidate only the uuids of given types and does not
         # consider embedded/linked uuids.
         # if types is not provided, all types will be used
-        result['types'] = types = request.json.get('types', None)
-        invalidated = list(get_uuids_for_types(request.registry, types))
+        types = request.json.get('types', None)
+        result['types_indexed'] = types if types is not None else 'all'
+        invalidated = set(get_uuids_for_types(request.registry, types))
         updated = invalidated
         flush = True
     else:
@@ -128,7 +130,7 @@ def index(request):
             result['first_txn_timestamp'] = first_txn.isoformat()
 
         # look through all indices and find items with matching embedded uuids
-        invalidated, referencing, flush = find_uuids_for_indexing(es, updated, renamed, log)
+        invalidated, referencing, flush = find_uuids_for_indexing(request.registry, updated, renamed, log)
         result.update(
             max_xid=max_xid,
             renamed=renamed,
@@ -151,8 +153,30 @@ def index(request):
         if not recovery:
             snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
 
+        index_start_time = datetime.datetime.now()
+        index_start_str = index_start_time.isoformat()
+
+        # create indexing record, with _id = indexing_start_time timestamp
+        indexing_record = {
+            'uuid': index_start_str,
+            'indexing_record': None,
+            'indexing_status': 'started'
+        }
+        # index the indexing record
+        if record:
+            try:
+                es.index(index='meta', doc_type='meta', body=indexing_record, id=index_start_str)
+            except:
+                log.error('Could not initialize indexing record for %s.', index_start_str)
+
+        result['indexing_started'] = index_start_str
         result['errors'] = indexer.update_objects(request, invalidated, xmin, snapshot_id)
+        index_finish_time = datetime.datetime.now()
+        result['indexing_finished'] = index_finish_time.isoformat()
+        result['indexing_elapsed'] = str(index_finish_time - index_start_time)
         result['indexed'] = len(invalidated)
+        indexing_record['indexing_record'] = result
+        indexing_record['indexing_status'] = 'finished'
 
         if record:
             try:
@@ -166,7 +190,13 @@ def index(request):
                         log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
                         item['error_message'] = "Error occured during indexing, check the logs"
                 result['errors'] = error_messages
+                indexing_record['indexing_status'] = 'errored'
 
+            # update the indexing record
+            try:
+                es.index(index='meta', doc_type='meta', body=indexing_record, id=index_start_str)
+            except:
+                log.error('Could not finalize indexing record for %s.', index_start_str)
 
             if es.indices.get_settings(index='meta')['meta']['settings']['index'].get('refresh_interval', '') != '1s':
                 interval_settings = {"index": {"refresh_interval": "1s"}}

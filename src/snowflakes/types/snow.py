@@ -26,16 +26,12 @@ def item_is_revoked(request, path):
     })
 class Snowset(Item):
     base_types = ['Snowset'] + Item.base_types
-    embedded = [
-        'snowflakes.*',
-        'snowflakes.submitted_by.*',
-        'snowflakes.lab.*',
+    embedded_list = [
         'submitted_by.*',
         'lab.*',
         'award.*',
     ]
     audit_inherit = [
-        'snowflakes',
         'submitted_by',
         'lab',
         'award',
@@ -60,7 +56,6 @@ class Snowset(Item):
 class Snowball(Snowset):
     item_type = 'snowball'
     schema = load_schema('snowflakes:schemas/snowball.json')
-    embedded = []
 
 
 @collection(
@@ -73,7 +68,6 @@ class Snowball(Snowset):
 class Snowfort(Snowset):
     item_type = 'snowfort'
     schema = load_schema('snowflakes:schemas/snowfort.json')
-    embedded = []
 
 
 @collection(
@@ -88,7 +82,7 @@ class Snowflake(Item):
     schema = load_schema('snowflakes:schemas/snowflake.json')
     name_key = 'accession'
 
-    embedded = [
+    embedded_list = [
         'lab.*',
         'lab.awards.project',
         'lab.awards.title',

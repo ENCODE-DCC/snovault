@@ -121,7 +121,7 @@ class TestingLinkTarget(Item):
     rev = {
         'reverse': ('TestingLinkSource', 'target'),
     }
-    embedded = [
+    embedded_list = [
         'reverse.*',
     ]
 
@@ -145,7 +145,7 @@ class TestingLinkTarget(Item):
 )
 class TestingPostPutPatch(Item):
     item_type = 'testing_post_put_patch'
-    embedded = ['protected_link.*']
+    embedded_list = ['protected_link.*']
     schema = {
         'required': ['required'],
         'type': 'object',

@@ -11,7 +11,7 @@ def test_add_default_embeds(registry, item_type):
     from snovault import TYPES
     type_info = registry[TYPES].by_item_type[item_type]
     schema = type_info.schema
-    embeds = add_default_embeds(item_type, registry[TYPES], type_info.embedded, schema)
+    embeds = add_default_embeds(item_type, registry[TYPES], type_info.embedded_list, schema)
     for embed in embeds:
         split_embed = embed.strip().split('.')
         error, added_embeds = crawl_schemas_by_embeds(item_type, registry[TYPES], split_embed, schema['properties'])
@@ -27,7 +27,7 @@ def test_manual_embeds(registry, item_type):
     from snovault import TYPES
     type_info = registry[TYPES].by_item_type[item_type]
     schema = type_info.schema
-    embeds = type_info.embedded
+    embeds = type_info.embedded_list
     for embed in embeds:
         split_embed = embed.strip().split('.')
         error, added_embeds = crawl_schemas_by_embeds(item_type, registry[TYPES], split_embed, schema['properties'])

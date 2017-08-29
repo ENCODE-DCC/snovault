@@ -1,5 +1,5 @@
 from snovault import Item, Root, CONNECTION
-from snovault.elasticsearch.indexer import all_uuids
+from snovault.elasticsearch.indexer_utils import get_uuids_for_types
 from past.builtins import basestring
 from pyramid.view import view_config
 
@@ -49,7 +49,7 @@ def jsongraph(context, request):
     cache = {
         'uuid': {},
     }
-    for uuid in all_uuids(request.registry):
+    for uuid in get_uuids_for_types(request.registry):
         item = conn[uuid]
         properties = item.__json__(request)
         cache['uuid'][uuid] = item_jsongraph(item, properties)

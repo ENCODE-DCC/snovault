@@ -26,6 +26,8 @@ from .util import (
     simple_path_ids,
 )
 
+from .fourfront_utils import add_default_embeds
+
 logger = logging.getLogger(__name__)
 
 
@@ -201,7 +203,7 @@ class Item(Resource):
     base_types = ['Item']
     name_key = None
     rev = {}
-    embedded = ()
+    embedded_list = []
     audit_inherit = None
     schema = None
     AbstractCollection = AbstractCollection
@@ -328,6 +330,23 @@ class Item(Resource):
 
         connection = self.registry[CONNECTION]
         connection.update(self.model, properties, sheets, unique_keys, links)
+
+    @reify
+    def embedded(self):
+        """
+        Use the embedded_list defined for the individual types to create the
+        embedded attribute through expansion using add_default_embeds
+        """
+        total_schema = self.schema.get('properties', {}).copy()
+        calc_props_schema = {}
+        types = self.registry[TYPES]
+        if self.registry['calculated_properties']:
+            for calc_props_key, calc_props_val in self.registry['calculated_properties'].props_for(self).items():
+                if calc_props_val.schema:
+                    calc_props_schema[calc_props_key] = calc_props_val.schema
+        total_schema.update(calc_props_schema)
+        this_type = self.type_info.item_type
+        return add_default_embeds(this_type, types, self.embedded_list, total_schema)
 
     @calculated_property(name='@type', schema={
         "title": "Type",

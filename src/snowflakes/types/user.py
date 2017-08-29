@@ -56,7 +56,7 @@ class User(Item):
     item_type = 'user'
     schema = load_schema('snowflakes:schemas/user.json')
     # Avoid access_keys reverse link so editing access keys does not reindex content.
-    embedded = [
+    embedded_list = [
         'lab.*',
     ]
     STATUS_ACL = {
