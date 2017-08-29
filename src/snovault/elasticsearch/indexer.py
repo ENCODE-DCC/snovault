@@ -160,7 +160,8 @@ def index(request):
         indexing_record = {
             'uuid': index_start_str,
             'indexing_record': None,
-            'indexing_status': 'started'
+            'indexing_status': 'started',
+            'to_index': len(invalidated)
         }
         # index the indexing record
         if record:
