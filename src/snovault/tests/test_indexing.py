@@ -218,7 +218,9 @@ def test_indexing_es(app, testapp, indexer_testapp):
     indexing_start = indexing_record_source.get('indexing_started')
     indexing_end = indexing_record_source.get('indexing_finished')
     assert indexing_start and indexing_end
-    assert datetime.strptime(indexing_start) < datetime.strptime(indexing_end)
+    time_start =  datetime.strptime(indexing_start[:19], '%Y-%m-%dT%H:%M:%S')
+    time_done = datetime.strptime(indexing_end[:19], '%Y-%m-%dT%H:%M:%S')
+    assert time_start < time_done
     # run create_mapping with check_first=False (do not expect a re-index)
     reindex_uuids = create_mapping.run(app)
     time.sleep(2)
