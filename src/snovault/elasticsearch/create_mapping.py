@@ -826,7 +826,7 @@ def set_es_uuid_store(es, indexing_uuids):
         print("MAPPING: uuids to index were NOT stored succesfully.")
 
 
-def run(app, collections=None, dry_run=False, check_first=False, force=False, print_count_only=False, strict=False):
+def run(app, collections=None, dry_run=False, check_first=False, force=False, strict=False, no_meta=False, print_count_only=False):
     """
     Run create_mapping. Has the following options:
     collection: run create mapping for the given collections (indices) only
@@ -850,8 +850,9 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, pr
         snovault_cleanup(es, registry)
     if not collections:
         collections = list(registry[COLLECTIONS].by_item_type.keys())
-        if not force:
-            collections = ['meta'] + collections
+    # meta could be added through item-type arg
+    if not no_meta and 'meta' not in collections:
+        collections = ['meta'] + collections
     for collection_name in collections:
         if collection_name == 'meta':
             # meta mapping just contains settings
@@ -893,11 +894,14 @@ def main():
     parser.add_argument('--check-first', action='store_true',
                         help="check if index exists first before attempting creation")
     parser.add_argument('--force', action='store_true',
-                        help="set this to ignore meta and force new mapping and reindexing of all/given collections")
-    parser.add_argument('--print-count-only', action='store_true',
-                        help="use with check_first to only print counts")
+                        help="force new mapping and synchronous reindexing of all/given collections")
     parser.add_argument('--strict', action='store_true',
                         help="used with force or check_first in combination with item-type. Only index the given types (ignore associated items). Advanced users only")
+    parser.add_argument('--no-meta', action='store_true',
+                        help="add to disregard the meta index")
+    parser.add_argument('--print-count-only', action='store_true',
+                        help="use with check_first to only print counts")
+
     args = parser.parse_args()
 
     logging.basicConfig()
@@ -907,7 +911,7 @@ def main():
     logging.getLogger('snovault').setLevel(logging.WARN)
 
     uuids = run(app, args.item_type, args.dry_run, args.check_first, args.force,
-               args.print_count_only, args.strict)
+               args.strict, args.no_meta, args.print_count_only)
     return
 
 
