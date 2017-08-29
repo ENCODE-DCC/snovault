@@ -223,8 +223,8 @@ def test_indexing_es(app, testapp, indexer_testapp):
     assert time_start < time_done
     # get indexing record by start_time
     indexing_record = es.get(index='meta', doc_type='meta', id=indexing_start)
-    assert indexing_record.get('indexing_status') == 'finished'
-    assert indexing_record.get('indexing_record') == indexing_doc_source
+    assert indexing_record.get('_source', {}).get('indexing_status') == 'finished'
+    assert indexing_record.get('_source', {}).get('indexing_record') == indexing_doc_source
     # run create_mapping with check_first=False (do not expect a re-index)
     reindex_uuids = create_mapping.run(app)
     time.sleep(2)
