@@ -192,7 +192,7 @@ def test_indexing_es(app, testapp, indexer_testapp):
     """
     from snovault.elasticsearch import create_mapping, indexer_utils
     from elasticsearch.exceptions import NotFoundError
-    import datetime
+    from datetime import datetime
     es = app.registry[ELASTIC_SEARCH]
     test_type = 'testing_post_put_patch'
     # no documents added yet
