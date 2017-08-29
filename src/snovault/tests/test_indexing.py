@@ -218,8 +218,8 @@ def test_indexing_es(app, testapp, indexer_testapp):
     indexing_start = indexing_record_source.get('indexing_started')
     indexing_end = indexing_record_source.get('indexing_finished')
     assert indexing_start and indexing_end
-    time_start =  datetime.strptime(indexing_start[:19], '%Y-%m-%dT%H:%M:%S')
-    time_done = datetime.strptime(indexing_end[:19], '%Y-%m-%dT%H:%M:%S')
+    time_start =  datetime.strptime(indexing_start, '%Y-%m-%dT%H:%M:%S.%f')
+    time_done = datetime.strptime(indexing_end, '%Y-%m-%dT%H:%M:%S.%f')
     assert time_start < time_done
     # run create_mapping with check_first=False (do not expect a re-index)
     reindex_uuids = create_mapping.run(app)
@@ -250,10 +250,11 @@ def test_indexing_es(app, testapp, indexer_testapp):
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
     assert len(reindex_uuids) == 1
-    # check indexing record for 'types_indexed'
+    # check indexing record for 'forcibly_indexed'
     indexing_record = es.get(index='meta', doc_type='meta', id='indexing')
     assert indexing_record.get('_source', {}).get('indexed') == 1
-    assert indexing_record.get('_source', {}).get('types_indexed') == [test_type]
+    forcibly_indexed = indexing_record.get('_source', {}).get('forcibly_indexed')
+    assert len(forcibly_indexed) == 1
     # post second item to database but do not index (don't load into es)
     res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
     time.sleep(2)
