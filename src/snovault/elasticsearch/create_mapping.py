@@ -495,7 +495,7 @@ def type_mapping(types, item_type, embed=True):
     schema = type_info.schema
     # use top_level parameter here for schema_mapping
     mapping = schema_mapping('*', schema, True)
-    embeds = add_default_embeds(item_type, types, type_info.embedded, schema)
+    embeds = add_default_embeds(item_type, types, type_info.embedded_list, schema)
     embeds.sort()
     if not embed:
         return mapping
@@ -613,7 +613,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
 
     # delete the index
     if this_index_exists:
-        res = es_safe_execute(es.indices.delete, index=in_type, ignore=[400,404], request_timeout=30)
+        res = es_safe_execute(es.indices.delete, index=in_type, ignore=[400,404])
         if res:
             print('MAPPING: index successfully deleted for %s' % (in_type))
         else:
@@ -621,14 +621,14 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
 
     # first, create the mapping. adds settings in the body
     put_settings = this_index_record['settings']
-    res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, ignore=[400], request_timeout=30)
+    res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, ignore=[400])
     if res:
         print('MAPPING: new index created for %s' % (in_type))
     else:
         print('MAPPING: new index failed for %s' % (in_type))
 
     # update with mapping
-    res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, ignore=[400], request_timeout=30)
+    res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, ignore=[400])
     if res:
         print('MAPPING: mapping successfully added for %s' % (in_type))
     else:
@@ -780,7 +780,6 @@ def es_safe_execute(function, **kwargs):
         except ConnectionTimeout:
             exec_count += 1
             print('ES connection issue! Retrying.', file=sys.stderr)
-            time.sleep(3)
         else:
             return True
     return False
@@ -827,7 +826,7 @@ def set_es_uuid_store(es, indexing_uuids):
         print("MAPPING: uuids to index were NOT stored succesfully.")
 
 
-def run(app, collections=None, dry_run=False, check_first=False, force=False, print_count_only=False, strict=False):
+def run(app, collections=None, dry_run=False, check_first=False, force=False, strict=False, no_meta=False, print_count_only=False):
     """
     Run create_mapping. Has the following options:
     collection: run create mapping for the given collections (indices) only
@@ -851,7 +850,8 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, pr
         snovault_cleanup(es, registry)
     if not collections:
         collections = list(registry[COLLECTIONS].by_item_type.keys())
-    if not force:
+    # meta could be added through item-type arg
+    if not no_meta and 'meta' not in collections:
         collections = ['meta'] + collections
     for collection_name in collections:
         if collection_name == 'meta':
@@ -867,10 +867,10 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, pr
     if uuids_to_index:
         # if strict option and we have an item-type(s) provided,
         # find associated uuids for indexing
-        if strict and collections:
+        if strict:
             uuids_to_index = uuids_to_index
         else:
-            uuids_to_index, _, _ = find_uuids_for_indexing(es, uuids_to_index, uuids_to_index, log)
+            uuids_to_index, _, _ = find_uuids_for_indexing(app.registry, uuids_to_index, uuids_to_index, log)
         if force:
             # use only the uuids from the index if strict and item-type provided
             print("MAPPING: indexing %s items" % (str(len(uuids_to_index))))
@@ -894,11 +894,14 @@ def main():
     parser.add_argument('--check-first', action='store_true',
                         help="check if index exists first before attempting creation")
     parser.add_argument('--force', action='store_true',
-                        help="set this to ignore meta and force new mapping and reindexing of all/given collections")
-    parser.add_argument('--print-count-only', action='store_true',
-                        help="use with check_first to only print counts")
+                        help="force new mapping and synchronous reindexing of all/given collections")
     parser.add_argument('--strict', action='store_true',
                         help="used with force or check_first in combination with item-type. Only index the given types (ignore associated items). Advanced users only")
+    parser.add_argument('--no-meta', action='store_true',
+                        help="add to disregard the meta index")
+    parser.add_argument('--print-count-only', action='store_true',
+                        help="use with check_first to only print counts")
+
     args = parser.parse_args()
 
     logging.basicConfig()
@@ -908,7 +911,7 @@ def main():
     logging.getLogger('snovault').setLevel(logging.WARN)
 
     uuids = run(app, args.item_type, args.dry_run, args.check_first, args.force,
-               args.print_count_only, args.strict)
+               args.strict, args.no_meta, args.print_count_only)
     return
 
 

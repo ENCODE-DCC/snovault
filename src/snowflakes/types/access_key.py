@@ -49,7 +49,6 @@ class AccessKey(Item):
     item_type = 'access_key'
     schema = load_schema('snowflakes:schemas/access_key.json')
     name_key = 'access_key_id'
-    embedded = []
 
     STATUS_ACL = {
         'current': [(Allow, 'role.owner', ['view', 'edit'])] + ONLY_ADMIN_VIEW,
