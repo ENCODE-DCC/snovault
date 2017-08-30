@@ -463,33 +463,32 @@ def set_index_mapping(es, index, doc_type, mapping):
 
 
 def run(app, collections=None, dry_run=False):
-    if not os.environ.get('TRAVIS'):
-        index = app.registry.settings['snovault.elasticsearch.index']
-        registry = app.registry
-        if not dry_run:
-            es = app.registry[ELASTIC_SEARCH]
-            print('CREATE MAPPING RUNNING')
-            # es.indices.delete(index='_all')
+    index = app.registry.settings['snovault.elasticsearch.index']
+    registry = app.registry
+    if not dry_run:
+        es = app.registry[ELASTIC_SEARCH]
+        print('CREATE MAPPING RUNNING')
+        # es.indices.delete(index='_all')
 
-        if not collections:
-            collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
+    if not collections:
+        collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
 
-        for collection_name in collections:
-            if collection_name == 'meta':
-                doc_type = 'meta'
-                mapping = META_MAPPING
-            else:
-                index = doc_type = collection_name
-                collection = registry[COLLECTIONS].by_item_type[collection_name]
-                mapping = es_mapping(type_mapping(registry[TYPES], collection.type_info.item_type))
+    for collection_name in collections:
+        if collection_name == 'meta':
+            doc_type = 'meta'
+            mapping = META_MAPPING
+        else:
+            index = doc_type = collection_name
+            collection = registry[COLLECTIONS].by_item_type[collection_name]
+            mapping = es_mapping(type_mapping(registry[TYPES], collection.type_info.item_type))
 
-            if mapping is None:
-                continue  # Testing collections
-            if dry_run:
-                print(json.dumps(sorted_dict({index: {doc_type: mapping}}), indent=4))
-                continue
-            create_elasticsearch_index(es, index, index_settings())
-            set_index_mapping(es, index, doc_type, {doc_type: mapping})
+        if mapping is None:
+            continue  # Testing collections
+        if dry_run:
+            print(json.dumps(sorted_dict({index: {doc_type: mapping}}), indent=4))
+            continue
+        create_elasticsearch_index(es, index, index_settings())
+        set_index_mapping(es, index, doc_type, {doc_type: mapping})
 
 
 def main():
