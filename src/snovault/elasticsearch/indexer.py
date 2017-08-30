@@ -23,6 +23,7 @@ import logging
 import pytz
 import time
 import copy
+import pdb
 
 
 
@@ -71,7 +72,7 @@ def index(request):
     # es_log_settings = {"transient": {"logger._root": "DEBUG"}}
     # es.cluster.put_settings(es_log_settings)
 
-
+    pdb.set_trace()
     if 'last_xmin' in request.json:
         last_xmin = request.json['last_xmin']
     else:
