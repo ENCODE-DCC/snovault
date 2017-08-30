@@ -47,7 +47,7 @@ def nginx_server_process(prefix='', echo=False):
     return process
 
 def redis_daemon_start(echo=False):
-    subprocess.check_call(['redis-server', 'etc/redis-encoded.conf'])
+    subprocess.check_call(['redis-server', 'etc/redis-development.conf'])
     subprocess.check_call(['redis-cli','flushall'])  # always (re)start local from a clean slate.
     if echo:
         pong = subprocess.check_output(['redis-cli','ping'])

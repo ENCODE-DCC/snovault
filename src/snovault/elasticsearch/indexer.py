@@ -80,6 +80,18 @@ class IndexerState(object):
     def prep_for_followup(self,xmin,uuids):
         self.redis_pipe.rpush(self.followup_prep_list, "xmin:%s" % xmin).rpush(self.followup_prep_list, *list(uuids)).execute()
 
+    def subtract_undone_uuids(self,xmin,uuids):
+        # If there are dones from the last cycle that match the xmin, then remove them
+        persistent_state = this.get()
+        if xmin != int(persistent_state.get('xmin',-1)):
+            return uuids
+        if not isinstance(uuids,set):
+            uuids = set(uuids)
+        dones = set(self.redis_client.smembers(self.done_set))
+        uuids = uuids - dones
+        # TODO: could blacklist uuids with troubled_set or twice_troubled set
+        return uuids
+
     def add_undone_uuids(self,uuids):
         # Adds undone from last cycle and returns set
         if not isinstance(uuids,set):
@@ -366,13 +378,17 @@ class Indexer(object):
         self.index = registry.settings['snovault.elasticsearch.index']
         self.redis_client = Redis(connection_pool=registry[CONNECTION].redis_pool, charset="utf-8", decode_responses=True)
         self.state = IndexerState(self.redis_client)
-        self.batch_size = 1024
+        try:
+            self.batch_size = int(registry.settings["indexer.batch_size"])  # found in buildout.cfg for production
+        except:
+            self.batch_size = 100
 
     def update_in_batches(self, request, uuids, xmin, snapshot_id):
         errors = []
         batch_count = 0
         while uuids:
             batch_uuids = []
+            batch_started = datetime.datetime.now(pytz.utc)
             while uuids:
                 batch_uuids.append(uuids.pop())
                 if len(batch_uuids) >= self.batch_size:
@@ -384,7 +400,7 @@ class Indexer(object):
                 self.state.uuids_done(batch_uuids)
                 if len(batch_of_errors) > 0:
                     errors.extend(batch_of_errors)
-                log.info('Indexed batch %d', batch_count)
+                log.error('Indexed batch: %d time: %s' % (batch_count,str(datetime.datetime.now(pytz.utc) - batch_started)))
 
         return errors
 

@@ -24,11 +24,16 @@ log = logging.getLogger(__name__)
 def includeme(config):
     if config.registry.settings.get('indexer_worker'):
         return
-    processes = config.registry.settings.get('indexer.processes')
+    processes = None
     try:
-        processes = int(processes)
+        processes = int(config.registry.settings.get('indexer.processes'))
     except:
-        processes = None
+        pass
+    chunksize = 1024
+    try:
+        chunksize = int(config.registry.settings.get('indexer.chunk_size'))
+    except:
+        pass
     config.registry[INDEXER] = MPIndexer(config.registry, processes=processes)
 
 
@@ -110,12 +115,13 @@ def update_object_in_snapshot(args):
 # Running in main process
 
 class MPIndexer(Indexer):
-    chunksize = 1024
+    #chunksize = 1024  # in production.ini (via buildout.cfg) as 1024
     maxtasks = 1  # pooled processes will exit and be replaced after this many tasks are completed.
 
     def __init__(self, registry, processes=None):
         super(MPIndexer, self).__init__(registry)
         self.processes = processes
+        self.chunksize = chunksize
         self.initargs = (registry[APP_FACTORY], registry.settings,)
 
     @reify
