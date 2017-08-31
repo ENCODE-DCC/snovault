@@ -28,6 +28,8 @@ import json
 from redis import Redis
 
 log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
+
 SEARCH_MAX = 99999  # OutOfMemoryError if too high
 
 def includeme(config):
@@ -78,12 +80,20 @@ class IndexerState(object):
             pass  # What sould be done?
 
     def prep_for_followup(self,xmin,uuids):
+        # TODO: Should probably toss any previous contents.  What is the likelihood that primary laps secondary?
+        if len(uuids) > SEARCH_MAX:
+             self.redis_pipe.delete(self.followup_prep_list)
         self.redis_pipe.rpush(self.followup_prep_list, "xmin:%s" % xmin).rpush(self.followup_prep_list, *list(uuids)).execute()
 
-    def subtract_undone_uuids(self,xmin,uuids):
+    def abandon_prior_prep(self):
+        self.redis_pipe.delete(self.followup_prep_list).execute()
+
+    def subtract_done_uuids(self,xmin,uuids):
         # If there are dones from the last cycle that match the xmin, then remove them
-        persistent_state = this.get()
-        if xmin != int(persistent_state.get('xmin',-1)):
+        # This happens when the server restarts in the middle of indexing
+        persistent_state = self.get()
+        # Only do this if we are within a single xmin (as happens when server is bounced
+        if (xmin - int(persistent_state.get('xmin',-1))) > 1:
             return uuids
         if not isinstance(uuids,set):
             uuids = set(uuids)
@@ -160,24 +170,23 @@ class IndexerState(object):
 
     def uuids_done(self,uuids=[]):
         if len(uuids):
-            self.redis_pipe.sadd(self.done_set, *uuids).srem(self.in_progress_set,*uuids).execute()
+            self.redis_pipe.sadd(self.done_set, *uuids).delete(self.in_progress_set).execute()
         else:
             return self.redis_client.scard(self.done_set)
 
-    def start_uuid(self,uuid):
-        # TODO: get rid of this after seeing times improve
-        #self.redis_pipe.sadd(self.in_progress_set, uuid).execute()
-        # Don't bother since it ain't THAT useful
-        return
-
+    #def start_uuid(self,uuid):
+    #    # TODO: get rid of this after seeing times improve
+    #    #self.redis_pipe.sadd(self.in_progress_set, uuid).execute()
+    #    # Don't bother since it ain't THAT useful
+    #    return
 
     def failed_uuid(self,uuid):
         #self.redis_pipe.sadd(self.failed_set, uuid).srem(self.in_progress_set, uuid).execute()
         self.redis_pipe.sadd(self.failed_set, uuid).execute()  # Hopefully these are rare so just redis it
 
-    def indexed_uuid(self,uuid):
-        #self.redis_pipe.sadd(self.done_set, uuid).srem(self.in_progress_set, uuid).execute()
-        self.redis_pipe.lpush(self.done_list, uuid).execute()
+    #def indexed_uuid(self,uuid):
+    #    #self.redis_pipe.sadd(self.done_set, uuid).srem(self.in_progress_set, uuid).execute()
+    #    self.redis_pipe.lpush(self.done_list, uuid).execute()
 
 
 @view_config(route_name='index', request_method='POST', permission="index")
@@ -296,14 +305,19 @@ def index(request):
     # May have undone uuids from prior cycle
     state = IndexerState()
     invalidated = state.add_undone_uuids(invalidated)
+    invalidated = state.subtract_done_uuids(xmin,invalidated)
 
     if invalidated and not dry_run:
+        if first_txn is None:
+            first_txn = datetime.datetime.now(pytz.utc)
+
         # Exporting a snapshot mints a new xid, so only do so when required.
         # Not yet possible to export a snapshot on a standby server:
         # http://www.postgresql.org/message-id/CAHGQGwEtJCeHUB6KzaiJ6ndvx6EFsidTGnuLwJ1itwVH0EJTOA@mail.gmail.com
         snapshot_id = None
         if not recovery:
             snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
+        result["snapshot"] = snapshot_id
         # Store unfinished set after updating it
 
         if secondary_indexer:
