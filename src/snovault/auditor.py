@@ -213,17 +213,10 @@ def traversed_path_ids(request, obj, path):
             yield item_uri
 
 
-def inherit_audits(request, embedded, embedded_paths):
-    audit_paths = {embedded['@id']}
-    for embedded_path in embedded_paths:
-        audit_paths.update(traversed_path_ids(request, embedded, embedded_path))
-
+def inherit_audits(request, audit_paths):
     audits = {}
     for audit_path in audit_paths:
         result = request.embed(audit_path, '@@audit-self')
-        # catch situations when fields, not objects, are embedded
-        if result is None or not isinstance(result, dict) or 'audit' not in result.keys():
-            continue
         for audit in result['audit']:
             if audit['level_name'] in audits:
                 audits[audit['level_name']].append(audit)
@@ -246,10 +239,14 @@ def item_view_audit_self(context, request):
 @view_config(context=Item, permission='audit', request_method='GET',
              name='audit')
 def item_view_audit(context, request):
-
+    if hasattr(request, '_embedded_uuids'):
+        embedded_uuids = request._embedded_uuids.copy()
+    else:
+        # get embedded uuids from @@object view
+        properties = request.embed(path, '@@object')
+        embedded_uuids = request._embedded_uuids.copy()
     path = request.resource_path(context)
-    properties = request.embed(path, '@@object')
-    audit = inherit_audits(request, properties, context.audit_inherit or context.embedded)
+    audit = inherit_audits(request, embedded_uuids)
     return {
         '@id': path,
         'audit': audit,

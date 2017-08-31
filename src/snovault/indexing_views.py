@@ -43,9 +43,9 @@ def item_index_data(context, request):
                 for key in unique_keys[key_name])
 
     path = path + '/'
-    embedded = request.embed(path, '@@embedded', fields_to_embed=context.embedded)
-    object = request.embed(path, '@@object')
+    embedded = request.embed(path, '@@embedded')
     audit = request.embed(path, '@@audit')['audit']
+    obj = request.embed(path, '@@object')
 
     document = {
         'audit': audit,
@@ -54,7 +54,7 @@ def item_index_data(context, request):
         'item_type': context.type_info.item_type,
         'linked_uuids': sorted(request._linked_uuids),
         'links': links,
-        'object': object,
+        'object': obj,
         'paths': sorted(paths),
         'principals_allowed': principals_allowed,
         'properties': properties,

@@ -75,6 +75,11 @@ def expand_path(request, obj, path):
 
 
 def expand_embedded_model(request, obj, model):
+    """
+    A similar idea to expand_path, but takes in a model from build_embedded_model
+    instead. Takes in the @@object view of the item (obj) and returns a
+    fully embedded result.
+    """
     embedded_res = {}
     # first take care of the fields_to_use at this level
     fields_to_use = model.get('fields_to_use')
@@ -90,38 +95,42 @@ def expand_embedded_model(request, obj, model):
     for to_embed in model:
         if to_embed == 'fields_to_use':
             continue
-        obj_path = obj.get(to_embed)
-        if obj_path is None:
+        obj_val = obj.get(to_embed)
+        if obj_val is None:
             continue
-        if isinstance(obj_path, list):
-            obj_list = []
-            for member in obj_path:
-                obj_embedded = expand_link_for_embedded_model(request, member, model[to_embed])
-                if obj_embedded is not None:
-                    obj_list.append(obj_embedded)
-            embedded_res[to_embed] = obj_list
-        else:
-            obj_embedded = expand_link_for_embedded_model(request, obj_path, model[to_embed])
-            if obj_embedded is not None:
-                embedded_res[to_embed] = obj_embedded
+        obj_embedded = expand_val_for_embedded_model(request, obj_val, model[to_embed])
+        if obj_embedded is not None:
+            embedded_res[to_embed] = obj_embedded
     return embedded_res
 
 
-def expand_link_for_embedded_model(request, obj_path, downstream_model):
-    # get the @@object view of obj to embed
-    # have to deal with strings and dictionaries
-    if isinstance(obj_path, dict):
-        obj_embedded = expand_embedded_model(request, obj_path, downstream_model)
+def expand_val_for_embedded_model(request, obj_val, downstream_model):
+    """
+    Take a value from an object and the relevant piece of the embedded_model
+    and perform embedding.
+    We have to account for list, dictionaries, and strings.
+    """
+    #
+    if isinstance(obj_val, list):
+        obj_list = []
+        for member in obj_val:
+            obj_embedded = expand_val_for_embedded_model(request, member, downstream_model)
+            if obj_embedded is not None:
+                obj_list.append(obj_embedded)
+        return obj_list
+    elif isinstance(obj_val, dict):
+        obj_embedded = expand_embedded_model(request, obj_val, downstream_model)
         return obj_embedded
-    elif isinstance(obj_path, basestring):
-        obj_val = secure_embed(request, obj_path, '@@object')
+    elif isinstance(obj_val, basestring):
+        # get the @@object view of obj to embed
+        obj_val = secure_embed(request, obj_val, '@@object')
         if not obj_val or obj_val == {'error': 'no view permissions'}:
-            return None
+            return obj_val
         obj_embedded = expand_embedded_model(request, obj_val, downstream_model)
         return obj_embedded
     else:
         # this means the object should be returned as-is
-        return obj_path
+        return obj_val
 
 
 def build_embedded_model(fields_to_embed):
