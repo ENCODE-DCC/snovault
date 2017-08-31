@@ -89,14 +89,14 @@ def embed(request, *elements, **kw):
     # request._linked_uuids.update(linked)
     # if we have a list of fields to embed, @@embebded is being called.
     # parse and trim fully embedded obj according to the fields to embed.
-    if fields_to_embed is not None:
-        global select_embedded_uuids
-        select_embedded_uuids = set()
-        p_result = parse_embedded_result(request, result, fields_to_embed)
-        request._embedded_uuids.update(select_embedded_uuids)
-        processed_linked_uuids = linked_uuids.difference(select_embedded_uuids)
-        request._linked_uuids.update(processed_linked_uuids)
-        return p_result
+    # if fields_to_embed is not None:
+    #     global select_embedded_uuids
+    #     select_embedded_uuids = set()
+    #     p_result = parse_embedded_result(request, result, fields_to_embed)
+    #     request._embedded_uuids.update(select_embedded_uuids)
+    #     processed_linked_uuids = linked_uuids.difference(select_embedded_uuids)
+    #     request._linked_uuids.update(processed_linked_uuids)
+    #     return p_result
     return result
 
 
@@ -191,45 +191,6 @@ def parse_embedded_result(request, result, fields_to_embed):
     """
     embedded_model = build_embedded_model(fields_to_embed)
     return build_embedded_result(request, result, embedded_model)
-
-
-def build_embedded_model(fields_to_embed):
-    """
-    Takes a list of fields to embed and builds the framework used to parse
-    the fully embedded result. 'fields_to_use' refer to specific fields that are to
-    be embedded within an object. The base level object gets a special flag,
-    '*', which means all non-object fields are embedded by default.
-    Below is an example calculated from the following fields:
-    INPUT:
-    [modifications.modified_regions.chromosome,
-    lab.uuid,
-    award.*,
-    biosource.*]
-    OUTPUT:
-    {'modifications': {'modified_regions': {'fields_to_use': ['chromosome']}},
-     'lab': {'fields_to_use': ['uuid']},
-     'award': {'*': ['fully embed this object']},
-     'bisource': {'*': ['fully embed this object']},
-     '*': ['fully embed this object']}
-    """
-    embedded_model = {'*':['fully embed this object']}
-    for field in fields_to_embed:
-        split_field = field.split('.')
-        field_pointer = embedded_model
-        for subfield in split_field:
-            if subfield == split_field[-1]:
-                if subfield == '*':
-                    # '*' means all fields are used
-                    field_pointer['*'] = ['fully embed this object']
-                elif 'fields_to_use' in field_pointer:
-                    field_pointer['fields_to_use'].append(subfield)
-                else:
-                    field_pointer['fields_to_use'] = [subfield]
-                continue
-            elif subfield not in field_pointer:
-                field_pointer[subfield] = {}
-            field_pointer = field_pointer[subfield]
-    return embedded_model
 
 
 def build_embedded_result(request, result, embedded_model):
