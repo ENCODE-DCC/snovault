@@ -174,26 +174,29 @@ class IndexerState(object):
         return state
 
     def uuids_in_progress(self,uuids=[]):
+        # Starts a batch
         if len(uuids):
             self.redis_pipe.sadd(self.in_progress_set, *uuids).execute()
         else:
             return self.redis_client.scard(self.in_progress_set)
 
     def uuids_done(self,uuids=[]):
+        # finishes a batch
         if len(uuids):
             self.redis_pipe.sadd(self.done_set, *uuids).delete(self.in_progress_set).execute()
         else:
             return self.redis_client.scard(self.done_set)
 
+    def failed_uuid(self,uuid):
+        #self.redis_pipe.sadd(self.failed_set, uuid).srem(self.in_progress_set, uuid).execute()
+        self.redis_pipe.sadd(self.failed_set, uuid).execute()  # Hopefully these are rare so just redis it
+
+    # To slow to handle one by one
     #def start_uuid(self,uuid):
     #    # TODO: get rid of this after seeing times improve
     #    #self.redis_pipe.sadd(self.in_progress_set, uuid).execute()
     #    # Don't bother since it ain't THAT useful
     #    return
-
-    def failed_uuid(self,uuid):
-        #self.redis_pipe.sadd(self.failed_set, uuid).srem(self.in_progress_set, uuid).execute()
-        self.redis_pipe.sadd(self.failed_set, uuid).execute()  # Hopefully these are rare so just redis it
 
     #def indexed_uuid(self,uuid):
     #    #self.redis_pipe.sadd(self.done_set, uuid).srem(self.in_progress_set, uuid).execute()
@@ -331,10 +334,7 @@ def index(request):
         if not recovery:
             snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
 
-        result.update(
-            snapshot=snapshot_id,
-            batch_size=indexer.batch_size,
-        )
+        result["snapshot"] = snapshot_id
 
         if secondary_indexer:
             # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
@@ -344,6 +344,7 @@ def index(request):
 
         # Do the work...
         if primary_accounting:
+            result['batch_size'] = indexer.batch_size
             errors = indexer.update_in_batches(request, invalidated, xmin, snapshot_id)
         else:
             errors = indexer.update_objects(request, invalidated, xmin, snapshot_id)
@@ -450,7 +451,6 @@ class Indexer(object):
         return errors
 
     def update_object(self, request, uuid, xmin):
-        #self.state.start_uuid(uuid)
 
         last_exc = None
         try:
@@ -489,7 +489,6 @@ class Indexer(object):
                     break
                 else:
                     # Get here on success and outside of try
-                    #self.state.indexed_uuid(uuid)
                     return
 
         self.state.failed_uuid(uuid)
