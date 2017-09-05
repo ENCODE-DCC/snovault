@@ -57,6 +57,7 @@ class User(Item):
     # Avoid access_keys reverse link so editing access keys does not reindex content.
     embedded_list = [
         'lab.*',
+        'submits_for.@id'
     ]
     STATUS_ACL = {
         'current': [(Allow, 'role.owner', ['edit', 'view_details'])] + USER_ALLOW_CURRENT,
