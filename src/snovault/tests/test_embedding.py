@@ -38,22 +38,15 @@ def content(testapp):
 
 
 def test_embedded_uuids_object(content, dummy_request, threadlocals):
-    # _embedded_uuids and_linked_uuids are only added to a request with fields_to_embed defined
     dummy_request.embed('/testing-link-sources/', sources[0]['uuid'], '@@object')
-    assert dummy_request._embedded_uuids == set()
-    assert dummy_request._linked_uuids == set()
-
-
-def test_embedded_uuids_embedded_no_fields(content, dummy_request, threadlocals):
-    dummy_request.embed('/testing-link-sources/', sources[0]['uuid'], '@@embedded')
-    assert dummy_request._embedded_uuids == set()
-    assert dummy_request._linked_uuids == set()
+    assert dummy_request._embedded_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd'}
+    assert dummy_request._linked_uuids == {'775795d3-4410-4114-836b-8eeecf1d0c2f', '16157204-8c8f-4672-a1a4-14f4b8021fcd'}
 
 
 def test_embedded_uuids_embedded(content, dummy_request, threadlocals):
-    dummy_request.embed('/testing-link-sources/', sources[0]['uuid'], '@@embedded', fields_to_embed=['*', 'target.uuid'])
-    assert dummy_request._embedded_uuids == {sources[0]['uuid'], targets[0]['uuid']}
-    assert dummy_request._linked_uuids == set()
+    dummy_request.embed('/testing-link-sources/', sources[0]['uuid'], '@@embedded')
+    assert dummy_request._embedded_uuids == {'775795d3-4410-4114-836b-8eeecf1d0c2f', '16157204-8c8f-4672-a1a4-14f4b8021fcd'}
+    assert dummy_request._linked_uuids == {'775795d3-4410-4114-836b-8eeecf1d0c2f', '16157204-8c8f-4672-a1a4-14f4b8021fcd'}
 
 
 def test_embedded_uuids_expand_target(content, dummy_request, threadlocals):
@@ -63,8 +56,8 @@ def test_embedded_uuids_expand_target(content, dummy_request, threadlocals):
     # but not we only return _embedded_uuids and _linked_uuids when
     # we're calling @@index-data, which corresponds to @@embedded with
     # field_to_embed defined
-    assert dummy_request._embedded_uuids == set()
-    assert dummy_request._linked_uuids == set()
+    assert dummy_request._embedded_uuids == {'775795d3-4410-4114-836b-8eeecf1d0c2f', '16157204-8c8f-4672-a1a4-14f4b8021fcd'}
+    assert dummy_request._linked_uuids == {'775795d3-4410-4114-836b-8eeecf1d0c2f', '16157204-8c8f-4672-a1a4-14f4b8021fcd'}
 
 
 def test_updated_source(content, testapp):
