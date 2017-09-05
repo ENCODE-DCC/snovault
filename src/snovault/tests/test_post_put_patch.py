@@ -219,10 +219,10 @@ def test_post_object_with_child(testapp):
         }]
     }
     res = testapp.post_json('/testing-link-targets', edit, status=201)
-    parent_id = res.json['@graph'][0]['@id']
+    parent_id = res.json['@graph'][0]['uuid']
     source = res.json['@graph'][0]['reverse'][0]
     res = testapp.get(source)
-    assert res.json['target']['@id'] == parent_id
+    assert res.json['target']['uuid'] == parent_id
 
 
 def test_retry(testapp):

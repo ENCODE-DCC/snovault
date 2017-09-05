@@ -20,8 +20,7 @@ from snovault import (
     load_schema,
 )
 from snovault.calculated import calculate_properties
-from snovault.resource_views import item_view_object
-from snovault.util import expand_path
+from snovault.resource_views import item_view_page
 from snovault.crud_views import collection_add
 from snovault.schema_utils import validate_request
 from snovault.storage import User as AuthUser
@@ -116,29 +115,17 @@ class User(Item):
 
 @view_config(context=User, permission='view', request_method='GET', name='page')
 def user_page_view(context, request):
-    if request.has_permission('view_details'):
-        properties = item_view_object(context, request)
-    else:
-        item_path = request.resource_path(context)
-        properties = request.embed(item_path, '@@object')
-    for path in context.embedded:
-        expand_path(request, properties, path)
-    calculated = calculate_properties(context, request, properties, category='page')
-    properties.update(calculated)
+    """smth."""
+    properties = item_view_page(context, request)
+    if not request.has_permission('view_details'):
+        filtered = {}
+        for key in ['@id', '@type', 'uuid', 'lab', 'title', 'link_id', 'display_title']:
+            try:
+                filtered[key] = properties[key]
+            except KeyError:
+                pass
+        return filtered
     return properties
-
-
-@view_config(context=User, permission='view', request_method='GET',
-             name='object')
-def user_basic_view(context, request):
-    properties = item_view_object(context, request)
-    filtered = {}
-    for key in ['@id', '@type', 'uuid', 'lab', 'title']:
-        try:
-            filtered[key] = properties[key]
-        except KeyError:
-            pass
-    return filtered
 
 
 @view_config(context=User.Collection, permission='add', request_method='POST',
