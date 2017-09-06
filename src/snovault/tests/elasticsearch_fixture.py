@@ -1,5 +1,6 @@
 import os.path
 import sys
+from time import sleep
 try:
     import subprocess32 as subprocess
 except ImportError:
@@ -40,8 +41,7 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
             print('detected start, broke')
             break
         if ERROR_TYPE in line:
-            print('detected ignorable error')
-            break
+            sleep(1)
     else:
         code = process.wait()
         msg = ('Process return code: %d\n' % code) + b''.join(lines).decode('utf-8')
