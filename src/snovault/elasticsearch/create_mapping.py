@@ -444,22 +444,11 @@ def type_mapping(types, item_type, embed=True):
 
 
 def create_elasticsearch_index(es, index, body):
-    es.indices.create(index=index, body=body)
-    # try:
-    #     es.indices.create(index=index, body=body)
-    # except RequestError:
-    #     es.indices.delete(index=index)
-    #     es.indices.create(index=index, body=body)
+    es.indices.create(index=index, body=body, ignore=[400])
 
 
 def set_index_mapping(es, index, doc_type, mapping):
-    es.indices.put_mapping(index=index, doc_type=doc_type, body=mapping)
-    # try:
-    #     es.indices.put_mapping(index=index, doc_type=doc_type, body=mapping)
-    # except:
-    #     log.exception("Could not create mapping for the collection %s", doc_type)
-    # else:
-    #     es.indices.refresh(index=index)
+    es.indices.put_mapping(index=index, doc_type=doc_type, body=mapping, ignore=[400])
 
 
 def run(app, collections=None, dry_run=False):

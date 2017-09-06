@@ -28,7 +28,7 @@ import pdb
 
 
 log = logging.getLogger(__name__)
-SEARCH_MAX = 99999  # OutOfMemoryError if too high
+SEARCH_MAX = 10000  # OutOfMemoryError if too high
 
 
 def includeme(config):
@@ -72,7 +72,7 @@ def index(request):
     # es_log_settings = {"transient": {"logger._root": "DEBUG"}}
     # es.cluster.put_settings(es_log_settings)
 
-    pdb.set_trace()
+    # pdb.set_trace()
     if 'last_xmin' in request.json:
         last_xmin = request.json['last_xmin']
     else:
@@ -84,7 +84,7 @@ def index(request):
                     "max_result_window": SEARCH_MAX,
                 }
             }
-            es.indices.put_settings(index='_all', body=interval_settings)
+            # es.indices.put_settings(index='_all', body=interval_settings)
         else:
             last_xmin = status['_source']['xmin']
 
@@ -107,6 +107,7 @@ def index(request):
         updated = set()
         renamed = set()
         max_xid = 0
+        # pdb.set_trace()
         txn_count = 0
         for txn in txns.all():
             txn_count += 1
@@ -121,8 +122,8 @@ def index(request):
         result['txn_count'] = txn_count
         if txn_count == 0:
             return result
-        es.indices.refresh(index=INDEX)
-        res = es.search(index=INDEX, size=SEARCH_MAX, body={
+        es.indices.refresh(index='_all')
+        res = es.search(index='_all', size=SEARCH_MAX, body={
             'query': {
                 'bool': {
                     'should': [
