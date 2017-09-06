@@ -41,7 +41,7 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
             print('detected start, broke')
             break
         if ERROR_TYPE in line:
-            sleep(1)
+            sleep(5)
     else:
         code = process.wait()
         msg = ('Process return code: %d\n' % code) + b''.join(lines).decode('utf-8')
