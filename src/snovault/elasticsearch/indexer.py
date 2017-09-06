@@ -25,7 +25,6 @@ import pytz
 import time
 import copy
 import json
-from redis import Redis
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -40,21 +39,26 @@ def includeme(config):
 
 
 class IndexerState(object):
-    def __init__(self, redis_client=None,accounting=True):
-        self.redis_client = redis_client
-        if self.redis_client is None:
-            self.redis_client = Redis(charset="utf-8", decode_responses=True)
-        self.accounting = accounting
-        self.redis_pipe = self.redis_client.pipeline()
-        self.persistent_key  = 'primary-state'         # State of the current or last cycle
-        self.todo_set        = 'primary-invalidated'   # one cycle of uuids, sent to the Secondary Indexer
-        self.in_progress_set = 'primary-in-progress'
-        self.failed_set      = 'primary-failed'
-        self.done_set        = 'primary-done'          # Trying to get all uuids from 'todo' to this set
-        self.troubled_set    = 'primary-troubled'      # uuids that failed to index in any cycle
-        self.last_set        = 'primary-last-cycle'    # uuids in the most recent finished cycle
-        self.followup_prep_list = 'primary-followup-prep-list' # Setting up the uuids to be handled by a followup process
-        self.followup_ready_list = 'staged-for-secondary-list'  # Followup list is added to here to pass baton
+    def __init__(self, es):
+        self.es = es
+        self.key = "indexerstate"
+        if not self.es.indices.exists(self.key):
+            self.es.indices.create(index=self.key, body={'index': {'number_of_shards': 1}})
+            mapping = {'default': {"_all":    {"enabled": False},
+                                "_source": {"enabled": True},
+                                # "_id":     {"index": "not_analyzed", "store": True},
+                                # "_ttl":    {"enabled": True, "default": "1d"},
+                                }}
+            self.es.indices.put_mapping(index=self.key, doc_type='default', body=mapping)
+        self.state_key       = 'primary_indexer'       # State of the current or last cycle
+        self.todo_set        = 'primary_invalidated'   # one cycle of uuids, sent to the Secondary Indexer
+        self.in_progress_set = 'primary_in_progress'
+        self.failed_set      = 'primary_failed'
+        self.done_set        = 'primary_done'          # Trying to get all uuids from 'todo' to this set
+        self.troubled_set    = 'primary_troubled'      # uuids that failed to index in any cycle
+        self.last_set        = 'primary_last_cycle'    # uuids in the most recent finished cycle
+        self.followup_prep_list = 'primary_followup_prep_list' # Setting up the uuids to be handled by a followup process
+        self.followup_ready_list = 'staged_for_secondary_list'  # Followup list is added to here to pass baton
         # DO NOT INHERIT! All keys that are cleaned up at the start and fully finished end of indexing
         self.cleanup_keys      = [self.todo_set,self.in_progress_set,self.failed_set,self.done_set]
         self.cleanup_last_keys = [self.last_set]  # ,self.audited_set] cleaned up only when new indexing occurs
@@ -67,140 +71,172 @@ class IndexerState(object):
 
     def get(self):
         try:
-            state = json.loads(self.redis_client.get(self.persistent_key))
+            state = self.es.get(index=self.key, doc_type='default', id=self.state_key)['_source']
         except:
             state = {}
         return state
 
-    def set(self,state):
-        # Don't save errors in redis
+    def put(self, state):
+        # Don't save errors in es
         errors = state.pop('errors',None)
+        state['indexer'] = self.state_key
         try:
-            self.redis_client.set(self.persistent_key,json.dumps(state))
+            self.es.index(index=self.key, doc_type='default', body=state, id=self.state_key)
         except:
-            log.warn("Failed to save to redis: " +str(state))
-            pass  # What sould be done?
+            log.warn("Failed to save to es: " +str(state))
+
         if errors is not None:
             state['errors'] = errors
 
-    def prep_for_followup(self,xmin,uuids):
-        # TODO: Should probably toss any previous contents.  What is the likelihood that primary laps secondary?
-        if len(uuids) > SEARCH_MAX:
-             self.redis_pipe.delete(self.followup_prep_list).execute()
-        self.redis_pipe.rpush(self.followup_prep_list, "xmin:%s" % xmin).rpush(self.followup_prep_list, *list(uuids)).execute()
+    def get_obj(self, id):
+        try:
+            return self.es.get(index=self.key, doc_type='default', id=id).get('_source',{})
+        except:
+            return {}
+
+    def put_obj(self, id, obj):
+        try:
+            self.es.index(index=self.key, doc_type='default', id=id, body=obj)
+        except:
+            log.warn("Failed to save to es: " + id)
+
+    def get_list(self, id):
+        return self.get_obj(id).get('list',[])
+
+    def get_count(self, id):
+        return self.get_obj(id).get('count',[])
+
+    def put_list(self, id, a_list):
+        return self.put_obj(id, { 'list': a_list, 'count': len(a_list) })
+
+    def get_diff(self,orig_id, subtract_ids):
+        result_set = set(self.get_list(orig_id))
+
+        if len(result_set) > 0:
+            for id in subtract_ids:
+                subtract_list = self.get_list(id)
+                if len(subtract_list):
+                    result_set = orig_set.difference_update(set(subtract_list))
+        return result_set
+
+    def set_add(self, id, vals):
+        set_to_update = set(self.get_list(id))
+        if len(set_to_update) > 0:
+            set_to_update.update(vals)
+        else:
+            set_to_update = vals
+        self.put_list(id, set_to_update)
+
+    def list_extend(self, id, vals):
+        list_to_extend = self.get_list(id)
+        if len(list_to_extend) > 0:
+            list_to_extend.extend(vals)
+        else:
+            list_to_extend = vals
+
+        self.put_list(id, list_to_extend)
+
+    def delete_objs(self, ids):
+        for id in ids:
+            try:
+                self.es.delete(index=self.key, doc_type='default', id=id)
+            except:
+                pass
+
+    def rename_objs(self, from_id, to_id):
+        val = self.get_list(from_id)
+        if val:
+            self.put_list(to_id, val)
+            self.delete_objs([from_id])
+
+    def prep_for_followup(self, xmin, uuids):
+        # set up new _cycle
+        prep_list = [ "xmin:%s" % xmin ]
+        prep_list.extend(uuids)
+        if len(uuids) <= SEARCH_MAX:
+            old_cycles = self.get_list(self.followup_prep_list)
+            if len(old_cycles) > 0:
+                prep_list = old_cycles.extend(prep_list)
+        self.put_list(self.followup_prep_list, prep_list)
+        ## TODO: Should probably toss any previous contents.  What is the likelihood that primary laps secondary?
 
     def abandon_prior_prep(self):
-        self.redis_pipe.delete(self.followup_prep_list).execute()
+        self.delete_objs([self.followup_prep_list])
 
-    def subtract_done_uuids(self,xmin,uuids):
-        if not self.accounting:
-            return uuids
-        # If there are dones from the last cycle that match the xmin, then remove them
-        # This happens when the server restarts in the middle of indexing
-        state = self.get()
-        # Only do this if we are within a single xmin (as happens when server is bounced
-        if (xmin - int(state.get('xmin',-1))) > 1:
-            return uuids
-        if not isinstance(uuids,set):
-            uuids = set(uuids)
-        dones = set(self.redis_client.smembers(self.done_set))
-        uuids = uuids - dones
-        # TODO: could blacklist uuids with troubled_set or twice_troubled set
-        return uuids
-
-    def add_undone_uuids(self,uuids):
-        if not self.accounting:
-            return uuids
-        # Adds undone from last cycle and returns set
-        if not isinstance(uuids,set):
-            uuids = set(uuids)
-        undones = list(self.redis_client.sdiff(self.todo_set, self.done_set))
-        uuids.update(undones)
-        # TODO: could blacklist uuids with troubled_set or twice_troubled set
-        return uuids
-
-    def start_cycle(self,uuids,state=None):
+    def start_cycle(self, uuids, state=None):
         if state is None:
             state = self.get()
         state['status'] = 'indexing'
-        state['accounting'] = self.accounting
         state['cycle_count'] = len(uuids)
-        self.set(state)
-        self.redis_pipe.delete(*self.cleanup_last_keys).delete(*self.cleanup_keys).sadd(self.todo_set,*set(uuids)).execute()
+        self.put(state)
+        self.delete_objs(self.cleanup_last_keys)
+        self.delete_objs(self.cleanup_keys)
+        self.put_list(self.todo_set, set(uuids))
         return state
 
     def successes_this_cycle(self):
         # Could be overwritten to change definition of success
-        return self.redis_client.scard(self.done_set)
+        return self.get_count(self.done_set)
 
-    def finish_cycle(self,state=None):
+    def finish_cycle(self, state=None):
         if state is None:
             state = self.get()
 
-        if not self.accounting:
-            self.redis_pipe.rename(self.todo_set, self.done_set).execute()
+        self.rename_objs(self.todo_set, self.done_set)
 
         # handle troubled uuids:
-        troubled_uuids = self.redis_client.smembers(self.failed_set)
+        troubled_uuids = set(self.get_list(self.failed_set))
         if len(troubled_uuids):
-            self.redis_pipe.sadd(self.troubled_set, *troubled_uuids).execute()
+            self.set_add(self.troubled_set, troubled_uuids)
         # TODO: Could add in_progress_set as well though it should be assertably empty
         # TODO: could make twice_troubled set and use it to blacklist uuids
 
         # save before closing
         success_count = self.successes_this_cycle()
         done_count = self.uuids_done()
+        cycle_count = state.pop('cycle_count',None)
+        assert(cycle_count == done_count)
         state['indexed'] = done_count
         if done_count != success_count or 'acted_on' in state.keys():
             state['acted_on'] = success_count
 
         # If nothing left to do?
-        #if not self.accounting or len(self.redis_client.sdiff(self.todo_set, self.done_set)) <= 0: # bek says 1
-        if not self.accounting or self.redis_client.scard(self.todo_set) == done_count:
-            # pass any staged items to followup
-            if self.followup_prep_list is not None:
-                hand_off_list = self.redis_client.lrange(self.followup_prep_list, 0, -1)
-                if len(hand_off_list) > 0:  # Have to push because ready_list may still have previous cycles in it
-                    self.redis_pipe.rpush(self.followup_ready_list, *hand_off_list).delete(self.followup_prep_list).execute()
-            self.redis_pipe.rename(self.done_set, self.last_set).delete(*self.cleanup_keys).execute()
-            state['status'] = 'done'
-        else:
-            state['status'] = 'need to cycle'
-
+        todo_count = self.get_count(self.todo_set)
+        # pass any staged items to followup
+        if self.followup_prep_list is not None:
+            hand_off_list = self.get_list(self.followup_prep_list)
+            if len(hand_off_list) > 0:  # Have to push because ready_list may still have previous cycles in it
+                self.list_extend(self.followup_ready_list, hand_off_list)
+                self.delete_objs([self.followup_prep_list])
+        self.rename_objs(self.done_set, self.last_set)
+        self.delete_objs(self.cleanup_keys)
+        state['status'] = 'done'
         state['cycles'] = state.get('cycles',0) + 1
-        self.set(state)
+        self.put(state)
 
         # returns successful count
         return state
 
-    def uuids_in_progress(self,uuids=[]):
+    def uuids_in_progress(self, uuids=[]):
         # Starts a batch
         if len(uuids):
-            self.redis_pipe.sadd(self.in_progress_set, *uuids).execute()
+            self.set_add(self.in_progress_set, uuids)
+            #self.redis_pipe.sadd(self.in_progress_set, *uuids).execute()
         else:
-            return self.redis_client.scard(self.in_progress_set)
+            return self.get_count(self.in_progress_set)
+            #return self.redis_client.scard(self.in_progress_set)
 
-    def uuids_done(self,uuids=[]):
+    def uuids_done(self, uuids=[]):
         # finishes a batch
         if len(uuids):
-            self.redis_pipe.sadd(self.done_set, *uuids).delete(self.in_progress_set).execute()
+            self.set_add(self.done_set, uuids)
+            #self.redis_pipe.sadd(self.done_set, *uuids).delete(self.in_progress_set).execute()
         else:
-            return self.redis_client.scard(self.done_set)
+            return self.get_count(self.done_set)
+            #return self.redis_client.scard(self.done_set)
 
-    def failed_uuid(self,uuid):
-        #self.redis_pipe.sadd(self.failed_set, uuid).srem(self.in_progress_set, uuid).execute()
-        self.redis_pipe.sadd(self.failed_set, uuid).execute()  # Hopefully these are rare so just redis it
-
-    # To slow to handle one by one
-    #def start_uuid(self,uuid):
-    #    # TODO: get rid of this after seeing times improve
-    #    #self.redis_pipe.sadd(self.in_progress_set, uuid).execute()
-    #    # Don't bother since it ain't THAT useful
-    #    return
-
-    #def indexed_uuid(self,uuid):
-    #    #self.redis_pipe.sadd(self.done_set, uuid).srem(self.in_progress_set, uuid).execute()
-    #    self.redis_pipe.lpush(self.done_list, uuid).execute()
+    def failed_uuid(self, uuid):
+        self.set_add(self.failed_set, set(uuid))  # Hopefully these are rare
 
 
 @view_config(route_name='index', request_method='POST', permission="index")
@@ -214,7 +250,6 @@ def index(request):
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
     secondary_indexer = request.registry["secondaryindexer"]
-    primary_accounting=False
 
     session = request.registry[DBSESSION]()
     connection = session.connection()
@@ -318,10 +353,7 @@ def index(request):
             )
 
     # May have undone uuids from prior cycle
-    state = IndexerState(accounting=primary_accounting)
-    if primary_accounting:
-        invalidated = state.add_undone_uuids(invalidated)
-        invalidated = state.subtract_done_uuids(xmin,invalidated)
+    state = IndexerState(es)
 
     if invalidated and not dry_run:
         if first_txn is None:
@@ -338,16 +370,12 @@ def index(request):
 
         if secondary_indexer:
             # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
-            state.prep_for_followup(xmin,invalidated)
+            state.prep_for_followup(xmin, invalidated)
 
-        result = state.start_cycle(invalidated,result)
+        result = state.start_cycle(invalidated, result)
 
         # Do the work...
-        if primary_accounting:
-            result['batch_size'] = indexer.batch_size
-            errors = indexer.update_in_batches(request, invalidated, xmin, snapshot_id)
-        else:
-            errors = indexer.update_objects(request, invalidated, xmin, snapshot_id)
+        errors = indexer.update_objects(request, invalidated, xmin, snapshot_id)
 
         result = state.finish_cycle(result)
 
@@ -381,7 +409,7 @@ def index(request):
 
     if first_txn is not None:
         result['lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
-        state.set(result)
+        state.put(result)
 
     return result
 
@@ -411,33 +439,11 @@ class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
         self.index = registry.settings['snovault.elasticsearch.index']
-        self.redis_client = Redis(connection_pool=registry[CONNECTION].redis_pool, charset="utf-8", decode_responses=True)
-        self.state = IndexerState(self.redis_client)
+        self.state = IndexerState(self.es)
         try:
             self.batch_size = int(registry.settings["indexer.batch_size"])  # found in buildout.cfg for production
         except:
             self.batch_size = 100
-
-    def update_in_batches(self, request, uuids, xmin, snapshot_id=None):
-        errors = []
-        batch_count = 0
-        while uuids:
-            batch_uuids = []
-            batch_started = datetime.datetime.now(pytz.utc)
-            while uuids:
-                batch_uuids.append(uuids.pop())
-                if len(batch_uuids) >= self.batch_size:
-                    break
-            if len(batch_uuids) > 0:
-                batch_count += 1
-                self.state.uuids_in_progress(batch_uuids)
-                batch_of_errors = self.update_objects(request, batch_uuids, xmin, snapshot_id)
-                self.state.uuids_done(batch_uuids)
-                if len(batch_of_errors) > 0:
-                    errors.extend(batch_of_errors)
-                log.error('Indexed batch: %d time: %s' % (batch_count,str(datetime.datetime.now(pytz.utc) - batch_started)))
-
-        return errors
 
     def update_objects(self, request, uuids, xmin, snapshot_id=None):
         errors = []
@@ -451,6 +457,13 @@ class Indexer(object):
         return errors
 
     def update_object(self, request, uuid, xmin):
+
+        # If a restart occurred in the middle of indexing, this uuid might have already been indexd, so skip redoing it.
+        try:
+            if exists(index=self.index, doc_type='_all', _source=False, id=str(uuid), version=xmin, version_type='external_gte'):
+                return
+        except:
+            pass
 
         last_exc = None
         try:
