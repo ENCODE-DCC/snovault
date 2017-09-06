@@ -378,14 +378,14 @@ def combine_schemas(a, b):
         return b
     if not b:
         return a
-    combined = {}
+    combined = collections.OrderedDict()
     for name in set(a.keys()).intersection(b.keys()):
         if a[name] == b[name]:
             combined[name] = a[name]
         elif name == 'type':
             combined[name] = sorted(set(ensurelist(a[name]) + ensurelist(b[name])))
         elif name == 'properties':
-            combined[name] = {}
+            combined[name] = collections.OrderedDict()
             for k in set(a[name].keys()).intersection(b[name].keys()):
                 combined[name][k] = combine_schemas(a[name][k], b[name][k])
             for k in set(a[name].keys()).difference(b[name].keys()):
@@ -395,11 +395,11 @@ def combine_schemas(a, b):
         elif name == 'items':
             combined[name] = combine_schemas(a[name], b[name])
         elif name in ('boost_values', 'facets'):
-            combined[name] = {}
+            combined[name] = collections.OrderedDict()
             combined[name].update(a[name])
             combined[name].update(b[name])
         elif name == 'columns':
-            allValues = {}
+            allValues = collections.OrderedDict()
             allValues.update(a[name])
             allValues.update(b[name])
             intersectedKeys = set(a[name].keys()).intersection(set(b[name].keys()))
