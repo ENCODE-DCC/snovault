@@ -29,6 +29,7 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
     )
 
     SUCCESS_LINE = b'started\n'
+    ERROR_TYPE = b'logging.log4j'
 
     lines = []
     for line in iter(process.stdout.readline, b''):
@@ -37,6 +38,9 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
         lines.append(line)
         if line.endswith(SUCCESS_LINE):
             print('detected start, broke')
+            break
+        if ERROR_TYPE in line:
+            print('detected ignorable error')
             break
     else:
         code = process.wait()
