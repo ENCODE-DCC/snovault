@@ -100,11 +100,11 @@ def snapshot(xmin, snapshot_id):
 
 
 def update_object_in_snapshot(args):
-    uuid, xmin, snapshot_id = args
+    uuid, xmin, snapshot_id, restart = args
     with snapshot(xmin, snapshot_id):
         request = get_current_request()
         indexer = request.registry[INDEXER]
-        return indexer.update_object(request, uuid, xmin)
+        return indexer.update_object(request, uuid, xmin, restart)
 
 
 # Running in main process
@@ -128,7 +128,7 @@ class MPIndexer(Indexer):
             context=get_context('forkserver'),
         )
 
-    def update_objects(self, request, uuids, xmin, snapshot_id):
+    def update_objects(self, request, uuids, xmin, snapshot_id, restart):
         # Ensure that we iterate over uuids in this thread not the pool task handler.
         uuid_count = len(uuids)
         workers = 1
@@ -138,7 +138,7 @@ class MPIndexer(Indexer):
         if chunkiness > self.chunksize:
             chunkiness = self.chunksize
 
-        tasks = [(uuid, xmin, snapshot_id) for uuid in uuids]
+        tasks = [(uuid, xmin, snapshot_id, restart) for uuid in uuids]
         errors = []
         try:
             for i, error in enumerate(self.pool.imap_unordered(

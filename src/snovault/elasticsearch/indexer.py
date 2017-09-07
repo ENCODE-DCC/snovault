@@ -52,15 +52,17 @@ class IndexerState(object):
             self.es.indices.put_mapping(index=self.key, doc_type='default', body=mapping)
         self.state_key       = 'primary_indexer'       # State of the current or last cycle
         self.todo_set        = 'primary_invalidated'   # one cycle of uuids, sent to the Secondary Indexer
-        self.in_progress_set = 'primary_in_progress'
+        #self.in_progress_set = 'primary_in_progress'
         self.failed_set      = 'primary_failed'
         self.done_set        = 'primary_done'          # Trying to get all uuids from 'todo' to this set
         self.troubled_set    = 'primary_troubled'      # uuids that failed to index in any cycle
         self.last_set        = 'primary_last_cycle'    # uuids in the most recent finished cycle
         self.followup_prep_list = 'primary_followup_prep_list' # Setting up the uuids to be handled by a followup process
         self.followup_ready_list = 'staged_for_secondary_list'  # Followup list is added to here to pass baton
+        self.success_set     = self.done_set
+        self.repeated_set = 'primary_repeats'
         # DO NOT INHERIT! All keys that are cleaned up at the start and fully finished end of indexing
-        self.cleanup_keys      = [self.todo_set,self.in_progress_set,self.failed_set,self.done_set]
+        self.cleanup_keys      = [self.todo_set,self.failed_set,self.done_set],  # ,self.in_progress_set
         self.cleanup_last_keys = [self.last_set]  # ,self.audited_set] cleaned up only when new indexing occurs
         self.cache = {}
         # desired:
@@ -124,7 +126,7 @@ class IndexerState(object):
         if len(set_to_update) > 0:
             set_to_update.update(vals)
         else:
-            set_to_update = vals
+            set_to_update = set(vals)
         self.put_list(id, set_to_update)
 
     def list_extend(self, id, vals):
@@ -153,12 +155,8 @@ class IndexerState(object):
         # set up new _cycle
         prep_list = [ "xmin:%s" % xmin ]
         prep_list.extend(uuids)
-        if len(uuids) <= SEARCH_MAX:
-            old_cycles = self.get_list(self.followup_prep_list)
-            if len(old_cycles) > 0:
-                prep_list = old_cycles.extend(prep_list)
         self.put_list(self.followup_prep_list, prep_list)
-        ## TODO: Should probably toss any previous contents.  What is the likelihood that primary laps secondary?
+        # No need to preserve anything on the prep_list as it passes to the staged list in one cycle.
 
     def abandon_prior_prep(self):
         self.delete_objs([self.followup_prep_list])
@@ -176,39 +174,38 @@ class IndexerState(object):
 
     def successes_this_cycle(self):
         # Could be overwritten to change definition of success
-        return self.get_count(self.done_set)
+        return self.get_count(self.success_set)
 
     def finish_cycle(self, state=None):
         if state is None:
             state = self.get()
 
-        self.rename_objs(self.todo_set, self.done_set)
-
         # handle troubled uuids:
         troubled_uuids = set(self.get_list(self.failed_set))
         if len(troubled_uuids):
             self.set_add(self.troubled_set, troubled_uuids)
-        # TODO: Could add in_progress_set as well though it should be assertably empty
         # TODO: could make twice_troubled set and use it to blacklist uuids
 
-        # save before closing
-        success_count = self.successes_this_cycle()
-        done_count = self.uuids_done()
-        cycle_count = state.pop('cycle_count',None)
-        assert(cycle_count == done_count)
-        state['indexed'] = done_count
-        if done_count != success_count or 'acted_on' in state.keys():
-            state['acted_on'] = success_count
-
-        # If nothing left to do?
-        todo_count = self.get_count(self.todo_set)
         # pass any staged items to followup
         if self.followup_prep_list is not None:
             hand_off_list = self.get_list(self.followup_prep_list)
             if len(hand_off_list) > 0:  # Have to push because ready_list may still have previous cycles in it
                 self.list_extend(self.followup_ready_list, hand_off_list)
                 self.delete_objs([self.followup_prep_list])
-        self.rename_objs(self.done_set, self.last_set)
+
+        # no accounting so todo => done => last in this function
+        #self.rename_objs(self.todo_set, self.done_set)
+        done_count = self.get_count(self.todo_set)
+        self.rename_objs(self.todo_set, self.last_set)
+
+        #done_count = self.get_count(self.done_set)  # no accounting so todo => done => last in this function
+        if self.success_set != self.done_set:
+            state['acted_on'] = self.successes_this_cycle()
+        cycle_count = state.pop('cycle_count',None)
+        #assert(cycle_count == done_count)
+        state['indexed'] = done_count
+
+        #self.rename_objs(self.done_set, self.last_set)   # no accounting so todo => done => last in this function
         self.delete_objs(self.cleanup_keys)
         state['status'] = 'done'
         state['cycles'] = state.get('cycles',0) + 1
@@ -217,26 +214,31 @@ class IndexerState(object):
         # returns successful count
         return state
 
-    def uuids_in_progress(self, uuids=[]):
-        # Starts a batch
-        if len(uuids):
-            self.set_add(self.in_progress_set, uuids)
-            #self.redis_pipe.sadd(self.in_progress_set, *uuids).execute()
-        else:
-            return self.get_count(self.in_progress_set)
-            #return self.redis_client.scard(self.in_progress_set)
+    def unfinished_cycle(self):
+        # if there is an unfinished cycle, then xmin and uuid's are returned
+        state = self.get()
+        if state.get('status','') != 'indexing':
+            return (-1, None, [])
 
-    def uuids_done(self, uuids=[]):
-        # finishes a batch
-        if len(uuids):
-            self.set_add(self.done_set, uuids)
-            #self.redis_pipe.sadd(self.done_set, *uuids).delete(self.in_progress_set).execute()
-        else:
-            return self.get_count(self.done_set)
-            #return self.redis_client.scard(self.done_set)
+        xmin = state.get('xmin', -1)
+        #snapshot = state.get('snapshot', None)
+        if xmin == -1:  # or snapshot is None:
+            return (-1, None, [])
+
+        #assert(self.get_count(self.done_set) == 0)
+        undone_uuids = self.get_diff(self.todo_set, [self.done_set])
+        if len(undone_uuids) <= 0:  # TODO SEARCH_MAX?  SEARCH_MAX/10
+            return (-1, None, [])
+
+        # Note: do not clean up last cycle yet because we could be restarted multiple times.
+
+        return (xmin, None, undone_uuids)
 
     def failed_uuid(self, uuid):
-        self.set_add(self.failed_set, set(uuid))  # Hopefully these are rare
+        self.set_add(self.failed_set, [uuid])  # Hopefully these are rare
+
+    def repeated_uuid(self, uuid):
+        self.set_add(self.repeated_set, [uuid])  # Hopefully these are rare
 
 
 @view_config(route_name='index', request_method='POST', permission="index")
@@ -250,121 +252,131 @@ def index(request):
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
     secondary_indexer = request.registry["secondaryindexer"]
-
     session = request.registry[DBSESSION]()
     connection = session.connection()
-    # http://www.postgresql.org/docs/9.3/static/functions-info.html#FUNCTIONS-TXID-SNAPSHOT
-    if recovery:
-        query = connection.execute(
-            "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;"
-            "SELECT txid_snapshot_xmin(txid_current_snapshot());"
-        )
-    else:
-        query = connection.execute(
-            "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE;"
-            "SELECT txid_snapshot_xmin(txid_current_snapshot());"
-        )
-    # DEFERRABLE prevents query cancelling due to conflicts but requires SERIALIZABLE mode
-    # which is not available in recovery.
-    xmin = query.scalar()  # lowest xid that is still in progress
-
     first_txn = None
-    last_xmin = None
-    if 'last_xmin' in request.json:
-        last_xmin = request.json['last_xmin']
-    else:
-        try:
-            status = es.get(index=INDEX, doc_type='meta', id='indexing')
-        except NotFoundError:
-            interval_settings = {"index": {"refresh_interval": "30s"}}
-            es.indices.put_settings(index=INDEX, body=interval_settings)
-            pass
-        else:
-            last_xmin = status['_source']['xmin']
-
-    result = {
-        'xmin': xmin,
-        'last_xmin': last_xmin,
-    }
-
-    flush = False
-    if last_xmin is None:
-        result['types'] = types = request.json.get('types', None)
-        invalidated = list(all_uuids(request.registry, types))
-        flush = True
-    else:
-        txns = session.query(TransactionRecord).filter(
-            TransactionRecord.xid >= last_xmin,
-        )
-
-        invalidated = set()
-        updated = set()
-        renamed = set()
-        max_xid = 0
-        txn_count = 0
-        for txn in txns.all():
-            txn_count += 1
-            max_xid = max(max_xid, txn.xid)
-            if first_txn is None:
-                first_txn = txn.timestamp
-            else:
-                first_txn = min(first_txn, txn.timestamp)
-            renamed.update(txn.data.get('renamed', ()))
-            updated.update(txn.data.get('updated', ()))
-
-        result['txn_count'] = txn_count
-        if txn_count == 0:
-            return result
-
-        es.indices.refresh(index=INDEX)
-        res = es.search(index=INDEX, size=SEARCH_MAX, body={
-            'filter': {
-                'or': [
-                    {
-                        'terms': {
-                            'embedded_uuids': updated,
-                            '_cache': False,
-                        },
-                    },
-                    {
-                        'terms': {
-                            'linked_uuids': renamed,
-                            '_cache': False,
-                        },
-                    },
-                ],
-            },
-            '_source': False,
-        })
-        if res['hits']['total'] > SEARCH_MAX:
-            invalidated = list(all_uuids(request.registry))
-            flush = True
-        else:
-            referencing = {hit['_id'] for hit in res['hits']['hits']}
-            invalidated = referencing | updated
-            result.update(
-                max_xid=max_xid,
-                renamed=renamed,
-                updated=updated,
-                referencing=len(referencing),
-                invalidated=len(invalidated),
-                txn_count=txn_count,
-                first_txn_timestamp=first_txn.isoformat(),
-            )
+    snapshot_id = None
+    restart=False
 
     # May have undone uuids from prior cycle
     state = IndexerState(es)
 
+    (xmin, snapshot_id, invalidated) = state.unfinished_cycle()
+
+    if xmin > -1 and len(invalidated) > 0:
+        restart = True
+        result = state.get()
+        flush = True
+    else:
+
+        # http://www.postgresql.org/docs/9.3/static/functions-info.html#FUNCTIONS-TXID-SNAPSHOT
+        if recovery:
+            query = connection.execute(
+                "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;"
+                "SELECT txid_snapshot_xmin(txid_current_snapshot());"
+            )
+        else:
+            query = connection.execute(
+                "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE;"
+                "SELECT txid_snapshot_xmin(txid_current_snapshot());"
+            )
+        # DEFERRABLE prevents query cancelling due to conflicts but requires SERIALIZABLE mode
+        # which is not available in recovery.
+        xmin = query.scalar()  # lowest xid that is still in progress
+
+        last_xmin = None
+        if 'last_xmin' in request.json:
+            last_xmin = request.json['last_xmin']
+        else:
+            try:
+                status = es.get(index=INDEX, doc_type='meta', id='indexing')
+            except NotFoundError:
+                interval_settings = {"index": {"refresh_interval": "30s"}}
+                es.indices.put_settings(index=INDEX, body=interval_settings)
+                pass
+            else:
+                last_xmin = status['_source']['xmin']
+
+        result = {
+            'xmin': xmin,
+            'last_xmin': last_xmin,
+        }
+
+        flush = False
+        if last_xmin is None:
+            result['types'] = types = request.json.get('types', None)
+            invalidated = list(all_uuids(request.registry, types))
+            flush = True
+        else:
+            txns = session.query(TransactionRecord).filter(
+                TransactionRecord.xid >= last_xmin,
+            )
+
+            invalidated = set()
+            updated = set()
+            renamed = set()
+            max_xid = 0
+            txn_count = 0
+            for txn in txns.all():
+                txn_count += 1
+                max_xid = max(max_xid, txn.xid)
+                if first_txn is None:
+                    first_txn = txn.timestamp
+                else:
+                    first_txn = min(first_txn, txn.timestamp)
+                renamed.update(txn.data.get('renamed', ()))
+                updated.update(txn.data.get('updated', ()))
+
+            result['txn_count'] = txn_count
+            if txn_count == 0:
+                return result
+
+            es.indices.refresh(index=INDEX)
+            res = es.search(index=INDEX, size=SEARCH_MAX, body={
+                'filter': {
+                    'or': [
+                        {
+                            'terms': {
+                                'embedded_uuids': updated,
+                                '_cache': False,
+                            },
+                        },
+                        {
+                            'terms': {
+                                'linked_uuids': renamed,
+                                '_cache': False,
+                            },
+                        },
+                    ],
+                },
+                '_source': False,
+            })
+            if res['hits']['total'] > SEARCH_MAX:
+                invalidated = list(all_uuids(request.registry))
+                flush = True
+            else:
+                referencing = {hit['_id'] for hit in res['hits']['hits']}
+                invalidated = referencing | updated
+                result.update(
+                    max_xid=max_xid,
+                    renamed=renamed,
+                    updated=updated,
+                    referencing=len(referencing),
+                    invalidated=len(invalidated),
+                    txn_count=txn_count,
+                    first_txn_timestamp=first_txn.isoformat(),
+                )
+
+            if invalidated and not dry_run:
+                # Exporting a snapshot mints a new xid, so only do so when required.
+                # Not yet possible to export a snapshot on a standby server:
+                # http://www.postgresql.org/message-id/CAHGQGwEtJCeHUB6KzaiJ6ndvx6EFsidTGnuLwJ1itwVH0EJTOA@mail.gmail.com
+                if snapshot_id is None and not recovery:
+                    snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
+
     if invalidated and not dry_run:
         if first_txn is None:
             first_txn = datetime.datetime.now(pytz.utc)
-
-        # Exporting a snapshot mints a new xid, so only do so when required.
-        # Not yet possible to export a snapshot on a standby server:
-        # http://www.postgresql.org/message-id/CAHGQGwEtJCeHUB6KzaiJ6ndvx6EFsidTGnuLwJ1itwVH0EJTOA@mail.gmail.com
-        snapshot_id = None
-        if not recovery:
-            snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
 
         result["snapshot"] = snapshot_id
 
@@ -375,7 +387,9 @@ def index(request):
         result = state.start_cycle(invalidated, result)
 
         # Do the work...
-        errors = indexer.update_objects(request, invalidated, xmin, snapshot_id)
+        #if len(invalidated) > 10:           # DEBUG: special to test fake interrupted cycle on local machine.
+        #    invalidated = invalidated[10:]  #        If using, make sure to comment out state.finish_cycle() below
+        errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
 
         result = state.finish_cycle(result)
 
@@ -445,7 +459,7 @@ class Indexer(object):
         except:
             self.batch_size = 100
 
-    def update_objects(self, request, uuids, xmin, snapshot_id=None):
+    def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         errors = []
         for i, uuid in enumerate(uuids):
             error = self.update_object(request, uuid, xmin)
@@ -456,14 +470,18 @@ class Indexer(object):
 
         return errors
 
-    def update_object(self, request, uuid, xmin):
+    def update_object(self, request, uuid, xmin, restart=False):
 
         # If a restart occurred in the middle of indexing, this uuid might have already been indexd, so skip redoing it.
-        try:
-            if exists(index=self.index, doc_type='_all', _source=False, id=str(uuid), version=xmin, version_type='external_gte'):
-                return
-        except:
-            pass
+        if restart:
+            try:
+                #if self.es.exists(index=self.index, id=str(uuid), version=xmin, version_type='external_gte'):
+                result = self.es.get(index=self.index, id=str(uuid), _source_include='uuid', version=xmin, version_type='external_gte')
+                if result.get('_source') is not None:
+                    self.state.repeated_uuid(uuid)
+                    return
+            except:
+                pass
 
         last_exc = None
         try:
