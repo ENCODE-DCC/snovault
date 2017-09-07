@@ -13,18 +13,19 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
         '-Enetwork.host=%s' % host,
         '-Ehttp.port=%d' % port,
         '-Epath.data=%s' % os.path.join(datadir, 'data'),
-        '-Epath.logs=%s' % os.path.join(datadir, 'logs')
+        '-Epath.logs=%s' % os.path.join(datadir, 'logs'),
+        '-Epath.conf=%s/conf' % os.environ['TRAVIS_BUILD_DIR']
     ]
-    if os.environ.get('TRAVIS'):
-        print('IN TRAVIS')
-        echo=True
-        args.append('-Epath.conf=%s/conf' % os.environ['TRAVIS_BUILD_DIR'])
-    elif os.path.exists('/etc/elasticsearch'):
-        print('NOT IN TRAVIS')
-        # elasticsearch.deb setup
-        args.append('-Epath.conf=/etc/elasticsearch')
-    else:
-        print('NO CONF FILES')
+    # if os.environ.get('TRAVIS'):
+    #     print('IN TRAVIS')
+    #     echo=True
+    #     args.append('-Epath.conf=%s/conf' % os.environ['TRAVIS_BUILD_DIR'])
+    # elif os.path.exists('/etc/elasticsearch'):
+    #     print('NOT IN TRAVIS')
+    #     # elasticsearch.deb setup
+    #     args.append('-Epath.conf=/etc/elasticsearch')
+    # else:
+    #     print('NO CONF FILES')
     print(args)
     process = subprocess.Popen(
         args,
