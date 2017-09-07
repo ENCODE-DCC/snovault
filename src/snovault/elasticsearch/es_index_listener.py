@@ -23,8 +23,6 @@ import sys
 import threading
 import time
 from urllib.parse import parse_qsl
-from redis import Redis
-from snovault import CONNECTION
 
 log = logging.getLogger(__name__)
 
@@ -52,8 +50,6 @@ def run(testapp, timeout=DEFAULT_TIMEOUT, dry_run=False, path='/index', control=
     else:
         es = testapp.app.registry[ELASTIC_SEARCH]
     es.info()
-
-    log.info('es_index_listener given path: ' + path)
 
     max_xid = 0
     DBSession = testapp.app.registry[STORAGE].write.DBSession
@@ -269,10 +265,6 @@ def composite(loader, global_conf, **settings):
     def status_app(environ, start_response):
         status = '200 OK'
         response_headers = [('Content-type', 'application/json')]
-        redis_client = Redis(charset="utf-8", decode_responses=True)
-        status_holder['status']['invalidated_count'] = redis_client.scard("invalidated")
-        status_holder['status']['indexed_count'] = redis_client.scard('indexed')
-        status_holder['status']['processing'] = list(redis_client.smembers('failed'))
         start_response(status, response_headers)
         return [json.dumps(status_holder['status'])]
 

@@ -145,7 +145,8 @@ class MPIndexer(Indexer):
                     update_object_in_snapshot, tasks, chunkiness)):
                 if error is not None:
                     errors.append(error)
-                log.warn('Indexing %d', i + 1)
+                if (i + 1) % 50 == 0:
+                    log.warn('Indexing %d', i + 1)
         except:
             self.shutdown()
             raise
