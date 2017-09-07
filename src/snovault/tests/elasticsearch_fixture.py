@@ -20,8 +20,12 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
         echo=True
         args.append('-Epath.conf=%s/conf' % os.environ['TRAVIS_BUILD_DIR'])
     elif os.path.exists('/etc/elasticsearch'):
+        print('NOT IN TRAVIS')
         # elasticsearch.deb setup
         args.append('-Epath.conf=/etc/elasticsearch')
+    else:
+        print('NO CONF FILES')
+    print(args)
     process = subprocess.Popen(
         args,
         close_fds=True,
@@ -30,7 +34,6 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
     )
 
     SUCCESS_LINE = b'started\n'
-    ERROR_TYPE = b'logging.log4j'
 
     lines = []
     for line in iter(process.stdout.readline, b''):
@@ -40,8 +43,6 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
         if line.endswith(SUCCESS_LINE):
             print('detected start, broke')
             break
-        if ERROR_TYPE in line:
-            sleep(5)
     else:
         code = process.wait()
         msg = ('Process return code: %d\n' % code) + b''.join(lines).decode('utf-8')
