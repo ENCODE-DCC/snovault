@@ -146,7 +146,7 @@ class MPIndexer(Indexer):
                 if error is not None:
                     errors.append(error)
                 if (i + 1) % 50 == 0:
-                    log.warn('Indexing %d', i + 1)
+                    log.info('Indexing %d', i + 1)
         except:
             self.shutdown()
             raise

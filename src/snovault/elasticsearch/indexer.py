@@ -59,9 +59,9 @@ class IndexerState(object):
         self.last_set        = 'primary_last_cycle'    # uuids in the most recent finished cycle
         self.followup_prep_list = 'primary_followup_prep_list' # Setting up the uuids to be handled by a followup process
         self.followup_ready_list = 'staged_for_secondary_list'  # Followup list is added to here to pass baton
-        self.success_set     = self.done_set
         self.repeated_set = 'primary_repeats'
         # DO NOT INHERIT! All keys that are cleaned up at the start and fully finished end of indexing
+        self.success_set       = self.done_set
         self.cleanup_keys      = [self.todo_set,self.failed_set,self.done_set],  # ,self.in_progress_set
         self.cleanup_last_keys = [self.last_set]  # ,self.audited_set] cleaned up only when new indexing occurs
         self.cache = {}
@@ -251,7 +251,7 @@ def index(request):
     recovery = request.json.get('recovery', False)
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
-    secondary_indexer = request.registry["secondaryindexer"]
+    stage_for_followup = request.registry["stage_for_followup"]
     session = request.registry[DBSESSION]()
     connection = session.connection()
     first_txn = None
@@ -380,7 +380,7 @@ def index(request):
 
         result["snapshot"] = snapshot_id
 
-        if secondary_indexer:
+        if stage_for_followup:
             # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
             state.prep_for_followup(xmin, invalidated)
 
