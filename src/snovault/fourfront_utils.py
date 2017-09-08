@@ -35,7 +35,7 @@ def add_default_embeds(item_type, types, embeds, schema={}):
             # be cases of fields that are not valid for default embeds
             # but are still themselves valid fields
             processed_fields.remove(field)
-            print(error_message, file=sys.stderr)
+            print(error_message, file = sys.stderr)
         else:
             embeds_to_add.extend(field_embeds_to_add)
 
@@ -53,6 +53,7 @@ def add_default_embeds(item_type, types, embeds, schema={}):
                 processed_fields.add(add_embed + '.link_id')
                 processed_fields.add(add_embed + '.display_title')
                 processed_fields.add(add_embed + '.uuid')
+                processed_fields.add(add_embed + '.principals_allowed.*')
     return list(processed_fields)
 
 
