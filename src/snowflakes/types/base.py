@@ -13,6 +13,7 @@ from pyramid.traversal import (
 )
 import snovault
 from ..schema_formats import is_accession
+from snovault.authentication import calc_principals
 
 
 @lru_cache()
@@ -210,6 +211,25 @@ class Item(snovault.Item):
         path_str = '~'.join(path_split) + '~'
         return path_str
 
+    @snovault.calculated_property(schema={
+        "title": "principals_allowed",
+        "description": "calced perms for ES filtering",
+        "type": "object",
+        'properties': {
+            'view': {
+                'type': 'string'
+            },
+            'edit': {
+                'type': 'string'
+            },
+            'audit': {
+                'type': 'string'
+            }
+        }
+    },)
+    def principals_allowed(self, request):
+        principals = calc_principals(self)
+        return principals
 
 class SharedItem(Item):
     ''' An Item visible to all authenticated users while "proposed" or "in progress".
