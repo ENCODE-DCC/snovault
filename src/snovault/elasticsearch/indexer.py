@@ -59,11 +59,10 @@ class IndexerState(object):
         self.last_set        = 'primary_last_cycle'    # uuids in the most recent finished cycle
         self.followup_prep_list = 'primary_followup_prep_list' # Setting up the uuids to be handled by a followup process
         self.followup_ready_list = 'staged_for_secondary_list'  # Followup list is added to here to pass baton
-        self.repeated_set    = 'primary_repeats'
         # DO NOT INHERIT! All keys that are cleaned up at the start and fully finished end of indexing
         self.success_set       = self.done_set
         self.cleanup_keys      = [self.todo_set,self.failed_set,self.done_set],  # ,self.in_progress_set
-        self.cleanup_last_keys = [self.last_set,self.repeated_set]  # ,self.audited_set] cleaned up only when new indexing occurs
+        self.cleanup_last_keys = [self.last_set]  # ,self.audited_set] cleaned up only when new indexing occurs
         self.cache = {}
         # desired:
         # 1) Hand off to secondary.  Will work fine
@@ -188,6 +187,7 @@ class IndexerState(object):
 
         # pass any staged items to followup
         if self.followup_prep_list is not None:
+            # TODO: send signal for 'all' when appropriate.  Saves the following expensive lines.
             hand_off_list = self.get_list(self.followup_prep_list)
             if len(hand_off_list) > 0:  # Have to push because ready_list may still have previous cycles in it
                 self.list_extend(self.followup_ready_list, hand_off_list)
@@ -216,6 +216,8 @@ class IndexerState(object):
 
     def unfinished_cycle(self):
         # if there is an unfinished cycle, then xmin and uuid's are returned
+        # TODO: Chance for backdoor reindexing.
+
         state = self.get()
         if state.get('status','') != 'indexing':
             return (-1, None, [])
@@ -236,9 +238,6 @@ class IndexerState(object):
 
     def failed_uuid(self, uuid):
         self.set_add(self.failed_set, [uuid])  # Hopefully these are rare
-
-    def repeated_uuid(self, uuid):
-        self.set_add(self.repeated_set, [uuid])  # Hopefully these are rare
 
 
 @view_config(route_name='index', request_method='POST', permission="index")
@@ -478,7 +477,6 @@ class Indexer(object):
                 #if self.es.exists(index=self.index, id=str(uuid), version=xmin, version_type='external_gte'):
                 result = self.es.get(index=self.index, id=str(uuid), _source_include='uuid', version=xmin, version_type='external_gte')
                 if result.get('_source') is not None:
-                    self.state.repeated_uuid(uuid)
                     return
             except:
                 pass
