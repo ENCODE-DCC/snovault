@@ -248,8 +248,8 @@ def test_indexing_es(app, testapp, indexer_testapp):
     store_uuids = indexer_utils.get_uuid_store_from_es(es)
     assert len(reindex_uuids) == 1
     assert reindex_uuids == set(store_uuids)
-    # reindex with --force and --item-type
-    reindex_uuids = create_mapping.run(app, collections=[test_type], force=True)
+    # reindex with --force, --sync-index, and --item-type
+    reindex_uuids = create_mapping.run(app, collections=[test_type], force=True, sync_index=True)
     time.sleep(3)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
@@ -266,7 +266,7 @@ def test_indexing_es(app, testapp, indexer_testapp):
     # doc_count has not yet updated
     assert doc_count == 1
     # run create mapping with force=True, expect test index to re-index
-    reindex_uuids = create_mapping.run(app, force=True)
+    reindex_uuids = create_mapping.run(app, force=True, sync_index=True)
     assert len(reindex_uuids) == 2
     time.sleep(3)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
@@ -292,13 +292,13 @@ def test_get_previous_index_record(app):
     from snovault.elasticsearch.create_mapping import get_previous_index_record
     es = app.registry[ELASTIC_SEARCH]
     test_type = 'testing_post_put_patch'
-    record = get_previous_index_record(True, True, es, test_type)
+    record = get_previous_index_record(True, es, test_type)
     assert record
     assert 'mappings' in record
     assert 'settings' in record
     # remove index record
     es.delete(index='meta', doc_type='meta', id=test_type)
-    record = get_previous_index_record(True, True, es, test_type)
+    record = get_previous_index_record(True, es, test_type)
     assert record is None
 
 
