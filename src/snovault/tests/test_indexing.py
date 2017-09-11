@@ -292,13 +292,13 @@ def test_get_previous_index_record(app):
     from snovault.elasticsearch.create_mapping import get_previous_index_record
     es = app.registry[ELASTIC_SEARCH]
     test_type = 'testing_post_put_patch'
-    record = get_previous_index_record(True, True, es, test_type)
+    record = get_previous_index_record(True, es, test_type)
     assert record
     assert 'mappings' in record
     assert 'settings' in record
     # remove index record
     es.delete(index='meta', doc_type='meta', id=test_type)
-    record = get_previous_index_record(True, True, es, test_type)
+    record = get_previous_index_record(True, es, test_type)
     assert record is None
 
 
