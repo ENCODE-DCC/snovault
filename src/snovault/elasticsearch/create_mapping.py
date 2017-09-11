@@ -15,7 +15,7 @@ from elasticsearch.exceptions import (
     TransportError,
     ConnectionTimeout
 )
-from elasticsearch_dsl import Index
+from elasticsearch_dsl import Index, Search
 from elasticsearch_dsl.connections import connections
 from functools import reduce
 from snovault import (
@@ -582,7 +582,7 @@ def create_mapping_by_type(in_type, registry):
     return es_mapping(embed_mapping)
 
 
-def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first, force=False, print_count_only=False):
+def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first, force=False, index_diff=False, print_count_only=False):
     """
     Creates an es index for the given in_type with the given mapping and
     settings defined by item_settings(). If check_first == True, attempting
@@ -604,11 +604,11 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
         prev_index_record = get_previous_index_record(this_index_exists, check_first, es, in_type)
         if prev_index_record is not None and this_index_record == prev_index_record:
             if in_type != 'meta':
-                check_and_reindex_existing(app, es, in_type, uuids_to_index, print_count_only)
+                check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff, print_count_only)
             print('MAPPING: using existing index for collection %s' % (in_type))
             return
 
-    if dry_run:
+    if dry_run or index_diff:
         return
 
     # delete the index
@@ -703,30 +703,40 @@ def get_previous_index_record(this_index_exists, check_first, es, in_type):
         return None
 
 
-def check_and_reindex_existing(app, es, in_type, uuids_to_index, print_counts=False):
+def check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff=False print_counts=False):
     """
     lastly, check to make sure the item count for the existing
     index matches the database document count. If not, queue the uuids_to_index
     in the index for reindexing.
+    If index_diff, store uuids for reindexing that
     """
-    db_count, es_count, coll_uuids = get_db_es_counts_and_db_uuids(app, es, in_type)
+    db_count, es_count, db_uuids, diff_uuids = get_db_es_counts_and_db_uuids(app, es, in_type)
     if print_counts:
         log.warn("DB count is %s and ES count is %s for index: %s" %
                  (str(db_count), str(es_count), in_type))
         return
     if es_count is None or es_count != db_count:
-        print('MAPPING: queueing all items in the existing index %s for reindexing' % (in_type))
-        uuids_to_index.update(coll_uuids)
+        if index_diff:
+            print('MAPPING: queueing %s items found in DB but not ES in the index %s for reindexing' % (str(len(diff_uuids)), in_type))
+            uuids_to_index.update(diff_uuids)
+        else:
+            print('MAPPING: queueing all items in the existing index %s for reindexing' % (in_type))
+            uuids_to_index.update(db_uuids)
 
 
 def get_db_es_counts_and_db_uuids(app, es, in_type):
     """
     Return the database count and elasticsearch count for a given item type,
-    as well as a list of collection uuids from the database
+    the list of collection uuids from the database, and the list of uuids
+    found in the DB but not in the ES store.
     """
     if check_if_index_exists(es, in_type, False):
-        count_res = es.count(index=in_type, doc_type=in_type)
-        es_count = count_res.get('count')
+        # count_res = es.count(index=in_type, doc_type=in_type)
+        # es_count = count_res.get('count')
+        search = Search(using=es, index=in_type, doc_type=in_type)
+        search_source = s.source([])
+        es_uuids = [h.meta.id for h in search_source.scan()]
+        es_count = len(es_uuids)
     else:
         es_count = 0
     # logic for datastore
@@ -738,11 +748,13 @@ def get_db_es_counts_and_db_uuids(app, es, in_type):
     else:
         if datastore == 'elasticsearch':
             app.datastore = 'database'
-    db_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
+    db_count, db_uuids = get_collection_uuids_and_count(app, in_type)
     # reset datastore
     if datastore:
         app.datastore = datastore
-    return db_count, es_count, coll_uuids
+    # find db uuids not in es uuids
+    diff_uuids = list(set(db_uuids) - set(es_uuids))
+    return db_count, es_count, db_uuids, diff_uuids
 
 
 def get_collection_uuids_and_count(app, in_type):
@@ -826,7 +838,7 @@ def set_es_uuid_store(es, indexing_uuids):
         print("MAPPING: uuids to index were NOT stored succesfully.")
 
 
-def run(app, collections=None, dry_run=False, check_first=False, force=False, strict=False, no_meta=False, print_count_only=False):
+def run(app, collections=None, dry_run=False, check_first=False, force=False, index_diff=False, strict=False, no_meta=False, print_count_only=False):
     """
     Run create_mapping. Has the following options:
     collection: run create mapping for the given collections (indices) only
@@ -836,6 +848,9 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, st
         the all items in the index for reindexing.
     force: if True, automatically recreate indices and synchronously index
         all items in them. Takes precedence over check_first
+    index_diff: if True, do NOT create/delete indices but identify any items
+        that exist in db but not in es and reindex those.
+        Takes precedence over check_first and force
     print_count_only: if True, print counts for existing indices instead of
         queueing items for reindexing. Must to be used with check_first.
     strict: if True, do not include associated items when considering what
@@ -857,11 +872,11 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, st
         if collection_name == 'meta':
             # meta mapping just contains settings
             build_index(app, es, collection_name, META_MAPPING, uuids_to_index,
-                        dry_run, check_first, force, print_count_only)
+                        dry_run, check_first, force, index_diff, print_count_only)
         else:
             mapping = create_mapping_by_type(collection_name, registry)
             build_index(app, es, collection_name, mapping, uuids_to_index,
-                        dry_run, check_first, force, print_count_only)
+                        dry_run, check_first, force, index_diff, print_count_only)
     # only index (synchronously) if --force option is used
     # otherwise, store uuids for later indexing in ES uuid_store document
     if uuids_to_index:
@@ -895,6 +910,8 @@ def main():
                         help="check if index exists first before attempting creation")
     parser.add_argument('--force', action='store_true',
                         help="force new mapping and synchronous reindexing of all/given collections")
+    parser.add_argument('--index-diff', action='store_true',
+                        help="reindex any items in the db but not es store for all/given collections")
     parser.add_argument('--strict', action='store_true',
                         help="used with force or check_first in combination with item-type. Only index the given types (ignore associated items). Advanced users only")
     parser.add_argument('--no-meta', action='store_true',
@@ -911,7 +928,7 @@ def main():
     logging.getLogger('snovault').setLevel(logging.WARN)
 
     uuids = run(app, args.item_type, args.dry_run, args.check_first, args.force,
-               args.strict, args.no_meta, args.print_count_only)
+               args.index_diff, args.strict, args.no_meta, args.print_count_only)
     return
 
 
