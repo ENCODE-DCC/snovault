@@ -711,10 +711,14 @@ def check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff=Fals
     in the index for reindexing.
     If index_diff, store uuids for reindexing that
     """
-    db_count, es_count, db_uuids, diff_uuids = get_db_es_counts_and_db_uuids(app, es, in_type)
+    db_count, es_count, db_uuids, diff_uuids = get_db_es_counts_and_db_uuids(app, es, in_type, index_diff)
     if print_counts:
         log.warn("DB count is %s and ES count is %s for index: %s" %
                  (str(db_count), str(es_count), in_type))
+        if index_diff and diff_uuids:
+            log.warn("The following UUIDs are found in the DB but not the ES index: %s" % (in_type))
+            for uuid in diff_uuids:
+                log.warn(uuid)
         return
     if es_count is None or es_count != db_count:
         if index_diff:
@@ -725,17 +729,22 @@ def check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff=Fals
             uuids_to_index.update(db_uuids)
 
 
-def get_db_es_counts_and_db_uuids(app, es, in_type):
+def get_db_es_counts_and_db_uuids(app, es, in_type, index_diff=False):
     """
     Return the database count and elasticsearch count for a given item type,
     the list of collection uuids from the database, and the list of uuids
     found in the DB but not in the ES store.
     """
     if check_if_index_exists(es, in_type, False):
-        search = Search(using=es, index=in_type, doc_type=in_type)
-        search_source = search.source([])
-        es_uuids = [h.meta.id for h in search_source.scan()]
-        es_count = len(es_uuids)
+        if index_diff:
+            search = Search(using=es, index=in_type, doc_type=in_type)
+            search_source = search.source([])
+            es_uuids = [h.meta.id for h in search_source.scan()]
+            es_count = len(es_uuids)
+        else:
+            count_res = es.count(index=in_type, doc_type=in_type)
+            es_count = count_res.get('count')
+            es_uuids = []
     else:
         es_count = 0
         es_uuids = []
@@ -753,7 +762,11 @@ def get_db_es_counts_and_db_uuids(app, es, in_type):
     if datastore:
         app.datastore = datastore
     # find db uuids not in es uuids
-    diff_uuids = list(set(db_uuids) - set(es_uuids))
+    # maybe save time by skipping set operation if we don't need it
+    if index_diff:
+        diff_uuids = list(set(db_uuids) - set(es_uuids))
+    else:
+        diff_uuids = []
     return db_count, es_count, db_uuids, diff_uuids
 
 
