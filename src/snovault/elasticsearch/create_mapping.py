@@ -762,7 +762,11 @@ def get_db_es_counts_and_db_uuids(app, es, in_type, index_diff=False):
     if datastore:
         app.datastore = datastore
     # find db uuids not in es uuids
-    diff_uuids = list(set(db_uuids) - set(es_uuids))
+    # maybe save time by skipping set operation if we don't need it
+    if index_diff:
+        diff_uuids = list(set(db_uuids) - set(es_uuids))
+    else:
+        diff_uuids = []
     return db_count, es_count, db_uuids, diff_uuids
 
 
