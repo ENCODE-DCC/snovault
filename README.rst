@@ -61,7 +61,7 @@ In one terminal startup the database servers and nginx proxy with::
 
     $ bin/dev-servers development.ini --app-name app --clear --init --load
 
-This will first clear any existing data in /tmp/snowflakes.
+This will first clear any existing data in /tmp/snowflakes
 Then postgres and elasticsearch servers will be initiated within /tmp/snowflakes.
 An nginx proxy running on port 8000 will be started.
 The servers are started, and finally the test set will be loaded.
