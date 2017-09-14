@@ -171,16 +171,19 @@ class ElasticSearchStorage(object):
         return [hit.to_dict().get('uuid', hit.to_dict().get('_id')) for hit in hits]
 
     def __iter__(self, *item_types):
-        query = {
-            'fields': [],
-            'filter': {'terms': {'item_type': item_types}} if item_types else {'match_all': {}},
-        }
+        query = {'query': {
+            'bool': {
+                'filter': {'terms': {'item_type': item_types}} if item_types else {'match_all': {}}
+            }
+        }}
         for hit in scan(self.es, query=query):
             yield hit.get('uuid', hit.get('_id'))
 
     def __len__(self, *item_types):
-        query = {
-            'filter': {'terms': {'item_type': item_types}} if item_types else {'match_all': {}},
-        }
+        query = {'query': {
+            'bool': {
+                'filter': {'terms': {'item_type': item_types}} if item_types else {'match_all': {}}
+            }
+        }}
         result = self.es.count(index=self.index, body=query)
         return result['count']
