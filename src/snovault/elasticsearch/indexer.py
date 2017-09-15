@@ -39,73 +39,58 @@ def includeme(config):
 
 
 class IndexerState(object):
-    def __init__(self, es):
+    # Keeps track of uuids and indexer state by cycle.  Also handles handoff of uuids to followup indexer
+    def __init__(self, es, key, title='primary'):
         self.es = es
-        self.key = "indexerstate"
-        if not self.es.indices.exists(self.key):
-            self.es.indices.create(index=self.key, body={'index': {'number_of_shards': 1}})
-            mapping = {'default': {"_all":    {"enabled": False},
-                                "_source": {"enabled": True},
-                                # "_id":     {"index": "not_analyzed", "store": True},
-                                # "_ttl":    {"enabled": True, "default": "1d"},
-                                }}
-            self.es.indices.put_mapping(index=self.key, doc_type='default', body=mapping)
-        self.state_key       = 'primary_indexer'       # State of the current or last cycle
-        self.todo_set        = 'primary_invalidated'   # one cycle of uuids, sent to the Secondary Indexer
-        #self.in_progress_set = 'primary_in_progress'
-        self.failed_set      = 'primary_failed'
-        self.done_set        = 'primary_done'          # Trying to get all uuids from 'todo' to this set
-        self.troubled_set    = 'primary_troubled'      # uuids that failed to index in any cycle
-        self.last_set        = 'primary_last_cycle'    # uuids in the most recent finished cycle
-        self.followup_prep_list = 'primary_followup_prep_list' # Setting up the uuids to be handled by a followup process
-        self.followup_ready_list = 'staged_for_secondary_list'  # Followup list is added to here to pass baton
-        # DO NOT INHERIT! All keys that are cleaned up at the start and fully finished end of indexing
-        self.success_set       = self.done_set
-        self.cleanup_keys      = [self.todo_set,self.failed_set,self.done_set],  # ,self.in_progress_set
-        self.cleanup_last_keys = [self.last_set]  # ,self.audited_set] cleaned up only when new indexing occurs
-        self.cache = {}
-        # desired:
-        # 1) Hand off to secondary.  Will work fine
-        # 2) Record failures and consider blacklisting them
-        # 3) Detect and recover from abreviated cycle - probably have to settle for batches
-        # 4) Identify what is being currently worked on.  Probably have to accept batches
+        self.key = key  # "indexerstate"
+        self.title           = title
+        self.state_id        = self.title + '_indexer'       # State of the current or last cycle
+        self.todo_set        = self.title + '_in_progress'   # one cycle of uuids, sent to the Secondary Indexer
+        #self.failed_set      = self.title + '_failed'
+        #self.done_set        = self.title + '_done'          # Trying to get all uuids from 'todo' to this set
+        self.troubled_set    = self.title + '_troubled'      # uuids that failed to index in any cycle
+        self.last_set        = self.title + '_last_cycle'    # uuids in the most recent finished cycle
+        self.success_set     = None                          # None is the same as self.done_set
+        self.cleanup_this_cycle = [self.todo_set]  # ,self.failed_set,self.done_set]  # Clean up at end of current cycle
+        self.cleanup_last_cycle = [self.last_set,self.troubled_set]              # Clean up at beginning of next cycle
+        self.override           = 'reindex_' + self.title      # If exists then reindex all
+        # DO NOT INHERIT! These keys are for passing on to other indexers
+        self.followup_prep_list  = 'primary_followup_prep_list' # Setting up the uuids to be handled by a followup process
+        self.followup_ready_list = 'staged_by_primary_list'     # Followup list is added to here to pass baton
+        # some goals:
+        # 1) Hand-off to secondary: working
+        # 2) Detect and recover from interrupted cycle - working but noisy
+        #    Investigate es.count(xmin) to see if it is worth the restart=True flag
+        #    "The _version field is not indexed, therefore you cannot query/filter on it."
+        #    Consider adding xmin to body?
+        # 3) Identify what is being currently worked on - Too expensive beyond invalidated list
+        # 4) Record (double?) failures and consider blacklisting them - not tried, could do.
 
-    def get(self):
-        try:
-            state = self.es.get(index=self.key, doc_type='default', id=self.state_key)['_source']
-        except:
-            state = {}
-        return state
-
-    def put(self, state):
-        # Don't save errors in es
-        errors = state.pop('errors',None)
-        state['indexer'] = self.state_key
-        try:
-            self.es.index(index=self.key, doc_type='default', body=state, id=self.state_key)
-        except:
-            log.warn("Failed to save to es: " +str(state))
-
-        if errors is not None:
-            state['errors'] = errors
-
+    # Private-ish primitives...
     def get_obj(self, id):
         try:
-            return self.es.get(index=self.key, doc_type='default', id=id).get('_source',{})
+            return self.es.get(index=self.key, doc_type='meta', id=id).get('_source',{})  # TODO: snovault/meta
         except:
             return {}
 
     def put_obj(self, id, obj):
         try:
-            self.es.index(index=self.key, doc_type='default', id=id, body=obj)
+            self.es.index(index=self.key, doc_type='meta', id=id, body=obj)
         except:
             log.warn("Failed to save to es: " + id)
+
+    def delete_objs(self, ids):
+        for id in ids:
+            try:
+                self.es.delete(index=self.key, doc_type='meta', id=id)
+            except:
+                pass
 
     def get_list(self, id):
         return self.get_obj(id).get('list',[])
 
     def get_count(self, id):
-        return self.get_obj(id).get('count',[])
+        return self.get_obj(id).get('count',0)
 
     def put_list(self, id, a_list):
         return self.put_obj(id, { 'list': a_list, 'count': len(a_list) })
@@ -131,18 +116,11 @@ class IndexerState(object):
     def list_extend(self, id, vals):
         list_to_extend = self.get_list(id)
         if len(list_to_extend) > 0:
-            list_to_extend.extend(vals)
+            list_to_extend.extend(vals)  # TODO: consider capping at SEARCH_MAX (keeping count but not uuids).  Requires followup handoff work.
         else:
             list_to_extend = vals
 
         self.put_list(id, list_to_extend)
-
-    def delete_objs(self, ids):
-        for id in ids:
-            try:
-                self.es.delete(index=self.key, doc_type='default', id=id)
-            except:
-                pass
 
     def rename_objs(self, from_id, to_id):
         val = self.get_list(from_id)
@@ -150,40 +128,104 @@ class IndexerState(object):
             self.put_list(to_id, val)
             self.delete_objs([from_id])
 
+    # Public access...
+    def get(self):
+        '''Returns the basic state info'''
+        return self.get_obj(self.state_id)
+
+    def put(self, state):
+        '''Update the basic state info'''
+        # Don't save errors in es
+        errors = state.pop('errors',None)
+        state['title'] = self.state_id
+        self.put_obj(self.state_id,state)
+
+        if errors is not None:
+            state['errors'] = errors
+
+    def priority_cycle(self, registry):
+        '''Initial startup, override, or interupted prior cycle can all lead to a priority cycle.
+           returns (discovered xmin, uuids, whether previous cycle was interupted).'''
+        # Not yet started?
+        initialized = self.get_obj("indexing")
+        if not initialized:
+            self.delete_objs([self.state_id,self.override,self.followup_ready_list])
+            return (-1, [], False)  # primary indexer will know what to do and secondary indexer should do nothing yet
+
+        state = self.get()
+
+        # Rare call for indexing all...
+        override = self.get_obj(self.override)
+        if override:
+            self.delete_objs([self.override,self.followup_ready_list])
+            uuids = list(all_uuids(registry))
+            log.warn('%s override doing all: %d' % (self.state_id,len(uuids)))
+            return (-1, uuids, False)
+
+        if state.get('status','') != 'indexing':
+            return (-1, [], False)
+
+        xmin = state.get('xmin', -1)
+        #snapshot = state.get('snapshot', None)
+        if xmin == -1:  # or snapshot is None:
+            return (-1, [], False)
+
+        #assert(self.get_count(self.done_set) == 0)  # Valid for cycle-level accounting only
+        #undone_uuids = self.get_diff(self.todo_set, [self.done_set])  # works for any accountingu
+        undone_uuids = self.get_list(self.todo_set)                    # works fastest for cycle-level accounting
+        if len(undone_uuids) <= 0:  # TODO SEARCH_MAX?  SEARCH_MAX/10
+            return (-1, [], False)
+
+        # Note: do not clean up last cycle yet because we could be restarted multiple times.
+
+        return (xmin, undone_uuids, True)
+
+
     def prep_for_followup(self, xmin, uuids):
-        # set up new _cycle
+        '''Prepare a cycle of uuids for passing to a followup indexer (e.g. audits, viscache)'''
         prep_list = [ "xmin:%s" % xmin ]
         prep_list.extend(uuids)
         self.put_list(self.followup_prep_list, prep_list)
         # No need to preserve anything on the prep_list as it passes to the staged list in one cycle.
 
-    def abandon_prior_prep(self):
-        self.delete_objs([self.followup_prep_list])
-
     def start_cycle(self, uuids, state=None):
+        '''Every indexing cycle must be properly opened.'''
         if state is None:
             state = self.get()
         state['status'] = 'indexing'
         state['cycle_count'] = len(uuids)
+        lag = state.pop('cycle_lag',None)  # Not informative when starting.
+        state['cycle_start'] = datetime.datetime.now(pytz.utc)
+
         self.put(state)
-        self.delete_objs(self.cleanup_last_keys)
-        self.delete_objs(self.cleanup_keys)
+        self.delete_objs(self.cleanup_last_cycle)
+        self.delete_objs(self.cleanup_this_cycle)
         self.put_list(self.todo_set, set(uuids))
         return state
 
-    def successes_this_cycle(self):
-        # Could be overwritten to change definition of success
-        return self.get_count(self.success_set)
+    def add_errors(self, errors, finished=True):
+        '''To avoid 16 worker concurency issues, errors are recorded at the end of a cycle.'''
+        uuids = [err['uuid'] for err in errors]  # better be uuids!
+        if len(uuids) > 0:
+            # Forget extend, this is cycle-level accounting
+            #self.list_extend(self.failed_set, uuids)
+            # Forget failed_set, this is cycle-level accounting
+            #self.put_list(self, self.failed_set, uuids)
 
-    def finish_cycle(self, state=None):
-        if state is None:
-            state = self.get()
+            if finshed:
+                # Forget sets... cycle-level accounting so errors => failed_set => troubled_set all in one cycle.
+                # handle troubled uuids:
+                #troubled_uuids = set(self.get_list(self.failed_set))
+                #if len(troubled_uuids):
+                #    self.set_add(self.troubled_set, troubled_uuids)
+                #    # TODO: could make doubled_troubled set and use it to blacklist uuids
+                self.put_list(self, self.troubled_set, uuids)
 
-        # handle troubled uuids:
-        troubled_uuids = set(self.get_list(self.failed_set))
-        if len(troubled_uuids):
-            self.set_add(self.troubled_set, troubled_uuids)
-        # TODO: could make twice_troubled set and use it to blacklist uuids
+
+    def finish_cycle(self, state, errors=None):
+        '''Every indexing cycle must be properly closed.'''
+        if errors:  # By handling here, we avoid overhead and concurrency issues of uuid-level accounting
+            self.add_errors(errors)
 
         # pass any staged items to followup
         if self.followup_prep_list is not None:
@@ -193,52 +235,29 @@ class IndexerState(object):
                 self.list_extend(self.followup_ready_list, hand_off_list)
                 self.delete_objs([self.followup_prep_list])
 
-        # no accounting so todo => done => last in this function
+        # cycle-level accounting so todo => done => last in this function
         #self.rename_objs(self.todo_set, self.done_set)
         done_count = self.get_count(self.todo_set)
         self.rename_objs(self.todo_set, self.last_set)
 
-        #done_count = self.get_count(self.done_set)  # no accounting so todo => done => last in this function
-        if self.success_set != self.done_set:
-            state['acted_on'] = self.successes_this_cycle()
+        if self.success_set is not None:
+            state[self.title + '_updated'] = self.get_count(self.success_set)
         cycle_count = state.pop('cycle_count',None)
         #assert(cycle_count == done_count)
         state['indexed'] = done_count
 
-        #self.rename_objs(self.done_set, self.last_set)   # no accounting so todo => done => last in this function
-        self.delete_objs(self.cleanup_keys)
+        #self.rename_objs(self.done_set, self.last_set)   # cycle-level accounting so todo => done => last in this function
+        self.delete_objs(self.cleanup_this_cycle)
         state['status'] = 'done'
         state['cycles'] = state.get('cycles',0) + 1
+        cycle_start = state.pop('cycle_start',None)  # Not informative when starting.
+        if cycle_start is not None:
+            state['cycle_lag'] = str(datetime.datetime.now(pytz.utc) - cycle_start)
+
         self.put(state)
 
         # returns successful count
         return state
-
-    def unfinished_cycle(self):
-        # if there is an unfinished cycle, then xmin and uuid's are returned
-        # TODO: Chance for backdoor reindexing.
-
-        state = self.get()
-        if state.get('status','') != 'indexing':
-            return (-1, None, [])
-
-        xmin = state.get('xmin', -1)
-        #snapshot = state.get('snapshot', None)
-        if xmin == -1:  # or snapshot is None:
-            return (-1, None, [])
-
-        #assert(self.get_count(self.done_set) == 0)
-        undone_uuids = self.get_diff(self.todo_set, [self.done_set])
-        if len(undone_uuids) <= 0:  # TODO SEARCH_MAX?  SEARCH_MAX/10
-            return (-1, None, [])
-
-        # Note: do not clean up last cycle yet because we could be restarted multiple times.
-
-        return (xmin, None, undone_uuids)
-
-    def failed_uuid(self, uuid):
-        self.set_add(self.failed_set, [uuid])  # Hopefully these are rare
-
 
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
@@ -250,7 +269,8 @@ def index(request):
     recovery = request.json.get('recovery', False)
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
-    stage_for_followup = request.registry["stage_for_followup"]
+    ########## TODO #######stage_for_followup = request.registry["stage_for_followup"]
+    stage_for_followup = request.registry["secondaryindexer"]
     session = request.registry[DBSESSION]()
     connection = session.connection()
     first_txn = None
@@ -258,30 +278,32 @@ def index(request):
     restart=False
 
     # May have undone uuids from prior cycle
-    state = IndexerState(es)
+    state = IndexerState(es,INDEX)
 
-    (xmin, snapshot_id, invalidated) = state.unfinished_cycle()
+    (xmin, invalidated, restart) = state.priority_cycle(request.registry)
+    result = state.get()  # get after checking priority!
+    result.pop('indexed', None)  # If using for new cycle, make certain indexed is not set.
 
-    if xmin > -1 and len(invalidated) > 0:
-        restart = True
-        result = state.get()
+    if len(invalidated) > 0:
+        if xmin == -1:
+            xmin = get_current_xmin(request)
         flush = True
     else:
-
-        # http://www.postgresql.org/docs/9.3/static/functions-info.html#FUNCTIONS-TXID-SNAPSHOT
-        if recovery:
-            query = connection.execute(
-                "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;"
-                "SELECT txid_snapshot_xmin(txid_current_snapshot());"
-            )
-        else:
-            query = connection.execute(
-                "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE;"
-                "SELECT txid_snapshot_xmin(txid_current_snapshot());"
-            )
-        # DEFERRABLE prevents query cancelling due to conflicts but requires SERIALIZABLE mode
-        # which is not available in recovery.
-        xmin = query.scalar()  # lowest xid that is still in progress
+        xmin = get_current_xmin(request)
+        ## # http://www.postgresql.org/docs/9.3/static/functions-info.html#FUNCTIONS-TXID-SNAPSHOT
+        ## if recovery:
+        ##     query = connection.execute(
+        ##         "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;"
+        ##         "SELECT txid_snapshot_xmin(txid_current_snapshot());"
+        ##     )
+        ## else:
+        ##     query = connection.execute(
+        ##         "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE;"
+        ##         "SELECT txid_snapshot_xmin(txid_current_snapshot());"
+        ##     )
+        ## # DEFERRABLE prevents query cancelling due to conflicts but requires SERIALIZABLE mode
+        ## # which is not available in recovery.
+        ## xmin = query.scalar()  # lowest xid that is still in progress
 
         last_xmin = None
         if 'last_xmin' in request.json:
@@ -296,10 +318,10 @@ def index(request):
             else:
                 last_xmin = status['_source']['xmin']
 
-        result = {
-            'xmin': xmin,
-            'last_xmin': last_xmin,
-        }
+        result.update(
+            xmin=xmin,
+            last_xmin=last_xmin,
+        )
 
         flush = False
         if last_xmin is None:
@@ -374,11 +396,6 @@ def index(request):
                     snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
 
     if invalidated and not dry_run:
-        if first_txn is None:
-            first_txn = datetime.datetime.now(pytz.utc)
-
-        result["snapshot"] = snapshot_id
-
         if stage_for_followup:
             # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
             state.prep_for_followup(xmin, invalidated)
@@ -390,7 +407,7 @@ def index(request):
         #    invalidated = invalidated[10:]  #        If using, make sure to comment out state.finish_cycle() below
         errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
 
-        result = state.finish_cycle(result)
+        result = state.finish_cycle(result,errors)
 
         if errors:
             result['errors'] = errors
@@ -413,7 +430,6 @@ def index(request):
                 es.indices.put_settings(index=INDEX, body=interval_settings)
 
         es.indices.refresh(index=INDEX)
-
         if flush:
             try:
                 es.indices.flush_synced(index=INDEX)  # Faster recovery on ES restart
@@ -421,11 +437,31 @@ def index(request):
                 pass
 
     if first_txn is not None:
-        result['lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
-        state.put(result)
+        result['txn_lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
 
     return result
 
+
+def get_current_xmin(request):
+    session = request.registry[DBSESSION]()
+    connection = session.connection()
+    recovery = request.json.get('recovery', False)
+
+    # http://www.postgresql.org/docs/9.3/static/functions-info.html#FUNCTIONS-TXID-SNAPSHOT
+    if recovery:
+        query = connection.execute(
+            "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;"
+            "SELECT txid_snapshot_xmin(txid_current_snapshot());"
+        )
+    else:
+        query = connection.execute(
+            "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE;"
+            "SELECT txid_snapshot_xmin(txid_current_snapshot());"
+        )
+    # DEFERRABLE prevents query cancelling due to conflicts but requires SERIALIZABLE mode
+    # which is not available in recovery.
+    xmin = query.scalar()  # lowest xid that is still in progress
+    return xmin
 
 def all_uuids(registry, types=None):
     # First index user and access_key so people can log in
@@ -452,7 +488,6 @@ class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
         self.index = registry.settings['snovault.elasticsearch.index']
-        self.state = IndexerState(self.es)
         try:
             self.batch_size = int(registry.settings["indexer.batch_size"])  # found in buildout.cfg for production
         except:
@@ -474,7 +509,7 @@ class Indexer(object):
         # If a restart occurred in the middle of indexing, this uuid might have already been indexd, so skip redoing it.
         if restart:
             try:
-                #if self.es.exists(index=self.index, id=str(uuid), version=xmin, version_type='external_gte'):
+                #if self.es.exists(index=self.index, id=str(uuid), version=xmin, version_type='external_gte'):  # couldn't get exists to work.
                 result = self.es.get(index=self.index, id=str(uuid), _source_include='uuid', version=xmin, version_type='external_gte')
                 if result.get('_source') is not None:
                     return
@@ -485,7 +520,6 @@ class Indexer(object):
         try:
             result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
         except StatementError:
-            self.state.failed_uuid(uuid)
             # Can't reconnect until invalid transaction is rolled back
             raise
         except Exception as e:
@@ -493,6 +527,20 @@ class Indexer(object):
             last_exc = repr(e)
 
         if last_exc is None:
+            ### OPTIONAL: secodary_indexer does audits
+            ### try:
+            ###     #if self.es.exists(index=self.index, id=str(uuid), version=xmin, version_type='external_gte'):
+            ###     old_result = self.es.get(index=self.index, id=str(uuid), _source_include='uuid')  # Any version
+            ###     audit = old_result.get('_source',{}).get('audit')
+            ###     if audit:
+            ###         result.update(
+            ###             audit=audit,
+            ###             audit_stale=True,
+            ###         )
+            ### except:
+            ###     pass
+            ### OPTIONAL: secodary_indexer does audits
+
             for backoff in [0, 10, 20, 40, 80]:
                 time.sleep(backoff)
                 try:
@@ -502,12 +550,10 @@ class Indexer(object):
                         request_timeout=30,
                     )
                 except StatementError:
-                    self.state.failed_uuid(uuid)
                     # Can't reconnect until invalid transaction is rolled back
                     raise
                 except ConflictError:
                     log.warning('Conflict indexing %s at version %d', uuid, xmin)
-                    self.state.failed_uuid(uuid)
                     return
                 except (ConnectionError, ReadTimeoutError, TransportError) as e:
                     log.warning('Retryable error indexing %s: %r', uuid, e)
@@ -520,7 +566,6 @@ class Indexer(object):
                     # Get here on success and outside of try
                     return
 
-        self.state.failed_uuid(uuid)
         timestamp = datetime.datetime.now().isoformat()
         return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
 
