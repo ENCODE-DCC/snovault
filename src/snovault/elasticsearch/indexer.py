@@ -290,20 +290,6 @@ def index(request):
         flush = True
     else:
         xmin = get_current_xmin(request)
-        ## # http://www.postgresql.org/docs/9.3/static/functions-info.html#FUNCTIONS-TXID-SNAPSHOT
-        ## if recovery:
-        ##     query = connection.execute(
-        ##         "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;"
-        ##         "SELECT txid_snapshot_xmin(txid_current_snapshot());"
-        ##     )
-        ## else:
-        ##     query = connection.execute(
-        ##         "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE;"
-        ##         "SELECT txid_snapshot_xmin(txid_current_snapshot());"
-        ##     )
-        ## # DEFERRABLE prevents query cancelling due to conflicts but requires SERIALIZABLE mode
-        ## # which is not available in recovery.
-        ## xmin = query.scalar()  # lowest xid that is still in progress
 
         last_xmin = None
         if 'last_xmin' in request.json:
