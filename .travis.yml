@@ -1,4 +1,5 @@
 language: python
+dist: precise
 sudo: false
 cache:
   directories:
@@ -14,6 +15,7 @@ addons:
     - graphviz
 env:
   global:
+    - BOTO_CONFIG=/bogus/value # see: https://github.com/boto/boto/issues/3263
 
   - secure: |-
       j9Ako+NzgzqQH8Vj13m/HyAad3nwM9YW/Wdjox7MsSV0xb75G0kuQWf6+hvIi
