@@ -269,8 +269,8 @@ def index(request):
     recovery = request.json.get('recovery', False)
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
-    ########## TODO #######stage_for_followup = request.registry["stage_for_followup"]
-    stage_for_followup = request.registry["secondaryindexer"]
+    stage_for_followup = request.registry.get("stage_for_followup",False)
+    #stage_for_followup = request.registry["secondaryindexer"]  ### TODO: remove.  Only for testing on my old demo
     session = request.registry[DBSESSION]()
     connection = session.connection()
     first_txn = None
