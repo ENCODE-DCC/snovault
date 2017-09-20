@@ -149,7 +149,10 @@ class IndexerState(object):
         # Not yet started?
         initialized = self.get_obj("indexing")
         if not initialized:
-            self.delete_objs([self.state_id,self.override,self.followup_ready_list])
+            self.delete_objs([self.override,self.followup_ready_list])
+            state = self.get()
+            state['status'] = 'uninitialized'
+            self.put(state)
             return (-1, [], False)  # primary indexer will know what to do and secondary indexer should do nothing yet
 
         state = self.get()
@@ -392,6 +395,15 @@ def index(request):
         #if len(invalidated) > 10:           # DEBUG: special to test fake interrupted cycle on local machine.
         #    invalidated = invalidated[10:]  #        If using, make sure to comment out state.finish_cycle() below
         errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
+        result['pass1_lag'] = str(datetime.datetime.now(pytz.utc) - result['cycle_start'])
+        state.put(result)
+        ### OPTIONAL: 2-step indexer does audits
+        pass2_start = datetime.datetime.now(pytz.utc)
+        audit_errors = indexer.update_audits(request, invalidated, xmin, snapshot_id)  # ignore restart
+        result['pass2_lag'] = str(datetime.datetime.now(pytz.utc) - pass2_start)
+        if len(audit_errors):
+            errors.extend(audit_errors)
+        ### OPTIONAL: 2-step indexer does audits
 
         result = state.finish_cycle(result,errors)
 
@@ -491,6 +503,9 @@ class Indexer(object):
         return errors
 
     def update_object(self, request, uuid, xmin, restart=False):
+        ### OPTIONAL: 2-step indexer does audits
+        request.datastore = 'database'
+        ### OPTIONAL: 2-step indexer does audits
 
         # If a restart occurred in the middle of indexing, this uuid might have already been indexd, so skip redoing it.
         if restart:
@@ -514,17 +529,17 @@ class Indexer(object):
 
         if last_exc is None:
             ### OPTIONAL: secodary_indexer does audits
-            ### try:
-            ###     #if self.es.exists(index=self.index, id=str(uuid), version=xmin, version_type='external_gte'):
-            ###     old_result = self.es.get(index=self.index, id=str(uuid), _source_include='uuid')  # Any version
-            ###     audit = old_result.get('_source',{}).get('audit')
-            ###     if audit:
-            ###         result.update(
-            ###             audit=audit,
-            ###             audit_stale=True,
-            ###         )
-            ### except:
-            ###     pass
+            try:
+                #if self.es.exists(index=self.index, id=str(uuid), version=xmin, version_type='external_gte'):
+                old_result = self.es.get(index=self.index, id=str(uuid), _source_include='uuid')  # Any version
+                audit = old_result.get('_source',{}).get('audit')
+                if audit:
+                    result.update(
+                        audit=audit,
+                        audit_stale=True,
+                    )
+            except:
+                pass
             ### OPTIONAL: secodary_indexer does audits
 
             for backoff in [0, 10, 20, 40, 80]:
@@ -554,6 +569,92 @@ class Indexer(object):
 
         timestamp = datetime.datetime.now().isoformat()
         return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
+
+    ### OPTIONAL: 2-step indexer does audits
+    def update_audits(self, request, uuids, xmin, snapshot_id=None):
+        errors = []
+        for i, uuid in enumerate(uuids):
+            error = self.update_audit(request, uuid, xmin)
+            if error is not None:
+                errors.append(error)
+            if (i + 1) % 50 == 0:
+                log.info('Auditing %d', i + 1)
+
+        return errors
+
+    def update_audit(self, request, uuid, xmin):
+        request.datastore = 'elasticsearch'  # Audits are built on elastic search !!!
+
+        last_exc = None
+        # First get the object currently in es
+        try:
+            #result = self.es.get(index=self.index, id=str(uuid))  # No reason to restrict by version and that would interfere with reindex all signal.
+            result = self.es.get(index=self.index, id=str(uuid), version=xmin, version_type='external_gte')
+            doc = result['_source']
+        except StatementError:
+            # Can't reconnect until invalid transaction is rolled back
+            raise
+        except Exception as e:
+            log.error("Error can't find %s in %s", uuid, ELASTIC_SEARCH)
+            last_exc = repr(e)
+
+        ### # Handle audits:
+        index_audit = False
+        if last_exc is None:
+            # It might be possible to assert that the audit is either empty or stale
+            # TODO assert('audit_stale' is in doc or doc.get('audit') is None)
+
+            try:
+                audit = request.embed('/%s/@@audit' % uuid, as_user=True)['audit']  ### DEFINITELY this is using datastore=database
+                #result = request.embed('/%s/@@index-audits' % uuid, as_user='INDEXER')  ### ALSO using datastore=database
+                # Should have document with audit only
+                #assert(result['uuid'] == doc['uuid'])
+                #audit = result.get('audit',{})
+                if audit or doc.get('audit_stale',False):
+                    doc['audit'] = audit
+                    doc['audit_stale'] = False
+                    index_audit = True
+            except StatementError:
+                # Can't reconnect until invalid transaction is rolled back
+                raise
+            except Exception as e:
+                log.error('Error rendering /%s/@@index-audits', uuid, exc_info=True)
+                last_exc = repr(e)
+
+        if index_audit:
+            if last_exc is None:
+                for backoff in [0, 10, 20, 40, 80]:
+                    time.sleep(backoff)
+                    try:
+                        self.es.index(
+                            index=self.index, doc_type=doc['item_type'], body=doc,
+                            id=str(uuid), version=xmin, version_type='external_gte',
+                            request_timeout=30,
+                        )
+                    except StatementError:
+                        # Can't reconnect until invalid transaction is rolled back
+                        raise
+                    except ConflictError:
+                        #log.warning('Conflict indexing %s at version %d', uuid, xmin)
+                        # This case occurs when the primary indexer is cycles ahead of the secondary indexer
+                        # And this uuid will be secondarily indexed again on a second round
+                        # So no error, pretend it has indexed and move on.
+                        return  # No use doing any further secondary indexing
+                    except (ConnectionError, ReadTimeoutError, TransportError) as e:
+                        log.warning('Retryable error indexing %s: %r', uuid, e)
+                        last_exc = repr(e)
+                    except Exception as e:
+                        log.error('Error indexing %s', uuid, exc_info=True)
+                        last_exc = repr(e)
+                        break
+                    else:
+                        # Get here on success and outside of try
+                        return
+
+        if last_exc is not None:
+            timestamp = datetime.datetime.now().isoformat()
+            return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
+    ### OPTIONAL: 2-step indexer does audits
 
     def shutdown(self):
         pass
