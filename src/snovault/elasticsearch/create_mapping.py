@@ -444,7 +444,9 @@ def type_mapping(types, item_type, embed=True):
 
 
 def create_elasticsearch_index(es, index, body):
-    es.indices.create(index=index, body=body, ignore=[400])
+    if es.indices.exists(index=index):
+        es.indices.exists(index=index)
+    es.indices.create(index=index, body=body)
 
 
 def set_index_mapping(es, index, doc_type, mapping):
