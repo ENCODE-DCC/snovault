@@ -45,38 +45,55 @@ def split_child_props(type_info, properties):
     return item_properties, propname_children
 
 
+def ensure_child_link(props, type_info, link_attr, uuid):
+    if type_info.schema['properties'][link_attr]['type'] == 'array':
+        if link_attr not in props:
+            props[link_attr] = uuid
+        elif uuid not in props:
+            props[link_attr].append(uuid)
+    else:
+        props[link_attr] = uuid
+
+
 def update_children(context, request, propname_children):
     registry = request.registry
     conn = registry[CONNECTION]
     collections = registry[COLLECTIONS]
     schema_rev_links = context.type_info.schema_rev_links
+    uuid = str(context.uuid)
 
     for propname, children in propname_children.items():
         link_type, link_attr = schema_rev_links[propname]
-        child_collection = collections[link_type]
         found = set()
 
         # Add or update children included in properties
         for i, child_props in enumerate(children):
             if isinstance(child_props, basestring):  # IRI of (existing) child
-                child = find_resource(child_collection, child_props)
+                child = find_resource(collections[link_type], child_props)
             else:
                 child_props = child_props.copy()
-                child_props[link_attr] = str(context.uuid)
+                child_type = child_props.pop('@type', None)
                 if 'uuid' in child_props:  # update existing child
                     child_id = child_props.pop('uuid')
                     child = conn.get_by_uuid(child_id)
                     if not request.has_permission('edit', child):
                         msg = u'edit forbidden to %s' % request.resource_path(child)
                         raise ValidationFailure('body', [propname, i], msg)
+                    ensure_child_link(
+                        child_props, child.type_info, link_attr, uuid)
                     try:
                         update_item(child, request, child_props)
                     except ValidationFailure as e:
                         e.location = [propname, i] + e.location
                         raise
                 else:  # add new child
+                    child_type = child_type[0]
+                    child_collection = collections[child_type]
+                    ensure_child_link(
+                        child_props, child_collection.type_info,
+                        link_attr, uuid)
                     if not request.has_permission('add', child_collection):
-                        msg = u'edit forbidden to %s' % request.resource_path(child)
+                        msg = u'add forbidden to %s' % request.resource_path(child_collection)
                         raise ValidationFailure('body', [propname, i], msg)
                     child = create_item(child_collection.type_info, request, child_props)
             found.add(child.uuid)
