@@ -445,7 +445,7 @@ def type_mapping(types, item_type, embed=True):
 
 def create_elasticsearch_index(es, index, body):
     if es.indices.exists(index=index):
-        es.indices.exists(index=index)
+        es.indices.delete(index=index)
     es.indices.create(index=index, body=body)
 
 
