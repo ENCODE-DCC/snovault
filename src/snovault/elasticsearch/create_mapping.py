@@ -459,7 +459,7 @@ def run(app, collections=None, dry_run=False):
     if not dry_run:
         es = app.registry[ELASTIC_SEARCH]
         print('CREATE MAPPING RUNNING')
-        # es.indices.delete(index='_all')
+        es.indices.delete(index='_all')
 
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
