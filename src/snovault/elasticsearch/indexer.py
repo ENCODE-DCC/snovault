@@ -25,6 +25,8 @@ import pytz
 import time
 import copy
 
+es_logger = logging.getLogger("elasticsearch")
+es_logger.setLevel(logging.ERROR)
 log = logging.getLogger(__name__)
 SEARCH_MAX = 99999  # OutOfMemoryError if too high
 
