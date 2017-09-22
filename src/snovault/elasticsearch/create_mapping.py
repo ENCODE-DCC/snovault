@@ -19,8 +19,9 @@ import collections
 import json
 import logging
 import os
+from time import sleep
 
-
+import pdb
 
 log = logging.getLogger(__name__)
 
@@ -444,13 +445,11 @@ def type_mapping(types, item_type, embed=True):
 
 
 def create_elasticsearch_index(es, index, body):
-    if es.indices.exists(index=index):
-        es.indices.delete(index=index)
-    es.indices.create(index=index, body=body)
+    es.indices.create(index=index, body=body, wait_for_active_shards=1, ignore=[400, 404], master_timeout='5m', request_timeout=300)
 
 
 def set_index_mapping(es, index, doc_type, mapping):
-    es.indices.put_mapping(index=index, doc_type=doc_type, body=mapping, ignore=[400])
+    es.indices.put_mapping(index=index, doc_type=doc_type, body=mapping, ignore=[400], request_timeout=300)
 
 
 def run(app, collections=None, dry_run=False):
@@ -459,7 +458,6 @@ def run(app, collections=None, dry_run=False):
     if not dry_run:
         es = app.registry[ELASTIC_SEARCH]
         print('CREATE MAPPING RUNNING')
-        es.indices.delete(index='_all')
 
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
