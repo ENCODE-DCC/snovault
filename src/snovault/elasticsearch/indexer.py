@@ -24,11 +24,8 @@ import logging
 import pytz
 import time
 import copy
-import json
 
 log = logging.getLogger(__name__)
-log.setLevel(logging.DEBUG)
-
 SEARCH_MAX = 99999  # OutOfMemoryError if too high
 
 def includeme(config):
@@ -57,6 +54,7 @@ class IndexerState(object):
         # DO NOT INHERIT! These keys are for passing on to other indexers
         self.followup_prep_list  = 'primary_followup_prep_list' # Setting up the uuids to be handled by a followup process
         self.followup_ready_list = 'staged_by_primary_list'     # Followup list is added to here to pass baton
+        self.clock = {}
         # some goals:
         # 1) Hand-off to secondary: working
         # 2) Detect and recover from interrupted cycle - working but noisy
@@ -77,7 +75,7 @@ class IndexerState(object):
         try:
             self.es.index(index=self.key, doc_type='meta', id=id, body=obj)
         except:
-            log.warn("Failed to save to es: " + id)
+            log.warn("Failed to save to es: " + id, exc_info=True)
 
     def delete_objs(self, ids):
         for id in ids:
@@ -136,12 +134,35 @@ class IndexerState(object):
     def put(self, state):
         '''Update the basic state info'''
         # Don't save errors in es
-        errors = state.pop('errors',None)
+        errors = state.pop('errors', None)
+
         state['title'] = self.state_id
-        self.put_obj(self.state_id,state)
+        self.put_obj(self.state_id, state)
 
         if errors is not None:
             state['errors'] = errors
+
+    def get_initial_state(self):
+        '''Useful to initialize at idle cycle'''
+        new_state = { 'title': self.state_id, 'status': 'idle'}
+        state = self.get()
+        for var in ['cycles']:  # could expand this list
+            val = state.pop('cycles',None)
+            if val is not None:
+                new_state[var] = val
+        return new_state
+
+    def start_clock(self, name):
+        '''Can start a named clock and use it later to figure out elapsed time'''
+        self.clock[name] = datetime.datetime.now(pytz.utc)
+
+    def elapsed(self, name):
+        '''Returns string of time elapsed since named clock started.'''
+        start = self.clock.get(name)
+        if start is None:
+            return 'unknown'
+        else:
+            return str(datetime.datetime.now(pytz.utc) - start)
 
     def priority_cycle(self, registry):
         '''Initial startup, override, or interupted prior cycle can all lead to a priority cycle.
@@ -149,7 +170,7 @@ class IndexerState(object):
         # Not yet started?
         initialized = self.get_obj("indexing")
         if not initialized:
-            self.delete_objs([self.override,self.followup_ready_list])
+            self.delete_objs([self.override, self.followup_ready_list])
             state = self.get()
             state['status'] = 'uninitialized'
             self.put(state)
@@ -162,10 +183,10 @@ class IndexerState(object):
         if override:
             self.delete_objs([self.override,self.followup_ready_list])
             uuids = list(all_uuids(registry))
-            log.warn('%s override doing all: %d' % (self.state_id,len(uuids)))
+            log.warn('%s override doing all: %d' % (self.state_id, len(uuids)))
             return (-1, uuids, False)
 
-        if state.get('status','') != 'indexing':
+        if state.get('status', '') != 'indexing':
             return (-1, [], False)
 
         xmin = state.get('xmin', -1)
@@ -180,7 +201,6 @@ class IndexerState(object):
             return (-1, [], False)
 
         # Note: do not clean up last cycle yet because we could be restarted multiple times.
-
         return (xmin, undone_uuids, True)
 
 
@@ -193,18 +213,25 @@ class IndexerState(object):
 
     def start_cycle(self, uuids, state=None):
         '''Every indexing cycle must be properly opened.'''
+        self.clock = {}
+        self.start_clock('cycle')
         if state is None:
             state = self.get()
         state['status'] = 'indexing'
         state['cycle_count'] = len(uuids)
-        lag = state.pop('cycle_lag',None)  # Not informative when starting.
-        state['cycle_start'] = datetime.datetime.now(pytz.utc)
 
         self.put(state)
         self.delete_objs(self.cleanup_last_cycle)
         self.delete_objs(self.cleanup_this_cycle)
         self.put_list(self.todo_set, set(uuids))
         return state
+
+    def start_pass2(self, state):
+        state['pass1_took'] = self.elapsed('cycle')
+        self.put(state)
+        self.start_clock('pass2')
+        return state
+
 
     def add_errors(self, errors, finished=True):
         '''To avoid 16 worker concurency issues, errors are recorded at the end of a cycle.'''
@@ -224,9 +251,12 @@ class IndexerState(object):
                 #    # TODO: could make doubled_troubled set and use it to blacklist uuids
                 self.put_list(self, self.troubled_set, uuids)
 
-
     def finish_cycle(self, state, errors=None):
         '''Every indexing cycle must be properly closed.'''
+
+        if 'pass2' in self.clock.keys():
+            state['pass2_took'] = self.elapsed('pass2')
+
         if errors:  # By handling here, we avoid overhead and concurrency issues of uuid-level accounting
             self.add_errors(errors)
 
@@ -245,22 +275,20 @@ class IndexerState(object):
 
         if self.success_set is not None:
             state[self.title + '_updated'] = self.get_count(self.success_set)
-        cycle_count = state.pop('cycle_count',None)
+        cycle_count = state.pop('cycle_count', None)
         #assert(cycle_count == done_count)
         state['indexed'] = done_count
 
         #self.rename_objs(self.done_set, self.last_set)   # cycle-level accounting so todo => done => last in this function
         self.delete_objs(self.cleanup_this_cycle)
         state['status'] = 'done'
-        state['cycles'] = state.get('cycles',0) + 1
-        cycle_start = state.pop('cycle_start',None)  # Not informative when starting.
-        if cycle_start is not None:
-            state['cycle_lag'] = str(datetime.datetime.now(pytz.utc) - cycle_start)
+        state['cycles'] = state.get('cycles', 0) + 1
+        state['cycle_took'] = self.elapsed('cycle')
 
         self.put(state)
 
-        # returns successful count
         return state
+
 
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
@@ -272,21 +300,23 @@ def index(request):
     recovery = request.json.get('recovery', False)
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
-    stage_for_followup = request.registry.get("stage_for_followup",False)
-    #stage_for_followup = request.registry["secondaryindexer"]  ### TODO: remove.  Only for testing on my old demo
+    stage_for_followup = request.registry.settings.get("stage_for_followup", False)
     session = request.registry[DBSESSION]()
     connection = session.connection()
     first_txn = None
     snapshot_id = None
     restart=False
+    invalidated = []
+    xmin = -1
 
     # May have undone uuids from prior cycle
     state = IndexerState(es,INDEX)
 
-    (xmin, invalidated, restart) = state.priority_cycle(request.registry)
-    result = state.get()  # get after checking priority!
-    result.pop('indexed', None)  # If using for new cycle, make certain indexed is not set.
+    # OPTIONAL: restart support
+    #(xmin, invalidated, restart) = state.priority_cycle(request.registry)
+    # OPTIONAL: restart support
 
+    result = state.get_initial_state()  # get after checking priority!
     if len(invalidated) > 0:
         if xmin == -1:
             xmin = get_current_xmin(request)
@@ -392,15 +422,16 @@ def index(request):
         result = state.start_cycle(invalidated, result)
 
         # Do the work...
-        #if len(invalidated) > 10:           # DEBUG: special to test fake interrupted cycle on local machine.
-        #    invalidated = invalidated[10:]  #        If using, make sure to comment out state.finish_cycle() below
-        errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
-        result['pass1_lag'] = str(datetime.datetime.now(pytz.utc) - result['cycle_start'])
-        state.put(result)
+
         ### OPTIONAL: 2-step indexer does audits
-        pass2_start = datetime.datetime.now(pytz.utc)
+        log.info("indexer starting pass 1 on %d uuids", len(invalidated))
+        ### OPTIONAL: 2-step indexer does audits
+        errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
+
+        ### OPTIONAL: 2-step indexer does audits
+        result = state.start_pass2(result)
+        log.info("indexer starting pass 2 on %d uuids", len(invalidated))
         audit_errors = indexer.update_audits(request, invalidated, xmin, snapshot_id)  # ignore restart
-        result['pass2_lag'] = str(datetime.datetime.now(pytz.utc) - pass2_start)
         if len(audit_errors):
             errors.extend(audit_errors)
         ### OPTIONAL: 2-step indexer does audits
@@ -519,7 +550,7 @@ class Indexer(object):
 
         last_exc = None
         try:
-            result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
+            doc = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
             raise
@@ -528,25 +559,23 @@ class Indexer(object):
             last_exc = repr(e)
 
         if last_exc is None:
-            ### OPTIONAL: secodary_indexer does audits
+            ### OPTIONAL: 2-pass indexer does audits
             try:
-                #if self.es.exists(index=self.index, id=str(uuid), version=xmin, version_type='external_gte'):
-                old_result = self.es.get(index=self.index, id=str(uuid), _source_include='uuid')  # Any version
-                audit = old_result.get('_source',{}).get('audit')
+                audit = self.es.get(index=self.index, id=str(uuid), _source_include='uuid').get('_source',{}).get('audit')  # Any version
                 if audit:
-                    result.update(
+                    doc.update(
                         audit=audit,
                         audit_stale=True,
                     )
             except:
                 pass
-            ### OPTIONAL: secodary_indexer does audits
+            ### OPTIONAL: 2-pass indexer does audits
 
             for backoff in [0, 10, 20, 40, 80]:
                 time.sleep(backoff)
                 try:
                     self.es.index(
-                        index=self.index, doc_type=result['item_type'], body=result,
+                        index=self.index, doc_type=doc['item_type'], body=doc,
                         id=str(uuid), version=xmin, version_type='external_gte',
                         request_timeout=30,
                     )
@@ -588,7 +617,6 @@ class Indexer(object):
         last_exc = None
         # First get the object currently in es
         try:
-            #result = self.es.get(index=self.index, id=str(uuid))  # No reason to restrict by version and that would interfere with reindex all signal.
             result = self.es.get(index=self.index, id=str(uuid), version=xmin, version_type='external_gte')
             doc = result['_source']
         except StatementError:
@@ -605,14 +633,12 @@ class Indexer(object):
             # TODO assert('audit_stale' is in doc or doc.get('audit') is None)
 
             try:
-                audit = request.embed('/%s/@@audit' % uuid, as_user=True)['audit']  ### DEFINITELY this is using datastore=database
-                #result = request.embed('/%s/@@index-audits' % uuid, as_user='INDEXER')  ### ALSO using datastore=database
-                # Should have document with audit only
-                #assert(result['uuid'] == doc['uuid'])
-                #audit = result.get('audit',{})
+                audit = request.embed('/%s/@@audit' % uuid, datastore='elasticsearch', as_user=True)['audit']
                 if audit or doc.get('audit_stale',False):
-                    doc['audit'] = audit
-                    doc['audit_stale'] = False
+                    doc.update(
+                        audit=audit,
+                        audit_stale=False,
+                    )
                     index_audit = True
             except StatementError:
                 # Can't reconnect until invalid transaction is rolled back

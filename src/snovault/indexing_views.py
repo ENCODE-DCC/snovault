@@ -9,9 +9,6 @@ from .resources import Item
 
 
 def includeme(config):
-    ### OPTIONAL: secodary_indexer does audits
-    config.add_route('index-audits', '/index-audits')
-    ### OPTIONAL: secodary_indexer does audits
     config.scan(__name__)
 
 
@@ -58,10 +55,10 @@ def item_index_data(context, request):
     embedded = request.embed(path, '@@embedded')
     object = request.embed(path, '@@object')
     ### audit = request.embed(path, '@@audit')['audit']
-    ### OPTIONAL: secodary_indexer does audits
+    ### OPTIONAL: 2-pass indexer does audits
     ###           Remove call to generate audits and just return an empty audit
     audit = {}  # audits are being handled by the secondary_indexer
-    ### OPTIONAL: secodary_indexer does audits
+    ### OPTIONAL: 2-pass indexer does audits
 
     document = {
         'audit': audit,
@@ -84,23 +81,3 @@ def item_index_data(context, request):
     }
 
     return document
-
-
-### OPTIONAL: secodary_indexer does audits
-@view_config(context=Item, name='index-audits', permission='view', request_method='GET')
-def item_index_audits(context, request):
-    uuid = str(context.uuid)
-
-    path = resource_path(context)
-
-    path = path + '/'
-    audit = request.embed(path, '@@audit')['audit']
-
-    document = {
-        'audit': audit,
-        'audit_stale': False,
-        'uuid': uuid,
-    }
-
-    return document
-### OPTIONAL: secodary_indexer does audits
