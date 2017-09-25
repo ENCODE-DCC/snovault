@@ -552,13 +552,16 @@ class Indexer(object):
 
         last_exc = None
         try:
-            doc = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
+            doc = request.embed('/%s/@@index-data/noaudit/' % uuid, as_user='INDEXER')
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
             raise
         except Exception as e:
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             last_exc = repr(e)
+
+        audit = doc['audit']
+        assert(not audit)  # == {}
 
         if last_exc is None:
             ### OPTIONAL: 2-pass indexer does audits

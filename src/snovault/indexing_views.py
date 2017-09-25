@@ -54,11 +54,12 @@ def item_index_data(context, request):
     path = path + '/'
     embedded = request.embed(path, '@@embedded')
     object = request.embed(path, '@@object')
-    ### audit = request.embed(path, '@@audit')['audit']
-    ### OPTIONAL: 2-pass indexer does audits
-    ###           Remove call to generate audits and just return an empty audit
-    audit = {}  # audits are being handled by the secondary_indexer
-    ### OPTIONAL: 2-pass indexer does audits
+
+    ### 2-pass indexer does audits using es, and will request noaudit here
+    if request.url.endswith('noaudit/'):
+        audit = {}  # audits are being handled by the secondary_indexer
+    else:
+        audit = request.embed(path, '@@audit')['audit']
 
     document = {
         'audit': audit,
