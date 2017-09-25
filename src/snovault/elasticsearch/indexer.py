@@ -560,9 +560,6 @@ class Indexer(object):
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             last_exc = repr(e)
 
-        audit = doc['audit']
-        assert(not audit)  # == {}
-
         if last_exc is None:
             ### OPTIONAL: 2-pass indexer does audits
             try:
