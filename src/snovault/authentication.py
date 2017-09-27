@@ -18,6 +18,7 @@ from pyramid.security import (
 )
 from pyramid.httpexceptions import (
     HTTPForbidden,
+    HTTPFound
 )
 from pyramid.view import (
     view_config,
