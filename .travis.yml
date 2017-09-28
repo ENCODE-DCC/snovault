@@ -45,9 +45,11 @@ env:
   - PATH="/usr/share/elasticsearch/bin:/usr/lib/postgresql/9.3/bin:$PATH"
 matrix:
   include:
-  - python: '3.5.1'
+  - python: '2.7'
+    env: BROWSER=
+  - python: '3.4'
     env: BROWSER=Chrome
-  - python: '3.5.1'
+  - python: '3.4'
     env: BROWSER=
 before_install:
 - postgres --version
@@ -63,7 +65,7 @@ install:
 before_script:
 - |
   if test -n "$BROWSER"; then
-    CONNECT_URL=https://saucelabs.com/downloads/sc-4.4.5-linux.tar.gz
+    CONNECT_URL=https://saucelabs.com/downloads/sc-4.4.4-linux.tar.gz
     CONNECT_DOWNLOAD=sc.tar.gz
     SC_READYFILE=sauce-connect-ready-$RANDOM
     SC_LOGFILE=$HOME/sauce-connect.log
