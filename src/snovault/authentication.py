@@ -32,6 +32,7 @@ from snovault.storage import User
 from snovault import COLLECTIONS
 from snovault.calculated import calculate_properties
 from snovault.validators import no_validate_item_content_post
+from snovault.validation import ValidationFailure
 
 
 CRYPT_CONTEXT = __name__ + ':crypt_context'
@@ -257,23 +258,31 @@ def basic_auth_check(username, password, request):
              validators=[no_validate_item_content_post],
              permission='impersonate')
 def impersonate_user(request):
+    from pprint import pprint as pp
     """As an admin, impersonate a different user."""
     userid = request.validated['userid']
+    pp('USERID {}'.format(userid))
     users = request.registry[COLLECTIONS]['user']
 
     try:
         user = users[userid]
     except KeyError:
         raise ValidationFailure('body', ['userid'], 'User not found.')
-
+    pp('USER IS FOUND FROM USERS {}'.format(user))
     if user.properties.get('status') != 'current':
         raise ValidationFailure('body', ['userid'], 'User is not enabled.')
+    pp('USER PROPERTIES')
+    pp(user.properties)
 
     request.session.invalidate()
     request.session.get_csrf_token()
     request.response.headerlist.extend(remember(request, 'mailto.' + userid))
     user_properties = request.embed('/session-properties', as_user=userid)
+    pp('USER PROPERTIES')
+    pp(user.properties)
     if 'auth.userid' in request.session:
+        pp('USER PROPERTIES')
+        pp(user.properties)
         user_properties['auth.userid'] = request.session['auth.userid']
 
     return user_properties
