@@ -169,14 +169,14 @@ module.exports.SessionManagement = {
         if (this.props) {
             for (key in this.props) {
                 if (this.props[key] !== prevProps[key]) {
-                    console.log('changed props: %s', key);
+                    console.log('changed props: %s', JSON.stringify(this.props[key]));
                 }
             }
         }
         if (this.state) {
             for (key in this.state) {
                 if (this.state[key] !== prevState[key]) {
-                    console.log('changed state: %s', key);
+                    console.log('changed state: %s', JSON.stringify(this.state[key]));
                 }
             }
         }
