@@ -2,7 +2,9 @@ Feature: User Profile
 
     Scenario Outline: View profile
         When I visit "/"
+        And I wait for 10 seconds
         And I reload
+        And I wait for 10 seconds
         And I click the link with text that contains "J. Michael Cherry"
         And I click the link with text that contains "Profile"
         Then I should see "J. Michael Cherry, Stanford"
