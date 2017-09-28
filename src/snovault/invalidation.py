@@ -92,13 +92,10 @@ def es_update_data(event):
 
     response.headers['X-Transaction'] = str(xid)
 
-    # Only set session cookie for web users
-    namespace = None
+    # Only set session cookie for web users and TEST
     login = request.authenticated_userid
-    if login is not None:
-        namespace, userid = login.split('.', 1)
 
-    if namespace == 'mailto':
+    if login is not None and (login.startswith('mailto.') or login == 'remoteuser.TEST'):
         edits = request.session.setdefault('edits', [])
         edits.append([xid, list(updated), list(renamed)])
         edits[:] = edits[-10:]
