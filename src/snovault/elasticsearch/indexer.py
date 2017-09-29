@@ -425,18 +425,14 @@ def index(request):
 
         # Do the work...
 
-        ### OPTIONAL: 2-step indexer does audits
         log.info("indexer starting pass 1 on %d uuids", len(invalidated))
-        ### OPTIONAL: 2-step indexer does audits
         errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
 
-        ### OPTIONAL: 2-step indexer does audits
         result = state.start_pass2(result)
         log.info("indexer starting pass 2 on %d uuids", len(invalidated))
         audit_errors = indexer.update_audits(request, invalidated, xmin, snapshot_id)  # ignore restart
         if len(audit_errors):
             errors.extend(audit_errors)
-        ### OPTIONAL: 2-step indexer does audits
 
         result = state.finish_cycle(result,errors)
 
@@ -536,9 +532,7 @@ class Indexer(object):
         return errors
 
     def update_object(self, request, uuid, xmin, restart=False):
-        ### OPTIONAL: 2-step indexer does audits
-        request.datastore = 'database'
-        ### OPTIONAL: 2-step indexer does audits
+        request.datastore = 'database'  # required by 2-step indexer
 
         # If a restart occurred in the middle of indexing, this uuid might have already been indexd, so skip redoing it.
         if restart:
@@ -561,7 +555,6 @@ class Indexer(object):
             last_exc = repr(e)
 
         if last_exc is None:
-            ### OPTIONAL: 2-pass indexer does audits
             try:
                 audit = self.es.get(index=self.index, id=str(uuid), _source_include='uuid').get('_source',{}).get('audit')  # Any version
                 if audit:
@@ -571,7 +564,6 @@ class Indexer(object):
                     )
             except:
                 pass
-            ### OPTIONAL: 2-pass indexer does audits
 
             for backoff in [0, 10, 20, 40, 80]:
                 time.sleep(backoff)
@@ -601,7 +593,6 @@ class Indexer(object):
         timestamp = datetime.datetime.now().isoformat()
         return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
 
-    ### OPTIONAL: 2-step indexer does audits
     def update_audits(self, request, uuids, xmin, snapshot_id=None):
         errors = []
         for i, uuid in enumerate(uuids):
@@ -682,7 +673,6 @@ class Indexer(object):
         if last_exc is not None:
             timestamp = datetime.datetime.now().isoformat()
             return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
-    ### OPTIONAL: 2-step indexer does audits
 
     def shutdown(self):
         pass

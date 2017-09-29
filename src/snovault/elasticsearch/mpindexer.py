@@ -106,14 +106,12 @@ def update_object_in_snapshot(args):
         indexer = request.registry[INDEXER]
         return indexer.update_object(request, uuid, xmin, restart)
 
-### OPTIONAL: 2-step indexer does audits
 def update_audit_in_snapshot(args):
     uuid, xmin, snapshot_id = args
     with snapshot(xmin, snapshot_id):
         request = get_current_request()
         indexer = request.registry[INDEXER]
         return indexer.update_audit(request, uuid, xmin)
-### OPTIONAL: 2-step indexer does audits
 
 
 # Running in main process
@@ -161,7 +159,6 @@ class MPIndexer(Indexer):
             raise
         return errors
 
-    ### OPTIONAL: 2-step indexer does audits
     def update_audits(self, request, uuids, xmin, snapshot_id=None):
         # Ensure that we iterate over uuids in this thread not the pool task handler.
         uuid_count = len(uuids)
@@ -185,7 +182,6 @@ class MPIndexer(Indexer):
             self.shutdown()
             raise
         return errors
-    ### OPTIONAL: 2-step indexer does audits
 
     def shutdown(self):
         if 'pool' in self.__dict__:
