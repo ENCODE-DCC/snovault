@@ -556,7 +556,7 @@ class Indexer(object):
 
         if last_exc is None:
             try:
-                audit = self.es.get(index=self.index, id=str(uuid), _source_include='uuid').get('_source',{}).get('audit')  # Any version
+                audit = self.es.get(index=self.index, id=str(uuid)).get('_source',{}).get('audit')  # Any version
                 if audit:
                     doc.update(
                         audit=audit,
