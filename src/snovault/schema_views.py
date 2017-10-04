@@ -54,4 +54,9 @@ def schemas(context, request):
     for type_info in types.by_item_type.values():
         name = type_info.name
         schemas[name] = _annotated_schema(type_info, request)
+
+    schemas['_subtypes'] = subtypes = {}
+    for name, type_info in types.abstract.items():
+        subtypes[name] = type_info.subtypes
+
     return schemas
