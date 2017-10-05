@@ -515,10 +515,6 @@ class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
         self.index = registry.settings['snovault.elasticsearch.index']
-        try:
-            self.batch_size = int(registry.settings["indexer.batch_size"])  # found in buildout.cfg for production
-        except:
-            self.batch_size = 100
 
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         errors = []
@@ -626,7 +622,8 @@ class Indexer(object):
             # TODO assert('audit_stale' is in doc or doc.get('audit') is None)
 
             try:
-                audit = request.embed('/%s/@@audit' % uuid, datastore='elasticsearch', as_user=True)['audit']
+                # using audit-now bypasses cached_views 'audit' ensureing the audit is recacluated.
+                audit = request.embed(str(uuid), '@@audit-now', as_user='INDEXER')['audit']
                 if audit or doc.get('audit_stale',False):
                     doc.update(
                         audit=audit,
