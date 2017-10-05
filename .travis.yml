@@ -1,6 +1,6 @@
 language: python
 dist: precise
-sudo: required
+sudo: false
 cache:
   directories:
   - eggs

@@ -277,3 +277,11 @@ def item_view_edit(context, request):
         )
 
     return properties
+
+
+@view_config(context=Item, permission='edit', request_method='GET',
+             name='form', decorator=etag_tid)
+def item_view_form(context, request):
+    properties = item_view_edit(context, request)
+    properties['@type'] = context.jsonld_type()
+    return properties

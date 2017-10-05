@@ -18,7 +18,7 @@ from pyramid.security import (
 )
 from pyramid.httpexceptions import (
     HTTPForbidden,
-    HTTPFound
+    HTTPFound,
 )
 from pyramid.view import (
     view_config,
@@ -31,6 +31,7 @@ from snovault import ROOT
 from snovault.storage import User
 from snovault import COLLECTIONS
 from snovault.calculated import calculate_properties
+from snovault.validation import ValidationFailure
 from snovault.validators import no_validate_item_content_post
 
 
