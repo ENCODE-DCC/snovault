@@ -235,9 +235,9 @@ def item_view_audit_self(context, request):
         'audit': request.audit(types=types, path=path),
     }
 
-# 'audit-now' is used to force recacluate audits (from elasticsearch), bypassing cached_view
-@view_config(context=Item, permission='audit', request_method='GET', name='audit-now')
-@view_config(context=Item, permission='audit', request_method='GET', name='audit')
+
+@view_config(context=Item, permission='audit', request_method='GET',
+             name='audit')
 def item_view_audit(context, request):
     path = request.resource_path(context)
     properties = request.embed(path, '@@object')

@@ -425,14 +425,18 @@ def index(request):
 
         # Do the work...
 
-        log.info("indexer starting pass 1 on %d uuids", len(invalidated))
+        ### OPTIONAL: audit via 2-pass is coming...
+        #log.info("indexer starting pass 1 on %d uuids", len(invalidated))
+        ### OPTIONAL: audit via 2-pass is coming...
         errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
 
-        result = state.start_pass2(result)
-        log.info("indexer starting pass 2 on %d uuids", len(invalidated))
-        audit_errors = indexer.update_audits(request, invalidated, xmin, snapshot_id)  # ignore restart
-        if len(audit_errors):
-            errors.extend(audit_errors)
+        ### OPTIONAL: audit via 2-pass is coming...
+        #result = state.start_pass2(result)
+        #log.info("indexer starting pass 2 on %d uuids", len(invalidated))
+        #audit_errors = indexer.update_audits(request, invalidated, xmin, snapshot_id)  # ignore restart
+        #if len(audit_errors):
+        #    errors.extend(audit_errors)
+        ### OPTIONAL: audit via 2-pass is coming...
 
         result = state.finish_cycle(result,errors)
 
@@ -542,7 +546,10 @@ class Indexer(object):
 
         last_exc = None
         try:
-            doc = request.embed('/%s/@@index-data/noaudit/' % uuid, as_user='INDEXER')
+            ### OPTIONAL: audit via 2-pass is coming...
+            #doc = request.embed('/%s/@@index-data/noaudit/' % uuid, as_user='INDEXER')
+            ### OPTIONAL: audit via 2-pass is coming...
+            doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
             raise
