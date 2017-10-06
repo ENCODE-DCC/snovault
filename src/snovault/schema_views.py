@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from pyramid.httpexceptions import HTTPNotFound
 from pyramid.view import view_config
 from .etag import etag_app_version_effective_principals
@@ -6,12 +5,23 @@ from .interfaces import (
     COLLECTIONS,
     TYPES,
 )
+from .util import mutated_schema
 
 
 def includeme(config):
     config.add_route('schemas', '/profiles/')
     config.add_route('schema', '/profiles/{type_name}.json')
     config.scan(__name__)
+
+
+def _apply_permission(collection, request):
+    def mutator(schema):
+        if 'permission' in schema:
+            if not request.has_permission(schema['permission'], collection):
+                schema = schema.copy()
+                schema['readonly'] = True
+        return schema
+    return mutator
 
 
 def _annotated_schema(type_info, request):
@@ -21,16 +31,10 @@ def _annotated_schema(type_info, request):
         return schema
 
     collection = request.registry[COLLECTIONS][type_info.name]
-    properties = OrderedDict()
-    # add a 'readonly' flag to fields that the current user cannot write
-    for k, v in schema['properties'].items():
-        if 'permission' in v:
-            if not request.has_permission(v['permission'], collection):
-                v = v.copy()
-                v['readonly'] = True
-        properties[k] = v
-    schema['properties'] = properties
-    return schema
+    return mutated_schema(
+        schema,
+        _apply_permission(collection, request),
+    )
 
 
 @view_config(route_name='schema', request_method='GET',
