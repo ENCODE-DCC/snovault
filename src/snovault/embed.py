@@ -69,8 +69,9 @@ def embed(request, *elements, **kw):
         result, embedded_uuids, linked_uuids = cached
         result = deepcopy(result)
     log.debug('embed: %s', path)
-    request._embedded_uuids.update(embedded_uuids)
-    request._linked_uuids.update(linked_uuids)
+    if not '@@audit' in path:
+        request._embedded_uuids.update(embedded_uuids)
+        request._linked_uuids.update(linked_uuids)
     return result
 
 
