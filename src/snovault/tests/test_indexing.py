@@ -91,6 +91,9 @@ def test_indexing_simple(testapp, indexer_testapp):
     uuid = res.json['@graph'][0]['uuid']
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexed'] == 1
+    assert res.json['title'] == 'primary_indexer'
+    assert res.json['cycles'] > 0
+    assert res.json.get('cycle_took') is not None
     assert res.json['txn_count'] == 1
     assert res.json['updated'] == [uuid]
     res = testapp.get('/search/?type=TestingPostPutPatch')

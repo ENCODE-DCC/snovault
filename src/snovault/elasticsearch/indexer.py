@@ -95,23 +95,23 @@ class IndexerState(object):
     def put_list(self, id, a_list):
         return self.put_obj(id, { 'list': a_list, 'count': len(a_list) })
 
-    def get_diff(self,orig_id, subtract_ids):
-        result_set = set(self.get_list(orig_id))
+    #def get_diff(self,orig_id, subtract_ids):
+    #    result_set = set(self.get_list(orig_id))
+    #
+    #    if len(result_set) > 0:
+    #        for id in subtract_ids:
+    #            subtract_list = self.get_list(id)
+    #            if len(subtract_list):
+    #                result_set = result_set.difference(set(subtract_list))
+    #    return result_set
 
-        if len(result_set) > 0:
-            for id in subtract_ids:
-                subtract_list = self.get_list(id)
-                if len(subtract_list):
-                    result_set = orig_set.difference_update(set(subtract_list))
-        return result_set
-
-    def set_add(self, id, vals):
-        set_to_update = set(self.get_list(id))
-        if len(set_to_update) > 0:
-            set_to_update.update(vals)
-        else:
-            set_to_update = set(vals)
-        self.put_list(id, set_to_update)
+    #def set_add(self, id, vals):
+    #    set_to_update = set(self.get_list(id))
+    #    if len(set_to_update) > 0:
+    #        set_to_update.update(vals)
+    #    else:
+    #        set_to_update = set(vals)
+    #    self.put_list(id, set_to_update)
 
     def list_extend(self, id, vals):
         list_to_extend = self.get_list(id)
@@ -244,7 +244,7 @@ class IndexerState(object):
             # Forget failed_set, this is cycle-level accounting
             #self.put_list(self, self.failed_set, uuids)
 
-            if finshed:
+            if finished:
                 # Forget sets... cycle-level accounting so errors => failed_set => troubled_set all in one cycle.
                 # handle troubled uuids:
                 #troubled_uuids = set(self.get_list(self.failed_set))
