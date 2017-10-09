@@ -18,8 +18,9 @@ The indexer reports certain current and historical values in an *in-memeory* JSO
   :errors: If an error occurred while trying to run the indexer, it should appear here.  This is distinct from result errors described below.
   :max_xid: This is a Postgres transaction id which should rise with each database change.  It is used to ensure a consistent view of data during an indexing cycle.
   :snapshot: Most recent postgres snapshot identifier.  As with xid, this is used by the indexer to ensure a consistent view of data.
-  :last_result: Result values from the latest cycles *whether anything was indexed or not*.
+  :last_result: Result values from the latest cycles **whether anything was indexed or not**.
   :results: An array of up to 10 results from the most recent cycles that *actually indexed* something.
+
     :title: Which indexer ran. This will be 'primary_indexer' for path /_indexer.  Other idexers exist in encoded.
     :timestamp: Time of this cycle.
     :xmin: Postgres transaction id of this cycle.
