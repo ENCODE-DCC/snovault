@@ -302,8 +302,8 @@ def index(request):
     recovery = request.json.get('recovery', False)
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
-    stage_for_followup = request.registry.settings.get("stage_for_followup", False)
-    use_2pass = True  # TODO: registry.settings.get("index_with_2pass", False)
+    stage_for_followup = request.registry.settings.get("stage_for_followup", False)  # defined in base.ini for encoded
+    use_2pass = request.registry.settings.get("index_with_2pass", False)             # defined in base.ini for encoded
     session = request.registry[DBSESSION]()
     connection = session.connection()
     first_txn = None
@@ -518,7 +518,7 @@ class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
         self.index = registry.settings['snovault.elasticsearch.index']
-        self.use_2pass = True  # TODO: registry.settings.get("index_with_2pass", False)
+        self.use_2pass = registry.settings.get("index_with_2pass", False)
 
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         errors = []
