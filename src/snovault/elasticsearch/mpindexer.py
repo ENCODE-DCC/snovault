@@ -100,22 +100,29 @@ def snapshot(xmin, snapshot_id):
 
 
 def update_object_in_snapshot(args):
+    uuid, xmin, snapshot_id, restart = args
+    with snapshot(xmin, snapshot_id):
+        request = get_current_request()
+        indexer = request.registry[INDEXER]
+        return indexer.update_object(request, uuid, xmin, restart)
+
+def update_audit_in_snapshot(args):
     uuid, xmin, snapshot_id = args
     with snapshot(xmin, snapshot_id):
         request = get_current_request()
         indexer = request.registry[INDEXER]
-        return indexer.update_object(request, uuid, xmin)
+        return indexer.update_audit(request, uuid, xmin)
 
 
 # Running in main process
 
 class MPIndexer(Indexer):
-    chunksize = 1024
     maxtasks = 1  # pooled processes will exit and be replaced after this many tasks are completed.
 
     def __init__(self, registry, processes=None):
         super(MPIndexer, self).__init__(registry)
         self.processes = processes
+        self.chunksize = int(registry.settings.get('indexer.chunk_size',1024))  # in production.ini (via buildout.cfg) as 1024
         self.initargs = (registry[APP_FACTORY], registry.settings,)
 
     @reify
@@ -128,7 +135,31 @@ class MPIndexer(Indexer):
             context=get_context('forkserver'),
         )
 
-    def update_objects(self, request, uuids, xmin, snapshot_id):
+    def update_objects(self, request, uuids, xmin, snapshot_id, restart):
+        # Ensure that we iterate over uuids in this thread not the pool task handler.
+        uuid_count = len(uuids)
+        workers = 1
+        if self.processes is not None and self.processes > 0:
+            workers = self.processes
+        chunkiness = int((uuid_count - 1) / workers) + 1
+        if chunkiness > self.chunksize:
+            chunkiness = self.chunksize
+
+        tasks = [(uuid, xmin, snapshot_id, restart) for uuid in uuids]
+        errors = []
+        try:
+            for i, error in enumerate(self.pool.imap_unordered(
+                    update_object_in_snapshot, tasks, chunkiness)):
+                if error is not None:
+                    errors.append(error)
+                if (i + 1) % 50 == 0:
+                    log.info('Indexing %d', i + 1)
+        except:
+            self.shutdown()
+            raise
+        return errors
+
+    def update_audits(self, request, uuids, xmin, snapshot_id=None):
         # Ensure that we iterate over uuids in this thread not the pool task handler.
         uuid_count = len(uuids)
         workers = 1
@@ -142,11 +173,11 @@ class MPIndexer(Indexer):
         errors = []
         try:
             for i, error in enumerate(self.pool.imap_unordered(
-                    update_object_in_snapshot, tasks, chunkiness)):
+                    update_audit_in_snapshot, tasks, chunkiness)):
                 if error is not None:
                     errors.append(error)
                 if (i + 1) % 50 == 0:
-                    log.info('Indexing %d', i + 1)
+                    log.info('Auditing %d', i + 1)
         except:
             self.shutdown()
             raise
