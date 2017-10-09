@@ -43,13 +43,13 @@ Indexer State in Elasticsearch
 
 In addition to using path /_indexer, the current state of the indexer can be queried directly from elasticsearch at (for example) ``curl http://localhost:9200/snovault/meta/primary_indexer/_source``
 
-The state object contains the same values found in /_indexer results described above.  However the status may be 'indexing', in which case the values reflect the current cycle and the count of uuids being worked on will be found in 'cycle_count'.  Also, if 2-pass indexing is enabled, then 'pass1_took' will be seen as soon as that pass is complete, even though the full indexing cycle may still be in progress.
+The state object contains the same values found in /_indexer 'results' described above.  However the status may be 'indexing', in which case the values reflect the current cycle and the count of uuids being worked on will be found in 'cycle_count'.  Also, if 2-pass indexing is enabled, then 'pass1_took' will be seen as soon as that pass is complete, even though the full indexing cycle may still be in progress.
 
 In addition to the primary_indexer state object, several other objects exist in elasticsearch to manage the indexer cycles.  All can be queried with ``curl http://localhost:9200/snovault/meta/{name}/_source``
 
-  :indexing: The master result used to pass the xmin from one cycle to the last_xmin of the next cycle.  Delete this object to request a complete reindexing. .. indexing object might to be replaced with primary_indexer state object.
+  :indexing: The master result used to pass the xmin from one cycle to the last_xmin of the next cycle.  Delete this object to request a complete reindexing.
   :primary_in_progress: Contains a list of uuids that are currently being indexed.
   :primary_troubled: Contains a list of uuids that failed to index in the last cycle.
   :primary_last_cycle: Contain a list of uuids that were indexed in the previous cycle.
   :primary_followup_prep_list: If a secondary indexer is enabled, this will contain the xmin of the current cycle followed by all uuids, staged for the secondary indexer once the current indexer has finished with them.
-  :staged_by_primary_list: Contains all xmin/uuids that are ready to be handled by the secondary_indexer.
+  :staged_by_primary_list: If a secondary indexer is enabled, this will contains all xmin/uuids that are ready to be handled by the secondary_indexer.  When a primary_indexer cycle completes, the 'primary_followup_prep_list' is added to the end of this list.
