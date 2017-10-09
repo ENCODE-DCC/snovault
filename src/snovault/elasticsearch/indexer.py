@@ -303,6 +303,7 @@ def index(request):
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
     stage_for_followup = request.registry.settings.get("stage_for_followup", False)
+    use_2pass = True  # TODO: registry.settings.get("index_with_2pass", False)
     session = request.registry[DBSESSION]()
     connection = session.connection()
     first_txn = None
@@ -425,14 +426,16 @@ def index(request):
 
         # Do the work...
 
-        log.info("indexer starting pass 1 on %d uuids", len(invalidated))
+        if use_2pass:
+            log.info("indexer starting pass 1 on %d uuids", len(invalidated))
         errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
 
-        result = state.start_pass2(result)
-        log.info("indexer starting pass 2 on %d uuids", len(invalidated))
-        audit_errors = indexer.update_audits(request, invalidated, xmin, snapshot_id)  # ignore restart
-        if len(audit_errors):
-            errors.extend(audit_errors)
+        if use_2pass:
+            result = state.start_pass2(result)
+            log.info("indexer starting pass 2 on %d uuids", len(invalidated))
+            audit_errors = indexer.update_audits(request, invalidated, xmin, snapshot_id)  # ignore restart
+            if len(audit_errors):
+                errors.extend(audit_errors)
 
         result = state.finish_cycle(result,errors)
 
@@ -515,6 +518,7 @@ class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
         self.index = registry.settings['snovault.elasticsearch.index']
+        self.use_2pass = True  # TODO: registry.settings.get("index_with_2pass", False)
 
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         errors = []
@@ -544,8 +548,10 @@ class Indexer(object):
 
         last_exc = None
         try:
-            doc = request.embed('/%s/@@index-data/noaudit/' % uuid, as_user='INDEXER')
-            #doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')    ### WAS: 1-pass indexing, which calculates audits herea
+            if self.use_2pass:
+                doc = request.embed('/%s/@@index-data/noaudit/' % uuid, as_user='INDEXER')
+            else:
+                doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
             raise
@@ -554,15 +560,16 @@ class Indexer(object):
             last_exc = repr(e)
 
         if last_exc is None:
-            try:
-                audit = self.es.get(index=self.index, id=str(uuid)).get('_source',{}).get('audit')  # Any version
-                if audit:
-                    doc.update(
-                        audit=audit,
-                        audit_stale=True,
-                    )
-            except:
-                pass
+            if self.use_2pass:
+                try:
+                    audit = self.es.get(index=self.index, id=str(uuid)).get('_source',{}).get('audit')  # Any version
+                    if audit:
+                        doc.update(
+                            audit=audit,
+                            audit_stale=True,
+                        )
+                except:
+                    pass
 
             for backoff in [0, 10, 20, 40, 80]:
                 time.sleep(backoff)
@@ -593,6 +600,7 @@ class Indexer(object):
         return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
 
     def update_audits(self, request, uuids, xmin, snapshot_id=None):
+        # Only called when use_2pass is True
         errors = []
         for i, uuid in enumerate(uuids):
             error = self.update_audit(request, uuid, xmin)
@@ -604,6 +612,7 @@ class Indexer(object):
         return errors
 
     def update_audit(self, request, uuid, xmin):
+        # Only called when use_2pass is True
         request.datastore = 'elasticsearch'  # Audits are built on elastic search !!!
 
         last_exc = None

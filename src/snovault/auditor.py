@@ -209,14 +209,18 @@ def traversed_path_ids(request, obj, path):
             yield item_uri
 
 
-def inherit_audits(request, embedded, embedded_paths):
+def inherit_audits(request, embedded, embedded_paths, now=False):
     audit_paths = {embedded['@id']}
     for embedded_path in embedded_paths:
         audit_paths.update(traversed_path_ids(request, embedded, embedded_path))
 
     audits = {}
+    audit_self = '@@audit-self'
+    if now:
+        audit_self = '@@audit-self-now'  # will bypass cached_view and recalculate the audit.
+
     for audit_path in audit_paths:
-        result = request.embed(audit_path, '@@audit-self')
+        result = request.embed(audit_path, audit_self)
         for audit in result['audit']:
             if audit['level_name'] in audits:
                 audits[audit['level_name']].append(audit)
@@ -225,8 +229,8 @@ def inherit_audits(request, embedded, embedded_paths):
     return audits
 
 
-@view_config(context=Item, permission='audit', request_method='GET',
-             name='audit-self')
+@view_config(context=Item, permission='audit', request_method='GET', name='audit-self-now')
+@view_config(context=Item, permission='audit', request_method='GET', name='audit-self')
 def item_view_audit_self(context, request):
     path = request.resource_path(context)
     types = [context.type_info.name] + context.type_info.base_types
@@ -240,8 +244,9 @@ def item_view_audit_self(context, request):
 @view_config(context=Item, permission='audit', request_method='GET', name='audit')
 def item_view_audit(context, request):
     path = request.resource_path(context)
+    now = ('audit-now' in request.url)
     properties = request.embed(path, '@@object')
-    audit = inherit_audits(request, properties, context.audit_inherit or context.embedded)
+    audit = inherit_audits(request, properties, context.audit_inherit or context.embedded, now)
     return {
         '@id': path,
         'audit': audit,

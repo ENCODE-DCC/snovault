@@ -39,3 +39,16 @@ def cached_view_audit(context, request):
         '@id': source['object']['@id'],
         'audit': source['audit'],
     }
+
+
+@view_config(context=ICachedItem, request_method='GET', name='audit-self')
+def cached_view_audit_self(context, request):
+    source = context.model.source
+    allowed = set(source['principals_allowed']['audit'])
+    if allowed.isdisjoint(request.effective_principals):
+        raise HTTPForbidden()
+    path = source['object']['@id']
+    return {
+        '@id': path,
+        'audit': [a for a in chain(*source['audit'].values()) if a['path'] == path],
+    }
