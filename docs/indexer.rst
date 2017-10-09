@@ -26,7 +26,7 @@ The indexer reports certain current and historical values in an *in-memeory* JSO
     :xmin: Postgres transaction id of this cycle.
     :cycle_took: How long it took to complete this indexer cycle.
     :pass1_took: If 2-pass indexing is enabled, this is the time it took to index objects without audits.
-    :pass2_took: If 2-pass indexing is enabled, this is the time it took to audit objects and add update that information in elasticsearch.
+    :pass2_took: If 2-pass indexing is enabled, this is the time it took to audit objects and update that information in elasticsearch.
     :indexed: Number of objects indexed in this cycle.
     :last_xmin: Postgres transaction id of last cycle.  Indexing should have covered all objects changed between last_xmin and xmin.
     :status: This should say 'done' as the results are displayed after a cycle has completed.  See the next section on querying the state of a current cycle.
@@ -34,18 +34,18 @@ The indexer reports certain current and historical values in an *in-memeory* JSO
     :errors: If there were any errors indexing specific objects, they should appear here.
     :updated: On small indexing cycle, may contain uuids of updated objects in Postgres.
     :renamed: On small indexing cycle, may contain uuids of renamed objects in Postgres.
-    :types: On small indexing cycle, may contain '@type's of changed objects in Postgres.
+    :types: On small indexing cycle, may contain '\@type's of changed objects in Postgres.
     :stats: This contains the raw stats from the response header for this indexer call.
 
 ------------------------------
 Indexer State in Elasticsearch
 ------------------------------
 
-In addition to using path /_indexer, the current state of the indexer can be queried directly from elasticsearch at http://localhost:9200/snovault/meta/primary_indexer/_source
+In addition to using path /_indexer, the current state of the indexer can be queried directly from elasticsearch at (for example) ``curl http://localhost:9200/snovault/meta/primary_indexer/_source``
 
 The state object contains the same values found in /_indexer results described above.  However the status may be 'indexing', in which case the values reflect the current cycle and the count of uuids being worked on will be found in 'cycle_count'.  Also, if 2-pass indexing is enabled, then 'pass1_took' will be seen as soon as that pass is complete, even though the full indexing cycle may still be in progress.
 
-In addition to the primary_indexer state object, several other objects exist in elasticsearch to manage the indexer cycles.  All can be queried with http://localhost:9200/snovault/meta/{name}/_source
+In addition to the primary_indexer state object, several other objects exist in elasticsearch to manage the indexer cycles.  All can be queried with ``curl http://localhost:9200/snovault/meta/{name}/_source``
 
   :indexing: The master result used to pass the xmin from one cycle to the last_xmin of the next cycle.  Delete this object to request a complete reindexing. .. indexing object might to be replaced with primary_indexer state object.
   :primary_in_progress: Contains a list of uuids that are currently being indexed.
