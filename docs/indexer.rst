@@ -27,8 +27,8 @@ The indexer reports certain current and historical values in an *in-memeory* JSO
     :cycle_took: How long it took to complete this indexer cycle.
     :pass1_took: If 2-pass indexing is enabled, this is the time it took to index objects without audits.
     :pass2_took: If 2-pass indexing is enabled, this is the time it took to audit objects and add update that information in elasticsearch.
-    indexed: Number of objects indexed in this cycle.
-    last_xmin: Postgres transaction id of last cycle.  Indexing should have covered all objects changed between last_xmin and xmin.
+    :indexed: Number of objects indexed in this cycle.
+    :last_xmin: Postgres transaction id of last cycle.  Indexing should have covered all objects changed between last_xmin and xmin.
     :status: This should say 'done' as the results are displayed after a cycle has completed.  See the next section on querying the state of a current cycle.
     :cycles: Count of indexer cycles that actually indexed something. This number should reflect all cycles since the system was initialized or since a full reindexing was requested.
     :errors: If there were any errors indexing specific objects, they should appear here.
