@@ -95,23 +95,23 @@ class IndexerState(object):
     def put_list(self, id, a_list):
         return self.put_obj(id, { 'list': a_list, 'count': len(a_list) })
 
-    def get_diff(self,orig_id, subtract_ids):
-        result_set = set(self.get_list(orig_id))
+    #def get_diff(self,orig_id, subtract_ids):
+    #    result_set = set(self.get_list(orig_id))
+    #
+    #    if len(result_set) > 0:
+    #        for id in subtract_ids:
+    #            subtract_list = self.get_list(id)
+    #            if len(subtract_list):
+    #                result_set = result_set.difference(set(subtract_list))
+    #    return result_set
 
-        if len(result_set) > 0:
-            for id in subtract_ids:
-                subtract_list = self.get_list(id)
-                if len(subtract_list):
-                    result_set = orig_set.difference_update(set(subtract_list))
-        return result_set
-
-    def set_add(self, id, vals):
-        set_to_update = set(self.get_list(id))
-        if len(set_to_update) > 0:
-            set_to_update.update(vals)
-        else:
-            set_to_update = set(vals)
-        self.put_list(id, set_to_update)
+    #def set_add(self, id, vals):
+    #    set_to_update = set(self.get_list(id))
+    #    if len(set_to_update) > 0:
+    #        set_to_update.update(vals)
+    #    else:
+    #        set_to_update = set(vals)
+    #    self.put_list(id, set_to_update)
 
     def list_extend(self, id, vals):
         list_to_extend = self.get_list(id)
@@ -244,7 +244,7 @@ class IndexerState(object):
             # Forget failed_set, this is cycle-level accounting
             #self.put_list(self, self.failed_set, uuids)
 
-            if finshed:
+            if finished:
                 # Forget sets... cycle-level accounting so errors => failed_set => troubled_set all in one cycle.
                 # handle troubled uuids:
                 #troubled_uuids = set(self.get_list(self.failed_set))
@@ -530,19 +530,22 @@ class Indexer(object):
     def update_object(self, request, uuid, xmin, restart=False):
         request.datastore = 'database'  # required by 2-step indexer
 
+        # OPTIONAL: restart support
         # If a restart occurred in the middle of indexing, this uuid might have already been indexd, so skip redoing it.
-        if restart:
-            try:
-                #if self.es.exists(index=self.index, id=str(uuid), version=xmin, version_type='external_gte'):  # couldn't get exists to work.
-                result = self.es.get(index=self.index, id=str(uuid), _source_include='uuid', version=xmin, version_type='external_gte')
-                if result.get('_source') is not None:
-                    return
-            except:
-                pass
+        # if restart:
+        #     try:
+        #         #if self.es.exists(index=self.index, id=str(uuid), version=xmin, version_type='external_gte'):  # couldn't get exists to work.
+        #         result = self.es.get(index=self.index, id=str(uuid), _source_include='uuid', version=xmin, version_type='external_gte')
+        #         if result.get('_source') is not None:
+        #             return
+        #     except:
+        #         pass
+        # OPTIONAL: restart support
 
         last_exc = None
         try:
             doc = request.embed('/%s/@@index-data/noaudit/' % uuid, as_user='INDEXER')
+            #doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')    ### WAS: 1-pass indexing, which calculates audits herea
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
             raise

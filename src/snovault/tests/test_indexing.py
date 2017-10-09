@@ -91,10 +91,29 @@ def test_indexing_simple(testapp, indexer_testapp):
     uuid = res.json['@graph'][0]['uuid']
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexed'] == 1
+    assert res.json['title'] == 'primary_indexer'
+    assert res.json['cycles'] > 0
+    assert res.json.get('cycle_took') is not None
     assert res.json['txn_count'] == 1
     assert res.json['updated'] == [uuid]
     res = testapp.get('/search/?type=TestingPostPutPatch')
     assert res.json['total'] == 2
+
+
+def test_indexer_state(dummy_request):
+    from snovault.elasticsearch.indexer import IndexerState
+    INDEX = dummy_request.registry.settings['snovault.elasticsearch.index']
+    es = dummy_request.registry['elasticsearch']
+    state = IndexerState(es,INDEX)
+    result = state.get_initial_state()
+    assert result['title'] == 'primary_indexer'
+    result = state.start_cycle(['1','2','3'], result)
+    assert result['cycle_count'] == 3
+    assert result['status'] == 'indexing'
+    cycles = result.get('cycles',0)
+    result = state.finish_cycle(result, [])
+    assert result['cycles'] == (cycles + 1)
+    assert result['status'] == 'done'
 
 
 def test_listening(testapp, listening_conn):
