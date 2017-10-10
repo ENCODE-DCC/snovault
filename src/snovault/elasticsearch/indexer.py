@@ -251,7 +251,7 @@ class IndexerState(object):
                 #if len(troubled_uuids):
                 #    self.set_add(self.troubled_set, troubled_uuids)
                 #    # TODO: could make doubled_troubled set and use it to blacklist uuids
-                self.put_list(self, self.troubled_set, uuids)
+                self.put_list(self.troubled_set, uuids)
 
     def finish_cycle(self, state, errors=None):
         '''Every indexing cycle must be properly closed.'''
