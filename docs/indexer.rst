@@ -7,10 +7,10 @@ The (snovault) system organizes simple Postgres objects into documents that incu
 _indexer values
 ---------------
 
-The indexer reports certain current and historical values in an *in-memeory* JSON object seen via the /_indexer path.  Some of the key values are described here:
+The indexer reports certain current and historical values in an *in-memory* JSON object seen via the /_indexer path.  Some of the key values are described here:
 
   :status: The indexer is either 'waiting' between cycles or 'indexing' during a cycle.
-  :started: The time the indexer porcess started.  This will reflect the most recent startup, which is not necessarily the time the server was first initialized.
+  :started: The time the indexer process started.  This will reflect the most recent startup, which is not necessarily the time the server was first initialized.
   :timestamp: Time of the latest cycle.
   :timeout: Number of seconds the process sleeps between cycles.
   :listening: True when Postgres is reachable and not in recovery.

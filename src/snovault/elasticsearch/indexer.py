@@ -149,7 +149,7 @@ class IndexerState(object):
         new_state = { 'title': self.state_id, 'status': 'idle'}
         state = self.get()
         for var in ['cycles']:  # could expand this list
-            val = state.pop('cycles',None)
+            val = state.pop(var,None)
             if val is not None:
                 new_state[var] = val
         return new_state
@@ -170,7 +170,7 @@ class IndexerState(object):
         '''Initial startup, override, or interupted prior cycle can all lead to a priority cycle.
            returns (discovered xmin, uuids, whether previous cycle was interupted).'''
         # Not yet started?
-        initialized = self.get_obj("indexing")
+        initialized = self.get_obj("indexing")  # http://localhost:9200/snovault/meta/indexing
         if not initialized:
             self.delete_objs([self.override, self.followup_ready_list])
             state = self.get()
@@ -251,7 +251,7 @@ class IndexerState(object):
                 #if len(troubled_uuids):
                 #    self.set_add(self.troubled_set, troubled_uuids)
                 #    # TODO: could make doubled_troubled set and use it to blacklist uuids
-                self.put_list(self, self.troubled_set, uuids)
+                self.put_list(self.troubled_set, uuids)
 
     def finish_cycle(self, state, errors=None):
         '''Every indexing cycle must be properly closed.'''
