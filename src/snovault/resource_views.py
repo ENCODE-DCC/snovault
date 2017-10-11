@@ -21,7 +21,11 @@ from .resources import (
     Item,
     Root,
 )
-from .util import expand_path
+from .util import (
+    expand_path,
+    build_embedded_model,
+    expand_embedded_model
+)
 
 
 def includeme(config):
@@ -177,9 +181,9 @@ def item_view_object(context, request):
 def item_view_embedded(context, request):
     item_path = request.resource_path(context)
     properties = request.embed(item_path, '@@object', as_user=True)
-    for path in context.embedded:
-        expand_path(request, properties, path)
-    return properties
+    embedded_model = build_embedded_model(context.embedded)
+    embedded = expand_embedded_model(request, properties, embedded_model)
+    return embedded
 
 
 @view_config(context=Item, permission='view', request_method='GET',

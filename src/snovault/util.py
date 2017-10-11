@@ -74,6 +74,101 @@ def expand_path(request, obj, path):
         expand_path(request, value, remaining)
 
 
+def expand_embedded_model(request, obj, model):
+    """
+    A similar idea to expand_path, but takes in a model from build_embedded_model
+    instead. Takes in the @@object view of the item (obj) and returns a
+    fully embedded result.
+    """
+    embedded_res = {}
+    # first take care of the fields_to_use at this level
+    fields_to_use = model.get('fields_to_use')
+    if fields_to_use:
+        if '*' in fields_to_use:
+            embedded_res = obj
+        else:
+            for field in fields_to_use:
+                found = obj.get(field)
+                if found:
+                    embedded_res[field] = found
+    # then handle objects at the next level
+    for to_embed in model:
+        if to_embed == 'fields_to_use':
+            continue
+        obj_val = obj.get(to_embed)
+        if obj_val is None:
+            continue
+        obj_embedded = expand_val_for_embedded_model(request, obj_val, model[to_embed])
+        if obj_embedded is not None:
+            embedded_res[to_embed] = obj_embedded
+    return embedded_res
+
+
+def expand_val_for_embedded_model(request, obj_val, downstream_model):
+    """
+    Take a value from an object and the relevant piece of the embedded_model
+    and perform embedding.
+    We have to account for list, dictionaries, and strings.
+    """
+    #
+    if isinstance(obj_val, list):
+        obj_list = []
+        for member in obj_val:
+            obj_embedded = expand_val_for_embedded_model(request, member, downstream_model)
+            if obj_embedded is not None:
+                obj_list.append(obj_embedded)
+        return obj_list
+    elif isinstance(obj_val, dict):
+        obj_embedded = expand_embedded_model(request, obj_val, downstream_model)
+        return obj_embedded
+    elif isinstance(obj_val, basestring):
+        # get the @@object view of obj to embed
+        obj_val = secure_embed(request, obj_val, '@@object')
+        if not obj_val or obj_val == {'error': 'no view permissions'}:
+            return obj_val
+        obj_embedded = expand_embedded_model(request, obj_val, downstream_model)
+        return obj_embedded
+    else:
+        # this means the object should be returned as-is
+        return obj_val
+
+
+def build_embedded_model(fields_to_embed):
+    """
+    Takes a list of fields to embed and builds the framework used to generate
+    the fully embedded result. 'fields_to_use' refer to specific fields that are to
+    be embedded within an object. The base level object gets a special flag,
+    '*', which means all non-object fields are embedded by default.
+    Below is an example calculated from the following fields:
+    INPUT:
+    [modifications.modified_regions.chromosome,
+    lab.uuid,
+    award.*,
+    biosource.name]
+    OUTPUT:
+    {'modifications': {'modified_regions': {'fields_to_use': ['chromosome']}},
+     'lab': {'fields_to_use': ['uuid']},
+     'award': {'fields_to_use': ['*']},
+     'bisource': {'fields_to_use': ['name']},
+     'fields_to_use': ['*']}
+    """
+    embedded_model = {'fields_to_use':['*']}
+    for field in fields_to_embed:
+        split_field = field.split('.')
+        field_pointer = embedded_model
+        for subfield in split_field:
+            if subfield == split_field[-1]:
+                if 'fields_to_use' in field_pointer:
+                    field_pointer['fields_to_use'].append(subfield)
+                else:
+                    field_pointer['fields_to_use'] = [subfield]
+                continue
+            elif subfield not in field_pointer:
+                field_pointer[subfield] = {}
+            field_pointer = field_pointer[subfield]
+    return embedded_model
+
+
 def select_distinct_values(request, value_path, *from_paths):
     if isinstance(value_path, basestring):
         value_path = value_path.split('.')
