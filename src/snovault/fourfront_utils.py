@@ -50,6 +50,8 @@ def add_default_embeds(item_type, types, embeds, schema={}):
             check_wildcard = add_embed + '.*'
             if check_wildcard not in processed_fields and check_wildcard not in embeds_to_add:
                 # default embeds to add
+                processed_fields.add(add_embed + '.@id')
+                # link_id can be removed soon
                 processed_fields.add(add_embed + '.link_id')
                 processed_fields.add(add_embed + '.display_title')
                 processed_fields.add(add_embed + '.uuid')
