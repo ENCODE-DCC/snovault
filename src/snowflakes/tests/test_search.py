@@ -54,6 +54,10 @@ def recursively_find_uuids(json, uuids):
     for key, val in json.items():
         if key == 'uuid':
             uuids.add(val)
+        elif isinstance(val, list):
+            for item in val:
+                if isinstance(item, dict):
+                    uuids = recursively_find_uuids(item, uuids)
         elif isinstance(val, dict):
             uuids = recursively_find_uuids(val, uuids)
     return uuids
