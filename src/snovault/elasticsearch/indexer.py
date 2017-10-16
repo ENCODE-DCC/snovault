@@ -32,6 +32,7 @@ SEARCH_MAX = 99999  # OutOfMemoryError if too high
 
 def includeme(config):
     config.add_route('index', '/index')
+    config.add_route('_indexer_state', '/_indexer_state')
     config.scan(__name__)
     registry = config.registry
     registry[INDEXER] = Indexer(registry)
@@ -39,7 +40,7 @@ def includeme(config):
 
 class IndexerState(object):
     # Keeps track of uuids and indexer state by cycle.  Also handles handoff of uuids to followup indexer
-    def __init__(self, es, key, title='primary'):
+    def __init__(self, es, key, title='primary', followups=[]):
         self.es = es
         self.key = key  # "indexerstate"
         self.title           = title
@@ -54,8 +55,12 @@ class IndexerState(object):
         self.cleanup_last_cycle = [self.last_set,self.troubled_set]              # Clean up at beginning of next cycle
         self.override           = 'reindex_' + self.title      # If exists then reindex all
         # DO NOT INHERIT! These keys are for passing on to other indexers
-        self.followup_prep_list  = 'primary_followup_prep_list' # Setting up the uuids to be handled by a followup process
-        self.followup_ready_list = 'staged_by_primary_list'     # Followup list is added to here to pass baton
+        self.followup_prep_list      = 'primary_followup_prep_list' # Setting up the uuids to be handled by a followup process
+        self.staged_for_vis_list     = 'staged_for_vis_list' # Followup list is added to here to pass baton
+        self.staged_for_regions_list = 'staged_for_regions_list'     # Followup list is added to here to pass baton
+        self.followup_lists = []                                     # filled dynamically
+        for name in followups:
+            self.followup_lists.append('staged_for_' + name + '_list')
         self.clock = {}
         # some goals:
         # 1) Hand-off to secondary: working
@@ -144,6 +149,10 @@ class IndexerState(object):
         if errors is not None:
             state['errors'] = errors
 
+    def request_reindex(self):
+        '''Requests full reindexin on next cycle'''
+        self.put_obj(self.override, {self.title : 'reindex'})
+
     def get_initial_state(self):
         '''Useful to initialize at idle cycle'''
         new_state = { 'title': self.state_id, 'status': 'idle'}
@@ -172,7 +181,7 @@ class IndexerState(object):
         # Not yet started?
         initialized = self.get_obj("indexing")  # http://localhost:9200/snovault/meta/indexing
         if not initialized:
-            self.delete_objs([self.override, self.followup_ready_list])
+            self.delete_objs([self.override] + self.followup_lists)
             state = self.get()
             state['status'] = 'uninitialized'
             self.put(state)
@@ -183,7 +192,7 @@ class IndexerState(object):
         # Rare call for indexing all...
         override = self.get_obj(self.override)
         if override:
-            self.delete_objs([self.override,self.followup_ready_list])
+            self.delete_objs([self.override] + self.followup_lists)
             uuids = list(all_uuids(registry))
             log.warn('%s override doing all: %d' % (self.state_id, len(uuids)))
             return (-1, uuids, False)
@@ -219,6 +228,7 @@ class IndexerState(object):
         self.start_clock('cycle')
         if state is None:
             state = self.get()
+        state['cycle_started'] = datetime.datetime.now().isoformat()
         state['status'] = 'indexing'
         state['cycle_count'] = len(uuids)
 
@@ -267,7 +277,8 @@ class IndexerState(object):
             # TODO: send signal for 'all' when appropriate.  Saves the following expensive lines.
             hand_off_list = self.get_list(self.followup_prep_list)
             if len(hand_off_list) > 0:  # Have to push because ready_list may still have previous cycles in it
-                self.list_extend(self.followup_ready_list, hand_off_list)
+                for id in self.followup_lists:
+                    self.list_extend(id, hand_off_list)
                 self.delete_objs([self.followup_prep_list])
 
         # cycle-level accounting so todo => done => last in this function
@@ -291,6 +302,66 @@ class IndexerState(object):
 
         return state
 
+    def display(self):
+        display = {}
+        display['state'] = self.get()
+        display['uuids in progress'] = self.get_count(self.todo_set)
+        display['uuids troubled'] = self.get_count(self.troubled_set)
+        display['uuids last cycle'] = self.get_count(self.last_set)
+        if self.followup_prep_list is not None:
+            display['to be handed off to other indexer(s)'] = self.get_count(self.followup_prep_list)
+        if self.title == 'primary':
+            for id in self.followup_lists:
+                display[id] = self.get_count(id)
+        else:
+            id = 'staged_for_%s_list' % (self.title)
+            display['staged by primary'] = self.get_count(id)
+
+        reindex = self.get_obj(self.override)
+        if reindex:
+            display['REINDEX requested'] = True
+        display['now'] = datetime.datetime.now().isoformat()
+
+        return display
+
+
+@view_config(route_name='_indexer_state', request_method='GET', permission="index")
+def indexer_show_state(request):
+    es = request.registry[ELASTIC_SEARCH]
+    INDEX = request.registry.settings['snovault.elasticsearch.index']
+    state = IndexerState(es,INDEX)
+
+    if request.params.get("reindex","false") == 'all':
+        state.request_reindex()
+        request.query_string = ''
+
+    display = state.display()
+    try:
+        count = es.count(index=INDEX).get('count',0)  # TODO: 'vis_composite' should be obtained from visualization.py
+        if count:
+            display['docs in index'] = count
+    except:
+        display['docs in index'] = 'Not Found'
+        pass
+
+    try:
+        import requests
+        r = requests.get(request.host_url + '/_indexer')
+        #subreq = Request.blank('/_indexer')
+        #result = request.invoke_subrequest(subreq)
+        result = json.loads(r.text)
+        #result = request.embed('_indexer')
+        result['current'] = display
+    except:
+        result = display
+
+    # always return raw json
+    if len(request.query_string) > 0:
+        request.query_string = "&format=json"
+    else:
+        request.query_string = "format=json"
+    return display
+
 
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
@@ -302,8 +373,6 @@ def index(request):
     recovery = request.json.get('recovery', False)
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
-    stage_for_followup = request.registry.settings.get("stage_for_followup", False)  # defined in base.ini for encoded
-    use_2pass = request.registry.settings.get("index_with_2pass", False)             # defined in base.ini for encoded
     session = request.registry[DBSESSION]()
     connection = session.connection()
     first_txn = None
@@ -312,8 +381,12 @@ def index(request):
     invalidated = []
     xmin = -1
 
+    # Currently 2 possible followup indexers
+    stage_for_followup = request.registry.settings.get("stage_for_followup", '').split(' ') # "vis region"
+    use_2pass = False # request.registry.settings.get("index_with_2pass", False)  # defined in base.ini for encoded
+
     # May have undone uuids from prior cycle
-    state = IndexerState(es,INDEX)
+    state = IndexerState(es, INDEX, stage_for_followup)
 
     # OPTIONAL: restart support
     #(xmin, invalidated, restart) = state.priority_cycle(request.registry)
@@ -418,7 +491,7 @@ def index(request):
                     snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
 
     if invalidated and not dry_run:
-        if stage_for_followup:
+        if len(stage_for_followup) > 0:
             # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
             state.prep_for_followup(xmin, invalidated)
 
@@ -518,7 +591,7 @@ class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
         self.index = registry.settings['snovault.elasticsearch.index']
-        self.use_2pass = registry.settings.get("index_with_2pass", False)
+        self.use_2pass = False #registry.settings.get("index_with_2pass", False)
 
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         errors = []

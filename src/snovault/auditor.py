@@ -218,6 +218,7 @@ def inherit_audits(request, embedded, embedded_paths, now=False):
     audit_self = '@@audit-self'
     if now:
         audit_self = '@@audit-self-now'  # will bypass cached_view and recalculate the audit.
+        # BUGBUG for some unknown reason this results in elasticsearch dying on a demo machine.
 
     for audit_path in audit_paths:
         result = request.embed(audit_path, audit_self)
@@ -244,7 +245,7 @@ def item_view_audit_self(context, request):
 @view_config(context=Item, permission='audit', request_method='GET', name='audit')
 def item_view_audit(context, request):
     path = request.resource_path(context)
-    now = ('audit-now' in request.url)
+    now = (request.url.endswith('@@audit-now'))
     properties = request.embed(path, '@@object')
     audit = inherit_audits(request, properties, context.audit_inherit or context.embedded, now)
     return {
