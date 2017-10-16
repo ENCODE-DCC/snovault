@@ -386,7 +386,7 @@ def index(request):
     use_2pass = False # request.registry.settings.get("index_with_2pass", False)  # defined in base.ini for encoded
 
     # May have undone uuids from prior cycle
-    state = IndexerState(es, INDEX, stage_for_followup)
+    state = IndexerState(es, INDEX, followups=stage_for_followup)
 
     # OPTIONAL: restart support
     #(xmin, invalidated, restart) = state.priority_cycle(request.registry)
