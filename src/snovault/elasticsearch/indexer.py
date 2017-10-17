@@ -56,20 +56,18 @@ class IndexerState(object):
         self.override           = 'reindex_' + self.title      # If exists then reindex all
         # DO NOT INHERIT! These keys are for passing on to other indexers
         self.followup_prep_list      = 'primary_followup_prep_list' # Setting up the uuids to be handled by a followup process
-        self.staged_for_vis_list     = 'staged_for_vis_list' # Followup list is added to here to pass baton
-        self.staged_for_regions_list = 'staged_for_regions_list'     # Followup list is added to here to pass baton
+        self.staged_for_vis_list     = 'staged_for_vis_indexer' # Followup list is added to here to pass baton
+        self.staged_for_regions_list = 'staged_for_region_indexer'     # Followup list is added to here to pass baton
         self.followup_lists = []                                     # filled dynamically
         for name in followups:
-            self.followup_lists.append('staged_for_' + name + '_list')
+            list_id = 'staged_for_' + name
+            assert list_id == self.staged_for_vis_list or list_id == self.staged_for_regions_list
+            self.followup_lists.append(list_id)
         self.clock = {}
         # some goals:
-        # 1) Hand-off to secondary: working
-        # 2) Detect and recover from interrupted cycle - working but noisy
-        #    Investigate es.count(xmin) to see if it is worth the restart=True flag
-        #    "The _version field is not indexed, therefore you cannot query/filter on it."
-        #    Consider adding xmin to body?
-        # 3) Identify what is being currently worked on - Too expensive beyond invalidated list
-        # 4) Record (double?) failures and consider blacklisting them - not tried, could do.
+        # 1) Detect and recover from interrupted cycle - working but ignored for now
+        # 2) Record (double?) failures and consider blacklisting them - not tried, could do.
+        # 3) Make 2-pass indexing work
 
     # Private-ish primitives...
     def get_obj(self, id):
@@ -279,6 +277,7 @@ class IndexerState(object):
             if len(hand_off_list) > 0:  # Have to push because ready_list may still have previous cycles in it
                 for id in self.followup_lists:
                     self.list_extend(id, hand_off_list)
+                    #log.warn("prmary added to %s" % id)
                 self.delete_objs([self.followup_prep_list])
 
         # cycle-level accounting so todo => done => last in this function
@@ -381,8 +380,8 @@ def index(request):
     invalidated = []
     xmin = -1
 
-    # Currently 2 possible followup indexers
-    stage_for_followup = request.registry.settings.get("stage_for_followup", '').split(' ') # "vis region"
+    # Currently 2 possible followup indexers (production.ini.inL [set stage_for_followup = "vis_indexer region_indexer"])
+    stage_for_followup = request.registry.settings.get("stage_for_followup", '').strip('"\'').split()
     use_2pass = False # request.registry.settings.get("index_with_2pass", False)  # defined in base.ini for encoded
 
     # May have undone uuids from prior cycle
