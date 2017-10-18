@@ -60,9 +60,10 @@ class IndexerState(object):
         self.staged_for_regions_list = 'staged_for_region_indexer'     # Followup list is added to here to pass baton
         self.followup_lists = []                                     # filled dynamically
         for name in followups:
-            list_id = 'staged_for_' + name
-            assert list_id == self.staged_for_vis_list or list_id == self.staged_for_regions_list
-            self.followup_lists.append(list_id)
+            if name != '':
+                list_id = 'staged_for_' + name
+                assert list_id == self.staged_for_vis_list or list_id == self.staged_for_regions_list
+                self.followup_lists.append(list_id)
         self.clock = {}
         # some goals:
         # 1) Detect and recover from interrupted cycle - working but ignored for now
@@ -381,7 +382,7 @@ def index(request):
     xmin = -1
 
     # Currently 2 possible followup indexers (production.ini.inL [set stage_for_followup = "vis_indexer region_indexer"])
-    stage_for_followup = request.registry.settings.get("stage_for_followup", '').split(', ')
+    stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').split(', '))
     use_2pass = False # request.registry.settings.get("index_with_2pass", False)  # defined in base.ini for encoded
 
     # May have undone uuids from prior cycle
