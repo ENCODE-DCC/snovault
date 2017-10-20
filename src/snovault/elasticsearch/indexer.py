@@ -24,6 +24,8 @@ import logging
 import pytz
 import time
 import copy
+import json
+import requests
 
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
@@ -36,7 +38,6 @@ def includeme(config):
     config.scan(__name__)
     registry = config.registry
     registry[INDEXER] = Indexer(registry)
-
 
 class IndexerState(object):
     # Keeps track of uuids and indexer state by cycle.  Also handles handoff of uuids to followup indexer
@@ -59,11 +60,13 @@ class IndexerState(object):
         self.staged_for_vis_list     = 'staged_for_vis_indexer' # Followup list is added to here to pass baton
         self.staged_for_regions_list = 'staged_for_region_indexer'     # Followup list is added to here to pass baton
         self.followup_lists = []                                     # filled dynamically
+        self.indexers = ['primary']
         for name in followups:
             if name != '':
                 list_id = 'staged_for_' + name
                 assert list_id == self.staged_for_vis_list or list_id == self.staged_for_regions_list
                 self.followup_lists.append(list_id)
+                self.indexers.append(name)
         self.clock = {}
         # some goals:
         # 1) Detect and recover from interrupted cycle - working but ignored for now
@@ -71,22 +74,22 @@ class IndexerState(object):
         # 3) Make 2-pass indexing work
 
     # Private-ish primitives...
-    def get_obj(self, id):
+    def get_obj(self, id, type='meta'):
         try:
-            return self.es.get(index=self.key, doc_type='meta', id=id).get('_source',{})  # TODO: snovault/meta
+            return self.es.get(index=self.key, doc_type=type, id=id).get('_source',{})  # TODO: snovault/meta
         except:
             return {}
 
-    def put_obj(self, id, obj):
+    def put_obj(self, id, obj, type='meta'):
         try:
-            self.es.index(index=self.key, doc_type='meta', id=id, body=obj)
+            self.es.index(index=self.key, doc_type=type, id=id, body=obj)
         except:
             log.warn("Failed to save to es: " + id, exc_info=True)
 
-    def delete_objs(self, ids):
+    def delete_objs(self, ids, type='meta'):
         for id in ids:
             try:
-                self.es.delete(index=self.key, doc_type='meta', id=id)
+                self.es.delete(index=self.key, doc_type=type, id=id)
             except:
                 pass
 
@@ -148,9 +151,44 @@ class IndexerState(object):
         if errors is not None:
             state['errors'] = errors
 
-    def request_reindex(self):
-        '''Requests full reindexin on next cycle'''
-        self.put_obj(self.override, {self.title : 'reindex'})
+    def request_reindex(self,requested):
+        '''Requests full reindexing on next cycle'''
+        if requested == all:
+            self.put_obj(self.override, {self.title : 'reindex', 'all': True})
+            if self.title == 'primary':  # If primary indexer delete the original master obj
+                self.delete_objs(["indexing"])  # http://localhost:9200/snovault/meta/indexing
+
+        else:
+            uuids = requested.split(',')
+            override_obj = self.get_obj(self.override)
+            if 'uuids' not in override_obj:
+                override_obj['uuids'] = uuids
+            else:
+                override_obj['uuids'].extend(uuids)
+            self.put_obj(self.override, override_obj)
+
+    def all_indexable_uuids(self, request):
+        '''returns list of uuids pertinant to this indexer.'''
+        return list(all_uuids(request.registry))
+
+    def reindex_requested(self, request):
+        '''returns list of uuids if a reindex was requested.'''
+        override = self.get_obj(self.override)
+        if override:
+            if override.get('all', False):
+                self.delete_objs([self.override] + self.followup_lists)
+                return self.all_indexable_uuids(request)
+            else:
+                uuids =  override.get('uuids',[])
+                uuid_count = len(uuids)
+                if uuid_count > 0:
+                    if uuid_count > SEARCH_MAX:
+                        self.delete_objs([self.override] + self.followup_lists)
+                    else:
+                        self.delete_objs([self.override])
+                    return uuids
+        return None
+
 
     def get_initial_state(self):
         '''Useful to initialize at idle cycle'''
@@ -174,8 +212,8 @@ class IndexerState(object):
         else:
             return str(datetime.datetime.now(pytz.utc) - start)
 
-    def priority_cycle(self, registry):
-        '''Initial startup, override, or interupted prior cycle can all lead to a priority cycle.
+    def priority_cycle(self, request):
+        '''Initial startup, reindex, or interupted prior cycle can all lead to a priority cycle.
            returns (discovered xmin, uuids, whether previous cycle was interupted).'''
         # Not yet started?
         initialized = self.get_obj("indexing")  # http://localhost:9200/snovault/meta/indexing
@@ -188,13 +226,12 @@ class IndexerState(object):
 
         state = self.get()
 
-        # Rare call for indexing all...
-        override = self.get_obj(self.override)
-        if override:
-            self.delete_objs([self.override] + self.followup_lists)
-            uuids = list(all_uuids(registry))
-            log.warn('%s override doing all: %d' % (self.state_id, len(uuids)))
-            return (-1, uuids, False)
+        # Rare call for reindexing...
+        reindex_uuids = self.reindex_requested(request)
+        if reindex_uuids is not None and reindex_uuids != []:
+            uuids_count = len(reindex_uuids)
+            log.warn('%s reindex of %d uuids requested' % (self.state_id, uuids_count))
+            return (-1, reindex_uuids, False)
 
         if state.get('status', '') != 'indexing':
             return (-1, [], False)
@@ -302,9 +339,119 @@ class IndexerState(object):
 
         return state
 
+    def set_notices(self, from_host, who=None, bot_token=None, which=None):
+        '''Set up notification so that slack bot can send a message when indexer finishes'''
+        if who is None and bot_token is None:
+            return "ERROR: must specify who to notify or bot_token"
+        if which is None:
+            which = self.title
+        if which not in ['primary','vis','region','all']:  # WARNING: hard-coded list
+            return "ERROR: unknown indexer to monitor: %s" % (which)
+
+        notify = self.get_obj('notify', 'default')
+        if bot_token is not None:
+            notify['bot_token'] = bot_token
+
+        if 'from' not in notify:
+            notify['from'] = from_host
+
+        if who is not None:
+            indexer_notices = notify.get(which,{})
+            if who in ['none','noone','nobody','stop','']:
+                notify.pop(which, None)
+            else:
+                if which == 'all':
+                    if 'indexers' not in indexer_notices:
+                        indexer_notices['indexers'] = ['primary','vis','region']  # WARNING: hard-coded list
+                users = who.split(',')
+                # TODO: verify users, convert users from names to tokens?
+                who_all = indexer_notices.get('who',[])
+                who_all.extend(users)
+                indexer_notices['who'] = list(set(who_all))
+                notify[which] = indexer_notices
+
+        self.put_obj('notify', notify, 'default')
+        if 'bot_token' not in notify:
+            return "WARNING: bot_token is required"
+        else:
+            return notify
+
+    def get_notices(self, full=False):
+        '''Get the notifications'''
+        notify = self.get_obj('notify','default')
+        if full:
+            return notify
+        notify.pop('bot_token', None)
+        notify.pop('from', None)
+        indexers = ['primary','vis','region','all']  # WARNING: hard-coded list
+        if self.title == 'primary':
+            for indexer in indexers:
+                if notify.get(indexer,{}):
+                    return notify  # return if anything
+        else:
+            indexers.remove(self.title)
+            indexers.remove('all')
+            for indexer in indexers:
+                notify.pop(indexer,None)
+            for indexer in [self.title, 'all']:
+                if notify.get(indexer,{}):
+                    return notify  # return if anything
+
+        return {}
+
+    def send_notices(self):
+        '''Sends notifications when indexer is done.'''
+        # https://slack.com/api/chat.postMessage?token=xoxb-197478914097-Tf1hh7JDQnU9ZL34lpBawn0T&channel=U1KPQK1HN&text=Yay!
+        notify = self.get_obj('notify','default')
+        if not notify:
+            return
+        if 'bot_token' not in notify or 'from' not in notify:
+            return
+
+        changed = False
+        text = None
+        who = []
+        if 'all' in notify:
+            # if all indexers are done, then report
+            indexers = notify['all'].get('indexers',[])
+            if self.title in indexers:
+                indexers.remove(self.title)
+            if len(indexers) > 0:
+                notify['all']['indexers'] = indexers
+            else:
+                who.extend(notify['all'].get('who',[]))
+                notify.pop('all',None)
+                text='All indexers are done for %s' % (notify['from'])
+            changed = True
+        if self.title in notify:
+            who.extend(notify[self.title].get('who',[]))
+            notify.pop(self.title, None)
+            changed = True
+            if text is None:
+                text='%s indexer is done for %s' % (self.title, notify['from'])
+        if len(who) > 0 and text is not None:
+            # TODO: convert single user to user_token and then channel
+            who = list(set(who))
+            users = ''
+            if len(who) > 1:
+                #channel='dcc-dev'  # TODO: user OR DCC-private
+                channel='U1KPQK1HN'  # TODO: user OR DCC-private
+                for user in who:
+                    users += '@' + user + ', '
+                msg = 'token=%s&channel=%s&text=%s%s' % (notify['bot_token'],channel,users,text)
+            else:
+                channel='U1KPQK1HN'  # TODO: look up user token
+                msg = 'token=%s&channel=%s&text=%s' % (notify['bot_token'],channel,text)
+
+            r = requests.get('https://slack.com/api/chat.postMessage?' + msg)
+        if changed:
+            self.put_obj('notify', notify, 'default')
+
+
     def display(self):
         display = {}
         display['state'] = self.get()
+        display['title'] = display['state']['title']
         display['uuids in progress'] = self.get_count(self.todo_set)
         display['uuids troubled'] = self.get_count(self.troubled_set)
         display['uuids last cycle'] = self.get_count(self.last_set)
@@ -319,21 +466,37 @@ class IndexerState(object):
 
         reindex = self.get_obj(self.override)
         if reindex:
-            display['REINDEX requested'] = True
+            uuids = reindex.get('uuids')
+            if uuids is not None:
+                display['REINDEX requested'] = uuids
+            elif reindex.get('all',False):
+                display['REINDEX requested'] = True
+        notify = self.get_notices()
+        if notify:
+            display['NOTIFY requested'] = notify
         display['now'] = datetime.datetime.now().isoformat()
 
         return display
 
 
 @view_config(route_name='_indexer_state', request_method='GET', permission="index")
-def indexer_show_state(request):
+def indexer_state_show(request):
     es = request.registry[ELASTIC_SEARCH]
     INDEX = request.registry.settings['snovault.elasticsearch.index']
     state = IndexerState(es,INDEX)
 
-    if request.params.get("reindex","false") == 'all':
-        state.request_reindex()
-        request.query_string = ''
+    # requesting reindex
+    reindex = request.params.get("reindex")
+    if reindex is not None:
+        state.request_reindex(reindex)
+
+    # Requested notification
+    who = request.params.get("notify")
+    bot_token = request.params.get("bot_token")
+    if who is not None or bot_token is not None:
+        notices = state.set_notices(request.host_url, who, bot_token, request.params.get("indexers"))
+        if isinstance(notices,str):
+            return notices
 
     display = state.display()
     try:
@@ -344,22 +507,19 @@ def indexer_show_state(request):
         display['docs in index'] = 'Not Found'
         pass
 
-    try:
-        import requests
-        r = requests.get(request.host_url + '/_indexer')
-        #subreq = Request.blank('/_indexer')
-        #result = request.invoke_subrequest(subreq)
-        result = json.loads(r.text)
-        #result = request.embed('_indexer')
-        result['current'] = display
-    except:
-        result = display
+    if not request.registry.settings.get('testing',False):  # NOTE: _indexer not working on local instances
+        try:
+            r = requests.get(request.host_url + '/_indexer')
+            display['listener'] = json.loads(r.text)
+            display['status'] = display['listener']['status']
+        except:
+            log.error('Error getting /_indexer', exc_info=True)
 
     # always return raw json
-    if len(request.query_string) > 0:
-        request.query_string = "&format=json"
-    else:
-        request.query_string = "format=json"
+    #if len(request.query_string) > 0:
+    #    request.query_string = "&format=json"
+    #else:
+    request.query_string = "format=json"
     return display
 
 
@@ -388,8 +548,11 @@ def index(request):
     # May have undone uuids from prior cycle
     state = IndexerState(es, INDEX, followups=stage_for_followup)
 
+    (xmin, invalidated, restart) = state.priority_cycle(request)
     # OPTIONAL: restart support
-    #(xmin, invalidated, restart) = state.priority_cycle(request.registry)
+    if restart:  # Currently not bothering with restart!!!
+        xmin = -1
+        invalidated = []
     # OPTIONAL: restart support
 
     result = state.get_initial_state()  # get after checking priority!
@@ -411,7 +574,7 @@ def index(request):
                 es.indices.put_settings(index=INDEX, body=interval_settings)
                 pass
             else:
-                last_xmin = status['_source']['xmin']
+                last_xmin = status['_source'].get('xmin')
 
         result.update(
             xmin=xmin,
@@ -542,6 +705,7 @@ def index(request):
     if first_txn is not None:
         result['txn_lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
 
+    state.send_notices()
     return result
 
 
