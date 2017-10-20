@@ -560,15 +560,17 @@ class Indexer(object):
             last_exc = repr(e)
 
         if last_exc is None:
-            try:
-                audit = self.es.get(index=self.index, id=str(uuid)).get('_source',{}).get('audit')  # Any version
-                if audit:
-                    doc.update(
-                        audit=audit,
-                        audit_stale=True,
-                    )
-            except:
-                pass
+            ### OPTIONAL: audit via 2-pass is coming...
+            #try:
+            #    audit = self.es.get(index=self.index, id=str(uuid)).get('_source',{}).get('audit')  # Any version
+            #    if audit:
+            #        doc.update(
+            #            audit=audit,
+            #            audit_stale=True,
+            #        )
+            #except:
+            #    pass
+            ### OPTIONAL: audit via 2-pass is coming...
 
             for backoff in [0, 10, 20, 40, 80]:
                 time.sleep(backoff)
