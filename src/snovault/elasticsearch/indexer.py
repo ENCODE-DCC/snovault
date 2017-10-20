@@ -153,7 +153,7 @@ class IndexerState(object):
 
     def request_reindex(self,requested):
         '''Requests full reindexing on next cycle'''
-        if requested == all:
+        if requested == 'all':
             self.put_obj(self.override, {self.title : 'reindex', 'all': True})
             if self.title == 'primary':  # If primary indexer delete the original master obj
                 self.delete_objs(["indexing"])  # http://localhost:9200/snovault/meta/indexing
@@ -339,6 +339,24 @@ class IndexerState(object):
 
         return state
 
+    def get_notice_user(self, user):
+        '''Returns the user token for a named user.'''
+        slack_users = self.get_obj('slack_users',{})
+        if not slack_users:
+            try:
+                r = requests.get('https://slack.com/api/users.list?token=xoxb-197478914097-Tf1hh7JDQnU9ZL34lpBawn0T')
+                resp = json.loads(r.text)
+                if not resp['ok']:
+                    log.warn(resp)
+                    return None
+                members = resp.get('members',[])
+                for member in members:
+                    slack_users[member['name']] = member['id']
+                self.put_obj('slack_users',slack_users)
+            except:
+                return None
+        return slack_users.get(user)
+
     def set_notices(self, from_host, who=None, bot_token=None, which=None):
         '''Set up notification so that slack bot can send a message when indexer finishes'''
         if who is None and bot_token is None:
@@ -355,6 +373,7 @@ class IndexerState(object):
         if 'from' not in notify:
             notify['from'] = from_host
 
+        user_warns = ''
         if who is not None:
             indexer_notices = notify.get(which,{})
             if who in ['none','noone','nobody','stop','']:
@@ -365,14 +384,21 @@ class IndexerState(object):
                         indexer_notices['indexers'] = ['primary','vis','region']  # WARNING: hard-coded list
                 users = who.split(',')
                 # TODO: verify users, convert users from names to tokens?
+                for name in users:
+                    if self.get_notice_user(name) is None:
+                        user_warns += ', ' + name
                 who_all = indexer_notices.get('who',[])
                 who_all.extend(users)
                 indexer_notices['who'] = list(set(who_all))
                 notify[which] = indexer_notices
 
         self.put_obj('notify', notify, 'default')
+        if user_warns != '':
+            user_warns = 'Unknown users: ' + user_warns[2:]
         if 'bot_token' not in notify:
-            return "WARNING: bot_token is required"
+            return "WARNING: bot_token is required. " + user_warns
+        elif user_warns != '':
+            return "WARNING: " + user_warns
         else:
             return notify
 
@@ -406,7 +432,7 @@ class IndexerState(object):
         if not notify:
             return
         if 'bot_token' not in notify or 'from' not in notify:
-            return
+            return  # silent failure
 
         changed = False
         text = None
@@ -430,23 +456,30 @@ class IndexerState(object):
             if text is None:
                 text='%s indexer is done for %s' % (self.title, notify['from'])
         if len(who) > 0 and text is not None:
-            # TODO: convert single user to user_token and then channel
             who = list(set(who))
             users = ''
-            if len(who) > 1:
-                #channel='dcc-dev'  # TODO: user OR DCC-private
-                channel='U1KPQK1HN'  # TODO: user OR DCC-private
+            msg = ''
+            if len(who) == 1:
+                #channel='U1KPQK1HN'  # TODO: look up user token
+                channel = self.get_notice_user(who[0])
+                if channel:
+                    msg = 'token=%s&channel=%s&text=%s' % (notify['bot_token'],channel,text)
+                # otherwise fall back on generic message.
+            if msg == '':
+                channel='dcc-private'  # TODO: user OR DCC-private
                 for user in who:
                     users += '@' + user + ', '
-                msg = 'token=%s&channel=%s&text=%s%s' % (notify['bot_token'],channel,users,text)
-            else:
-                channel='U1KPQK1HN'  # TODO: look up user token
-                msg = 'token=%s&channel=%s&text=%s' % (notify['bot_token'],channel,text)
+                msg = 'token=%s&channel=%s&link_names=true&text=%s%s' % (notify['bot_token'],channel,users,text)
 
-            r = requests.get('https://slack.com/api/chat.postMessage?' + msg)
+            try:
+                r = requests.get('https://slack.com/api/chat.postMessage?' + msg)
+                resp = json.loads(r.text)
+                if not resp['ok']:
+                    log.warn(resp)
+            except:
+                pass   # silent failure
         if changed:
             self.put_obj('notify', notify, 'default')
-
 
     def display(self):
         display = {}
