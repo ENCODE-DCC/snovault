@@ -484,7 +484,7 @@ class IndexerState(object):
     def display(self):
         display = {}
         display['state'] = self.get()
-        display['title'] = display['state']['title']
+        display['title'] = display['state'].get('title',self.state_id)
         display['uuids in progress'] = self.get_count(self.todo_set)
         display['uuids troubled'] = self.get_count(self.troubled_set)
         display['uuids last cycle'] = self.get_count(self.last_set)
