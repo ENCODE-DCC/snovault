@@ -1,13 +1,25 @@
 Indexer Documentation:
 =====================
 
-The (snovault) system organizes simple Postgres objects into documents that incude, among other things, object relationships in the form of embedded objects, and audits.  These documents are then indexed by elasticsearch.  The work of *indexing*, which includes building the documents from Postgres objects is accomplished by a separate *master indexer process* that may then use multiple *worker processes* (via mpindexer.py) to accomplish the work.  Upon initialization, the master indexer process will index all objects in the Postgres database.  After initial indexing, the process wakes every 60 seconds and checks to see if there have been any Postgres transactions since the previous indexing.  If so, a list of uuids for all changed database objects and all related objects is generated and a new indexing cycle begins on just those uuids.  If the list of uuids is large enough (currently more than 100K), the entire set of objects is reindexed.
 
 ---------------
-_indexer values
+Primary Indexer
 ---------------
 
-The indexer reports certain current and historical values in an *in-memory* JSON object seen via the /_indexer path.  Some of the key values are described here:
+The (snovault) system organizes simple objects stored in Postgres into 'documents' that incude, among other things, object relationships in the form of embedded objects, and audits.  These documents are then indexed by elasticsearch.  The work of *indexing*, which includes constructing the documents from Postgres objects is accomplished by a separate *master indexer process* that may then use multiple *worker processes* (via mpindexer.py) to accomplish the tasks.  Upon initialization, the master indexer process will index all documents from all uuids (object ids) in the Postgres database.  After initial indexing, the process wakes every 60 seconds and checks to see if there have been any Postgres transactions since the previous indexing.  If so, a list of uuids for all changed database objects and all related objects is generated and a new indexing cycle begins on just those uuids.  If the list of uuids is large enough (currently 100K or more), the entire set of objects is reindexed.  If there are any **followup indexers**, then the primary indexer will stage the list of uuids just indexed so those indexers may begin work.
+
+
+-----------------
+Followup Indexers
+-----------------
+
+Currently snovault has no followup indexers.  If it did, they would act on uuids staged by the primary indexer at the end if its cycle.  Like the primary indexer, each followup indexer is intended to run in a separate process and wakes up every N seconds to see if there is anything to do.
+
+--------------------------
+_indexer values (listener)
+--------------------------
+
+The *indexer listener* reports certain current and historical values from an *in-memory* JSON object seen via the ``/_indexer`` path. Key values are described here:
 
   :status: The indexer is either 'waiting' between cycles or 'indexing' during a cycle.
   :started: The time the indexer process started.  This will reflect the most recent startup, which is not necessarily the time the server was first initialized.
@@ -24,7 +36,6 @@ The indexer reports certain current and historical values in an *in-memory* JSON
     :title: Which indexer ran. This will be 'primary_indexer' for path /_indexer.  Other idexers exist in encoded.
     :timestamp: Time of this cycle.
     :xmin: Postgres transaction id of this cycle.
-    :cycle_took: How long it took to complete this indexer cycle.
     :pass1_took: If 2-pass indexing is enabled, this is the time it took to index objects without audits.
     :pass2_took: If 2-pass indexing is enabled, this is the time it took to audit objects and update that information in elasticsearch.
     :indexed: Number of objects indexed in this cycle.
@@ -37,19 +48,47 @@ The indexer reports certain current and historical values in an *in-memory* JSON
     :types: On small indexing cycle, may contain '\@type's of changed objects in Postgres.
     :stats: This contains the raw stats from the response header for this indexer call.
 
-------------------------------
-Indexer State in Elasticsearch
-------------------------------
+------------------
+_indexer_state API
+------------------
 
-In addition to using path /_indexer, the current state of the indexer can be queried directly from elasticsearch at (for example) ``curl http://localhost:9200/snovault/meta/primary_indexer/_source``
+In addition to using path /_indexer, a more complete image of an indexer can be accessed via the ``/_indexer_state`` path. This require admin login to be accessed as will become clear below.
 
-The state object contains the same values found in /_indexer 'results' described above.  However the status may be 'indexing', in which case the values reflect the current cycle and the count of uuids being worked on will be found in 'cycle_count'.  Also, if 2-pass indexing is enabled, then 'pass1_took' will be seen as soon as that pass is complete, even though the full indexing cycle may still be in progress.
+These view will return the following values:
 
-In addition to the primary_indexer state object, several other objects exist in elasticsearch to manage the indexer cycles.  All can be queried with ``curl http://localhost:9200/snovault/meta/{name}/_source``
+  :title: Should be 'primary_indexer'.
+  :status: The indexer is either 'waiting' between cycles or 'indexing' during a cycle.  It might also be 'uninitialized' when the system is first coming up.
+  :docs in index: The count of all documents currently in the elasticsearch index.
+  :uuids in progress: The count of uuids currently being indexed.
+  :uuids last cycle: The number of uuids in the previous cycle.
+  :uuids troubled: The number of uuids that failed to index during the last cycle.
+  :to be handed off to other indexer(s): If followup indexers exist, this is the count of uuids that will be staged by the primary indexer when its current cycle completes.
+  :registered indexers: (primary only) List of indexers that have started.
+  :now: The UTC time this view was displayed.  Useful for comparing to other times found here.
+  :listener: The contents of an ``/_indexer`` request.  *Described above*.
+  :REINDEX requested: If reindexing was requested this will contain 'all' or a list of uuids.
+  :NOTIFY requested: If notify was requested, this will include who to notify and in which circumstances.
+  :state: The contents of the indexer's state object held in elasticsearch...
 
-  :indexing: The master result used to pass the xmin from one cycle to the last_xmin of the next cycle.  Delete this object to request a complete reindexing.
-  :primary_in_progress: Contains a list of uuids that are currently being indexed.
-  :primary_troubled: Contains a list of uuids that failed to index in the last cycle.
-  :primary_last_cycle: Contain a list of uuids that were indexed in the previous cycle.
-  :primary_followup_prep_list: If a secondary indexer is enabled, this will contain the xmin of the current cycle followed by all uuids, staged for the secondary indexer once the current indexer has finished with them.
-  :staged_by_primary_list: If a secondary indexer is enabled, this will contains all xmin/uuids that are ready to be handled by the secondary_indexer.  When a primary_indexer cycle completes, the 'primary_followup_prep_list' is added to the end of this list.
+    :title: Should be 'primary_indexer'.
+    :status: The indexer is either 'waiting' between cycles or 'indexing' during a cycle.
+    :cycles: Count of indexer cycles that actually indexed something. This number should reflect all cycles since the system was initialized or since a full reindexing was requested.
+    :cycle_count: When indexing, the number of uuids in the cuuent cycle.
+    :cycle_took: How long it took to complete the most recent indexer cycle.
+    :cycle_started: When the most recent indexing cycle started.
+    :indexed: Number of objects indexed in the most recent cycle.
+    :xmin: Postgres transaction id of this cycle.
+    :last_xmin: Postgres transaction id of last cycle.  Indexing should have covered all objects changed between last_xmin and xmin.
+    :max_xid: This is a Postgres transaction id which should rise with each database change.  It is used to ensure a consistent view of data during an indexing cycle.
+    :invalidated: Number of uuids invalidated.
+    :renamed: uuids of renamed objects
+    :updated: uuids of updated objects
+    :first_txn_timestamp: Timestamp of when the postgres tranaction occurred which led to this indeing cycle.
+    :txn_count: Number of postgres transactions this cycle covers.
+    :referencing: Count of uuids referenced updated objects.
+
+Several requests can be made of the ``/_indexer_state`` path with use of ?request=value appended to the url:
+
+  :reindex: Use 'all' for complete reindexing or comma separated uuids for specific reindexing.  This powerful method necessitates being logged on with admin permissions.
+  :notify: One or more comma separated slack ids to be notified when the specific indexer is done.
+  :bot_token: For the time being this is required for slack notification to work.

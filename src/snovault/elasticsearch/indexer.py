@@ -60,13 +60,11 @@ class IndexerState(object):
         self.staged_for_vis_list     = 'staged_for_vis_indexer' # Followup list is added to here to pass baton
         self.staged_for_regions_list = 'staged_for_region_indexer'     # Followup list is added to here to pass baton
         self.followup_lists = []                                     # filled dynamically
-        self.indexers = ['primary']
         for name in followups:
             if name != '':
                 list_id = 'staged_for_' + name
                 assert list_id == self.staged_for_vis_list or list_id == self.staged_for_regions_list
                 self.followup_lists.append(list_id)
-                self.indexers.append(name)
         self.clock = {}
         # some goals:
         # 1) Detect and recover from interrupted cycle - working but ignored for now
@@ -112,13 +110,13 @@ class IndexerState(object):
     #                result_set = result_set.difference(set(subtract_list))
     #    return result_set
 
-    #def set_add(self, id, vals):
-    #    set_to_update = set(self.get_list(id))
-    #    if len(set_to_update) > 0:
-    #        set_to_update.update(vals)
-    #    else:
-    #        set_to_update = set(vals)
-    #    self.put_list(id, set_to_update)
+    def set_add(self, id, vals):
+        set_to_update = set(self.get_list(id))
+        if len(set_to_update) > 0:
+            set_to_update.update(vals)
+        else:
+            set_to_update = set(vals)
+        self.put_list(id, set_to_update)
 
     def list_extend(self, id, vals):
         list_to_extend = self.get_list(id)
@@ -198,6 +196,8 @@ class IndexerState(object):
             val = state.pop(var,None)
             if val is not None:
                 new_state[var] = val
+        # Make sure indexer is registered:
+        self.set_add("registered_indexers", [self.title])
         return new_state
 
     def start_clock(self, name):
@@ -339,6 +339,10 @@ class IndexerState(object):
 
         return state
 
+    def registered_indexers(self):
+        '''Returns a list of registered indexers.'''
+        return self.get_list("registered_indexers")
+
     def get_notice_user(self, user):
         '''Returns the user token for a named user.'''
         slack_users = self.get_obj('slack_users',{})
@@ -363,7 +367,7 @@ class IndexerState(object):
             return "ERROR: must specify who to notify or bot_token"
         if which is None:
             which = self.title
-        if which not in ['primary','vis','region','all']:  # WARNING: hard-coded list
+        if which != 'all' and which not in self.get_list("registered_indexers"):
             return "ERROR: unknown indexer to monitor: %s" % (which)
 
         notify = self.get_obj('notify', 'default')
@@ -381,7 +385,7 @@ class IndexerState(object):
             else:
                 if which == 'all':
                     if 'indexers' not in indexer_notices:
-                        indexer_notices['indexers'] = ['primary','vis','region']  # WARNING: hard-coded list
+                        indexer_notices['indexers'] = self.get_list("registered_indexers")
                 users = who.split(',')
                 # TODO: verify users, convert users from names to tokens?
                 for name in users:
@@ -409,20 +413,22 @@ class IndexerState(object):
             return notify
         notify.pop('bot_token', None)
         notify.pop('from', None)
-        indexers = ['primary','vis','region','all']  # WARNING: hard-coded list
-        if self.title == 'primary':
+        for which in notify.keys():
+            if len(notify[which].get('who',[])) == 1:
+                notify[which] = notify[which]['who'][0]
+        indexers = self.get_list("registered_indexers")
+        if self.title == 'primary':  # Primary will show all notices
+            indexers.append('all')
             for indexer in indexers:
                 if notify.get(indexer,{}):
                     return notify  # return if anything
-        else:
+        else:  # non-primary will show specific notice and all
             indexers.remove(self.title)
-            indexers.remove('all')
             for indexer in indexers:
                 notify.pop(indexer,None)
             for indexer in [self.title, 'all']:
                 if notify.get(indexer,{}):
                     return notify  # return if anything
-
         return {}
 
     def send_notices(self):
@@ -447,7 +453,7 @@ class IndexerState(object):
             else:
                 who.extend(notify['all'].get('who',[]))
                 notify.pop('all',None)
-                text='All indexers are done for %s' % (notify['from'])
+                text='All indexers are done for %s/_indexer_state' % (notify['from'])
             changed = True
         if self.title in notify:
             who.extend(notify[self.title].get('who',[]))
@@ -455,6 +461,10 @@ class IndexerState(object):
             changed = True
             if text is None:
                 text='%s indexer is done for %s' % (self.title, notify['from'])
+                if self.title == 'primary':
+                    text += '/_indexer_state'
+                else:
+                    text += '/_%sindexer_state' % (self.title)
         if len(who) > 0 and text is not None:
             who = list(set(who))
             users = ''
@@ -503,7 +513,7 @@ class IndexerState(object):
             if uuids is not None:
                 display['REINDEX requested'] = uuids
             elif reindex.get('all',False):
-                display['REINDEX requested'] = True
+                display['REINDEX requested'] = 'all'
         notify = self.get_notices()
         if notify:
             display['NOTIFY requested'] = notify
@@ -548,6 +558,7 @@ def indexer_state_show(request):
         except:
             log.error('Error getting /_indexer', exc_info=True)
 
+    display['registered indexers'] = state.get_list('registered_indexers')
     # always return raw json
     #if len(request.query_string) > 0:
     #    request.query_string = "&format=json"
@@ -574,8 +585,8 @@ def index(request):
     invalidated = []
     xmin = -1
 
-    # Currently 2 possible followup indexers (production.ini.inL [set stage_for_followup = "vis_indexer region_indexer"])
-    stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').split(', '))
+    # Currently 2 possible followup indexers (base.ini [set stage_for_followup = vis_indexer, region_indexer])
+    stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').replace(' ','').split(','))
     use_2pass = False # request.registry.settings.get("index_with_2pass", False)  # defined in base.ini for encoded
 
     # May have undone uuids from prior cycle
