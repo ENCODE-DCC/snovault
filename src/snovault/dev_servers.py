@@ -48,7 +48,6 @@ def nginx_server_process(prefix='', echo=False):
 
     return process
 
-
 def main():
     import argparse
     parser = argparse.ArgumentParser(

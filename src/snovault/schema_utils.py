@@ -135,10 +135,10 @@ def linkFrom(validator, linkFrom, instance, schema):
     collections = request.registry[COLLECTIONS]
 
     linkType, linkProp = linkFrom.split('.')
+    linkCollection = collections[linkType]
     if validator.is_type(instance, "string"):
-        base = collections[linkType]
         try:
-            item = find_resource(base, instance.replace(':', '%3A'))
+            item = find_resource(linkCollection, instance.replace(':', '%3A'))
             if item is None:
                 raise KeyError()
         except KeyError:
@@ -153,19 +153,58 @@ def linkFrom(validator, linkFrom, instance, schema):
             error = "%r is not of type %s" % (instance, repr(linkType))
             yield ValidationError(error)
             return
-        pass
     else:
-        path = instance.get('@id')
         if validator._serialize:
             lv = len(validator._validated)
-        if '@id' in instance:
-            del instance['@id']
+
+        # Look for an existing item;
+        # if found use the schema for its type,
+        # which may be a subtype of an abstract linkType
+        subschema = None
+        path = instance.pop('@id', None)
+        uuid = None
+        if path is not None:
+            item = find_resource(request.root, path.replace(':', '%3A'))
+            if item is not None:
+                if linkType not in set([item.type_info.name] + item.type_info.base_types):
+                    error = "%r is not of type %s" % (instance, repr(linkType))
+                    yield ValidationError(error)
+                    return
+                subschema = item.type_info.schema
+                uuid = str(item.uuid)
+
+        # For new items, we need to use @type to determine the subschema
+        new_type = None
+        if subschema is None:
+            try:
+                new_type = instance.pop('@type')[0]
+            except (KeyError, IndexError):
+                if len(linkCollection.type_info.subtypes) == 1:
+                    new_type = linkType
+                    type_info = linkCollection.type_info
+                else:
+                    subtypes = ', '.join(linkCollection.type_info.subtypes)
+                    yield ValidationError(
+                        'Expected @type to be array with one of: {}'.format(
+                            subtypes))
+                    return
+            else:
+                try:
+                    type_info = request.registry[TYPES][new_type]
+                except KeyError:
+                    yield ValidationError(
+                        '@type {} not recognized'.format(new_type))
+                    return
+                if linkType not in set([type_info.name] + type_info.base_types):
+                    yield ValidationError(
+                        '{} is not of type {}'.format(instance, linkType))
+                    return
+            subschema = type_info.schema
 
         # treat the link property as not required
         # because it will be filled in when the child is created/updated
-        subschema = request.registry[TYPES][linkType].schema
-        subschema = copy.deepcopy(subschema)
         if linkProp in subschema['required']:
+            subschema = copy.deepcopy(subschema)
             subschema['required'].remove(linkProp)
 
         for error in validator.descend(instance, subschema):
@@ -174,11 +213,12 @@ def linkFrom(validator, linkFrom, instance, schema):
         if validator._serialize:
             validated_instance = validator._validated[lv]
             del validator._validated[lv:]
-            if path is not None:
-                item = find_resource(request.root, path.replace(':', '%3A'))
-                validated_instance['uuid'] = str(item.uuid)
+            if uuid is not None:
+                validated_instance['uuid'] = uuid
             elif 'uuid' in validated_instance:  # where does this come from?
                 del validated_instance['uuid']
+            if new_type is not None:
+                validated_instance['@type'] = [new_type]
             validator._validated[-1] = validated_instance
 
 

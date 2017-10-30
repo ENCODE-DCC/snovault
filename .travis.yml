@@ -13,7 +13,7 @@ addons:
     - elasticsearch
 env:
   global:
-
+  - BOTO_CONFIG=/bogus/value # see: https://github.com/boto/boto/issues/3263
   - secure: |-
       j9Ako+NzgzqQH8Vj13m/HyAad3nwM9YW/Wdjox7MsSV0xb75G0kuQWf6+hvIi
       Nw10G8z7JQB3Wdh9CWaCf8Lqo2o72NmU1Gm3ZmJWFkHS1PNI7Hlnn80oDddR5
@@ -88,7 +88,7 @@ script:
 - |
   if test -n "$BROWSER"; then
     test -f "$SC_PIDFILE" && bin/test -v -v --timeout=400 -m "bdd" --tb=short \
-      --splinter-implicit-wait 10 \
+      --splinter-implicit-wait 20 \
       --splinter-webdriver remote \
       --splinter-remote-url "http://$SAUCE_USERNAME:$SAUCE_ACCESS_KEY@localhost:4445/wd/hub" \
       --splinter-socket-timeout 300 \
