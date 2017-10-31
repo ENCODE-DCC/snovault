@@ -515,6 +515,7 @@ class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
         self.esstorage = registry[STORAGE]
+        self.index = registry.settings['snovault.elasticsearch.index']
 
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         errors = []
