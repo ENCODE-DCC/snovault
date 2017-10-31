@@ -41,9 +41,9 @@ def includeme(config):
 
 class IndexerState(object):
     # Keeps track of uuids and indexer state by cycle.  Also handles handoff of uuids to followup indexer
-    def __init__(self, es, key, title='primary'):
+    def __init__(self, es, index, title='primary'):
         self.es = es
-        self.key = key  # "indexerstate"
+        self.index = index  # "index where indexerstate is stored"
         self.title           = title
         self.state_id        = self.title + '_indexer'       # State of the current or last cycle
         self.todo_set        = self.title + '_in_progress'   # one cycle of uuids, sent to the Secondary Indexer
@@ -71,20 +71,20 @@ class IndexerState(object):
     # Private-ish primitives...
     def get_obj(self, id):
         try:
-            return self.es.get(index=self.key, doc_type='meta', id=id).get('_source',{})  # TODO: snovault/meta
+            return self.es.get(index=self.index, doc_type='meta', id=id).get('_source',{})  # TODO: snovault/meta
         except:
             return {}
 
     def put_obj(self, id, obj):
         try:
-            self.es.index(index=self.key, doc_type='meta', id=id, body=obj)
+            self.es.index(index=self.index, doc_type='meta', id=id, body=obj)
         except:
             log.warn("Failed to save to es: " + id, exc_info=True)
 
     def delete_objs(self, ids):
         for id in ids:
             try:
-                self.es.delete(index=self.key, doc_type='meta', id=id)
+                self.es.delete(index=self.index, doc_type='meta', id=id)
             except:
                 pass
 
