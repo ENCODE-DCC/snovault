@@ -9,6 +9,8 @@ from sqlalchemy.exc import StatementError
 from snovault import (
     COLLECTIONS,
     DBSESSION,
+    CONNECTION,
+    STORAGE
 )
 from snovault.storage import (
     TransactionRecord,
@@ -16,10 +18,8 @@ from snovault.storage import (
 from urllib3.exceptions import ReadTimeoutError
 from .interfaces import (
     ELASTIC_SEARCH,
-    INDEXER,
-    STORAGE
+    INDEXER
 )
-from snovault import CONNECTION
 import datetime
 import logging
 import pytz
