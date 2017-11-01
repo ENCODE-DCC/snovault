@@ -133,7 +133,8 @@ class ElasticSearchStorage(object):
                 'term': {
                     'uuid': str(uuid)
                 }
-            }
+            },
+            'version': True
         }
         result = self.es.search(index=self.index, body=query, _source=True, size=1)
         if result['hits']['total'] == 0:

@@ -520,7 +520,6 @@ class Indexer(object):
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         errors = []
         for i, uuid in enumerate(uuids):
-            print('set trace here again')
             error = self.update_object(request, uuid, xmin)
             if error is not None:
                 errors.append(error)
