@@ -35,10 +35,20 @@ log = logging.getLogger(__name__)
 
 
 def includeme(config):
-    config.add_route('index', '/index')
+    if config.registry.settings.get('should_index'):
+        config.add_route('index', '/index')
+    else:
+        config.add_route('mock_index', '/index')
+
     config.scan(__name__)
     registry = config.registry
     registry[INDEXER] = Indexer(registry)
+
+
+@view_config(route_name='mock_index', request_method='POST', permission="index")
+def mock_index(request):
+    print("not indexing, just mocked")
+    return {}
 
 
 @view_config(route_name='index', request_method='POST', permission="index")
