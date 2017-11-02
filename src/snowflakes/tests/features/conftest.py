@@ -28,6 +28,7 @@ def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server)
     settings['item_datastore'] = 'elasticsearch'
     settings['snovault.elasticsearch.index'] = 'snovault'
     settings['indexer'] = True
+    settings['should_index'] = True
     settings['indexer.processes'] = 2
     return settings
 
