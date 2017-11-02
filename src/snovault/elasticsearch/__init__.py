@@ -35,10 +35,9 @@ def includeme(config):
     if not config.registry.settings.get('indexer'):
         config.include('.esstorage')
 
-    if asbool(settings.get('should_index')):
-        config.include('.indexer')
-        if asbool(settings.get('indexer')) and not PY2:
-           config.include('.mpindexer')
+    config.include('.indexer')
+    if asbool(settings.get('indexer')) and not PY2:
+        config.include('.mpindexer')
 
 
 
