@@ -35,20 +35,14 @@ log = logging.getLogger(__name__)
 
 
 def includeme(config):
-    if config.registry.settings.get('should_index'):
-        config.add_route('index', '/index')
-    else:
-        config.add_route('mock_index', '/index')
+    config.add_route('index', '/index')
 
     config.scan(__name__)
     registry = config.registry
-    registry[INDEXER] = Indexer(registry)
-
-
-@view_config(route_name='mock_index', request_method='POST', permission="index")
-def mock_index(request):
-    print("not indexing, just mocked")
-    return {}
+    if registry.settings.get('indexer'):
+        registry[INDEXER] = Indexer(registry)
+    else:
+        registry[INDEXER] = None
 
 
 @view_config(route_name='index', request_method='POST', permission="index")
@@ -61,6 +55,9 @@ def index(request):
     req_uuids = request.json.get('uuids', None)
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
+    if not indexer:
+        print("skipping indexing cause set")
+        return {}
 
     session = request.registry[DBSESSION]()
     connection = session.connection()
