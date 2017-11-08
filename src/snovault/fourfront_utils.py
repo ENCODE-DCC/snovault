@@ -36,7 +36,8 @@ def expand_embedded_list(item_type, types, embeds, schema, processed_embeds):
     # Handles the use of a terminal '*' in the embeds
     for embed_path in embeds:
         # ensure that the embed is valid
-        error_message, path_embeds_to_add = crawl_schemas_by_embeds(item_type, types, embed_path, schema)
+        split_path = embed_path.strip().split('.')
+        error_message, path_embeds_to_add = crawl_schemas_by_embeds(item_type, types, split_path, schema)
         if error_message:
             # remove bad embeds
             # check error_message rather than is_valid because there can
@@ -98,22 +99,23 @@ def find_default_embeds_for_schema(path_thus_far, subschema):
     return linkTo_paths
 
 
-def crawl_schemas_by_embeds(item_type, types, embed_path, schema):
+def crawl_schemas_by_embeds(item_type, types, split_path, schema):
     """
-    Take an embed_path from the embedded_list and confirm that each item in the
+    Take a split embed_path from the embedded_list and confirm that each item in the
     path has a valid schema. Also return default embeds associated with embed_path.
     If embed_path only has one element, return an error. This is because it is
     a redundant embed (all top level fields and @id/display_title for
     linkTos are added automatically).
-    types parameter is registry[TYPES].
-    The test if an schema is a valid linkTo is if it has @id and display_title fields.
+    - split_path is embed_path (e.g. biosource.biosample.*) split on '.', so
+      ['biosample', 'biosource', '*'] for the example above.
+    - types parameter is registry[TYPES].
+    A linkTo schema is considered valid if it has @id and display_title fields.
     Return values:
     1. error_message. Either None for no errors or a string to describe the error
     2. embeds_to_add. List of embeds to add for the given embed_path. In the
     case of embed_path ending with a *, this is the default embeds for that
     object's schema. Otherwise, it may just be embed_path, once its validated.
     """
-    split_path = embed_path.strip().split('.')
     schema_cursor = schema
     embeds_to_add = []
     error_message = None
