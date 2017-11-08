@@ -28,7 +28,6 @@ def test_build_default_embeds():
 def test_find_default_embeds_for_schema(app):
     from snovault.fourfront_utils import find_default_embeds_for_schema
     from snovault import TYPES
-    import pdb; pdb.set_trace()
     type_info = registry[TYPES].by_item_type['snowset']
     schema_props = type_info.schema.get('properties')
     default_embeds = find_default_embeds_for_schema('', schema_props)
