@@ -30,7 +30,7 @@ import pdb
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
 log = logging.getLogger(__name__)
-SEARCH_MAX = 10000  # OutOfMemoryError if too high
+SEARCH_MAX = 99999  # OutOfMemoryError if too high
 
 def includeme(config):
     config.add_route('index', '/index')
