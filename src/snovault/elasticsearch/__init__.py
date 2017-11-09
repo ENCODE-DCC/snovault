@@ -32,10 +32,7 @@ def includeme(config):
     )
 
     config.include('.cached_views')
-    # if not config.registry.settings.get('indexer'):
-    #     config.include('.esstorage')
     config.include('.esstorage')
-
     config.include('.indexer')
     if asbool(settings.get('mpindexer')) and not PY2:
         config.include('.mpindexer')
