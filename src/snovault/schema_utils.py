@@ -266,13 +266,15 @@ def validators(validator, validators, instance, schema):
             yield ValidationError(error)
 
 
-def calculatedProperty(validator, linkTo, instance, schema):
-    yield ValidationError('submission of calculatedProperty disallowed')
+def notSubmittable(validator, linkTo, instance, schema):
+    yield ValidationError('submission disallowed')
 
 
 class SchemaValidator(Draft4Validator):
     VALIDATORS = Draft4Validator.VALIDATORS.copy()
-    VALIDATORS['calculatedProperty'] = calculatedProperty
+    VALIDATORS['notSubmittable'] = notSubmittable
+    # for backwards-compatibility
+    VALIDATORS['calculatedProperty'] = notSubmittable
     VALIDATORS['linkTo'] = linkTo
     VALIDATORS['linkFrom'] = linkFrom
     VALIDATORS['permission'] = permission

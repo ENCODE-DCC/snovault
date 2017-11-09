@@ -2,6 +2,8 @@
 
 - Fix development build.
 
+- Use notSubmittable instead of calculatedProperty to indicate properties that may not be submitted.
+
 0.30:
 
 - Document dependency on java 8.
