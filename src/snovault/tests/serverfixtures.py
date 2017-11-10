@@ -40,7 +40,7 @@ def engine_url(request):
 
 
 @pytest.mark.fixture_cost(10)
-@pytest.yield_fixture(scope='session')
+@pytest.yield_fixture(scope='module')
 def postgresql_server(request):
     from urllib.parse import quote
     from .postgresql_fixture import initdb, server_process
