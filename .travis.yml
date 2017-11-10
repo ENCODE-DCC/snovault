@@ -1,5 +1,6 @@
 language: python
-sudo: true
+sudo: required
+distro: trusty
 cache:
   directories:
   - eggs

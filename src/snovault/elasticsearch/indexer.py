@@ -20,6 +20,7 @@ from .interfaces import (
     ELASTIC_SEARCH,
     INDEXER
 )
+from snovault import CONNECTION
 import datetime
 import logging
 import pytz
