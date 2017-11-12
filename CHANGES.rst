@@ -1,8 +1,11 @@
 0.31:
 
-- Fix development build.
+- ENCD-3684 Specify https index to fix buildout, update
+  changelog.
 
-- Use notSubmittable instead of calculatedProperty to indicate properties that may not be submitted.
+- Use notSubmittable instead of calculatedProperty
+  to indicate properties that may not be submitted.
+  Related to ENCD-3669.
 
 0.30:
 
