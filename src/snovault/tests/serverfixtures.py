@@ -1,5 +1,6 @@
 import pytest
 import os
+from subprocess import TimeoutExpired
 
 
 def pytest_configure():
@@ -75,7 +76,10 @@ def elasticsearch_server(request, elasticsearch_host_port):
 
     if 'process' in locals() and process.poll() is None:
         process.terminate()
-        process.wait()
+        try:
+            process.wait(timeout=10)
+        except TimeoutExpired:
+            process.kill()
 
 
 # http://docs.sqlalchemy.org/en/rel_0_8/orm/session.html#joining-a-session-into-an-external-transaction
