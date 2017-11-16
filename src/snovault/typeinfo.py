@@ -107,6 +107,8 @@ class TypeInfo(AbstractTypeInfo):
     def schema_rev_links(self):
         revs = {}
         for key, prop in self.schema['properties'].items():
+            if prop.get('notSubmittable'):
+                continue
             linkFrom = prop.get('linkFrom', prop.get('items', {}).get('linkFrom'))
             if linkFrom is None:
                 continue

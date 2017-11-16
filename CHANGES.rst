@@ -1,3 +1,8 @@
+0.32:
+
+- Don't include notSubmittable reverse links in the edit view
+  of an object.
+
 0.31:
 
 - ENCD-3684 Specify https index to fix buildout, update
