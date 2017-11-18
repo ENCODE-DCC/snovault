@@ -91,4 +91,5 @@ Several requests can be made of the ``/_indexer_state`` path with use of ?reques
 
   :reindex: Use 'all' for complete reindexing or comma separated uuids for specific reindexing.  This powerful method necessitates being logged on with admin permissions.
   :notify: One or more comma separated slack ids to be notified when the specific indexer is done.
-  :bot_token: For the time being this is required for slack notification to work.
+
+    :bot_token: For the time being this is required for slack notification to work.

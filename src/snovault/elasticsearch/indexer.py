@@ -152,14 +152,15 @@ class IndexerState(object):
     def request_reindex(self,requested):
         '''Requests full reindexing on next cycle'''
         if requested == 'all':
-            self.put_obj(self.override, {self.title : 'reindex', 'all': True})
             if self.title == 'primary':  # If primary indexer delete the original master obj
                 self.delete_objs(["indexing"])  # http://localhost:9200/snovault/meta/indexing
+            else:
+                self.put_obj(self.override, {self.title : 'reindex', 'all': True})
 
         else:
             uuids = requested.split(',')
             override_obj = self.get_obj(self.override)
-            if 'uuids' not in override_obj:
+            if 'uuids' not in override_obj.keys():
                 override_obj['uuids'] = uuids
             else:
                 override_obj['uuids'].extend(uuids)
@@ -343,15 +344,15 @@ class IndexerState(object):
         '''Returns a list of registered indexers.'''
         return self.get_list("registered_indexers")
 
-    def get_notice_user(self, user):
+    def get_notice_user(self, user, bot_token):
         '''Returns the user token for a named user.'''
         slack_users = self.get_obj('slack_users',{})
         if not slack_users:
             try:
-                r = requests.get('https://slack.com/api/users.list?token=xoxb-197478914097-Tf1hh7JDQnU9ZL34lpBawn0T')
+                r = requests.get('https://slack.com/api/users.list?token=%s' % (bot_token)
                 resp = json.loads(r.text)
-                if not resp['ok']:
-                    log.warn(resp)
+                if not resp['ok']:  # and resp.get('error','') != 'ratelimited':
+                    log.warn(resp)  # too many at once: {'error': 'ratelimited', 'ok': False}
                     return None
                 members = resp.get('members',[])
                 for member in members:
@@ -387,10 +388,10 @@ class IndexerState(object):
                     if 'indexers' not in indexer_notices:
                         indexer_notices['indexers'] = self.get_list("registered_indexers")
                 users = who.split(',')
-                # TODO: verify users, convert users from names to tokens?
-                for name in users:
-                    if self.get_notice_user(name) is None:
-                        user_warns += ', ' + name
+                if 'bot_token' in notify:
+                    for name in users:
+                        if self.get_notice_user(name,notify['bot_token']) is None:
+                            user_warns += ', ' + name
                 who_all = indexer_notices.get('who',[])
                 who_all.extend(users)
                 indexer_notices['who'] = list(set(who_all))
@@ -433,7 +434,7 @@ class IndexerState(object):
 
     def send_notices(self):
         '''Sends notifications when indexer is done.'''
-        # https://slack.com/api/chat.postMessage?token=xoxb-197478914097-Tf1hh7JDQnU9ZL34lpBawn0T&channel=U1KPQK1HN&text=Yay!
+        # https://slack.com/api/chat.postMessage?token=xoxb-1974789...&channel=U1KPQK1HN&text=Yay!
         notify = self.get_obj('notify','default')
         if not notify:
             return
@@ -471,12 +472,12 @@ class IndexerState(object):
             msg = ''
             if len(who) == 1:
                 #channel='U1KPQK1HN'  # TODO: look up user token
-                channel = self.get_notice_user(who[0])
+                channel = self.get_notice_user(who[0],notify['bot_token'])
                 if channel:
                     msg = 'token=%s&channel=%s&text=%s' % (notify['bot_token'],channel,text)
                 # otherwise fall back on generic message.
-            if msg == '':
-                channel='dcc-private'  # TODO: user OR DCC-private
+            if msg == '':  # This will catch multiple users AND single users for which a channel could not be found
+                channel='dcc-private'
                 for user in who:
                     users += '@' + user + ', '
                 msg = 'token=%s&channel=%s&link_names=true&text=%s%s' % (notify['bot_token'],channel,users,text)
@@ -537,7 +538,7 @@ def indexer_state_show(request):
     who = request.params.get("notify")
     bot_token = request.params.get("bot_token")
     if who is not None or bot_token is not None:
-        notices = state.set_notices(request.host_url, who, bot_token, request.params.get("indexers"))
+        notices = state.set_notices(request.host_url, who, bot_token, request.params.get("which"))
         if isinstance(notices,str):
             return notices
 
@@ -587,7 +588,7 @@ def index(request):
 
     # Currently 2 possible followup indexers (base.ini [set stage_for_followup = vis_indexer, region_indexer])
     stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').replace(' ','').split(','))
-    use_2pass = False # request.registry.settings.get("index_with_2pass", False)  # defined in base.ini for encoded
+    use_2pass = False #request.registry.settings.get("index_with_2pass", False)  # defined in base.ini for encoded
 
     # May have undone uuids from prior cycle
     state = IndexerState(es, INDEX, followups=stage_for_followup)
@@ -652,6 +653,7 @@ def index(request):
 
             result['txn_count'] = txn_count
             if txn_count == 0:
+                state.send_notices()
                 return result
 
             es.indices.refresh(index=INDEX)
@@ -882,6 +884,7 @@ class Indexer(object):
 
     def update_audits(self, request, uuids, xmin, snapshot_id=None):
         # Only called when use_2pass is True
+        assert(self.use_2pass)
         errors = []
         for i, uuid in enumerate(uuids):
             error = self.update_audit(request, uuid, xmin)
@@ -915,8 +918,10 @@ class Indexer(object):
             # TODO assert('audit_stale' is in doc or doc.get('audit') is None)
 
             try:
+                #log.warning('2nd-pass audit for %s' % (uuid))
                 # using audit-now bypasses cached_views 'audit' ensureing the audit is recacluated.
-                audit = request.embed(str(uuid), '@@audit-now', as_user='INDEXER')['audit']
+                audit = request.embed(str(uuid) + '/@@audit-now', as_user='INDEXER')['audit']
+                #audit = request.embed(str(uuid), '@@audit-now', as_user='INDEXER')['audit']
                 if audit or doc.get('audit_stale',False):
                     doc.update(
                         audit=audit,
