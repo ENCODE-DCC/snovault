@@ -250,7 +250,7 @@ var jsonSchemaToFormSchema = function(attrs) {
         var properties = {}, name;
         for (name in p.properties) {
             if (name == 'uuid' || name == 'schema_version') continue;
-            if (p.properties[name].calculatedProperty) continue;
+            if (p.properties[name].notSubmittable) continue;
             if (!showReadOnly && p.properties[name].readonly) continue;
             if (_.contains(skip, name)) continue;
             var required = _.contains(p.required || [], name);

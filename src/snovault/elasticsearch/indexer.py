@@ -448,10 +448,12 @@ class IndexerState(object):
             # if all indexers are done, then report
             indexers = notify['all'].get('indexers',[])
             if self.title in indexers:
-                indexers.remove(self.title)
-            if len(indexers) > 0:
-                notify['all']['indexers'] = indexers
-            else:
+                # Primary must finish before follow up indexers can remove themselves from list
+                if self.title != 'primary' and 'primary' not in indexers:
+                    indexers.remove(self.title)
+                    if len(indexers) > 0:
+                        notify['all']['indexers'] = indexers
+            if len(indexers) == 0:
                 who.extend(notify['all'].get('who',[]))
                 notify.pop('all',None)
                 text='All indexers are done for %s/_indexer_state' % (notify['from'])
