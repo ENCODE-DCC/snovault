@@ -1,7 +1,7 @@
 0.32:
 
-- Don't include notSubmittable reverse links in the edit view
-  of an object.
+- Update to ENCD-3669 to not include notSubmittable
+  reverse links in the edit view of an object.
 
 0.31:
 
