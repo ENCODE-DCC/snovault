@@ -60,16 +60,15 @@ def get_pagination(request):
 def get_filtered_query(term, search_fields, result_fields, principals, doc_types):
     return {
         'query': {
+            'query_string': {
+                'query': term,
+                'fields': search_fields,
+                'default_operator': 'AND'
+            }
+        },
+        'post_filter': {
             'bool': {
-                'must': {
-                    'multi_match': {
-                        'query': term,
-                        'fields': search_fields,
-                        'type': 'best_fields',
-                        'operator': 'and'
-                    }
-                },
-                'filter': [
+                'must': [
                     {
                         'terms': {
                             'principals_allowed.view': principals
@@ -80,8 +79,9 @@ def get_filtered_query(term, search_fields, result_fields, principals, doc_types
                             'embedded.@type': doc_types
                         }
                     }
-                ]
-            },
+                ],
+                'must_not': []
+            }
         },
 
         '_source': list(result_fields),
@@ -151,7 +151,7 @@ def set_sort_order(request, search_term, types, doc_types, query, result):
         if not sort:
             sort['embedded.date_created'] = result_sort['date_created'] = {
                 'order': 'desc',
-                'unmapped_type': 'date',
+                'unmapped_type': 'keyword',
             }
             sort['embedded.label'] = result_sort['label'] = {
                 'order': 'asc',
@@ -179,7 +179,7 @@ def get_search_fields(request, doc_types):
         for value in type_info.schema.get('boost_values', ()):
             fields.add('embedded.' + value)
             highlights['embedded.' + value] = {}
-    return fields, highlights
+    return list(fields), highlights
 
 
 def list_visible_columns_for_schemas(request, schemas):
@@ -252,48 +252,48 @@ def list_result_fields(request, doc_types):
     return fields
 
 
-def build_terms_filter(field, terms):
+def build_terms_filter(query_filters, field, terms, query):
     if field.endswith('!'):
         field = field[:-1]
         if not field.startswith('audit'):
             field = 'embedded.' + field
         # Setting not filter instead of terms filter
         if terms == ['*']:
-            return {
-                'missing': {
-                    'field': field,
-                }
-            }
-        else:
-            return {
-                'not': {
-                    'term': {
-                        field: terms,
-                    }
-                }
-            }
-    else:
-        if not field.startswith('audit'):
-            field = 'embedded.' + field
-        if terms == ['*']:
-            return {
+            negative_filter_condition = {
                 'exists': {
                     'field': field,
                 }
             }
         else:
-            return {
+            negative_filter_condition = {
+                'terms': {
+                    field: terms
+                }
+            }
+        query_filters['must_not'].append(negative_filter_condition)
+    else:
+        if not field.startswith('audit'):
+            field = 'embedded.' + field
+        if terms == ['*']:
+            filter_condition = {
+                'exists': {
+                    'field': field,
+                }
+            }
+        else:
+            filter_condition = {
                 'terms': {
                     field: terms,
                 },
             }
+        query_filters['must'].append(filter_condition)
 
 
 def set_filters(request, query, result, static_items=None):
     """
     Sets filters in the query
     """
-    query_filters = query['query']['bool']['filter']
+    query_filters = query['post_filter']['bool']
     used_filters = {}
     if static_items is None:
         static_items = []
@@ -317,8 +317,8 @@ def set_filters(request, query, result, static_items=None):
             continue
 
         terms = all_terms[field]
-        if field in ['type', 'limit', 'mode',
-                     'format', 'frame', 'datastore', 'field',
+        if field in ['type', 'limit', 'y.limit', 'x.limit', 'mode', 'annotation',
+                     'format', 'frame', 'datastore', 'field', 'region', 'genome',
                      'sort', 'from', 'referrer']:
             continue
 
@@ -343,11 +343,7 @@ def set_filters(request, query, result, static_items=None):
         used_filters[field] = terms
 
         # Add filter to query
-        query_filters.append(build_terms_filter(field, terms))
-    # pp('used and query filters ')
-    # pp(used_filters)
-    # pp('')
-    # pp(query_filters)
+        build_terms_filter(query_filters, field, terms, query)
 
     return used_filters
 
@@ -380,8 +376,20 @@ def build_aggregation(facet_name, facet_options, min_doc_count=0):
         agg = {
             'filters': {
                 'filters': {
-                    'yes': {'exists': {'field': field}},
-                    'no': {'missing': {'field': field}},
+                    'yes': {
+                        'bool': {
+                            'must': {
+                                'exists': {'field': field}
+                            }
+                        }
+                    },
+                    'no': {
+                        'bool': {
+                            'must_not': {
+                                'exists': {'field': field}
+                            }
+                        }
+                    },
                 },
             },
         }
@@ -404,6 +412,7 @@ def set_facets(facets, used_filters, principals, doc_types):
             {'terms': {'principals_allowed.view': principals}},
             {'terms': {'embedded.@type': doc_types}},
         ]
+        negative_filters = []
         # Also apply any filters NOT from the same field as the facet
         for field, terms in used_filters.items():
             if field.endswith('!'):
@@ -421,9 +430,9 @@ def set_facets(facets, used_filters, principals, doc_types):
 
             if field.endswith('!'):
                 if terms == ['*']:
-                    filters.append({'missing': {'field': query_field}})
+                    negative_filters.append({'exists': {'field': query_field}})
                 else:
-                    filters.append({'not': {'terms': {query_field: terms}}})
+                    negative_filters.append({'terms': {query_field: terms}})
             else:
                 if terms == ['*']:
                     filters.append({'exists': {'field': query_field}})
@@ -438,6 +447,7 @@ def set_facets(facets, used_filters, principals, doc_types):
             'filter': {
                 'bool': {
                     'must': filters,
+                    'must_not': negative_filters
                 },
             },
         }
@@ -692,11 +702,11 @@ def search(context, request, search_type=None, return_generator=False):
     # If no text search, use match_all query instead of query_string
     if search_term == '*':
         # query['query']['match_all'] = {}
-        del query['query']['bool']['must']
+        del query['query']['query_string']
     # If searching for more than one type, don't specify which fields to search
-    elif len(doc_types) != 1:
-        del query['query']['bool']['must']['multi_match']['fields']
-        query['query']['bool']['must']['multi_match']['fields'] = ['_all', '*.uuid',]
+    else:
+        # del query['query']['bool']['must']['multi_match']['fields']
+        query['query']['query_string']['fields'].extend(['_all', '*.uuid', '*.md5sum', '*.submitted_file_name'])
 
 
     # Set sort order
@@ -723,6 +733,12 @@ def search(context, request, search_type=None, return_generator=False):
     do_scan = size is None or size > 1000
     # Execute the query
     # pdb.set_trace()
+
+    if not request.params.get('type') or 'Item' in doc_types:
+        es_index = '_all'
+    else:
+        es_index = [types[type_name].item_type for type_name in doc_types if hasattr(types[type_name], 'item_type')]
+    
     if do_scan:
         # pp('###### inside search type count')
         # pp(query)

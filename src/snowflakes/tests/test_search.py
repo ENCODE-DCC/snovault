@@ -42,17 +42,21 @@ class FakeRequest(object):
 
 
 def test_set_filters():
-    from snowflakes.search import set_filters
+    from encoded.search import set_filters
 
     request = FakeRequest((
         ('field1', 'value1'),
     ))
     query = {
         'query': {
-            'bool': {
-                'filter': [],
-            },
+            'query_string': {}
         },
+        'post_filter': {
+            'bool': {
+                'must': [],
+                'must_not': []
+            }
+        }
     }
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
@@ -60,17 +64,21 @@ def test_set_filters():
     assert used_filters == {'field1': ['value1']}
     assert query == {
         'query': {
+            'query_string': {}
+        },
+        'post_filter': {
             'bool': {
-                'filter': [
+                'must': [
                     {
                         'terms': {
                             'embedded.field1': ['value1'],
                         },
                     },
                 ],
-            },
-        },
+                'must_not': []
             }
+        }
+    }
     assert result == {
         'filters': [
             {
@@ -83,17 +91,21 @@ def test_set_filters():
 
 
 def test_set_filters_searchTerm():
-    from snowflakes.search import set_filters
+    from encoded.search import set_filters
 
     request = FakeRequest((
         ('searchTerm', 'value1'),
     ))
     query = {
         'query': {
-            'bool': {
-                'filter': [],
-            },
+            'query_string': {}
         },
+        'post_filter': {
+            'bool': {
+                'must': [],
+                'must_not': []
+            }
+        }
     }
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
@@ -101,10 +113,14 @@ def test_set_filters_searchTerm():
     assert used_filters == {}
     assert query == {
         'query': {
-            'bool': {
-                'filter': [],
-            },
+            'query_string': {}
         },
+        'post_filter': {
+            'bool': {
+                'must': [],
+                'must_not': []
+            }
+        }
     }
     assert result == {
         'filters': [
@@ -122,17 +138,21 @@ def test_set_filters_searchTerm():
     'type', 'limit', 'mode',
     'format', 'frame', 'datastore', 'field', 'sort', 'from', 'referrer'])
 def test_set_filters_reserved_params(param):
-    from snowflakes.search import set_filters
+    from encoded.search import set_filters
 
     request = FakeRequest((
         (param, 'foo'),
     ))
     query = {
         'query': {
-            'bool': {
-                'filter': [],
-            },
+            'query_string': {}
         },
+        'post_filter': {
+            'bool': {
+                'must': [],
+                'must_not': []
+            }
+        }
     }
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
@@ -140,10 +160,14 @@ def test_set_filters_reserved_params(param):
     assert used_filters == {}
     assert query == {
         'query': {
-            'bool': {
-                'filter': [],
-            },
+            'query_string': {}
         },
+        'post_filter': {
+            'bool': {
+                'must': [],
+                'must_not': []
+            }
+        }
     }
     assert result == {
         'filters': [],
@@ -151,7 +175,7 @@ def test_set_filters_reserved_params(param):
 
 
 def test_set_filters_multivalued():
-    from snowflakes.search import set_filters
+    from encoded.search import set_filters
 
     request = FakeRequest((
         ('field1', 'value1'),
@@ -159,10 +183,14 @@ def test_set_filters_multivalued():
     ))
     query = {
         'query': {
-            'bool': {
-                'filter': [],
-            },
+            'query_string': {}
         },
+        'post_filter': {
+            'bool': {
+                'must': [],
+                'must_not': []
+            }
+        }
     }
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
@@ -170,16 +198,20 @@ def test_set_filters_multivalued():
     assert used_filters == {'field1': ['value1', 'value2']}
     assert query == {
         'query': {
+            'query_string': {}
+        },
+        'post_filter': {
             'bool': {
-                'filter': [
+                'must': [
                     {
                         'terms': {
-                            'embedded.field1': ['value1', 'value2'],
-                        },
-                    },
+                            'embedded.field1': ['value1', 'value2']
+                        }
+                    }
                 ],
-            },
-        },
+                'must_not': []
+            }
+        }
     }
     assert result == {
         'filters': [
@@ -198,17 +230,21 @@ def test_set_filters_multivalued():
 
 
 def test_set_filters_negated():
-    from snowflakes.search import set_filters
+    from encoded.search import set_filters
 
     request = FakeRequest((
         ('field1!', 'value1'),
     ))
     query = {
         'query': {
-            'bool': {
-                'filter': [],
-            },
+            'query_string': {}
         },
+        'post_filter': {
+            'bool': {
+                'must': [],
+                'must_not': []
+            }
+        }
     }
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
@@ -216,18 +252,20 @@ def test_set_filters_negated():
     assert used_filters == {'field1!': ['value1']}
     assert query == {
         'query': {
-            'bool': {
-                'filter': [
-                    {
-                        'not': {
-                            'term': {
-                                'embedded.field1': ['value1'],
-                            },
-                        },
-                    },
-                ],
-            },
+            'query_string': {}
         },
+        'post_filter': {
+            'bool': {
+                'must_not': [
+                    {
+                        'terms': {
+                            'embedded.field1': ['value1']
+                        }
+                    }
+                ],
+                'must': []
+            }
+        }
     }
     assert result == {
         'filters': [
@@ -241,17 +279,21 @@ def test_set_filters_negated():
 
 
 def test_set_filters_audit():
-    from snowflakes.search import set_filters
+    from encoded.search import set_filters
 
     request = FakeRequest((
         ('audit.foo', 'value1'),
     ))
     query = {
         'query': {
-            'bool': {
-                'filter': [],
-            },
+            'query_string': {}
         },
+        'post_filter': {
+            'bool': {
+                'must': [],
+                'must_not': []
+            }
+        }
     }
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
@@ -259,16 +301,20 @@ def test_set_filters_audit():
     assert used_filters == {'audit.foo': ['value1']}
     assert query == {
         'query': {
+            'query_string': {}
+        },
+        'post_filter': {
             'bool': {
-                'filter': [
+                'must': [
                     {
                         'terms': {
-                            'audit.foo': ['value1'],
+                            'audit.foo': ['value1']
                         },
                     },
                 ],
-            },
-        },
+                'must_not': []
+            }
+        }
     }
     assert result == {
         'filters': [
@@ -281,8 +327,9 @@ def test_set_filters_audit():
     }
 
 
+
 def test_set_filters_exists_missing():
-    from snowflakes.search import set_filters
+    from encoded.search import set_filters
 
     request = FakeRequest((
         ('field1', '*'),
@@ -290,10 +337,14 @@ def test_set_filters_exists_missing():
     ))
     query = {
         'query': {
-            'bool': {
-                'filter': [],
-            },
+            'query_string': {}
         },
+        'post_filter': {
+            'bool': {
+                'must': [],
+                'must_not': []
+            }
+        }
     }
     result = {'filters': []}
     used_filters = set_filters(request, query, result)
@@ -302,24 +353,32 @@ def test_set_filters_exists_missing():
         'field1': ['*'],
         'field2!': ['*'],
     }
+
     assert query == {
         'query': {
+            'query_string': {}
+        },
+        'post_filter': {
             'bool': {
-                'filter': [
+                'must': [
                     {
                         'exists': {
-                            'field': 'embedded.field1',
-                        },
+                            'field': 'embedded.field1'
+                        }
                     },
+                ],
+                'must_not': [
                     {
-                        'missing': {
-                            'field': 'embedded.field2',
+                        'exists': {
+                            'field': 'embedded.field2'
                         }
                     }
-                ],
-            },
-        },
+
+                ]
+            }
+        }
     }
+
     assert result == {
         'filters': [
             {
@@ -338,7 +397,7 @@ def test_set_filters_exists_missing():
 
 def test_set_facets():
     from collections import OrderedDict
-    from snowflakes.search import set_facets
+    from encoded.search import set_facets
     facets = [
         ('type', {'title': 'Type'}),
         ('audit.foo', {'title': 'Audit'}),
@@ -372,6 +431,7 @@ def test_set_facets():
                         {'terms': {'embedded.facet1': ['value1']}},
                         {'terms': {'audit.foo': ['value2']}},
                     ],
+                    'must_not': []
                 },
             },
         },
@@ -392,6 +452,7 @@ def test_set_facets():
                         {'terms': {'embedded.@type': ['Snowball']}},
                         {'terms': {'embedded.facet1': ['value1']}},
                     ],
+                    'must_not': []
                 },
             },
         },
@@ -412,6 +473,7 @@ def test_set_facets():
                         {'terms': {'embedded.@type': ['Snowball']}},
                         {'terms': {'audit.foo': ['value2']}},
                     ],
+                    'must_not': []
                 },
             },
         }
@@ -421,7 +483,7 @@ def test_set_facets():
 
 def test_set_facets_negated_filter():
     from collections import OrderedDict
-    from snowflakes.search import set_facets
+    from encoded.search import set_facets
     facets = [
         ('facet1', {'title': 'Facet 1'}),
     ]
@@ -447,8 +509,10 @@ def test_set_facets_negated_filter():
                 'bool': {
                     'must': [
                         {'terms': {'principals_allowed.view': ['group.admin']}},
-                        {'terms': {'embedded.@type': ['Snowball']}},
-                        {'not': {'terms': {'embedded.field2': ['value1']}}},
+                        {'terms': {'embedded.@type': ['Snowball']}}
+                    ],
+                    'must_not': [
+                        {'terms': {'embedded.field2': ['value1']}}
                     ],
                 },
             },
@@ -456,9 +520,10 @@ def test_set_facets_negated_filter():
     } == aggs
 
 
+
 def test_set_facets_type_exists():
     from collections import OrderedDict
-    from snowflakes.search import set_facets
+    from encoded.search import set_facets
     facets = [
         ('field1', {'title': 'Facet 1', 'type': 'exists'}),
         ('field2', {'title': 'Facet 2', 'type': 'exists'}),
@@ -478,10 +543,18 @@ def test_set_facets_type_exists():
                     'filters': {
                         'filters': {
                             'yes': {
-                                'exists': {'field': 'embedded.field1'}
+                                'bool': {
+                                    'must': {
+                                        'exists': {'field': 'embedded.field1'}
+                                    }
+                                }
                             },
                             'no': {
-                                'missing': {'field': 'embedded.field1'}
+                                'bool': {
+                                    'must_not': {
+                                        'exists': {'field': 'embedded.field1'}
+                                    }
+                                }
                             }
                         },
                     },
@@ -491,9 +564,11 @@ def test_set_facets_type_exists():
                 'bool': {
                     'must': [
                         {'terms': {'principals_allowed.view': ['group.admin']}},
-                        {'terms': {'embedded.@type': ['Snowball']}},
-                        {'missing': {'field': 'embedded.field2'}},
+                        {'terms': {'embedded.@type': ['Snowball']}}
                     ],
+                    'must_not': [
+                        {'exists': {'field': 'embedded.field2'}}
+                    ]
                 },
             },
         },
@@ -503,10 +578,18 @@ def test_set_facets_type_exists():
                     'filters': {
                         'filters': {
                             'yes': {
-                                'exists': {'field': 'embedded.field2'}
+                                'bool': {
+                                    'must': {
+                                        'exists': {'field': 'embedded.field2'}
+                                    }
+                                }
                             },
                             'no': {
-                                'missing': {'field': 'embedded.field2'}
+                                'bool': {
+                                    'must_not': {
+                                        'exists': {'field': 'embedded.field2'}
+                                    }
+                                }
                             }
                         },
                     },
@@ -519,6 +602,7 @@ def test_set_facets_type_exists():
                         {'terms': {'embedded.@type': ['Snowball']}},
                         {'exists': {'field': 'embedded.field1'}},
                     ],
+                    'must_not': []
                 },
             },
         },
