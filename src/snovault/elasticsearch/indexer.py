@@ -349,7 +349,7 @@ class IndexerState(object):
         slack_users = self.get_obj('slack_users',{})
         if not slack_users:
             try:
-                r = requests.get('https://slack.com/api/users.list?token=%s' % (bot_token)
+                r = requests.get('https://slack.com/api/users.list?token=%s' % (bot_token))
                 resp = json.loads(r.text)
                 if not resp['ok']:  # and resp.get('error','') != 'ratelimited':
                     log.warn(resp)  # too many at once: {'error': 'ratelimited', 'ok': False}
