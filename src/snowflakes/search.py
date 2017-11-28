@@ -12,9 +12,6 @@ from pyramid.security import effective_principals
 from urllib.parse import urlencode
 from collections import OrderedDict
 
-import pdb;
-from pprint import pprint as pp
-
 
 CHAR_COUNT = 32
 
@@ -731,23 +728,17 @@ def search(context, request, search_type=None, return_generator=False):
 
     # Decide whether to use scan for results.
     do_scan = size is None or size > 1000
-    # Execute the query
-    # pdb.set_trace()
 
+    # Send search request to proper indices
     if not request.params.get('type') or 'Item' in doc_types:
         es_index = '_all'
     else:
         es_index = [types[type_name].item_type for type_name in doc_types if hasattr(types[type_name], 'item_type')]
     
+    # Execute the query
     if do_scan:
-        # pp('###### inside search type count')
-        # pp(query)
-        # pdb.set_trace()
-
         es_results = es.search(body=query, index=es_index, search_type='query_then_fetch')
     else:
-        # pp(query)
-        # pdb.set_trace()
         es_results = es.search(body=query, index=es_index, from_=from_, size=size)
 
     result['total'] = total = es_results['hits']['total']
