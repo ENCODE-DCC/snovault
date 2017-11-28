@@ -9,7 +9,6 @@ from sqlalchemy.exc import StatementError
 from snovault import (
     COLLECTIONS,
     DBSESSION,
-    CONNECTION,
     STORAGE
 )
 from snovault.storage import (
@@ -20,13 +19,11 @@ from .interfaces import (
     ELASTIC_SEARCH,
     INDEXER
 )
-from snovault import CONNECTION
 import datetime
 import logging
 import pytz
 import time
 import copy
-import pdb
 
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
