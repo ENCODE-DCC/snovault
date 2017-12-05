@@ -147,7 +147,6 @@ def test_patch_delete_fields_still_works_with_no_validation(content, testapp):
 
 
 def test_patch_delete_fields_bad_param(content, testapp):
-    from ..validation import ValidationFailure
     url = content['@id']
     res = testapp.get(url)
     assert res.json['simple1'] == 'simple1 default'
