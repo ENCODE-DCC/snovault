@@ -175,6 +175,9 @@ class TestingPostPutPatch(Item):
                 'type': 'string',
                 'default': 'simple2 default',
             },
+            'field_no_default': {
+                'type': 'string',
+            },
             'protected': {
                 # This should be allowed on PUT so long as value is the same
                 'type': 'string',
