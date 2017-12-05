@@ -34,7 +34,9 @@ def no_validate_item_content_patch(context, request):
 def delete_fields(request, data):
     if request.params.get('delete_fields'):
         for dfield in request.params['delete_fields'].split(','):
-            del data[dfield]
+            dfield = dfield.strip();
+            if dfield in data:
+                del data[dfield]
     return data
 
 
