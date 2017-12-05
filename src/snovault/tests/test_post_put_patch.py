@@ -146,6 +146,18 @@ def test_patch_delete_fields_still_works_with_no_validation(content, testapp):
     assert 'simple1' not in res.json['@graph'][0].keys()
 
 
+def test_patch_delete_fields_bad_param(content, testapp):
+    from ..validation import ValidationFailure
+    url = content['@id']
+    res = testapp.get(url)
+    assert res.json['simple1'] == 'simple1 default'
+    assert res.json['simple2'] == 'simple2 default'
+    assert res.json['field_no_default'] == 'test'
+    res = testapp.patch_json(url + "?delete_fields=simple1,bad_fieldname", {}, status=422)
+    assert res.json['description'] == "Failed validation"
+    assert res.json['errors'][0]['description'] == "cannot delete invalid field: bad_fieldname"
+
+
 def test_patch_new_schema_version(content, root, testapp, monkeypatch):
     collection = root['testing_post_put_patch']
     properties = collection.type_info.schema['properties']
