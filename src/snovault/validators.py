@@ -23,6 +23,7 @@ def no_validate_item_content_put(context, request):
 def no_validate_item_content_patch(context, request):
     data = context.properties.copy()
     data.update(request.json)
+    delete_fields(request, data)
     if 'uuid' in data:
         if UUID(data['uuid']) != context.uuid:
             msg = 'uuid may not be changed'
@@ -30,9 +31,14 @@ def no_validate_item_content_patch(context, request):
     request.validated.update(data)
 
 
+def delete_fields(request, data):
+    if request.params.get('delete_fields'):
+        for dfield in request.params['delete_fields'].split(','):
+            del data[dfield]
+    return data
+
+
 # Schema checking validators
-
-
 def validate_item_content_post(context, request):
     data = request.json
     validate_request(context.type_info.schema, request, data)
@@ -54,6 +60,7 @@ def validate_item_content_patch(context, request):
     if 'schema_version' in data:
         del data['schema_version']
     data.update(request.json)
+    delete_fields(request, data)
     schema = context.type_info.schema
     if 'uuid' in data and UUID(data['uuid']) != context.uuid:
         msg = 'uuid may not be changed'

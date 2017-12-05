@@ -177,6 +177,8 @@ def item_edit(context, request, render=None):
 
     PUT - replaces the current properties with the new body
     PATCH - updates the current properties with those supplied.
+    Note validators will handle the PATH ?delete_fields parameter if you want
+    field to be deleted
     """
     if render is None:
         render = request.params.get('render', True)
