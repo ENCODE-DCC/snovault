@@ -23,6 +23,8 @@ item_with_uuid = [
     {
         'uuid': '0f13ff76-c559-4e70-9497-a6130841df9f',
         'required': 'required value 1',
+        'field_no_default': 'test'
+
     },
     {
         'uuid': '6c3e444b-f290-43c4-bfb9-d20135377770',
@@ -112,6 +114,36 @@ def test_patch(content, testapp):
     res = testapp.patch_json(url, {'simple2': 'supplied simple2'}, status=200)
     assert res.json['@graph'][0]['simple1'] == 'supplied simple1'
     assert res.json['@graph'][0]['simple2'] == 'supplied simple2'
+
+
+def test_patch_delete_fields(content, testapp):
+    url = content['@id']
+    res = testapp.get(url)
+    assert res.json['simple1'] == 'simple1 default'
+    assert res.json['simple2'] == 'simple2 default'
+    assert res.json['field_no_default'] == 'test'
+
+    res = testapp.patch_json(url, {'simple1': 'this is a test'}, status=200)
+    assert res.json['@graph'][0]['simple1'] == 'this is a test'
+
+    # delete fields with defaults resets to default, while deleting non default field
+    # completely removes them
+    res = testapp.patch_json(url + "?delete_fields=simple1,field_no_default", {}, status=200)
+    assert 'field_no_default' not in res.json['@graph'][0].keys()
+    assert res.json['@graph'][0]['simple1'] == 'simple1 default'
+
+
+def test_patch_delete_fields_still_works_with_no_validation(content, testapp):
+    url = content['@id']
+    res = testapp.get(url)
+    assert res.json['simple1'] == 'simple1 default'
+    assert res.json['simple2'] == 'simple2 default'
+    assert res.json['field_no_default'] == 'test'
+
+    # with validate=false, then defaults are not populated so default fields are also deleted
+    res = testapp.patch_json(url + "?delete_fields=simple1,field_no_default&validate=false", {}, status=200)
+    assert 'field_no_default' not in res.json['@graph'][0].keys()
+    assert 'simple1' not in res.json['@graph'][0].keys()
 
 
 def test_patch_new_schema_version(content, root, testapp, monkeypatch):
