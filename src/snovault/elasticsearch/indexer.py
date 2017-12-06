@@ -19,6 +19,7 @@ from .interfaces import (
     ELASTIC_SEARCH,
     INDEXER
 )
+from snovault import CONNECTION
 import datetime
 import logging
 import pytz
@@ -42,7 +43,6 @@ class IndexerState(object):
     def __init__(self, es, index, title='primary'):
         self.es = es
         self.index = index  # "index where indexerstate is stored"
-
         self.title           = title
         self.state_id        = self.title + '_indexer'       # State of the current or last cycle
         self.todo_set        = self.title + '_in_progress'   # one cycle of uuids, sent to the Secondary Indexer
