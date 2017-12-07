@@ -7,6 +7,7 @@ For the development.ini you must supply the paster app name:
 """
 from pkg_resources import resource_filename
 from pyramid.paster import get_app
+from multiprocessing import Process
 
 import atexit
 import logging
@@ -14,6 +15,7 @@ import os.path
 import select
 import shutil
 import sys
+import pdb
 try:
     import subprocess32 as subprocess
 except ImportError:
@@ -62,7 +64,7 @@ def main():
 
     logging.basicConfig()
     # Loading app will have configured from config file. Reconfigure here:
-    logging.getLogger('snowvault').setLevel(logging.DEBUG)
+    logging.getLogger('snovault').setLevel(logging.INFO)
 
     from snovault.tests import elasticsearch_fixture, postgresql_fixture
     from snovault.elasticsearch import create_mapping
@@ -81,6 +83,8 @@ def main():
     nginx = nginx_server_process(echo=True)
     processes = [postgres, elasticsearch, nginx]
 
+    print_processes = []
+
     @atexit.register
     def cleanup_process():
         for process in processes:
@@ -93,6 +97,8 @@ def main():
             except IOError:
                 pass
             process.wait()
+        for p in print_processes:
+            p.terminate()
 
     if args.init:
         app = get_app(args.config_uri, args.app_name)
@@ -108,17 +114,19 @@ def main():
 
     stdouts = [p.stdout for p in processes]
 
-    # Ugly should probably use threads instead
-    while True:
-        readable, writable, err = select.select(stdouts, [], stdouts, 5)
-        for stdout in readable:
+    def print_to_terminal(stdout):
+        while True:
             for line in iter(stdout.readline, b''):
                 sys.stdout.write(line.decode('utf-8'))
-        if err:
-            for stdout in err:
-                for line in iter(stdout.readline, b''):
-                    sys.stdout.write(line.decode('utf-8'))
-            break
+
+
+    readable, writable, err = select.select(stdouts, [], stdouts, 5)
+    for stdout in readable:
+        print_processes.append(Process(target=print_to_terminal, args=(stdout,)))
+    for stdout in err:
+        print_processes.append(Process(target=print_to_terminal, args=(stdout,)))
+    for p in print_processes:
+        p.start()
 
 if __name__ == '__main__':
     main()

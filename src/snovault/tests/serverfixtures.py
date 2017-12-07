@@ -1,4 +1,6 @@
 import pytest
+import os
+from subprocess import TimeoutExpired
 
 
 def pytest_configure():
@@ -68,13 +70,16 @@ def elasticsearch_server(request, elasticsearch_host_port):
     host, port = elasticsearch_host_port
     tmpdir = request.config._tmpdirhandler.mktemp('elasticsearch', numbered=True)
     tmpdir = str(tmpdir)
-    process = server_process(str(tmpdir), host=host, port=port)
+    process = server_process(str(tmpdir), host=host, port=9201, echo=True)
+    print('PORT CHANGED')
+    yield 'http://%s:%d' % (host, 9201)
 
-    yield 'http://%s:%d' % (host, port)
-
-    if process.poll() is None:
+    if 'process' in locals() and process.poll() is None:
         process.terminate()
-        process.wait()
+        try:
+            process.wait(timeout=10)
+        except TimeoutExpired:
+            process.kill()
 
 
 # http://docs.sqlalchemy.org/en/rel_0_8/orm/session.html#joining-a-session-into-an-external-transaction
@@ -356,6 +361,7 @@ def wsgi_server(request, wsgi_server_app, wsgi_server_host_port):
         expose_tracebacks=True,
     )
     assert server.wait()
+    print("wsgi server port {}".format(port))
 
     yield 'http://%s:%s' % wsgi_server_host_port
 

@@ -13,11 +13,6 @@ from urllib.parse import urlencode
 from collections import OrderedDict
 
 
-'''
-This is a generic faceted search interface with a "list object" view and a "csv report view".
-It can be customized to your application
-'''
-
 CHAR_COUNT = 32
 
 
@@ -26,6 +21,9 @@ def includeme(config):
     config.add_route('report', '/report{slash:/?}')
     config.scan(__name__)
 
+
+sanitize_search_string_re = re.compile(r'[\\\+\-\&\|\!\(\)\{\}\[\]\^\~\:\/\\\*\?]')
+
 audit_facets = [
     ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
     ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
@@ -33,11 +31,8 @@ audit_facets = [
     ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
 ]
 
-sanitize_search_string_re = re.compile(r'[\\\+\-\&\|\!\(\)\{\}\[\]\^\~\:\/\\\*\?]')
-
 
 DEFAULT_DOC_TYPES = [
-    'Page',
     'Lab',
     'Snowset',
     'Snowball',
@@ -68,9 +63,9 @@ def get_filtered_query(term, search_fields, result_fields, principals, doc_types
                 'default_operator': 'AND'
             }
         },
-        'filter': {
-            'and': {
-                'filters': [
+        'post_filter': {
+            'bool': {
+                'must': [
                     {
                         'terms': {
                             'principals_allowed.view': principals
@@ -78,12 +73,14 @@ def get_filtered_query(term, search_fields, result_fields, principals, doc_types
                     },
                     {
                         'terms': {
-                            'embedded.@type.raw': doc_types
+                            'embedded.@type': doc_types
                         }
                     }
-                ]
+                ],
+                'must_not': []
             }
         },
+
         '_source': list(result_fields),
     }
 
@@ -130,9 +127,10 @@ def set_sort_order(request, search_term, types, doc_types, query, result):
         else:
             name = requested_sort
             order = 'asc'
-        sort['embedded.' + name + '.raw'] = result_sort[name] = {
+        # TODO: unmapped type needs to be determined, not hard coded
+        sort['embedded.' + name] = result_sort[name] = {
             'order': order,
-            'ignore_unmapped': True,
+            'unmapped_type': 'keyword',
         }
 
     # Otherwise we use a default sort only when there's no text search to be ranked
@@ -144,18 +142,18 @@ def set_sort_order(request, search_term, types, doc_types, query, result):
             if 'sort_by' in type_schema:
                 for k, v in type_schema['sort_by'].items():
                     # Should always sort on raw field rather than analyzed field
-                    sort['embedded.' + k + '.raw'] = result_sort[k] = v
+                    sort['embedded.' + k] = result_sort[k] = v
 
         # Default is most recent first, then alphabetical by label
         if not sort:
-            sort['embedded.date_created.raw'] = result_sort['date_created'] = {
+            sort['embedded.date_created'] = result_sort['date_created'] = {
                 'order': 'desc',
-                'ignore_unmapped': True,
+                'unmapped_type': 'keyword',
             }
-            sort['embedded.label.raw'] = result_sort['label'] = {
+            sort['embedded.label'] = result_sort['label'] = {
                 'order': 'asc',
                 'missing': '_last',
-                'ignore_unmapped': True,
+                'unmapped_type': 'keyword',
             }
 
     if sort:
@@ -178,7 +176,7 @@ def get_search_fields(request, doc_types):
         for value in type_info.schema.get('boost_values', ()):
             fields.add('embedded.' + value)
             highlights['embedded.' + value] = {}
-    return fields, highlights
+    return list(fields), highlights
 
 
 def list_visible_columns_for_schemas(request, schemas):
@@ -208,6 +206,10 @@ def list_visible_columns_for_schemas(request, schemas):
             if field in columns:
                 limited_columns[field] = columns[field]
             else:
+                # We don't currently traverse to other schemas for embedded
+                # objects to find property titles. In this case we'll just
+                # show the field's dotted path for now.
+                limited_columns[field] = {'title': field}
                 for schema in schemas:
                     if field in schema['properties']:
                         limited_columns[field] = {
@@ -239,89 +241,160 @@ def list_result_fields(request, doc_types):
         schemas = [types[doc_type].schema for doc_type in doc_types]
         columns = list_visible_columns_for_schemas(request, schemas)
         fields.update('embedded.' + column for column in columns)
+
+    # Ensure that 'audit' field is requested with _source in the ES query
+    if request.__parent__ and '/metadata/' in request.__parent__.url and request.has_permission('search_audit'):
+        fields.add('audit.*')
+
     return fields
 
 
-def set_filters(request, query, result):
+def build_terms_filter(query_filters, field, terms, query):
+    if field.endswith('!'):
+        field = field[:-1]
+        if not field.startswith('audit'):
+            field = 'embedded.' + field
+        # Setting not filter instead of terms filter
+        if terms == ['*']:
+            negative_filter_condition = {
+                'exists': {
+                    'field': field,
+                }
+            }
+        else:
+            negative_filter_condition = {
+                'terms': {
+                    field: terms
+                }
+            }
+        query_filters['must_not'].append(negative_filter_condition)
+    else:
+        if not field.startswith('audit'):
+            field = 'embedded.' + field
+        if terms == ['*']:
+            filter_condition = {
+                'exists': {
+                    'field': field,
+                }
+            }
+        else:
+            filter_condition = {
+                'terms': {
+                    field: terms,
+                },
+            }
+        query_filters['must'].append(filter_condition)
+
+
+def set_filters(request, query, result, static_items=None):
     """
     Sets filters in the query
     """
-    query_filters = query['filter']['and']['filters']
+    query_filters = query['post_filter']['bool']
     used_filters = {}
-    for field, term in request.params.items():
-        if field in ['type', 'limit', 'mode', 'format', 'frame', 'datastore', 'field',
+    if static_items is None:
+        static_items = []
+
+    # Get query string items plus any static items, then extract all the fields
+    qs_items = list(request.params.items())
+    total_items = qs_items + static_items
+    qs_fields = [item[0] for item in qs_items]
+    fields = [item[0] for item in total_items]
+
+    # Now make lists of terms indexed by field
+    all_terms = {}
+    for item in total_items:
+        if item[0] in all_terms:
+            all_terms[item[0]].append(item[1])
+        else:
+            all_terms[item[0]] = [item[1]]
+
+    for field in fields:
+        if field in used_filters:
+            continue
+
+        terms = all_terms[field]
+        if field in ['type', 'limit', 'y.limit', 'x.limit', 'mode', 'annotation',
+                     'format', 'frame', 'datastore', 'field', 'region', 'genome',
                      'sort', 'from', 'referrer']:
             continue
 
         # Add filter to result
-        qs = urlencode([
-            (k.encode('utf-8'), v.encode('utf-8'))
-            for k, v in request.params.items() if v != term
-        ])
-        result['filters'].append({
-            'field': field,
-            'term': term,
-            'remove': '{}?{}'.format(request.path, qs)
-        })
+        if field in qs_fields:
+            for term in terms:
+                qs = urlencode([
+                    (k.encode('utf-8'), v.encode('utf-8'))
+                    for k, v in qs_items
+                    if '{}={}'.format(k, v) != '{}={}'.format(field, term)
+                ])
+                result['filters'].append({
+                    'field': field,
+                    'term': term,
+                    'remove': '{}?{}'.format(request.path, qs)
+                })
 
         if field == 'searchTerm':
             continue
 
-        # Add filter to query
-        if field.startswith('audit'):
-            query_field = field
-        else:
-            query_field = 'embedded.' + field + '.raw'
+        # Add to list of active filters
+        used_filters[field] = terms
 
-        if field.endswith('!'):
-            if field not in used_filters:
-                # Setting not filter instead of terms filter
-                query_filters.append({
-                    'not': {
-                        'terms': {
-                            'embedded.' + field[:-1] + '.raw': [term],
-                        }
-                    }
-                })
-                query_terms = used_filters[field] = []
-            else:
-                query_filters.remove({
-                    'not': {
-                        'terms': {
-                            'embedded.' + field[:-1] + '.raw': used_filters[field]
-                        }
-                    }
-                })
-                used_filters[field].append(term)
-                query_filters.append({
-                    'not': {
-                        'terms': {
-                            'embedded.' + field[:-1] + '.raw': used_filters[field]
-                        }
-                    }
-                })
-        else:
-            if field not in used_filters:
-                query_terms = used_filters[field] = []
-                query_filters.append({
-                    'terms': {
-                        query_field: query_terms,
-                    }
-                })
-            else:
-                query_filters.remove({
-                    'terms': {
-                        query_field: used_filters[field]
-                    }
-                })
-                used_filters[field].append(term)
-                query_filters.append({
-                    'terms': {
-                        query_field: used_filters[field]
-                    }
-                })
-        used_filters[field].append(term)
+        # Add filter to query
+        build_terms_filter(query_filters, field, terms, query)
+
     return used_filters
+
+
+def build_aggregation(facet_name, facet_options, min_doc_count=0):
+    """Specify an elasticsearch aggregation from schema facet configuration.
+    """
+    exclude = []
+    if facet_name == 'type':
+        field = 'embedded.@type'
+        exclude = ['Item']
+    elif facet_name.startswith('audit'):
+        field = facet_name
+    else:
+        field = 'embedded.' + facet_name
+    agg_name = facet_name.replace('.', '-')
+
+    facet_type = facet_options.get('type', 'terms')
+    if facet_type == 'terms':
+        agg = {
+            'terms': {
+                'field': field,
+                'min_doc_count': min_doc_count,
+                'size': 100,
+            },
+        }
+        if exclude:
+            agg['terms']['exclude'] = exclude
+    elif facet_type == 'exists':
+        agg = {
+            'filters': {
+                'filters': {
+                    'yes': {
+                        'bool': {
+                            'must': {
+                                'exists': {'field': field}
+                            }
+                        }
+                    },
+                    'no': {
+                        'bool': {
+                            'must_not': {
+                                'exists': {'field': field}
+                            }
+                        }
+                    },
+                },
+            },
+        }
+    else:
+        raise ValueError('Unrecognized facet type {} for {} facet'.format(
+            facet_type, field))
+
+    return agg_name, agg
 
 
 def set_facets(facets, used_filters, principals, doc_types):
@@ -329,44 +402,49 @@ def set_facets(facets, used_filters, principals, doc_types):
     Sets facets in the query using filters
     """
     aggs = {}
-    for field, _ in facets:
-        exclude = []
-        if field == 'type':
-            query_field = 'embedded.@type.raw'
-            exclude = ['Item']
-        elif field.startswith('audit'):
-            query_field = field
-        else:
-            query_field = 'embedded.' + field + '.raw'
-        agg_name = field.replace('.', '-')
-
-        terms = [
+    for facet_name, facet_options in facets:
+        # Filter facet results to only include
+        # objects of the specified type(s) that the user can see
+        filters = [
             {'terms': {'principals_allowed.view': principals}},
-            {'terms': {'embedded.@type.raw': doc_types}},
+            {'terms': {'embedded.@type': doc_types}},
         ]
-        # Adding facets based on filters
-        for q_field, q_terms in used_filters.items():
-            if q_field != field and q_field.startswith('audit'):
-                terms.append({'terms': {q_field: q_terms}})
-            elif q_field != field and not q_field.endswith('!'):
-                terms.append({'terms': {'embedded.' + q_field + '.raw': q_terms}})
-            elif q_field != field and q_field.endswith('!'):
-                terms.append({'not': {'terms': {'embedded.' + q_field[:-1] + '.raw': q_terms}}})
+        negative_filters = []
+        # Also apply any filters NOT from the same field as the facet
+        for field, terms in used_filters.items():
+            if field.endswith('!'):
+                query_field = field[:-1]
+            else:
+                query_field = field
 
+            # if an option was selected in this facet,
+            # don't filter the facet to only include that option
+            if query_field == facet_name:
+                continue
+
+            if not query_field.startswith('audit'):
+                query_field = 'embedded.' + query_field
+
+            if field.endswith('!'):
+                if terms == ['*']:
+                    negative_filters.append({'exists': {'field': query_field}})
+                else:
+                    negative_filters.append({'terms': {query_field: terms}})
+            else:
+                if terms == ['*']:
+                    filters.append({'exists': {'field': query_field}})
+                else:
+                    filters.append({'terms': {query_field: terms}})
+
+        agg_name, agg = build_aggregation(facet_name, facet_options)
         aggs[agg_name] = {
             'aggs': {
-                agg_name: {
-                    'terms': {
-                        'field': query_field,
-                        'exclude': exclude,
-                        'min_doc_count': 0,
-                        'size': 100
-                    }
-                }
+                agg_name: agg
             },
             'filter': {
                 'bool': {
-                    'must': terms,
+                    'must': filters,
+                    'must_not': negative_filters
                 },
             },
         }
@@ -374,7 +452,7 @@ def set_facets(facets, used_filters, principals, doc_types):
     return aggs
 
 
-def format_results(request, hits):
+def format_results(request, hits, result=None):
     """
     Loads results to pass onto UI
     """
@@ -384,32 +462,41 @@ def format_results(request, hits):
     else:
         frame = request.params.get('frame')
 
+    # Request originating from metadata generation will skip to
+    # partion of the code that adds audit  object to result items
+    if request.__parent__ and '/metadata/' in request.__parent__.url:
+        frame = ''
+
+    any_released = False  # While formatting, figure out if any are released.
+
     if frame in ['embedded', 'object']:
         for hit in hits:
+            if not any_released and hit['_source'][frame].get('status','released') == 'released':
+                any_released = True
             yield hit['_source'][frame]
-        return
-
-    # columns
-    for hit in hits:
-        item = hit['_source']['embedded']
-        if 'audit' in hit['_source']:
-            item['audit'] = hit['_source']['audit']
-        if 'highlight' in hit:
-            item['highlight'] = {}
-            for key in hit['highlight']:
-                item['highlight'][key[9:]] = list(set(hit['highlight'][key]))
-        yield item
+    else:
+        # columns
+        for hit in hits:
+            item = hit['_source']['embedded']
+            if not any_released and item.get('status','released') == 'released':
+                any_released = True # Not exp? 'released' to do the least harm
+            if 'audit' in hit['_source']:
+                item['audit'] = hit['_source']['audit']
+            if 'highlight' in hit:
+                item['highlight'] = {}
+                for key in hit['highlight']:
+                    item['highlight'][key[9:]] = list(set(hit['highlight'][key]))
+            yield item
 
 
 def search_result_actions(request, doc_types, es_results, position=None):
     actions = {}
     aggregations = es_results['aggregations']
 
-    ''' hook to add ui Actions, encode uses this to generate visualize links based on aggregations'''
     return actions
 
 
-def format_facets(es_results, facets, used_filters, schemas, total):
+def format_facets(es_results, facets, used_filters, schemas, total, principals):
     result = []
     # Loading facets in to the results
     if 'aggregations' not in es_results:
@@ -417,7 +504,8 @@ def format_facets(es_results, facets, used_filters, schemas, total):
 
     aggregations = es_results['aggregations']
     used_facets = set()
-    for field, facet in facets:
+    exists_facets = set()
+    for field, options in facets:
         used_facets.add(field)
         agg_name = field.replace('.', '-')
         if agg_name not in aggregations:
@@ -425,9 +513,20 @@ def format_facets(es_results, facets, used_filters, schemas, total):
         terms = aggregations[agg_name][agg_name]['buckets']
         if len(terms) < 2:
             continue
+        # internal_status exception. Only display for admin users
+        if field == 'internal_status' and 'group.admin' not in principals:
+            continue
+        facet_type = options.get('type', 'terms')
+        if facet_type == 'exists':
+            terms = [
+                {'key': 'yes', 'doc_count': terms['yes']['doc_count']},
+                {'key': 'no', 'doc_count': terms['no']['doc_count']},
+            ]
+            exists_facets.add(field)
         result.append({
+            'type': facet_type,
             'field': field,
-            'title': facet.get('title', field),
+            'title': options.get('title', field),
             'terms': terms,
             'total': aggregations[agg_name]['doc_count']
         })
@@ -435,7 +534,7 @@ def format_facets(es_results, facets, used_filters, schemas, total):
     # Show any filters that aren't facets as a fake facet with one entry,
     # so that the filter can be viewed and removed
     for field, values in used_filters.items():
-        if field not in used_facets:
+        if field not in used_facets and field.rstrip('!') not in exists_facets:
             title = field
             for schema in schemas:
                 if field in schema['properties']:
@@ -464,30 +563,38 @@ def normalize_query(request):
     return '?' + qs if qs else ''
 
 
-def iter_long_json(name, iterable, **other):
+def iter_long_json(name, iterable, other):
     import json
 
-    before = (json.dumps(other)[:-1] + ',') if other else '{'
-    yield before + json.dumps(name) + ':['
+    start = None
 
+    # Note: by yielding @graph (iterable) first, then the contents of result (other) *may* be altered based upon @graph
     it = iter(iterable)
     try:
         first = next(it)
     except StopIteration:
         pass
     else:
-        yield json.dumps(first)
+        #yield json.dumps(first)
+        start = '{' + json.dumps(name) + ':['
+        yield start + json.dumps(first)
         for value in it:
             yield ',' + json.dumps(value)
 
-    yield ']}'
-
+    if start is None: # Nothing has bee yielded yet
+        yield json.dumps(other)
+    else:
+        other_stuff = (',' + json.dumps(other)[1:-1]) if other else ''
+        yield ']' + other_stuff + '}'
 
 @view_config(route_name='search', request_method='GET', permission='search')
 def search(context, request, search_type=None, return_generator=False):
     """
     Search view connects to ElasticSearch and returns the results
     """
+    # sets up ES and checks permissions/principles
+
+    # gets schemas for all types
     types = request.registry[TYPES]
     search_base = normalize_query(request)
     result = {
@@ -499,13 +606,17 @@ def search(context, request, search_type=None, return_generator=False):
     }
     principals = effective_principals(request)
     es = request.registry[ELASTIC_SEARCH]
-    es_index = request.registry.settings['snovault.elasticsearch.index']
+    es_index = '_all'
     search_audit = request.has_permission('search_audit')
 
+
+    # extract from/size from query parameters
     from_, size = get_pagination(request)
 
+    # looks at searchTerm query parameter, sets to '*' if none, and creates antlr/lucene query for fancy stuff
     search_term = prepare_search_term(request)
 
+    ## converts type= query parameters to list of doc_types to search, "*" becomes super class Item
     if search_type is None:
         doc_types = request.params.getall('type')
         if '*' in doc_types:
@@ -524,6 +635,7 @@ def search(context, request, search_type=None, return_generator=False):
         raise HTTPBadRequest(explanation=msg)
 
     # Clear Filters path -- make a path that clears all non-datatype filters.
+    # this saves the searchTerm when you click clear filters
     # http://stackoverflow.com/questions/16491988/how-to-convert-a-list-of-strings-to-a-query-string#answer-16492046
     searchterm_specs = request.params.getall('searchTerm')
     searchterm_only = urlencode([("searchTerm", searchterm) for searchterm in searchterm_specs])
@@ -537,11 +649,16 @@ def search(context, request, search_type=None, return_generator=False):
 
     # Building query for filters
     if not doc_types:
+        # For form editing embedded searches
         if request.params.get('mode') == 'picker':
             doc_types = ['Item']
+        # For /search/ with no type= use defalts
         else:
             doc_types = DEFAULT_DOC_TYPES
     else:
+        # TYPE filters that were set by UI for labeling, only seen with >1 types
+        # Probably this is why filtering Items with subclasses doesn't work right
+        # i.e., search/?type=Dataset   Type is not a regular filter/facet.
         for item_type in doc_types:
             ti = types[item_type]
             qs = urlencode([
@@ -553,6 +670,8 @@ def search(context, request, search_type=None, return_generator=False):
                 'term': ti.name,
                 'remove': '{}?{}'.format(request.path, qs)
             })
+
+        # Add special views like Report and Matrix if search is a single type
         if len(doc_types) == 1:
             result['views'] = views = []
             views.append({
@@ -560,12 +679,6 @@ def search(context, request, search_type=None, return_generator=False):
                 'title': 'View tabular report',
                 'icon': 'table',
             })
-            if hasattr(ti.factory, 'matrix'):
-                views.append({
-                    'href': request.route_path('matrix', slash='/') + search_base,
-                    'title': 'View summary matrix',
-                    'icon': 'th',
-                })
 
     search_fields, highlights = get_search_fields(request, doc_types)
 
@@ -576,22 +689,25 @@ def search(context, request, search_type=None, return_generator=False):
                                principals,
                                doc_types)
 
+    #  Columns is used in report view
     schemas = [types[doc_type].schema for doc_type in doc_types]
     columns = list_visible_columns_for_schemas(request, schemas)
+    # and here it is attached to the result for the UI
     if columns:
         result['columns'] = columns
 
     # If no text search, use match_all query instead of query_string
     if search_term == '*':
-        query['query']['match_all'] = {}
+        # query['query']['match_all'] = {}
         del query['query']['query_string']
     # If searching for more than one type, don't specify which fields to search
-    elif len(doc_types) != 1:
-        del query['query']['query_string']['fields']
-        query['query']['query_string']['fields'] = ['_all', '*.uuid', '*.md5sum', '*.submitted_file_name']
+    else:
+        # del query['query']['bool']['must']['multi_match']['fields']
+        query['query']['query_string']['fields'].extend(['_all', '*.uuid', '*.md5sum', '*.submitted_file_name'])
+
 
     # Set sort order
-    has_sort = set_sort_order(request, search_term, types, doc_types, query, result)
+    set_sort_order(request, search_term, types, doc_types, query, result)
 
     # Setting filters
     used_filters = set_filters(request, query, result)
@@ -613,9 +729,15 @@ def search(context, request, search_type=None, return_generator=False):
     # Decide whether to use scan for results.
     do_scan = size is None or size > 1000
 
+    # Send search request to proper indices
+    if not request.params.get('type') or 'Item' in doc_types:
+        es_index = '_all'
+    else:
+        es_index = [types[type_name].item_type for type_name in doc_types if hasattr(types[type_name], 'item_type')]
+    
     # Execute the query
     if do_scan:
-        es_results = es.search(body=query, index=es_index, search_type='count')
+        es_results = es.search(body=query, index=es_index, search_type='query_then_fetch')
     else:
         es_results = es.search(body=query, index=es_index, from_=from_, size=size)
 
@@ -623,7 +745,7 @@ def search(context, request, search_type=None, return_generator=False):
 
     schemas = (types[item_type].schema for item_type in doc_types)
     result['facets'] = format_facets(
-        es_results, facets, used_filters, schemas, total)
+        es_results, facets, used_filters, schemas, total, principals)
 
     # Add batch actions
     result.update(search_result_actions(request, doc_types, es_results))
@@ -642,10 +764,9 @@ def search(context, request, search_type=None, return_generator=False):
         return result if not return_generator else []
 
     result['notification'] = 'Success'
-
     # Format results for JSON-LD
     if not do_scan:
-        graph = format_results(request, es_results['hits']['hits'])
+        graph = format_results(request, es_results['hits']['hits'], result)
         if return_generator:
             return graph
         else:
@@ -655,12 +776,12 @@ def search(context, request, search_type=None, return_generator=False):
     # Scan large result sets.
     del query['aggs']
     if size is None:
-        # preserve_order=True has unexpected results in clustered environment 
+        # preserve_order=True has unexpected results in clustered environment
         # https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/helpers/__init__.py#L257
-        hits = scan(es, query=query, index=es_index, preserve_order=False) 
+        hits = scan(es, query=query, index=es_index, preserve_order=False)
     else:
         hits = scan(es, query=query, index=es_index, from_=from_, size=size, preserve_order=False)
-    graph = format_results(request, hits)
+    graph = format_results(request, hits, result)
 
     # Support for request.embed() and `return_generator`
     if request.__parent__ is not None or return_generator:
@@ -672,7 +793,7 @@ def search(context, request, search_type=None, return_generator=False):
 
     # Stream response using chunked encoding.
     # XXX BeforeRender event listeners not called.
-    app_iter = iter_long_json('@graph', graph, **result)
+    app_iter = iter_long_json('@graph', graph, result)
     request.response.content_type = 'application/json'
     if str is bytes:  # Python 2 vs 3 wsgi differences
         request.response.app_iter = app_iter  # Python 2
@@ -702,6 +823,7 @@ def report(context, request):
         msg = 'Report view requires specifying a single type.'
         raise HTTPBadRequest(explanation=msg)
 
+    # schemas for all types
     types = request.registry[TYPES]
 
     # Get the subtypes of the requested type
@@ -734,6 +856,7 @@ def report(context, request):
     }
     search_base = normalize_query(request)
     res['@id'] = '/report/' + search_base
+    # TODO add this back one day
     # res['download_tsv'] = request.route_path('report_download') + search_base
     res['title'] = 'Report'
     res['@type'] = ['Report']
