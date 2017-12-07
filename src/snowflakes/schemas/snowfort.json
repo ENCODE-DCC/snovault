@@ -70,16 +70,13 @@
     },
     "facets": {
         "method": {
-            "title": "Method",
-            "type": "string"
+            "title": "Method"
         },
         "size": {
-            "title": "Size",
-            "type": "string"
+            "title": "Size"
         },
         "award.project": {
-            "title": "Project",
-            "type": "string"
+            "title": "Project"
         },
         "award.rfa": {
             "title": "RFA"

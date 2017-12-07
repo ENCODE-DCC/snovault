@@ -13,7 +13,7 @@ var portal = {
         {id: 'data', title: 'Data', children: [
             {id: 'snowballsearch', title: 'Snowballs', url: '/search/?type=Snowball'},
             {id: 'snowfortsearch', title: 'Snowforts', url: '/search/?type=Snowfort'},
-            {id: 'snowflakesearch', title: 'Snowflakes', url: '/search/?type=Snowflakes'},
+            {id: 'snowflakesearch', title: 'Snowflakes', url: '/search/?type=Snowflake'},
         ]},
         {id: 'help', title: 'Help', children: [
             {id: 'gettingstarted', title: 'Getting started', url: '/help/getting-started/'},
