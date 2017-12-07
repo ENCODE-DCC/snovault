@@ -133,6 +133,16 @@ def test_patch_delete_fields(content, testapp):
     assert res.json['@graph'][0]['simple1'] == 'simple1 default'
 
 
+def test_patch_delete_fields_non_string(content, testapp):
+    url = content['@id']
+    res = testapp.get(url)
+
+    # delete fields with defaults resets to default, while deleting non default field
+    # completely removes them
+    res = testapp.patch_json(url + "?delete_fields=schema_version", {}, status=200)
+    assert res.json['@graph'][0]['schema_version'] == '1'
+
+
 def test_patch_delete_fields_still_works_with_no_validation(content, testapp):
     url = content['@id']
     res = testapp.get(url)
@@ -154,7 +164,24 @@ def test_patch_delete_fields_bad_param(content, testapp):
     assert res.json['field_no_default'] == 'test'
     res = testapp.patch_json(url + "?delete_fields=simple1,bad_fieldname", {}, status=422)
     assert res.json['description'] == "Failed validation"
-    assert res.json['errors'][0]['description'] == "cannot delete invalid field: bad_fieldname"
+    assert res.json['errors'][0]['description'] == "Additional properties are not allowed ('bad_fieldname' was unexpected)"
+
+
+def test_patch_delete_fields_import_items_admin(link_targets, testapp):
+    res = testapp.post_json(COLLECTION_URL, item_with_link[0], status=201)
+    url = res.location
+    assert res.json['@graph'][0]['protected_link']
+    res = testapp.patch_json(url + "?delete_fields=protected_link", {}, status=200)
+
+
+def test_patch_delete_fields_required(content, testapp):
+    url = content['@id']
+    res = testapp.get(url)
+
+    # with validate=false, then defaults are not populated so default fields are also deleted
+    res = testapp.patch_json(url + "?delete_fields=required", {}, status=422)
+    assert res.json['description'] == "Failed validation"
+    assert res.json['errors'][0]['description'] == "'required' is a required property"
 
 
 def test_patch_new_schema_version(content, root, testapp, monkeypatch):
