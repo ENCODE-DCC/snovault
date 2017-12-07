@@ -149,6 +149,7 @@ class TestingPostPutPatch(Item):
     schema = {
         'required': ['required'],
         'type': 'object',
+        "additionalProperties": False,
         'properties': {
             "schema_version": {
                 "type": "string",

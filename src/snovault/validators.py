@@ -1,5 +1,5 @@
 from uuid import UUID
-from .schema_utils import validate_request
+from .schema_utils import validate_request, validate, IgnoreUnchanged
 from .validation import ValidationFailure
 
 
@@ -35,14 +35,34 @@ def no_validate_item_content_patch(context, request):
 # Delete fields from data in the delete_fields param of the request
 # Throw a validation error if the field does not exist within the schema
 def delete_fields(request, data, schema):
+    if not request.params.get('delete_fields'):
+        return
+
+    add_delete_fields(request, data, schema)
+    validated, errors = validate(schema, data)
+    # don't care about these errors
+    errors = [err for err in errors if not isinstance(err, IgnoreUnchanged)]
+    if errors:
+        for error in errors:
+            request.errors.add('body', list(error.path), error.message)
+        raise ValidationFailure('body', ['delete_fields'], 'error deleting field')
+
+    for dfield in request.params['delete_fields'].split(','):
+        dfield = dfield.strip()
+        if dfield in data:
+            del data[dfield]
+
+
+def add_delete_fields(request, data, schema):
     if request.params.get('delete_fields'):
         for dfield in request.params['delete_fields'].split(','):
-            dfield = dfield.strip();
-            if dfield not in schema.get('properties', {}):
-                msg = ''.join(['cannot delete invalid field: ', dfield])
-                raise ValidationFailure('body', ['delete_fields'], msg)
-            if dfield in data:
-                del data[dfield]
+            dfield = dfield.strip()
+            val = ''
+            field_schema = schema['properties'].get(dfield, {})
+            if 'default' in field_schema:
+                val = field_schema['default']
+
+            data[dfield] = val
 
 
 # Schema checking validators
@@ -74,4 +94,9 @@ def validate_item_content_patch(context, request):
         raise ValidationFailure('body', ['uuid'], msg)
     current = context.upgrade_properties().copy()
     current['uuid'] = str(context.uuid)
+    # add deleted fields to current to trigger import-items check
+    # i.e. do I have permission to edit, thus delete the field
+    # add_delete_fields(request, current, schema)
     validate_request(schema, request, data, current)
+    # import pdb; pdb.set_trace()
+    # delete_fields(request, request.validated, schema)
