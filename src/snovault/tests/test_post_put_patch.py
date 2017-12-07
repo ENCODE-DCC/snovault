@@ -170,8 +170,8 @@ def test_patch_delete_fields_bad_param(content, testapp):
 def test_patch_delete_fields_import_items_admin(link_targets, testapp):
     res = testapp.post_json(COLLECTION_URL, item_with_link[0], status=201)
     url = res.location
-    assert res.json['@graph'][0]['uuid']
-    res = testapp.patch_json(url + "?delete_fields=uuid", {}, status=200)
+    assert res.json['@graph'][0]['protected_link']
+    res = testapp.patch_json(url + "?delete_fields=protected_link", {}, status=200)
 
 
 def test_patch_delete_fields_required(content, testapp):
