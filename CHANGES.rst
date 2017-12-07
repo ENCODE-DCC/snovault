@@ -1,3 +1,8 @@
+0.33:
+
+- ES5 Update: ENCD-2488 ES5 Update aka RM3910
+- Fix travis build: Pre Install setuptools with pip for travis like ENCD-3722
+
 0.32:
 
 - Update to ENCD-3669 to not include notSubmittable
