@@ -59,6 +59,8 @@ def add_delete_fields(request, data, schema):
             dfield = dfield.strip()
             val = ''
             field_schema = schema['properties'].get(dfield, {})
+            if field_schema.get('linkTo'):
+                continue
             if 'default' in field_schema:
                 val = field_schema['default']
             elif field_schema.get('type') == 'array':
