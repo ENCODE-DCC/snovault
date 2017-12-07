@@ -45,7 +45,7 @@ def delete_fields(request, data, schema):
     if errors:
         for error in errors:
             request.errors.add('body', list(error.path), error.message)
-        raise ValidationFailure('body', [error.path], 'error deleting field')
+        raise ValidationFailure('body', ['?delete_fields'], 'error deleting fields')
 
     for dfield in request.params['delete_fields'].split(','):
         dfield = dfield.strip()
