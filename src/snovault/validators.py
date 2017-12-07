@@ -67,7 +67,8 @@ def add_delete_fields(request, data, schema):
                 val = []
             elif field_schema.get('type') == 'object':
                 val = {}
-
+            elif field_schema.get('type') in ['number', 'integer']:
+                val = 0
             data[dfield] = val
 
 
