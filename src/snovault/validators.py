@@ -1,6 +1,7 @@
 from uuid import UUID
 from .schema_utils import validate_request, validate, IgnoreUnchanged
 from .validation import ValidationFailure
+from pyramid.security import ACLDenied, has_permission
 
 
 # No-validation validators
@@ -40,11 +41,13 @@ def delete_fields(request, data, schema):
 
     add_delete_fields(request, data, schema)
     validated, errors = validate(schema, data)
-    # don't care about these errors
-    errors = [err for err in errors if not isinstance(err, IgnoreUnchanged)]
     if errors:
         for error in errors:
+            if isinstance(error, IgnoreUnchanged):
+                if error.validator != 'permission':
+                    continue
             request.errors.add('body', list(error.path), error.message)
+    if request.errors:
         raise ValidationFailure('body', ['?delete_fields'], 'error deleting fields')
 
     for dfield in request.params['delete_fields'].split(','):
@@ -101,9 +104,4 @@ def validate_item_content_patch(context, request):
         raise ValidationFailure('body', ['uuid'], msg)
     current = context.upgrade_properties().copy()
     current['uuid'] = str(context.uuid)
-    # add deleted fields to current to trigger import-items check
-    # i.e. do I have permission to edit, thus delete the field
-    # add_delete_fields(request, current, schema)
     validate_request(schema, request, data, current)
-    # import pdb; pdb.set_trace()
-    # delete_fields(request, request.validated, schema)

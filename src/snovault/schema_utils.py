@@ -256,7 +256,6 @@ def requestMethod(validator, requestMethod, instance, schema):
 
 
 def permission(validator, permission, instance, schema):
-    #  import pdb; pdb.set_trace()
     if not validator.is_type(permission, "string"):
         raise Exception("Bad schema")  # raise some sort of schema error
 
