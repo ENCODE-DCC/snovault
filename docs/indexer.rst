@@ -36,8 +36,6 @@ The *indexer listener* reports certain current and historical values from an *in
     :title: Which indexer ran. This will be 'primary_indexer' for path /_indexer.  Other idexers exist in encoded.
     :timestamp: Time of this cycle.
     :xmin: Postgres transaction id of this cycle.
-    :pass1_took: If 2-pass indexing is enabled, this is the time it took to index objects without audits.
-    :pass2_took: If 2-pass indexing is enabled, this is the time it took to audit objects and update that information in elasticsearch.
     :indexed: Number of objects indexed in this cycle.
     :last_xmin: Postgres transaction id of last cycle.  Indexing should have covered all objects changed between last_xmin and xmin.
     :status: This should say 'done' as the results are displayed after a cycle has completed.  See the next section on querying the state of a current cycle.
@@ -71,21 +69,21 @@ These view will return the following values:
   :state: The contents of the indexer's state object held in elasticsearch...
 
     :title: Should be 'primary_indexer'.
-    :status: The indexer is either 'waiting' between cycles or 'indexing' during a cycle.
+    :status: The indexer is either 'done' with a cycle or 'indexing' during a cycle.
     :cycles: Count of indexer cycles that actually indexed something. This number should reflect all cycles since the system was initialized or since a full reindexing was requested.
-    :cycle_count: When indexing, the number of uuids in the cuuent cycle.
+    :cycle_count: When indexing, the number of uuids in the current cycle.
     :cycle_took: How long it took to complete the most recent indexer cycle.
     :cycle_started: When the most recent indexing cycle started.
     :indexed: Number of objects indexed in the most recent cycle.
+    :invalidated: Number of uuids needing to be indexed.
+    :renamed: uuids of objects renamed in postgres.
+    :updated: uuids of objects updated in postgres.
+    :referencing: Count of uuids referenced by objects updated or renamed in postgres.
+    :txn_count: Number of postgres transactions this cycle covers.
     :xmin: Postgres transaction id of this cycle.
     :last_xmin: Postgres transaction id of last cycle.  Indexing should have covered all objects changed between last_xmin and xmin.
     :max_xid: This is a Postgres transaction id which should rise with each database change.  It is used to ensure a consistent view of data during an indexing cycle.
-    :invalidated: Number of uuids invalidated.
-    :renamed: uuids of renamed objects
-    :updated: uuids of updated objects
-    :first_txn_timestamp: Timestamp of when the postgres tranaction occurred which led to this indeing cycle.
-    :txn_count: Number of postgres transactions this cycle covers.
-    :referencing: Count of uuids referenced updated objects.
+    :first_txn_timestamp: Timestamp of when the postgres tranaction occurred which led to this indexing cycle.
 
 Several requests can be made of the ``/_indexer_state`` path with use of ?request=value appended to the url:
 
