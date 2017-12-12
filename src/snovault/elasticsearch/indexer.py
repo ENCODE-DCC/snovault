@@ -41,7 +41,7 @@ def includeme(config):
 
 class IndexerState(object):
     # Keeps track of uuids and indexer state by cycle.  Also handles handoff of uuids to followup indexer
-    def __init__(self, es, index, title='primary'):
+    def __init__(self, es, index, title='primary', followups=[]):
         self.es = es
         self.index = index  # "index where indexerstate is stored"
 
@@ -75,20 +75,20 @@ class IndexerState(object):
     # Private-ish primitives...
     def get_obj(self, id, type='meta'):
         try:
-            return self.es.get(index=self.index, doc_type='meta', id=id).get('_source',{})  # TODO: snovault/meta
+            return self.es.get(index=self.index, doc_type=type, id=id).get('_source',{})  # TODO: snovault/meta
         except:
             return {}
 
     def put_obj(self, id, obj, type='meta'):
         try:
-            self.es.index(index=self.index, doc_type='meta', id=id, body=obj)
+            self.es.index(index=self.index, doc_type=type, id=id, body=obj)
         except:
             log.warn("Failed to save to es: " + id, exc_info=True)
 
     def delete_objs(self, ids, type='meta'):
         for id in ids:
             try:
-                self.es.delete(index=self.index, doc_type='meta', id=id)
+                self.es.delete(index=self.index, doc_type=type, id=id)
             except:
                 pass
 
@@ -713,6 +713,9 @@ def index(request):
         errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
 
         if use_2pass:
+            # We need to make the recently pushed objects searchable
+            # Audit will fetch the most recent version after the refresh
+            self.es.indices.refresh(index='_all')
             result = state.start_pass2(result)
             log.info("indexer starting pass 2 on %d uuids", len(invalidated))
             audit_errors = indexer.update_audits(request, invalidated, xmin, snapshot_id)  # ignore restart
@@ -883,9 +886,6 @@ class Indexer(object):
     def update_audits(self, request, uuids, xmin, snapshot_id=None):
         # Only called when use_2pass is True
         assert(self.use_2pass)
-        # We need to make the recently pushed objects searchable
-        # Audit will fetch the most recent version after the refresh
-        self.es.indices.refresh(index='_all')
         errors = []
         for i, uuid in enumerate(uuids):
             error = self.update_audit(request, uuid, xmin)
