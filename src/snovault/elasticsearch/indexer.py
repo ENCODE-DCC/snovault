@@ -156,7 +156,7 @@ class IndexerState(object):
             if self.title == 'primary':  # If primary indexer delete the original master obj
                 self.delete_objs(["indexing"])  # http://localhost:9200/snovault/meta/indexing
             else:
-                self.put_obj(self.override, {self.title : 'reindex', 'all': True})
+                self.put_obj(self.override, {self.title : 'reindex', 'all_uuids': True})
 
         else:
             uuids = requested.split(',')
@@ -175,7 +175,7 @@ class IndexerState(object):
         '''returns list of uuids if a reindex was requested.'''
         override = self.get_obj(self.override)
         if override:
-            if override.get('all', False):
+            if override.get('all_uuids', False):
                 self.delete_objs([self.override] + self.followup_lists)
                 return self.all_indexable_uuids(request)
             else:
@@ -199,7 +199,7 @@ class IndexerState(object):
             if val is not None:
                 new_state[var] = val
         # Make sure indexer is registered:
-        self.set_add("registered_indexers", [self.title])
+        self.set_add("registered_indexers", [self.state_id])
         return new_state
 
     def start_clock(self, name):
@@ -368,9 +368,14 @@ class IndexerState(object):
         if who is None and bot_token is None:
             return "ERROR: must specify who to notify or bot_token"
         if which is None:
-            which = self.title
-        if which != 'all' and which not in self.get_list("registered_indexers"):
-            return "ERROR: unknown indexer to monitor: %s" % (which)
+            which = self.state_id
+        if which == 'all':
+            which += '_indexers' # needed because of elasticsearch conflicts with 'all'
+        elif which not in self.get_list("registered_indexers"):
+            if which + '_indexer' in self.get_list("registered_indexers"):
+                which += '_indexer'
+            else:
+                return "ERROR: unknown indexer to monitor: %s" % (which)
 
         notify = self.get_obj('notify', 'default')
         if bot_token is not None:
@@ -385,7 +390,7 @@ class IndexerState(object):
             if who in ['none','noone','nobody','stop','']:
                 notify.pop(which, None)
             else:
-                if which == 'all':
+                if which == 'all_indexers':
                     if 'indexers' not in indexer_notices:
                         indexer_notices['indexers'] = self.get_list("registered_indexers")
                 users = who.split(',')
@@ -420,15 +425,15 @@ class IndexerState(object):
                 notify[which] = notify[which]['who'][0]
         indexers = self.get_list("registered_indexers")
         if self.title == 'primary':  # Primary will show all notices
-            indexers.append('all')
+            indexers.append('all_indexers')
             for indexer in indexers:
                 if notify.get(indexer,{}):
                     return notify  # return if anything
         else:  # non-primary will show specific notice and all
-            indexers.remove(self.title)
+            indexers.remove(self.state_id)
             for indexer in indexers:
                 notify.pop(indexer,None)
-            for indexer in [self.title, 'all']:
+            for indexer in [self.state_id, 'all_indexers']:
                 if notify.get(indexer,{}):
                     return notify  # return if anything
         return {}
@@ -445,26 +450,26 @@ class IndexerState(object):
         changed = False
         text = None
         who = []
-        if 'all' in notify:
+        if 'all_indexers' in notify:
             # if all indexers are done, then report
-            indexers = notify['all'].get('indexers',[])
-            if self.title in indexers:
+            indexers = notify['all_indexers'].get('indexers',[])
+            if self.state_id in indexers:
                 # Primary must finish before follow up indexers can remove themselves from list
-                if self.title != 'primary' and 'primary' not in indexers:
-                    indexers.remove(self.title)
+                if self.state_id != 'primary_indexer' and 'primary_indexer' not in indexers:
+                    indexers.remove(self.state_id)
                     if len(indexers) > 0:
-                        notify['all']['indexers'] = indexers
+                        notify['all_indexers']['indexers'] = indexers
             if len(indexers) == 0:
-                who.extend(notify['all'].get('who',[]))
-                notify.pop('all',None)
+                who.extend(notify['all_indexers'].get('who',[]))
+                notify.pop('all_indexers',None)
                 text='All indexers are done for %s/_indexer_state' % (notify['from'])
             changed = True
-        if self.title in notify:
-            who.extend(notify[self.title].get('who',[]))
-            notify.pop(self.title, None)
+        if self.state_id in notify:
+            who.extend(notify[self.state_id].get('who',[]))
+            notify.pop(self.state_id, None)
             changed = True
             if text is None:
-                text='%s indexer is done for %s' % (self.title, notify['from'])
+                text='%s is done for %s' % (self.state_id, notify['from'])
                 if self.title == 'primary':
                     text += '/_indexer_state'
                 else:
@@ -516,7 +521,7 @@ class IndexerState(object):
             uuids = reindex.get('uuids')
             if uuids is not None:
                 display['REINDEX requested'] = uuids
-            elif reindex.get('all',False):
+            elif reindex.get('all_uuids',False):
                 display['REINDEX requested'] = 'all'
         notify = self.get_notices()
         if notify:
