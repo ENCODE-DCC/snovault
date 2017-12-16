@@ -165,7 +165,7 @@ def index_settings():
         'settings': {
             'index.max_result_window': 99999,
             'index.mapping.total_fields.limit': 5000,
-            'index.number_of_shards': 1,
+            'index.number_of_shards': 5,
             'index.number_of_replicas': 2,
             'analysis': {
                 'filter': {
@@ -229,7 +229,7 @@ def audit_mapping():
         },
         'detail': {
             'type': 'text',
-            'index': 'true', 
+            'index': 'true',
         },
         'level_name': {
             'type': 'keyword',
