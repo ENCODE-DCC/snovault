@@ -60,7 +60,7 @@ def main():
     parser.add_argument('--load', action="store_true", help="Load test set")
     parser.add_argument('--datadir', default='/tmp/snovault', help="path to datadir")
     parser.add_argument('--access-key',
-                        help="store local or copy to s3, will generate and store access key for admin user")
+                        help="store local or copy to s3, will generate and store access key for admin user", default=None)
     args = parser.parse_args()
 
     logging.basicConfig()

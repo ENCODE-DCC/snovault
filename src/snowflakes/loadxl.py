@@ -507,7 +507,7 @@ def load_all(testapp, filename, docsdir, test=False):
         process(combine(source, pipeline))
 
 
-def load_test_data(app):
+def load_test_data(app, access_key_loc=None):
     from webtest import TestApp
     environ = {
         'HTTP_ACCEPT': 'application/json',
