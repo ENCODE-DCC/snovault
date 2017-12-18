@@ -108,7 +108,7 @@ def main():
         from pyramid.path import DottedNameResolver
         load_test_data = app.registry.settings.get('snovault.load_test_data')
         load_test_data = DottedNameResolver().resolve(load_test_data)
-        load_test_data(app, args.access_key)
+        load_test_data(app)
 
     print('Started. ^C to exit.')
 
