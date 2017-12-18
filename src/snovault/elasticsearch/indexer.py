@@ -370,7 +370,7 @@ class IndexerState(object):
         if which is None:
             which = self.state_id
         if which == 'all':
-            which += '_indexers' # needed because of elasticsearch conflicts with 'all'
+            which = 'all_indexers' # needed because of elasticsearch conflicts with 'all'
         elif which not in self.get_list("registered_indexers"):
             if which + '_indexer' in self.get_list("registered_indexers"):
                 which += '_indexer'
@@ -390,7 +390,7 @@ class IndexerState(object):
             if who in ['none','noone','nobody','stop','']:
                 notify.pop(which, None)
             else:
-                if which == 'all_indexers':
+                if which == 'all_indexers':  # each indexer will have to finish
                     if 'indexers' not in indexer_notices:
                         indexer_notices['indexers'] = self.get_list("registered_indexers")
                 users = who.split(',')
@@ -402,6 +402,7 @@ class IndexerState(object):
                 who_all.extend(users)
                 indexer_notices['who'] = list(set(who_all))
                 notify[which] = indexer_notices
+                # either self.state_id: {who: [...]} or 'all_indexers': {'indexers': [...], 'who': [...]}
 
         self.put_obj('notify', notify, 'default')
         if user_warns != '':
@@ -445,26 +446,27 @@ class IndexerState(object):
         if not notify:
             return
         if 'bot_token' not in notify or 'from' not in notify:
-            return  # silent failure
+            return  # silent failure, but leaves notify unchanged for evidence
 
         changed = False
         text = None
         who = []
-        if 'all_indexers' in notify:
+        if 'all_indexers' in notify:  # 'all_indexers': {'indexers': [...], 'who': [...]}
             # if all indexers are done, then report
             indexers = notify['all_indexers'].get('indexers',[])
             if self.state_id in indexers:
                 # Primary must finish before follow up indexers can remove themselves from list
-                if self.state_id != 'primary_indexer' and 'primary_indexer' not in indexers:
+                if self.state_id == 'primary_indexer' or 'primary_indexer' not in indexers:
                     indexers.remove(self.state_id)
                     if len(indexers) > 0:
                         notify['all_indexers']['indexers'] = indexers
+                        changed = True
             if len(indexers) == 0:
                 who.extend(notify['all_indexers'].get('who',[]))
                 notify.pop('all_indexers',None)
+                changed = True
                 text='All indexers are done for %s/_indexer_state' % (notify['from'])
-            changed = True
-        if self.state_id in notify:
+        if self.state_id in notify:  # self.state_id: {who: [...]}
             who.extend(notify[self.state_id].get('who',[]))
             notify.pop(self.state_id, None)
             changed = True
@@ -496,8 +498,9 @@ class IndexerState(object):
                 if not resp['ok']:
                     log.warn(resp)
             except:
-                pass   # silent failure
-        if changed:
+                log.warn("Failed to notify via slack: [%s]" % (msg))
+
+        if changed:  # alter notify even if error, so the same error doesn't flood log.
             self.put_obj('notify', notify, 'default')
 
     def display(self):
@@ -551,13 +554,25 @@ def indexer_state_show(request):
             return notices
 
     display = state.display()
-    try:
-        count = es.count(index=INDEX).get('count',0)  # TODO: 'vis_composite' should be obtained from visualization.py
-        if count:
-            display['docs in index'] = count
-    except:
+    # getting count is complicated in es5 as docs are separate indexes
+    item_types = all_types(request.registry)
+    count = 0
+    for item_type in item_types:
+        #all_count = es.count(index='_all').get('count',0)
+        #vis_count = es.count(index='vis_cache').get('count',0)  # TODO: 'vis_cache' should be obtained from vi_indexer.py
+        #chrom_count = es.count(index='chr*').get('count',0)
+        #resident_count = es.count(index='resident_regionsets').get('count',0)  # TODO: 'resident_regionsets' should be obtained from region_indexer.py
+        # count = all_count - vis_count - chrom_count - resident_count
+        try:
+            type_count = es.count(index=item_type).get('count',0)  # TODO: 'vis_composite' should be obtained from visualization.py
+            count += type_count
+        except:
+            pass
+        #all_count = es.count(index='_all').get('count',0)  # TODO: 'vis_composite' should be obtained from visualization.py
+    if count:
+        display['docs in index'] = count
+    else:
         display['docs in index'] = 'Not Found'
-        pass
 
     if not request.registry.settings.get('testing',False):  # NOTE: _indexer not working on local instances
         try:
@@ -780,6 +795,11 @@ def get_current_xmin(request):
     # which is not available in recovery.
     xmin = query.scalar()  # lowest xid that is still in progress
     return xmin
+
+def all_types(registry):
+    collections = registry[COLLECTIONS]
+    return sorted(collections.by_item_type)
+
 
 def all_uuids(registry, types=None):
     # First index user and access_key so people can log in
