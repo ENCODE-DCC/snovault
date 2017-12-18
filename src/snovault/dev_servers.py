@@ -59,6 +59,8 @@ def main():
     parser.add_argument('--init', action="store_true", help="Init database")
     parser.add_argument('--load', action="store_true", help="Load test set")
     parser.add_argument('--datadir', default='/tmp/snovault', help="path to datadir")
+    parser.add_argument('--access-key',
+                        help="store local or copy to s3, will generate and store access key for admin user", default=None)
     args = parser.parse_args()
 
     logging.basicConfig()
@@ -106,7 +108,7 @@ def main():
         from pyramid.path import DottedNameResolver
         load_test_data = app.registry.settings.get('snovault.load_test_data')
         load_test_data = DottedNameResolver().resolve(load_test_data)
-        load_test_data(app)
+        load_test_data(app, args.access_key)
 
     print('Started. ^C to exit.')
 
