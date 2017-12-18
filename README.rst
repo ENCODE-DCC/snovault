@@ -27,7 +27,7 @@ Step 2: Install or update dependencies::
     $ brew install libevent libmagic libxml2 libxslt openssl postgresql graphviz nginx python3
     $ brew install freetype libjpeg libtiff littlecms webp  # Required by Pillow
     $ brew tap homebrew/versions
-    $ brew install elasticsearch17 node4-lts
+    $ brew install elasticsearch@5.6 node4-lts
 
 If you need to update dependencies::
 
