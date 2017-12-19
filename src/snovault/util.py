@@ -85,16 +85,21 @@ def quick_deepcopy(obj):
     return obj
 
 
-def mutated_schema(schema, mutator):
+def mutated_schema(schema, *mutators):
     """Apply a change to all levels of a schema.
 
     Returns a new schema rather than modifying the original.
     """
-    schema = mutator(schema.copy())
+    for mutator in mutators:
+        schema = mutator(schema.copy())
     if 'items' in schema:
-        schema['items'] = mutated_schema(schema['items'], mutator)
+        schema['items'] = mutated_schema(schema['items'], *mutators)
     if 'properties' in schema:
         schema['properties'] = schema['properties'].copy()
         for k, v in schema['properties'].items():
-            schema['properties'][k] = mutated_schema(v, mutator)
+            schema['properties'][k] = mutated_schema(v, *mutators)
+    if 'dependencies' in schema:
+        schema['dependencies'] = schema['dependencies'].copy()
+        for k, v in schema['dependencies'].items():
+            schema['dependencies'][k] = mutated_schema(v, *mutators)
     return schema

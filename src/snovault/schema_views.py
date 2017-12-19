@@ -3,6 +3,7 @@ from pyramid.view import view_config
 from .etag import etag_app_version_effective_principals
 from .interfaces import (
     COLLECTIONS,
+    ROOT,
     TYPES,
 )
 from .util import mutated_schema
@@ -24,16 +25,30 @@ def _apply_permission(collection, request):
     return mutator
 
 
+def _resolve_uuids(request, root):
+    def mutator(schema):
+        if 'linkEnum' in schema:
+            schema = schema.copy()
+            schema['linkEnum'] = [
+                request.resource_path(root.get(uuid))
+                for uuid in schema['linkEnum']
+            ]
+        return schema
+    return mutator
+
+
 def _annotated_schema(type_info, request):
     schema = type_info.schema.copy()
     schema['@type'] = ['JSONSchema']
     if type_info.factory is None:
         return schema
 
+    root = request.registry[ROOT]
     collection = request.registry[COLLECTIONS][type_info.name]
     return mutated_schema(
         schema,
         _apply_permission(collection, request),
+        _resolve_uuids(request, root),
     )
 
 
