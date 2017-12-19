@@ -1,3 +1,7 @@
+0.33:
+- Pre Install setuptools with pip for travis like ENCD-3722
+- Make v0.32 the pre-ES5 branch point
+
 0.32:
 
 - Update to ENCD-3669 to not include notSubmittable
