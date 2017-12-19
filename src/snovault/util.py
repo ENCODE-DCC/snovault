@@ -101,5 +101,8 @@ def mutated_schema(schema, *mutators):
     if 'dependencies' in schema:
         schema['dependencies'] = schema['dependencies'].copy()
         for k, v in schema['dependencies'].items():
-            schema['dependencies'][k] = mutated_schema(v, *mutators)
+            if type(v) is list:
+                schema['dependencies'] = v
+            else:
+                schema['dependencies'][k] = mutated_schema(v, *mutators)
     return schema
