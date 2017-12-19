@@ -1,3 +1,7 @@
+0.34:
+ - Removed ES5. ES5 will continue with version>=v1.0
+   Subsequent v0.x tags will contain updates for pre-ES5 builds.
+
 0.33:
 
 - ES5 Update: ENCD-2488 ES5 Update aka RM3910
