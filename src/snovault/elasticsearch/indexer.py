@@ -41,7 +41,7 @@ def includeme(config):
 
 class IndexerState(object):
     # Keeps track of uuids and indexer state by cycle.  Also handles handoff of uuids to followup indexer
-    def __init__(self, es, index, title='primary'):
+    def __init__(self, es, index, title='primary', followups=[]):
         self.es = es
         self.index = index  # "index where indexerstate is stored"
 
@@ -70,25 +70,24 @@ class IndexerState(object):
         # some goals:
         # 1) Detect and recover from interrupted cycle - working but ignored for now
         # 2) Record (double?) failures and consider blacklisting them - not tried, could do.
-        # 3) Make 2-pass indexing work
 
     # Private-ish primitives...
     def get_obj(self, id, type='meta'):
         try:
-            return self.es.get(index=self.index, doc_type='meta', id=id).get('_source',{})  # TODO: snovault/meta
+            return self.es.get(index=self.index, doc_type=type, id=id).get('_source',{})  # TODO: snovault/meta
         except:
             return {}
 
     def put_obj(self, id, obj, type='meta'):
         try:
-            self.es.index(index=self.index, doc_type='meta', id=id, body=obj)
+            self.es.index(index=self.index, doc_type=type, id=id, body=obj)
         except:
             log.warn("Failed to save to es: " + id, exc_info=True)
 
     def delete_objs(self, ids, type='meta'):
         for id in ids:
             try:
-                self.es.delete(index=self.index, doc_type='meta', id=id)
+                self.es.delete(index=self.index, doc_type=type, id=id)
             except:
                 pass
 
@@ -156,7 +155,7 @@ class IndexerState(object):
             if self.title == 'primary':  # If primary indexer delete the original master obj
                 self.delete_objs(["indexing"])  # http://localhost:9200/snovault/meta/indexing
             else:
-                self.put_obj(self.override, {self.title : 'reindex', 'all': True})
+                self.put_obj(self.override, {self.title : 'reindex', 'all_uuids': True})
 
         else:
             uuids = requested.split(',')
@@ -175,7 +174,7 @@ class IndexerState(object):
         '''returns list of uuids if a reindex was requested.'''
         override = self.get_obj(self.override)
         if override:
-            if override.get('all', False):
+            if override.get('all_uuids', False):
                 self.delete_objs([self.override] + self.followup_lists)
                 return self.all_indexable_uuids(request)
             else:
@@ -199,7 +198,7 @@ class IndexerState(object):
             if val is not None:
                 new_state[var] = val
         # Make sure indexer is registered:
-        self.set_add("registered_indexers", [self.title])
+        self.set_add("registered_indexers", [self.state_id])
         return new_state
 
     def start_clock(self, name):
@@ -276,13 +275,6 @@ class IndexerState(object):
         self.put_list(self.todo_set, set(uuids))
         return state
 
-    def start_pass2(self, state):
-        state['pass1_took'] = self.elapsed('cycle')
-        self.put(state)
-        self.start_clock('pass2')
-        return state
-
-
     def add_errors(self, errors, finished=True):
         '''To avoid 16 worker concurency issues, errors are recorded at the end of a cycle.'''
         uuids = [err['uuid'] for err in errors]  # better be uuids!
@@ -303,9 +295,6 @@ class IndexerState(object):
 
     def finish_cycle(self, state, errors=None):
         '''Every indexing cycle must be properly closed.'''
-
-        if 'pass2' in self.clock.keys():
-            state['pass2_took'] = self.elapsed('pass2')
 
         if errors:  # By handling here, we avoid overhead and concurrency issues of uuid-level accounting
             self.add_errors(errors)
@@ -368,9 +357,14 @@ class IndexerState(object):
         if who is None and bot_token is None:
             return "ERROR: must specify who to notify or bot_token"
         if which is None:
-            which = self.title
-        if which != 'all' and which not in self.get_list("registered_indexers"):
-            return "ERROR: unknown indexer to monitor: %s" % (which)
+            which = self.state_id
+        if which == 'all':
+            which = 'all_indexers' # needed because of elasticsearch conflicts with 'all'
+        elif which not in self.get_list("registered_indexers"):
+            if which + '_indexer' in self.get_list("registered_indexers"):
+                which += '_indexer'
+            else:
+                return "ERROR: unknown indexer to monitor: %s" % (which)
 
         notify = self.get_obj('notify', 'default')
         if bot_token is not None:
@@ -385,7 +379,7 @@ class IndexerState(object):
             if who in ['none','noone','nobody','stop','']:
                 notify.pop(which, None)
             else:
-                if which == 'all':
+                if which == 'all_indexers':  # each indexer will have to finish
                     if 'indexers' not in indexer_notices:
                         indexer_notices['indexers'] = self.get_list("registered_indexers")
                 users = who.split(',')
@@ -397,6 +391,7 @@ class IndexerState(object):
                 who_all.extend(users)
                 indexer_notices['who'] = list(set(who_all))
                 notify[which] = indexer_notices
+                # either self.state_id: {who: [...]} or 'all_indexers': {'indexers': [...], 'who': [...]}
 
         self.put_obj('notify', notify, 'default')
         if user_warns != '':
@@ -420,15 +415,15 @@ class IndexerState(object):
                 notify[which] = notify[which]['who'][0]
         indexers = self.get_list("registered_indexers")
         if self.title == 'primary':  # Primary will show all notices
-            indexers.append('all')
+            indexers.append('all_indexers')
             for indexer in indexers:
                 if notify.get(indexer,{}):
                     return notify  # return if anything
         else:  # non-primary will show specific notice and all
-            indexers.remove(self.title)
+            indexers.remove(self.state_id)
             for indexer in indexers:
                 notify.pop(indexer,None)
-            for indexer in [self.title, 'all']:
+            for indexer in [self.state_id, 'all_indexers']:
                 if notify.get(indexer,{}):
                     return notify  # return if anything
         return {}
@@ -440,31 +435,32 @@ class IndexerState(object):
         if not notify:
             return
         if 'bot_token' not in notify or 'from' not in notify:
-            return  # silent failure
+            return  # silent failure, but leaves notify unchanged for evidence
 
         changed = False
         text = None
         who = []
-        if 'all' in notify:
+        if 'all_indexers' in notify:  # 'all_indexers': {'indexers': [...], 'who': [...]}
             # if all indexers are done, then report
-            indexers = notify['all'].get('indexers',[])
-            if self.title in indexers:
+            indexers = notify['all_indexers'].get('indexers',[])
+            if self.state_id in indexers:
                 # Primary must finish before follow up indexers can remove themselves from list
-                if self.title != 'primary' and 'primary' not in indexers:
-                    indexers.remove(self.title)
+                if self.state_id == 'primary_indexer' or 'primary_indexer' not in indexers:
+                    indexers.remove(self.state_id)
                     if len(indexers) > 0:
-                        notify['all']['indexers'] = indexers
+                        notify['all_indexers']['indexers'] = indexers
+                        changed = True
             if len(indexers) == 0:
-                who.extend(notify['all'].get('who',[]))
-                notify.pop('all',None)
+                who.extend(notify['all_indexers'].get('who',[]))
+                notify.pop('all_indexers',None)
+                changed = True
                 text='All indexers are done for %s/_indexer_state' % (notify['from'])
-            changed = True
-        if self.title in notify:
-            who.extend(notify[self.title].get('who',[]))
-            notify.pop(self.title, None)
+        if self.state_id in notify:  # self.state_id: {who: [...]}
+            who.extend(notify[self.state_id].get('who',[]))
+            notify.pop(self.state_id, None)
             changed = True
             if text is None:
-                text='%s indexer is done for %s' % (self.title, notify['from'])
+                text='%s is done for %s' % (self.state_id, notify['from'])
                 if self.title == 'primary':
                     text += '/_indexer_state'
                 else:
@@ -491,8 +487,9 @@ class IndexerState(object):
                 if not resp['ok']:
                     log.warn(resp)
             except:
-                pass   # silent failure
-        if changed:
+                log.warn("Failed to notify via slack: [%s]" % (msg))
+
+        if changed:  # alter notify even if error, so the same error doesn't flood log.
             self.put_obj('notify', notify, 'default')
 
     def display(self):
@@ -516,7 +513,7 @@ class IndexerState(object):
             uuids = reindex.get('uuids')
             if uuids is not None:
                 display['REINDEX requested'] = uuids
-            elif reindex.get('all',False):
+            elif reindex.get('all_uuids',False):
                 display['REINDEX requested'] = 'all'
         notify = self.get_notices()
         if notify:
@@ -546,13 +543,25 @@ def indexer_state_show(request):
             return notices
 
     display = state.display()
-    try:
-        count = es.count(index=INDEX).get('count',0)  # TODO: 'vis_composite' should be obtained from visualization.py
-        if count:
-            display['docs in index'] = count
-    except:
+    # getting count is complicated in es5 as docs are separate indexes
+    item_types = all_types(request.registry)
+    count = 0
+    for item_type in item_types:
+        #all_count = es.count(index='_all').get('count',0)
+        #vis_count = es.count(index='vis_cache').get('count',0)  # TODO: 'vis_cache' should be obtained from vi_indexer.py
+        #chrom_count = es.count(index='chr*').get('count',0)
+        #resident_count = es.count(index='resident_regionsets').get('count',0)  # TODO: 'resident_regionsets' should be obtained from region_indexer.py
+        # count = all_count - vis_count - chrom_count - resident_count
+        try:
+            type_count = es.count(index=item_type).get('count',0)  # TODO: 'vis_composite' should be obtained from visualization.py
+            count += type_count
+        except:
+            pass
+        #all_count = es.count(index='_all').get('count',0)  # TODO: 'vis_composite' should be obtained from visualization.py
+    if count:
+        display['docs in index'] = count
+    else:
         display['docs in index'] = 'Not Found'
-        pass
 
     if not request.registry.settings.get('testing',False):  # NOTE: _indexer not working on local instances
         try:
@@ -591,7 +600,6 @@ def index(request):
 
     # Currently 2 possible followup indexers (base.ini [set stage_for_followup = vis_indexer, region_indexer])
     stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').replace(' ','').split(','))
-    use_2pass = False #request.registry.settings.get("index_with_2pass", False)  # defined in base.ini for encoded
 
     # May have undone uuids from prior cycle
     state = IndexerState(es, INDEX, followups=stage_for_followup)
@@ -708,16 +716,7 @@ def index(request):
 
         # Do the work...
 
-        if use_2pass:
-            log.info("indexer starting pass 1 on %d uuids", len(invalidated))
         errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
-
-        if use_2pass:
-            result = state.start_pass2(result)
-            log.info("indexer starting pass 2 on %d uuids", len(invalidated))
-            audit_errors = indexer.update_audits(request, invalidated, xmin, snapshot_id)  # ignore restart
-            if len(audit_errors):
-                errors.extend(audit_errors)
 
         result = state.finish_cycle(result,errors)
 
@@ -773,6 +772,11 @@ def get_current_xmin(request):
     xmin = query.scalar()  # lowest xid that is still in progress
     return xmin
 
+def all_types(registry):
+    collections = registry[COLLECTIONS]
+    return sorted(collections.by_item_type)
+
+
 def all_uuids(registry, types=None):
     # First index user and access_key so people can log in
     collections = registry[COLLECTIONS]
@@ -799,7 +803,6 @@ class Indexer(object):
         self.es = registry[ELASTIC_SEARCH]
         self.esstorage = registry[STORAGE]
         self.index = registry.settings['snovault.elasticsearch.index']
-        self.use_2pass = False #registry.settings.get("index_with_2pass", False)
 
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         errors = []
@@ -829,10 +832,7 @@ class Indexer(object):
 
         last_exc = None
         try:
-            if self.use_2pass:
-                doc = request.embed('/%s/@@index-data/noaudit/' % uuid, as_user='INDEXER')
-            else:
-                doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
+            doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
             raise
@@ -841,17 +841,6 @@ class Indexer(object):
             last_exc = repr(e)
 
         if last_exc is None:
-            if self.use_2pass:
-                try:
-                    audit = self.es.get(index=self.index, id=str(uuid)).get('_source',{}).get('audit')  # Any version
-                    if audit:
-                        doc.update(
-                            audit=audit,
-                            audit_stale=True,
-                        )
-                except:
-                    pass
-
             for backoff in [0, 10, 20, 40, 80]:
                 time.sleep(backoff)
                 try:
@@ -879,99 +868,6 @@ class Indexer(object):
 
         timestamp = datetime.datetime.now().isoformat()
         return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
-
-    def update_audits(self, request, uuids, xmin, snapshot_id=None):
-        # Only called when use_2pass is True
-        assert(self.use_2pass)
-        # We need to make the recently pushed objects searchable
-        # Audit will fetch the most recent version after the refresh
-        self.es.indices.refresh(index='_all')
-        errors = []
-        for i, uuid in enumerate(uuids):
-            error = self.update_audit(request, uuid, xmin)
-            if error is not None:
-                errors.append(error)
-            if (i + 1) % 50 == 0:
-                log.info('Auditing %d', i + 1)
-
-        return errors
-
-    def update_audit(self, request, uuid, xmin):
-        # Only called when use_2pass is True
-        request.datastore = 'elasticsearch'  # Audits are built on elastic search !!!
-
-        last_exc = None
-        # First get the object currently in es
-        try:
-            # This slings the single result via PickStorage via CachedModel via ElasticSearchStorage
-            # Only works if request.datastore = 'elasticsearch'
-            result = self.esstorage.get_by_uuid(uuid)
-            doc = result.source
-        except StatementError:
-            # Can't reconnect until invalid transaction is rolled back
-            raise
-        except Exception as e:
-            log.error("Error can't find %s in %s", uuid, ELASTIC_SEARCH)
-            last_exc = repr(e)
-
-        ### # Handle audits:
-        index_audit = False
-        if last_exc is None:
-            # It might be possible to assert that the audit is either empty or stale
-            # TODO assert('audit_stale' is in doc or doc.get('audit') is None)
-
-            try:
-                #log.warning('2nd-pass audit for %s' % (uuid))
-                # using audit-now bypasses cached_views 'audit' ensureing the audit is recacluated.
-                audit = request.embed(str(uuid) + '/@@audit-now', as_user='INDEXER')['audit']
-                #audit = request.embed(str(uuid), '@@audit-now', as_user='INDEXER')['audit']
-                if audit or doc.get('audit_stale',False):
-                    doc.update(
-                        audit=audit,
-                        audit_stale=False,
-                    )
-                    index_audit = True
-            except StatementError:
-                print('statement error')
-                # Can't reconnect until invalid transaction is rolled back
-                raise
-            except Exception as e:
-                log.error('Error rendering /%s/@@index-audits', uuid, exc_info=True)
-                last_exc = repr(e)
-
-        if index_audit:
-            if last_exc is None:
-                for backoff in [0, 10, 20, 40, 80]:
-                    time.sleep(backoff)
-                    try:
-                        self.es.index(
-                            index=doc['item_type'], doc_type=doc['item_type'], body=doc,
-                            id=str(uuid), version=xmin, version_type='external_gte',
-                            request_timeout=30,
-                        )
-                    except StatementError:
-                        # Can't reconnect until invalid transaction is rolled back
-                        raise
-                    except ConflictError:
-                        #log.warning('Conflict indexing %s at version %d', uuid, xmin)
-                        # This case occurs when the primary indexer is cycles ahead of the secondary indexer
-                        # And this uuid will be secondarily indexed again on a second round
-                        # So no error, pretend it has indexed and move on.
-                        return  # No use doing any further secondary indexing
-                    except (ConnectionError, ReadTimeoutError, TransportError) as e:
-                        log.warning('Retryable error indexing %s: %r', uuid, e)
-                        last_exc = repr(e)
-                    except Exception as e:
-                        log.error('Error indexing %s', uuid, exc_info=True)
-                        last_exc = repr(e)
-                        break
-                    else:
-                        # Get here on success and outside of try
-                        return
-
-        if last_exc is not None:
-            timestamp = datetime.datetime.now().isoformat()
-            return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
 
     def shutdown(self):
         pass

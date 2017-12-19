@@ -209,19 +209,15 @@ def traversed_path_ids(request, obj, path):
             yield item_uri
 
 
-def inherit_audits(request, embedded, embedded_paths, now=False):
+def inherit_audits(request, embedded, embedded_paths):
     audit_paths = {embedded['@id']}
     for embedded_path in embedded_paths:
         audit_paths.update(traversed_path_ids(request, embedded, embedded_path))
 
     audits = {}
-    audit_self = '@@audit-self'
-    if now:
-        audit_self = '@@audit-self-now'  # will bypass cached_view and recalculate the audit.
-        # BUGBUG for some unknown reason this results in elasticsearch dying on a demo machine.
 
     for audit_path in audit_paths:
-        result = request.embed(audit_path, audit_self)
+        result = request.embed(audit_path, '@@audit-self')
         for audit in result['audit']:
             if audit['level_name'] in audits:
                 audits[audit['level_name']].append(audit)
@@ -230,7 +226,6 @@ def inherit_audits(request, embedded, embedded_paths, now=False):
     return audits
 
 
-@view_config(context=Item, permission='audit', request_method='GET', name='audit-self-now')
 @view_config(context=Item, permission='audit', request_method='GET', name='audit-self')
 def item_view_audit_self(context, request):
     path = request.resource_path(context)
@@ -240,14 +235,11 @@ def item_view_audit_self(context, request):
         'audit': request.audit(types=types, path=path),
     }
 
-# 'audit-now' is used to force recacluate audits (from elasticsearch), bypassing cached_view
-@view_config(context=Item, permission='audit', request_method='GET', name='audit-now')
 @view_config(context=Item, permission='audit', request_method='GET', name='audit')
 def item_view_audit(context, request):
     path = request.resource_path(context)
-    now = (request.url.endswith('@@audit-now'))
     properties = request.embed(path, '@@object')
-    audit = inherit_audits(request, properties, context.audit_inherit or context.embedded, now)
+    audit = inherit_audits(request, properties, context.audit_inherit or context.embedded)
     return {
         '@id': path,
         'audit': audit,
