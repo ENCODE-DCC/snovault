@@ -102,7 +102,7 @@ def mutated_schema(schema, *mutators):
         schema['dependencies'] = schema['dependencies'].copy()
         for k, v in schema['dependencies'].items():
             if type(v) is list:
-                schema['dependencies'] = v
+                schema['dependencies'][k] = v
             else:
                 schema['dependencies'][k] = mutated_schema(v, *mutators)
     return schema
