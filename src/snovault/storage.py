@@ -20,6 +20,7 @@ from sqlalchemy.orm import (
     collections,
     scoped_session,
     sessionmaker,
+    backref,
 )
 from sqlalchemy.orm.exc import (
     FlushError,
@@ -166,6 +167,25 @@ class RDBStorage(object):
         assert conflicts
         msg = 'Keys conflict: %r' % conflicts
         raise HTTPConflict(msg)
+
+    def delete_by_uuid(self, rid):
+        # WARNING USE WITH CARE PERMANENTLY DELETES RESOURCES
+        session = self.DBSession()
+        sp = session.begin_nested()
+        model = self.get_by_uuid(rid)
+        try:
+            for current_propsheet in model.data.values():
+                # delete the propsheet history
+                for propsheet in current_propsheet.history:
+                    session.delete(propsheet)
+                # now delete the currentPropsheet
+                session.delete(current_propsheet)
+            # now delete the resource, keys and links(via cascade)
+            session.delete(model)
+            sp.commit()
+        except Exception as e:
+            sp.rollback()
+            raise e
 
     def _update_properties(self, model, properties, sheets=None):
         if properties is not None:
@@ -364,7 +384,7 @@ class Key(Base):
                  nullable=False, index=True)
 
     # Be explicit about dependencies to the ORM layer
-    resource = orm.relationship('Resource', backref='unique_keys')
+    resource = orm.relationship('Resource', backref=backref('unique_keys', cascade='all, delete-orphan'))
 
 
 class Link(Base):
@@ -379,9 +399,9 @@ class Link(Base):
         index=True)  # Single column index for reverse lookup
 
     source = orm.relationship(
-        'Resource', foreign_keys=[source_rid], backref='rels')
+        'Resource', foreign_keys=[source_rid], backref=backref('rels', cascade='all, delete-orphan'))
     target = orm.relationship(
-        'Resource', foreign_keys=[target_rid], backref='revs')
+        'Resource', foreign_keys=[target_rid], backref=backref('revs', cascade='all, delete-orphan'))
 
 
 class PropertySheet(Base):
@@ -433,6 +453,9 @@ class CurrentPropertySheet(Base):
         viewonly=True,
     )
     resource = orm.relationship('Resource')
+    __mapper_args__ = {
+        'confirm_deleted_rows': False,
+    }
 
 
 class Resource(Base):
@@ -527,6 +550,7 @@ class TransactionRecord(Base):
 # User specific stuff
 import cryptacular.bcrypt
 crypt = cryptacular.bcrypt.BCRYPTPasswordManager()
+
 
 def hash_password(password):
     return crypt.encode(password)
