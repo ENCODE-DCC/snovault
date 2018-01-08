@@ -1,17 +1,16 @@
 language: python
-dist: precise
-sudo: false
+sudo: required
+dist: trusty
+
 cache:
   directories:
   - eggs
   - .npm
 addons:
   apt:
-    sources:
-    - elasticsearch-1.7
     packages:
+    - oracle-java8-set-default
     - bsdtar
-    - elasticsearch
     - graphviz
 env:
   global:
@@ -42,26 +41,33 @@ env:
       C0cq1ad+T3gAsxRdvIgWrU86QMLNxlgyNW+eijTZH5XDvYtVjBovyuf2zZ2P4
       7F+UQNsSLGGLVORcsmBG7ByCMYljVk8i14rWonrXVjPP1fuwIp2AIZzNK6KrJ
       tQzLeb5gEy3A=
+  - BOTO_CONFIG=tmp/bogusvalue
+  - JAVA_HOME=/usr/lib/jvm/java-8-oracle
+  - ES_VERSION=5.6.1
+  - ES_DOWNLOAD_URL=https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-${ES_VERSION}.deb
   - PATH="/usr/share/elasticsearch/bin:/usr/lib/postgresql/9.3/bin:$PATH"
+  - ES_JAVA_OPTS="-Xms2g -Xmx2g"
+
 matrix:
   include:
-  - python: '2.7'
-    env: BROWSER=
-  - python: '3.4'
+  - python: '3.4.3'
     env: BROWSER=Chrome
-  - python: '3.4'
+  - python: '3.4.3'
     env: BROWSER=
 before_install:
 - postgres --version
 - initdb --version
-- elasticsearch -v
-- nvm install 4
+- nvm install 6
 - node --version
 - npm config set python /usr/bin/python2.7
+- curl -O  ${ES_DOWNLOAD_URL} && sudo dpkg -i --force-confnew elasticsearch-${ES_VERSION}.deb && sudo service elasticsearch stop
+- pip install setuptools==18.5
 install:
-- python bootstrap.py --buildout-version 2.4.1 --setuptools-version 18.5
+- python bootstrap.py --buildout-version 2.9.5 --setuptools-version 18.5
 - bin/buildout -c buildout-travis.cfg || (echo "Retrying buildout" && bin/buildout
   -c buildout-travis.cfg)
+- sudo chown -R travis /etc/elasticsearch
+
 before_script:
 - |
   if test -n "$BROWSER"; then

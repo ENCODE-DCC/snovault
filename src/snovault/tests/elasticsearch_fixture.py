@@ -1,32 +1,28 @@
 import os.path
 import sys
+from time import sleep
 try:
     import subprocess32 as subprocess
 except ImportError:
     import subprocess
 
 
-def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
+def server_process(datadir, host='127.0.0.1', port=9201, prefix='', echo=False):
     args = [
         os.path.join(prefix, 'elasticsearch'),
-        '-f',  # foreground
-        '-Des.path.data="%s"' % os.path.join(datadir, 'data'),
-        '-Des.path.logs="%s"' % os.path.join(datadir, 'logs'),
-        '-Des.node.local=true',
-        '-Des.discovery.zen.ping.multicast.enabled=false',
-        '-Des.network.host=%s' % host,
-        '-Des.http.port=%d' % port,
-        '-Des.index.number_of_shards=1',
-        '-Des.index.number_of_replicas=0',
-        '-Des.index.store.type=memory',
-        '-Des.index.store.fs.memory.enabled=true',
-        '-Des.index.gateway.type=none',
-        '-Des.gateway.type=none',
-        '-XX:MaxDirectMemorySize=4096m',
+        '-Enetwork.host=%s' % host,
+        '-Ehttp.port=%d' % port,
+        '-Epath.data=%s' % os.path.join(datadir, 'data'),
+        '-Epath.logs=%s' % os.path.join(datadir, 'logs'),
     ]
-    # elasticsearch.deb setup
-    if os.path.exists('/etc/elasticsearch'):
-        args.append('-Des.path.conf=/etc/elasticsearch')
+    if os.environ.get('TRAVIS'):
+        print('IN TRAVIS')
+        echo=True
+        args.append('-Epath.conf=%s/conf' % os.environ['TRAVIS_BUILD_DIR'])
+    elif os.path.exists('/etc/elasticsearch'):
+        print('NOT IN TRAVIS')
+        args.append('-Epath.conf=/etc/elasticsearch')
+    print(args)
     process = subprocess.Popen(
         args,
         close_fds=True,
@@ -42,6 +38,7 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
             sys.stdout.write(line.decode('utf-8'))
         lines.append(line)
         if line.endswith(SUCCESS_LINE):
+            print('detected start, broke')
             break
     else:
         code = process.wait()
@@ -50,7 +47,7 @@ def server_process(datadir, host='127.0.0.1', port=9200, prefix='', echo=False):
 
     if not echo:
         process.stdout.close()
-
+    print('returning process')
     return process
 
 

@@ -21,7 +21,7 @@ def node(type_name, props):
     ).format(type_name=type_name)
     items = sorted(props.items())
     for name, prop in items:
-        if name == 'uuid' or prop.get('calculatedProperty'):
+        if name == 'uuid' or prop.get('notSubmittable'):
             continue
         label = escape(name)
         if 'items' in prop:
@@ -66,7 +66,7 @@ def digraph(types, exclude=None):
             continue
         out.extend(node(type_info.name, type_info.schema['properties']))
         for name, prop in type_info.schema['properties'].items():
-            if name in exclude or prop.get('calculatedProperty'):
+            if name in exclude or prop.get('notSubmittable'):
                 continue
             prop = prop.get('items', prop)
             if 'linkTo' in prop:

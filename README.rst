@@ -2,8 +2,6 @@
 SnoVault JSON-LD Database Framework
 ========================
 
-Version 0.28
-
 |Build status|_
 
 .. |Build status| image:: https://travis-ci.org/ENCODE-DCC/snovault.png?branch=master
