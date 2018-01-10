@@ -8,6 +8,9 @@ from .interfaces import (
     ELASTIC_SEARCH,
     ICachedItem,
 )
+from ..storage import (
+    RDBStorage
+)
 
 SEARCH_MAX = 99999  # OutOfMemoryError if too high. Previously: (2 ** 31) - 1
 
@@ -105,6 +108,37 @@ class PickStorage(object):
                 return self.write.get_by_json(key, value, item_type)
         return model
 
+    def delete_by_uuid(self, rid, item_type=None):
+        pg_storage_engine = None
+        es_storage_engine = None
+
+        if isinstance(self.write, RDBStorage):
+            pg_storage_engine = self.write
+        elif isinstance(self.read, RDBStorage):
+            pg_storage_engine = self.read
+        else: # TODO: Better exception type
+            raise Exception('No RDBStorage found to delete item with.')
+
+        if isinstance(self.read, ElasticSearchStorage):
+            es_storage_engine = self.read
+        elif isinstance(self.write, ElasticSearchStorage):
+            es_storage_engine = self.write
+        else: # TODO: Better exception type
+            raise Exception('No ElasticSearchStorage found to delete item with.')
+
+        result = { 'ElasticSearch' : True, 'RDB' : True }
+
+        try:
+            es_storage_engine.delete_by_uuid(rid, item_type) # Delete from ES
+        except:
+            result['ElasticSearch'] = False
+
+        try:
+            pg_storage_engine.delete_by_uuid(rid) # Delete from PG
+        except:
+            result['RDB'] = False
+
+        return result
 
     def get_rev_links(self, model, rel, *item_types):
         return self.storage().get_rev_links(model, rel, *item_types)
@@ -169,6 +203,9 @@ class ElasticSearchStorage(object):
             search = search.filter('terms', item_type=item_types)
         hits = search.execute()
         return [hit.to_dict().get('uuid', hit.to_dict().get('_id')) for hit in hits]
+
+    def delete_by_uuid(self, rid, type=None):
+        self.es.delete(index=type, doc_type=type, id=rid)
 
     def __iter__(self, *item_types):
         query = {'query': {

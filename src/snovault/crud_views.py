@@ -12,6 +12,7 @@ from .etag import if_match_tid
 from .interfaces import (
     COLLECTIONS,
     CONNECTION,
+    STORAGE,
     Created,
     BeforeModified,
     AfterModified,
@@ -131,7 +132,26 @@ def delete_item(context, request):
     properties = context.properties.copy()
     properties['status'] = 'deleted'
     update_item(context, request, properties)
+    return True
 
+
+def delete_item_from_database(context, request):
+    item_type = context.collection.type_info.item_type
+    item_uuid = str(context.uuid)
+    return request.registry[STORAGE].delete_by_uuid(item_uuid, item_type)
+
+
+def get_item_rendered(context, render): # Just some DRYness.
+    if render == 'uuid':
+        item_uri = '/%s' % context.uuid
+    else:
+        item_uri = request.resource_path(context)
+
+    if asbool(render) is True:
+        rendered = request.embed(item_uri, '@@object', as_user=True)
+    else:
+        rendered = item_uri
+    return rendered
 
 @view_config(context=Collection, permission='add', request_method='POST',
              validators=[validate_item_content_post])
@@ -143,15 +163,7 @@ def collection_add(context, request, render=None):
         render = request.params.get('render', True)
 
     item = create_item(context.type_info, request, request.validated)
-
-    if render == 'uuid':
-        item_uri = '/%s/' % item.uuid
-    else:
-        item_uri = request.resource_path(item)
-    if asbool(render) is True:
-        rendered = request.embed(item_uri, '@@object', as_user=True)
-    else:
-        rendered = item_uri
+    rendered = get_item_rendered(item, render)
     request.response.status = 201
     request.response.location = item_uri
     result = {
@@ -185,15 +197,7 @@ def item_edit(context, request, render=None):
 
     # This *sets* the property sheet
     update_item(context, request, request.validated)
-
-    if render == 'uuid':
-        item_uri = '/%s' % context.uuid
-    else:
-        item_uri = request.resource_path(context)
-    if asbool(render) is True:
-        rendered = request.embed(item_uri, '@@object', as_user=True)
-    else:
-        rendered = item_uri
+    rendered = get_item_rendered(context, render)
     request.response.status = 200
     result = {
         'status': 'success',
@@ -201,3 +205,35 @@ def item_edit(context, request, render=None):
         '@graph': [rendered],
     }
     return result
+
+
+@view_config(context=Item, permission='edit', request_method='DELETE', decorator=if_match_tid)
+def item_delete_full(context, request, render=None):
+    delete_from_db = asbool(request.GET and (request.GET.get('from_database') or request.GET.get('delete_from_database'))) or False
+
+    result = None
+    if delete_from_db:
+        result = delete_item_from_database(context, request)
+    else:
+        result = delete_item(context, request)
+
+    if result: 
+        
+        if not delete_from_db:
+            rendered = get_item_rendered(context, render)
+            return {
+                'status': 'success',
+                '@type': ['result'],
+                '@graph': [rendered]
+            }
+        else:
+            return {
+                'status': 'success',
+                '@type': ['result'],
+                'by_datastore' : result,
+                '@graph': [context.uuid]
+            }
+
+    #TODO: Throw error of some sort if no success?
+
+    pass
