@@ -1,4 +1,4 @@
-def find_uuids_for_indexing(registry, updated, renamed, log):
+def find_uuids_for_indexing(registry, updated, renamed, log=None):
     from .interfaces import ELASTIC_SEARCH
     from .create_mapping import index_settings
     from elasticsearch.exceptions import ConnectionTimeout
@@ -51,8 +51,9 @@ def find_uuids_for_indexing(registry, updated, renamed, log):
         invalidated = referencing = set(get_uuids_for_types(registry))
         return invalidated, referencing, True
     else:
-        log.debug("Found %s associated items for indexing" %
-                 (str(res['hits']['total'])))
+        if (log):
+            log.debug("Found %s associated items for indexing" %
+                    (str(res['hits']['total'])))
         if res['hits']['total'] > SEARCH_MAX:
             referencing = set(get_uuids_for_types(registry))
             flush = True

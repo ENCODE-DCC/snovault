@@ -3,14 +3,16 @@ from snovault.util import get_root_request
 from elasticsearch.helpers import scan
 from elasticsearch_dsl import Search, Q
 from pyramid.threadlocal import get_current_request
+from pyramid.httpexceptions import (
+    HTTPLocked
+)
 from zope.interface import alsoProvides
 from .interfaces import (
     ELASTIC_SEARCH,
     ICachedItem,
 )
-from ..storage import (
-    RDBStorage
-)
+from ..storage import RDBStorage
+from .indexer_utils import find_uuids_for_indexing
 
 SEARCH_MAX = 99999  # OutOfMemoryError if too high. Previously: (2 ** 31) - 1
 
@@ -109,8 +111,14 @@ class PickStorage(object):
         return model
 
     def delete_by_uuid(self, rid, item_type=None):
-        self.write.delete_by_uuid(rid) # Deletes from RDB
-        self.read.delete_by_uuid(rid, item_type) # Deletes from ES
+        request = get_current_request()
+        uuids_linking_to_item = find_uuids_for_indexing(request.registry, set(), set([rid]))[0] - set([rid])
+        if len(uuids_linking_to_item) > 0:
+            raise HTTPLocked(detail="Cannot delete an Item from the database if other Items are still linking to it.", comment=[
+                { p:v for p,v in self.read.get_by_uuid(uuid).source.get('embedded', {}).items() if p in ('@id', 'display_title', 'uuid') } for uuid in uuids_linking_to_item
+            ])
+        self.write.delete_by_uuid(rid)              # Deletes from RDB
+        self.read.delete_by_uuid(rid, item_type)    # Deletes from ES
         # TODO: invalidate ES, links
 
     def get_rev_links(self, model, rel, *item_types):
