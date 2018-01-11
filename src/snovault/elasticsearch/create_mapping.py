@@ -851,11 +851,14 @@ def set_es_uuid_store(es, indexing_uuids):
         print("MAPPING: uuids to index were NOT stored succesfully.")
 
 
-def run(app, collections=None, dry_run=False, check_first=False, force=False, index_diff=False, strict=False, sync_index=False, no_meta=False, print_count_only=False):
+def run(app, collections=None, dry_run=False, index_uuids=None, check_first=False, force=False, index_diff=False, strict=False, sync_index=False, no_meta=False, print_count_only=False):
     """
     Run create_mapping. Has the following options:
-    collection: run create mapping for the given collections (indices) only
+    collection: run create mapping for the given list of collections (indices) only.
     dry_run: if True, do not delete/create indices
+    index_uuids: do not attempt to change/create mappings but force indexing of
+        the given list of uuids. Will fail if the indices are not build yet.
+        Can be combined with "strict" and "sync_index" parameters.
     check_first: if True, attempt to keep indices that have not changed mapping.
         If the document counts in the index and db do not match, queue
         the all items in the index for reindexing.
@@ -874,23 +877,27 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, in
     es = app.registry[ELASTIC_SEARCH]
     # keep a set of all uuids to be reindexed, which occurs after all indices
     # are created
-    uuids_to_index = set()
-    if not dry_run:
-        snovault_cleanup(es, registry)
-    if not collections:
-        collections = list(registry[COLLECTIONS].by_item_type.keys())
-    # meta could be added through item-type arg
-    if not no_meta and 'meta' not in collections:
-        collections = ['meta'] + collections
-    for collection_name in collections:
-        if collection_name == 'meta':
-            # meta mapping just contains settings
-            build_index(app, es, collection_name, META_MAPPING, uuids_to_index,
-                        dry_run, check_first, force, index_diff, print_count_only)
-        else:
-            mapping = create_mapping_by_type(collection_name, registry)
-            build_index(app, es, collection_name, mapping, uuids_to_index,
-                        dry_run, check_first, force, index_diff, print_count_only)
+    if index_uuids and isinstance(index_uuids, list):
+        # skip create_mapping and index these uuids directly
+        uuids_to_index = set(index_uuids)
+    else:
+        uuids_to_index = set()
+        if not dry_run:
+            snovault_cleanup(es, registry)
+        if not collections:
+            collections = list(registry[COLLECTIONS].by_item_type.keys())
+        # meta could be added through item-type arg
+        if not no_meta and 'meta' not in collections:
+            collections = ['meta'] + collections
+        for collection_name in collections:
+            if collection_name == 'meta':
+                # meta mapping just contains settings
+                build_index(app, es, collection_name, META_MAPPING, uuids_to_index,
+                            dry_run, check_first, force, index_diff, print_count_only)
+            else:
+                mapping = create_mapping_by_type(collection_name, registry)
+                build_index(app, es, collection_name, mapping, uuids_to_index,
+                            dry_run, check_first, force, index_diff, print_count_only)
     if uuids_to_index:
         # if strict option and we have an item-type(s) provided,
         # find associated uuids for indexing
@@ -906,7 +913,7 @@ def run(app, collections=None, dry_run=False, check_first=False, force=False, in
         else:
             print("MAPPING: storing %s items for reindexing..." % (str(len(uuids_to_index))))
             set_es_uuid_store(es, uuids_to_index)
-    return uuids_to_index
+    return list(uuids_to_index)
 
 
 def main():
@@ -919,6 +926,8 @@ def main():
     parser.add_argument(
         '--dry-run', action='store_true', help="Don't post to ES, just print")
     parser.add_argument('config_uri', help="path to configfile")
+    parser.add_argument('--index_uuids', action='append',
+                        help="If this is provided, do not attempt to change any mappings but simply pass this list to uuids_to_index")
     parser.add_argument('--check-first', action='store_true',
                         help="check if index exists first before attempting creation")
     parser.add_argument('--force', action='store_true',
@@ -942,7 +951,7 @@ def main():
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.WARN)
 
-    uuids = run(app, args.item_type, args.dry_run, args.check_first, args.force,
+    uuids = run(app, args.item_type, args.dry_run, args.index_uuids, args.check_first, args.force,
                args.index_diff, args.strict, args.sync_index, args.no_meta, args.print_count_only)
     return
 
