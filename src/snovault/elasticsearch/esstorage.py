@@ -109,25 +109,9 @@ class PickStorage(object):
         return model
 
     def delete_by_uuid(self, rid, item_type=None):
-        pg_storage_engine = None
-        es_storage_engine = None
-
-        if isinstance(self.write, RDBStorage):
-            pg_storage_engine = self.write
-        elif isinstance(self.read, RDBStorage):
-            pg_storage_engine = self.read
-        else: # TODO: Better exception type
-            raise Exception('No RDBStorage found to delete item with.')
-
-        if isinstance(self.read, ElasticSearchStorage):
-            es_storage_engine = self.read
-        elif isinstance(self.write, ElasticSearchStorage):
-            es_storage_engine = self.write
-        else: # TODO: Better exception type
-            raise Exception('No ElasticSearchStorage found to delete item with.')
-
-        es_storage_engine.delete_by_uuid(rid, item_type)
-        pg_storage_engine.delete_by_uuid(rid)
+        self.write.delete_by_uuid(rid) # Deletes from RDB
+        self.read.delete_by_uuid(rid, item_type) # Deletes from ES
+        # TODO: invalidate ES, links
 
     def get_rev_links(self, model, rel, *item_types):
         return self.storage().get_rev_links(model, rel, *item_types)
