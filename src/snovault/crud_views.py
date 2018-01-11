@@ -142,7 +142,7 @@ def delete_item_from_database(context, request):
     return True
 
 
-def render_item(request, context, render):
+def render_item(request, context, render, return_uri_also=False):
     if render == 'uuid':
         item_uri = '/%s' % context.uuid
     else:
@@ -152,7 +152,7 @@ def render_item(request, context, render):
         rendered = request.embed(item_uri, '@@object', as_user=True)
     else:
         rendered = item_uri
-    return rendered
+    return (rendered, item_uri) if return_uri_also else rendered
 
 @view_config(context=Collection, permission='add', request_method='POST',
              validators=[validate_item_content_post])
@@ -164,7 +164,7 @@ def collection_add(context, request, render=None):
         render = request.params.get('render', True)
 
     item = create_item(context.type_info, request, request.validated)
-    rendered = render_item(request, item, render)
+    rendered, item_uri = render_item(request, item, render, True)
     request.response.status = 201
     request.response.location = item_uri
     result = {
