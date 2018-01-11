@@ -126,19 +126,8 @@ class PickStorage(object):
         else: # TODO: Better exception type
             raise Exception('No ElasticSearchStorage found to delete item with.')
 
-        result = { 'ElasticSearch' : True, 'RDB' : True }
-
-        try:
-            es_storage_engine.delete_by_uuid(rid, item_type) # Delete from ES
-        except:
-            result['ElasticSearch'] = False
-
-        try:
-            pg_storage_engine.delete_by_uuid(rid) # Delete from PG
-        except:
-            result['RDB'] = False
-
-        return result
+        es_storage_engine.delete_by_uuid(rid, item_type)
+        pg_storage_engine.delete_by_uuid(rid)
 
     def get_rev_links(self, model, rel, *item_types):
         return self.storage().get_rev_links(model, rel, *item_types)
@@ -205,7 +194,7 @@ class ElasticSearchStorage(object):
         return [hit.to_dict().get('uuid', hit.to_dict().get('_id')) for hit in hits]
 
     def delete_by_uuid(self, rid, type=None):
-        self.es.delete(index=type, doc_type=type, id=rid)
+        self.es.delete(id=rid, index=type, doc_type=type)
 
     def __iter__(self, *item_types):
         query = {'query': {

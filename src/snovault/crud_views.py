@@ -138,10 +138,11 @@ def delete_item(context, request):
 def delete_item_from_database(context, request):
     item_type = context.collection.type_info.item_type
     item_uuid = str(context.uuid)
-    return request.registry[STORAGE].delete_by_uuid(item_uuid, item_type)
+    request.registry[STORAGE].delete_by_uuid(item_uuid, item_type)
+    return True
 
 
-def get_item_rendered(context, render): # Just some DRYness.
+def render_item(request, context, render):
     if render == 'uuid':
         item_uri = '/%s' % context.uuid
     else:
@@ -163,7 +164,7 @@ def collection_add(context, request, render=None):
         render = request.params.get('render', True)
 
     item = create_item(context.type_info, request, request.validated)
-    rendered = get_item_rendered(item, render)
+    rendered = render_item(request, item, render)
     request.response.status = 201
     request.response.location = item_uri
     result = {
@@ -197,7 +198,7 @@ def item_edit(context, request, render=None):
 
     # This *sets* the property sheet
     update_item(context, request, request.validated)
-    rendered = get_item_rendered(context, render)
+    rendered = render_item(request, context, render)
     request.response.status = 200
     result = {
         'status': 'success',
@@ -209,31 +210,35 @@ def item_edit(context, request, render=None):
 
 @view_config(context=Item, permission='edit', request_method='DELETE', decorator=if_match_tid)
 def item_delete_full(context, request, render=None):
-    delete_from_db = asbool(request.GET and (request.GET.get('from_database') or request.GET.get('delete_from_database'))) or False
 
-    result = None
-    if delete_from_db:
+    delete_from_database = asbool(request.GET and request.GET.get('delete_from_database'))
+    uuid = str(context.uuid)
+
+    if delete_from_database:
+        # Delete entirely - WARNING USE WITH CAUTION - DELETES PERMANENTLY
         result = delete_item_from_database(context, request)
+        if result:
+            return {
+                'status': 'success',
+                '@type': ['result'],
+                'notification' : 'Permanently deleted ' + uuid,
+                '@graph': [uuid]
+            }
     else:
         result = delete_item(context, request)
-
-    if result: 
-        
-        if not delete_from_db:
-            rendered = get_item_rendered(context, render)
+        if result:
             return {
                 'status': 'success',
                 '@type': ['result'],
-                '@graph': [rendered]
-            }
-        else:
-            return {
-                'status': 'success',
-                '@type': ['result'],
-                'by_datastore' : result,
-                '@graph': [context.uuid]
+                'notification' : 'Set status of ' + uuid + ' to deleted',
+                '@graph': [ render_item(request, context, render) ]
             }
 
-    #TODO: Throw error of some sort if no success?
+    #TODO: Throw error of some sort if no exceptions?
 
-    pass
+    return {
+        'status': 'failure',
+        '@type': ['result'],
+        '@graph': [uuid]
+    }
+
