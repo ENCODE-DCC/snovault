@@ -248,7 +248,7 @@ def test_indexing_es(app, testapp, indexer_testapp):
     time.sleep(3)
     store_uuids = indexer_utils.get_uuid_store_from_es(es)
     assert len(reindex_uuids) == 1
-    assert reindex_uuids == set(store_uuids)
+    assert reindex_uuids == store_uuids
     # reindex with --force, --sync-index, and --item-type
     reindex_uuids = create_mapping.run(app, collections=[test_type], force=True, sync_index=True)
     time.sleep(3)
@@ -274,6 +274,28 @@ def test_indexing_es(app, testapp, indexer_testapp):
     # doc_count will have updated due to indexing in create_mapping
     assert doc_count == 2
     res = indexer_testapp.post_json('/index', {'record': True})
+    # remove the index again
+    es.indices.delete(index=test_type)
+    # reindex only test_type items, strictly and synchronously
+    reindex_uuids = create_mapping.run(app, collections=[test_type], strict=True, no_meta=True, sync_index=True)
+    test_uuid = reindex_uuids[0]
+    time.sleep(3)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 2
+    # delete one uuid
+    es.delete(id=test_uuid, index=test_type, doc_type=test_type, version_type='force', version=0)
+    time.sleep(3)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 1
+    # reindex that specific uuid only, using index_uuid arg. do strictly
+    reindex_uuids = create_mapping.run(app, index_uuids=[test_uuid], strict=True, sync_index=True)
+    assert len(reindex_uuids) == 1
+    time.sleep(3)
+    # search for that uuid explicilty
+    results = es.search(index=test_type)
+    hits = results['hits']['hits']
+    hit_uuids = [hit.get('_source').get('uuid') for hit in hits]
+    assert test_uuid in hit_uuids
 
 
 # some unit tests associated with build_index in create_mapping
