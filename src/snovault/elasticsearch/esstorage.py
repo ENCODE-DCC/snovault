@@ -26,6 +26,32 @@ def includeme(config):
     registry[STORAGE] = PickStorage(ElasticSearchStorage(es, es_index), wrapped_storage, registry)
 
 
+def find_linking_property(our_dict, value_to_find):
+
+    def find_it(d, parent_key=None):
+        if isinstance(d, list):
+            for idx, v in enumerate(d):
+                print('\n', idx, v)
+                if isinstance(v, dict) or isinstance(v, list):
+                    found = find_it(v, parent_key)
+                    if found:
+                        return (parent_key if parent_key else '') + '[' + str(idx) + '].' + found
+                elif v == value_to_find:
+                    return '[' + str(idx) + ']'
+
+        elif isinstance(d, dict):
+            for k, v in d.items():
+                print('\n', k, v)
+                if isinstance(v, dict) or isinstance(v, list):
+                    found = find_it(v, k)
+                    if found:
+                        return found
+                elif v == value_to_find:
+                    return (parent_key + '.' if parent_key else '') + k
+        return None
+
+    return find_it(our_dict)
+
 class CachedModel(object):
     def __init__(self, hit):
         self.source = hit.to_dict()
@@ -117,10 +143,19 @@ class PickStorage(object):
             item_type = model.item_type
         uuids_linking_to_item = find_uuids_for_indexing(self.registry, set(), set([rid]))[0] - set([rid])
         if len(uuids_linking_to_item) > 0:
-            raise HTTPLocked(detail="Cannot delete an Item from the database if other Items are still linking to it.", comment=[
-                # Return list of { '@id', 'display_title', 'uuid' } in 'comment' property in response to assist with any manual unlinking.
-                { p:v for p,v in self.read.get_by_uuid(uuid).source.get('embedded', {}).items() if p in ('@id', 'display_title', 'uuid') } for uuid in uuids_linking_to_item
-            ])
+            # Return list of { '@id', 'display_title', 'uuid' } in 'comment' property of HTTPException response to assist with any manual unlinking.
+            conflicts = []
+            for linking_uuid in uuids_linking_to_item:
+                linking_dict = self.read.get_by_uuid(linking_uuid).source.get('embedded')
+                linking_property = find_linking_property(linking_dict, rid)
+                conflicts.append({
+                    '@id' : linking_dict['@id'],
+                    'display_title' : linking_dict['display_title'],
+                    'uuid' : linking_uuid,
+                    'field' : linking_property or "Not Embedded"
+                })
+
+            raise HTTPLocked(detail="Cannot delete an Item from the database if other Items are still linking to it.", comment=conflicts)
 
         self.write.delete_by_uuid(rid)              # Deletes from RDB
         self.read.delete_by_uuid(rid, item_type)    # Deletes from ES
