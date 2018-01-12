@@ -121,10 +121,9 @@ class PickStorage(object):
                 # Return list of { '@id', 'display_title', 'uuid' } in 'comment' property in response to assist with any manual unlinking.
                 { p:v for p,v in self.read.get_by_uuid(uuid).source.get('embedded', {}).items() if p in ('@id', 'display_title', 'uuid') } for uuid in uuids_linking_to_item
             ])
+
         self.write.delete_by_uuid(rid)              # Deletes from RDB
         self.read.delete_by_uuid(rid, item_type)    # Deletes from ES
-        # TODO: invalidate ES, links
-        return 'BACON'
 
     def get_rev_links(self, model, rel, *item_types):
         return self.storage().get_rev_links(model, rel, *item_types)
