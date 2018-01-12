@@ -31,7 +31,6 @@ def find_linking_property(our_dict, value_to_find):
     def find_it(d, parent_key=None):
         if isinstance(d, list):
             for idx, v in enumerate(d):
-                print('\n', idx, v)
                 if isinstance(v, dict) or isinstance(v, list):
                     found = find_it(v, parent_key)
                     if found:
@@ -41,13 +40,12 @@ def find_linking_property(our_dict, value_to_find):
 
         elif isinstance(d, dict):
             for k, v in d.items():
-                print('\n', k, v)
                 if isinstance(v, dict) or isinstance(v, list):
                     found = find_it(v, k)
                     if found:
                         return found
                 elif v == value_to_find:
-                    return (parent_key + '.' if parent_key else '') + k
+                    return k
         return None
 
     return find_it(our_dict)
