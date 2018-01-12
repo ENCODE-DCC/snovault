@@ -23,7 +23,7 @@ def includeme(config):
     # ES 5 change: 'snovault' index removed, search among '_all' instead
     es_index = '_all'
     wrapped_storage = registry[STORAGE]
-    registry[STORAGE] = PickStorage(ElasticSearchStorage(es, es_index), wrapped_storage)
+    registry[STORAGE] = PickStorage(ElasticSearchStorage(es, es_index), wrapped_storage, registry)
 
 
 class CachedModel(object):
@@ -75,9 +75,10 @@ class CachedModel(object):
 
 
 class PickStorage(object):
-    def __init__(self, read, write):
+    def __init__(self, read, write, registry):
         self.read = read
         self.write = write
+        self.registry = registry
 
     def storage(self):
         request = get_current_request()
@@ -111,15 +112,19 @@ class PickStorage(object):
         return model
 
     def delete_by_uuid(self, rid, item_type=None):
-        request = get_current_request()
-        uuids_linking_to_item = find_uuids_for_indexing(request.registry, set(), set([rid]))[0] - set([rid])
+        if not item_type: # ES deletion requires index & doc_type, which are both == item_type
+            model = self.get_by_uuid(rid)
+            item_type = model.item_type
+        uuids_linking_to_item = find_uuids_for_indexing(self.registry, set(), set([rid]))[0] - set([rid])
         if len(uuids_linking_to_item) > 0:
             raise HTTPLocked(detail="Cannot delete an Item from the database if other Items are still linking to it.", comment=[
+                # Return list of { '@id', 'display_title', 'uuid' } in 'comment' property in response to assist with any manual unlinking.
                 { p:v for p,v in self.read.get_by_uuid(uuid).source.get('embedded', {}).items() if p in ('@id', 'display_title', 'uuid') } for uuid in uuids_linking_to_item
             ])
         self.write.delete_by_uuid(rid)              # Deletes from RDB
         self.read.delete_by_uuid(rid, item_type)    # Deletes from ES
         # TODO: invalidate ES, links
+        return 'BACON'
 
     def get_rev_links(self, model, rel, *item_types):
         return self.storage().get_rev_links(model, rel, *item_types)
@@ -185,8 +190,11 @@ class ElasticSearchStorage(object):
         hits = search.execute()
         return [hit.to_dict().get('uuid', hit.to_dict().get('_id')) for hit in hits]
 
-    def delete_by_uuid(self, rid, type=None):
-        self.es.delete(id=rid, index=type, doc_type=type)
+    def delete_by_uuid(self, rid, item_type=None):
+        if not item_type:
+            model = self.get_by_uuid(rid)
+            item_type = model.item_type
+        self.es.delete(id=rid, index=item_type, doc_type=item_type)
 
     def __iter__(self, *item_types):
         query = {'query': {

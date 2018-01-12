@@ -340,3 +340,79 @@ def test_check_and_reindex_existing(app, testapp):
     test_uuids = set()
     check_and_reindex_existing(app, es, test_type, test_uuids)
     assert(len(test_uuids)) == 1
+
+
+def test_es_delete_simple(app, session):
+    from snovault.interfaces import STORAGE
+    from snovault.storage import (
+        Resource,
+        Key,
+        PropertySheet,
+        CurrentPropertySheet,
+        TransactionRecord,
+    )
+    from snovault.elasticsearch.create_mapping import (
+    #    run as run_create_mapping,
+        check_and_reindex_existing,
+    #    run_indexing
+    )
+    from snovault.commands.es_index_data import run as run_index_data
+    ## Adding new test resource to DB
+    storage = app.registry[STORAGE]
+    item_type = 'testing_link_target'
+    name = 'testdata'
+    props1 = {'foo': 'bar'}
+    resource = Resource(item_type, { name : props1 })
+    session.add(resource)
+    session.flush()
+    resource = session.query(Resource).one()
+    check = storage.get_by_uuid(str(resource.rid))
+    #import pdb
+    #pdb.set_trace()
+    assert check[name] == props1
+    # add a key
+    testname = 'foo'
+    key = Key(rid=resource.rid, name=testname, value=props1[testname])
+    session.add(key)
+    session.flush()
+    assert session.query(Key).count() == 1
+
+    ## Checking Item in DB to make sure it matches
+    propsheet = session.query(PropertySheet).one()
+    assert propsheet.sid
+    assert propsheet.rid == resource.rid
+    current = session.query(CurrentPropertySheet).one()
+    assert current.sid == propsheet.sid
+    assert current.rid == resource.rid
+
+    ## Make sure we update ES index
+    test_uuids = set()
+    check_and_reindex_existing(app, app.registry[ELASTIC_SEARCH], item_type, test_uuids)
+
+    assert str(current.rid) in test_uuids # Assert that this newly added Item is not yet indexed.
+
+    check_post_1 = storage.get_by_uuid(str(resource.rid))
+    check_post_2 = storage.get_by_uuid(str(resource.rid))
+
+    # Then index it:
+    #run_create_mapping(app, index_uuids=[str(current.rid)], strict=True, sync_index=True)
+    #run_indexing(app, set([str(current.rid)]))
+    run_index_data(app, uuids=test_uuids)
+    ## Now ensure that we do has it in ES:
+    #test_uuids = set()
+    #create_mapping.check_and_reindex_existing(app, app.registry[ELASTIC_SEARCH], item_type, test_uuids)
+
+    #assert bool(test_uuids) == False # Ensure we don't have any more indices to reindex after indexing our newly added UUID/Item
+
+    check_post = storage.write.get_by_uuid(str(resource.rid))
+
+    import pdb
+    pdb.set_trace()
+
+    #delti = storage.delete_by_uuid(str(resource.rid), item_type)
+    #assert delti == 'BACON'
+    #check_post = storage.get_by_uuid(str(resource.rid))
+    assert not check_post
+    assert session.query(Key).count() == 0
+    assert session.query(PropertySheet).count() == 0
+    assert session.query(CurrentPropertySheet).count() == 0
