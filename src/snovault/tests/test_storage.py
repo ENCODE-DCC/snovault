@@ -110,6 +110,85 @@ def test_current_propsheet_update(session):
     assert current.sid
 
 
+def test_delete_simple(session, storage):
+    from snovault.storage import (
+        Resource,
+        Key,
+        PropertySheet,
+        CurrentPropertySheet,
+        TransactionRecord,
+    )
+    name = 'testdata'
+    props1 = {'foo': 'bar'}
+    resource = Resource('test_item', {name: props1})
+    session.add(resource)
+    session.flush()
+    resource = session.query(Resource).one()
+    check = storage.get_by_uuid(str(resource.rid))
+    assert check[name] == props1
+    # add a key
+    testname = 'foo'
+    key = Key(rid=resource.rid, name=testname, value=props1[testname])
+    session.add(key)
+    session.flush()
+    assert session.query(Key).count() == 1
+
+    propsheet = session.query(PropertySheet).one()
+    assert propsheet.sid
+    assert propsheet.rid == resource.rid
+    current = session.query(CurrentPropertySheet).one()
+    assert current.sid == propsheet.sid
+    assert current.rid == resource.rid
+
+    storage.delete_by_uuid(str(resource.rid))
+    check_post = storage.get_by_uuid(str(resource.rid))
+    assert not check_post
+    assert session.query(Key).count() == 0
+    assert session.query(PropertySheet).count() == 0
+    assert session.query(CurrentPropertySheet).count() == 0
+
+
+def test_delete_compound(session, storage):
+    from snovault.storage import (
+        CurrentPropertySheet,
+        Resource,
+        PropertySheet,
+        Key,
+    )
+    name = 'testdata'
+    props1 = {'foo': 'bar'}
+    resource = Resource('test_item', {name: props1})
+    session.add(resource)
+    session.flush()
+    resource = session.query(Resource).one()
+    check = storage.get_by_uuid(str(resource.rid))
+    assert check[name] == props1
+    # add a key
+    testname = 'foo'
+    key = Key(rid=resource.rid, name=testname, value=props1[testname])
+    session.add(key)
+    session.flush()
+    assert session.query(Key).count() == 1
+
+    props2 = {'foo': 'baz'}
+    resource[name] = props2
+    session.flush()
+    resource = session.query(Resource).one()
+    session.flush()
+    assert resource[name] == props2
+    assert session.query(PropertySheet).count() == 2
+    assert [propsheet.properties for propsheet in resource.data[name].history] == [props1, props2]
+    current = session.query(CurrentPropertySheet).one()
+    assert current.sid
+
+    storage.delete_by_uuid(str(resource.rid))
+    check_post = storage.get_by_uuid(str(resource.rid))
+    assert not check_post
+    assert session.query(Key).count() == 0
+    assert session.query(PropertySheet).count() == 0
+    assert session.query(CurrentPropertySheet).count() == 0
+
+
 def test_keys(session):
     from sqlalchemy.orm.exc import FlushError
     from snovault.storage import (
