@@ -1,3 +1,8 @@
+1.0.0:
+
+- 31 delete
+- ES5 Fix: Update index settings shard number
+
 0.33:
 
 - ES5 Update: ENCD-2488 ES5 Update aka RM3910
