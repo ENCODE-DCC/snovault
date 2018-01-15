@@ -208,7 +208,7 @@ def item_edit(context, request, render=None):
     return result
 
 
-@view_config(context=Item, permission='edit', request_method='DELETE', decorator=if_match_tid)
+@view_config(context=Item, permission='delete', request_method='DELETE', decorator=if_match_tid)
 def item_delete_full(context, request, render=None):
 
     delete_from_database = asbool(request.GET and request.GET.get('delete_from_database'))
@@ -241,4 +241,3 @@ def item_delete_full(context, request, render=None):
         '@type': ['result'],
         '@graph': [uuid]
     }
-

@@ -926,7 +926,7 @@ def main():
     parser.add_argument(
         '--dry-run', action='store_true', help="Don't post to ES, just print")
     parser.add_argument('config_uri', help="path to configfile")
-    parser.add_argument('--index_uuids', action='append',
+    parser.add_argument('--index-uuids', action='append',
                         help="If this is provided, do not attempt to change any mappings but simply pass this list to uuids_to_index")
     parser.add_argument('--check-first', action='store_true',
                         help="check if index exists first before attempting creation")
