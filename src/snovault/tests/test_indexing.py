@@ -65,7 +65,6 @@ def teardown(app, dbapi_conn):
     from snovault.elasticsearch import create_mapping
     create_mapping.run(app)
     cursor = dbapi_conn.cursor()
-    cursor.execute("SET statement_timeout = 0") # no timeout for next query
     cursor.execute("""TRUNCATE resources, transactions CASCADE;""")
     cursor.close()
 
