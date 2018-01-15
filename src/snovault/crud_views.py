@@ -12,6 +12,7 @@ from .etag import if_match_tid
 from .interfaces import (
     COLLECTIONS,
     CONNECTION,
+    STORAGE,
     Created,
     BeforeModified,
     AfterModified,
@@ -131,7 +132,27 @@ def delete_item(context, request):
     properties = context.properties.copy()
     properties['status'] = 'deleted'
     update_item(context, request, properties)
+    return True
 
+
+def delete_item_from_database(context, request):
+    item_type = context.collection.type_info.item_type
+    item_uuid = str(context.uuid)
+    request.registry[STORAGE].delete_by_uuid(item_uuid, item_type)
+    return True
+
+
+def render_item(request, context, render, return_uri_also=False):
+    if render == 'uuid':
+        item_uri = '/%s' % context.uuid
+    else:
+        item_uri = request.resource_path(context)
+
+    if asbool(render) is True:
+        rendered = request.embed(item_uri, '@@object', as_user=True)
+    else:
+        rendered = item_uri
+    return (rendered, item_uri) if return_uri_also else rendered
 
 @view_config(context=Collection, permission='add', request_method='POST',
              validators=[validate_item_content_post])
@@ -143,15 +164,7 @@ def collection_add(context, request, render=None):
         render = request.params.get('render', True)
 
     item = create_item(context.type_info, request, request.validated)
-
-    if render == 'uuid':
-        item_uri = '/%s/' % item.uuid
-    else:
-        item_uri = request.resource_path(item)
-    if asbool(render) is True:
-        rendered = request.embed(item_uri, '@@object', as_user=True)
-    else:
-        rendered = item_uri
+    rendered, item_uri = render_item(request, item, render, True)
     request.response.status = 201
     request.response.location = item_uri
     result = {
@@ -185,15 +198,7 @@ def item_edit(context, request, render=None):
 
     # This *sets* the property sheet
     update_item(context, request, request.validated)
-
-    if render == 'uuid':
-        item_uri = '/%s' % context.uuid
-    else:
-        item_uri = request.resource_path(context)
-    if asbool(render) is True:
-        rendered = request.embed(item_uri, '@@object', as_user=True)
-    else:
-        rendered = item_uri
+    rendered = render_item(request, context, render)
     request.response.status = 200
     result = {
         'status': 'success',
@@ -201,3 +206,43 @@ def item_edit(context, request, render=None):
         '@graph': [rendered],
     }
     return result
+
+
+@view_config(context=Item, permission='edit', request_method='DELETE', decorator=if_match_tid)
+def item_delete_full(context, request, render=None):
+    # possibly temporary fix to check if user is admin
+    user_details = request.user_info.get('details', {})
+    if 'admin' not in user_details.get('groups', []):
+        msg = u'Must be admin to fully delete items.'
+        raise ValidationFailure('body', ['userid'], msg)
+
+    delete_from_database = asbool(request.GET and request.GET.get('delete_from_database'))
+    uuid = str(context.uuid)
+
+    if delete_from_database:
+        # Delete entirely - WARNING USE WITH CAUTION - DELETES PERMANENTLY
+        result = delete_item_from_database(context, request)
+        if result:
+            return {
+                'status': 'success',
+                '@type': ['result'],
+                'notification' : 'Permanently deleted ' + uuid,
+                '@graph': [uuid]
+            }
+    else:
+        result = delete_item(context, request)
+        if result:
+            return {
+                'status': 'success',
+                '@type': ['result'],
+                'notification' : 'Set status of ' + uuid + ' to deleted',
+                '@graph': [ render_item(request, context, render) ]
+            }
+
+    #TODO: Throw error of some sort if no exceptions?
+
+    return {
+        'status': 'failure',
+        '@type': ['result'],
+        '@graph': [uuid]
+    }

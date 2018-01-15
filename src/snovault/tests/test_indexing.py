@@ -248,7 +248,7 @@ def test_indexing_es(app, testapp, indexer_testapp):
     time.sleep(3)
     store_uuids = indexer_utils.get_uuid_store_from_es(es)
     assert len(reindex_uuids) == 1
-    assert reindex_uuids == set(store_uuids)
+    assert reindex_uuids == store_uuids
     # reindex with --force, --sync-index, and --item-type
     reindex_uuids = create_mapping.run(app, collections=[test_type], force=True, sync_index=True)
     time.sleep(3)
@@ -274,6 +274,28 @@ def test_indexing_es(app, testapp, indexer_testapp):
     # doc_count will have updated due to indexing in create_mapping
     assert doc_count == 2
     res = indexer_testapp.post_json('/index', {'record': True})
+    # remove the index again
+    es.indices.delete(index=test_type)
+    # reindex only test_type items, strictly and synchronously
+    reindex_uuids = create_mapping.run(app, collections=[test_type], strict=True, no_meta=True, sync_index=True)
+    test_uuid = reindex_uuids[0]
+    time.sleep(3)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 2
+    # delete one uuid
+    es.delete(id=test_uuid, index=test_type, doc_type=test_type, version_type='force', version=0)
+    time.sleep(3)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 1
+    # reindex that specific uuid only, using index_uuid arg. do strictly
+    reindex_uuids = create_mapping.run(app, index_uuids=[test_uuid], strict=True, sync_index=True)
+    assert len(reindex_uuids) == 1
+    time.sleep(3)
+    # search for that uuid explicilty
+    results = es.search(index=test_type)
+    hits = results['hits']['hits']
+    hit_uuids = [hit.get('_source').get('uuid') for hit in hits]
+    assert test_uuid in hit_uuids
 
 
 # some unit tests associated with build_index in create_mapping
@@ -318,3 +340,63 @@ def test_check_and_reindex_existing(app, testapp):
     test_uuids = set()
     check_and_reindex_existing(app, es, test_type, test_uuids)
     assert(len(test_uuids)) == 1
+
+
+def test_es_delete_simple(app, testapp, session):
+    from snovault.interfaces import STORAGE
+    from snovault.storage import (
+        Resource,
+        Key,
+        PropertySheet,
+        CurrentPropertySheet,
+        TransactionRecord,
+    )
+    from snovault.elasticsearch.create_mapping import (
+       run as run_create_mapping,
+       check_and_reindex_existing
+    )
+    from snovault.commands.es_index_data import run as run_index_data
+    ## Adding new test resource to DB
+    storage = app.registry[STORAGE]
+    test_type = 'testing_post_put_patch'
+    test_body = {'required': '', 'simple1' : 'foo', 'simple2' : 'bar' }
+    res = testapp.post_json('/testing-post-put-patch/', test_body)
+    test_uuid = res.json['@graph'][0]['uuid']
+    check = storage.get_by_uuid(test_uuid)
+
+    assert str(check.uuid) == test_uuid
+
+    ## Make sure we update ES index
+    test_uuids = set()
+    check_and_reindex_existing(app, app.registry[ELASTIC_SEARCH], test_type, test_uuids)
+
+    assert test_uuid in test_uuids # Assert that this newly added Item is not yet indexed.
+
+    # Then index it:
+    run_create_mapping(app, index_uuids=list(test_uuids), strict=True, sync_index=True)
+    time.sleep(5) # INDEXER performs a network request to ES server to index things. Whether we like it or not, this means it's async and we must wait.
+
+    ## Now ensure that we do has it in ES:
+    test_uuids_2 = set()
+    check_and_reindex_existing(app, app.registry[ELASTIC_SEARCH], test_type, test_uuids_2)
+    assert bool(test_uuids_2) == False # Ensure we don't have any more indices to reindex after indexing our newly added UUID/Item
+
+    check_post_from_es = storage.read.get_by_uuid(test_uuid)
+    check_post_from_rdb = storage.write.get_by_uuid(test_uuid)
+
+    assert check_post_from_es is not None
+    assert check_post_from_rdb is not None
+
+    assert check_post_from_es.properties['simple1'] == test_body['simple1']
+    assert check_post_from_es.properties['simple2'] == test_body['simple2']
+
+    # The actual delete
+    storage.delete_by_uuid(test_uuid) # We can optionally pass in test_type as well for better performance.
+
+    check_post_from_rdb_2 = storage.write.get_by_uuid(test_uuid)
+
+    assert check_post_from_rdb_2 is None
+
+    time.sleep(5) # Allow time for ES API to send network request to ES server to perform delete.
+    check_post_from_es_2 = storage.read.get_by_uuid(test_uuid)
+    assert check_post_from_es_2 is None

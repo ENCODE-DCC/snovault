@@ -3,11 +3,16 @@ from snovault.util import get_root_request
 from elasticsearch.helpers import scan
 from elasticsearch_dsl import Search, Q
 from pyramid.threadlocal import get_current_request
+from pyramid.httpexceptions import (
+    HTTPLocked
+)
 from zope.interface import alsoProvides
 from .interfaces import (
     ELASTIC_SEARCH,
     ICachedItem,
 )
+from ..storage import RDBStorage
+from .indexer_utils import find_uuids_for_indexing
 
 SEARCH_MAX = 99999  # OutOfMemoryError if too high. Previously: (2 ** 31) - 1
 
@@ -18,8 +23,32 @@ def includeme(config):
     # ES 5 change: 'snovault' index removed, search among '_all' instead
     es_index = '_all'
     wrapped_storage = registry[STORAGE]
-    registry[STORAGE] = PickStorage(ElasticSearchStorage(es, es_index), wrapped_storage)
+    registry[STORAGE] = PickStorage(ElasticSearchStorage(es, es_index), wrapped_storage, registry)
 
+
+def find_linking_property(our_dict, value_to_find):
+
+    def find_it(d, parent_key=None):
+        if isinstance(d, list):
+            for idx, v in enumerate(d):
+                if isinstance(v, dict) or isinstance(v, list):
+                    found = find_it(v, parent_key)
+                    if found:
+                        return (parent_key if parent_key else '') + '[' + str(idx) + '].' + found
+                elif v == value_to_find:
+                    return '[' + str(idx) + ']'
+
+        elif isinstance(d, dict):
+            for k, v in d.items():
+                if isinstance(v, dict) or isinstance(v, list):
+                    found = find_it(v, k)
+                    if found:
+                        return found
+                elif v == value_to_find:
+                    return k
+        return None
+
+    return find_it(our_dict)
 
 class CachedModel(object):
     def __init__(self, hit):
@@ -70,9 +99,10 @@ class CachedModel(object):
 
 
 class PickStorage(object):
-    def __init__(self, read, write):
+    def __init__(self, read, write, registry):
         self.read = read
         self.write = write
+        self.registry = registry
 
     def storage(self):
         request = get_current_request()
@@ -105,6 +135,28 @@ class PickStorage(object):
                 return self.write.get_by_json(key, value, item_type)
         return model
 
+    def delete_by_uuid(self, rid, item_type=None):
+        if not item_type: # ES deletion requires index & doc_type, which are both == item_type
+            model = self.get_by_uuid(rid)
+            item_type = model.item_type
+        uuids_linking_to_item = find_uuids_for_indexing(self.registry, set(), set([rid]))[0] - set([rid])
+        if len(uuids_linking_to_item) > 0:
+            # Return list of { '@id', 'display_title', 'uuid' } in 'comment' property of HTTPException response to assist with any manual unlinking.
+            conflicts = []
+            for linking_uuid in uuids_linking_to_item:
+                linking_dict = self.read.get_by_uuid(linking_uuid).source.get('embedded')
+                linking_property = find_linking_property(linking_dict, rid)
+                conflicts.append({
+                    '@id' : linking_dict['@id'],
+                    'display_title' : linking_dict['display_title'],
+                    'uuid' : linking_uuid,
+                    'field' : linking_property or "Not Embedded"
+                })
+
+            raise HTTPLocked(detail="Cannot delete an Item from the database if other Items are still linking to it.", comment=conflicts)
+
+        self.write.delete_by_uuid(rid)              # Deletes from RDB
+        self.read.delete_by_uuid(rid, item_type)    # Deletes from ES
 
     def get_rev_links(self, model, rel, *item_types):
         return self.storage().get_rev_links(model, rel, *item_types)
@@ -169,6 +221,12 @@ class ElasticSearchStorage(object):
             search = search.filter('terms', item_type=item_types)
         hits = search.execute()
         return [hit.to_dict().get('uuid', hit.to_dict().get('_id')) for hit in hits]
+
+    def delete_by_uuid(self, rid, item_type=None):
+        if not item_type:
+            model = self.get_by_uuid(rid)
+            item_type = model.item_type
+        self.es.delete(id=rid, index=item_type, doc_type=item_type)
 
     def __iter__(self, *item_types):
         query = {'query': {
