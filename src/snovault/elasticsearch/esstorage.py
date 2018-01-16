@@ -155,8 +155,12 @@ class PickStorage(object):
 
             raise HTTPLocked(detail="Cannot delete an Item from the database if other Items are still linking to it.", comment=conflicts)
 
-        self.write.delete_by_uuid(rid)              # Deletes from RDB
-        self.read.delete_by_uuid(rid, item_type)    # Deletes from ES
+        self.write.delete_by_uuid(rid)                  # Deletes from RDB
+        try:
+            self.read.delete_by_uuid(rid, item_type)    # Deletes from ES
+        except elasticsearch.exceptions.NotFoundError:
+            print('Couldn\'t find ' + rid + ' in ElasticSearch. Continuing.')
+            pass
 
     def get_rev_links(self, model, rel, *item_types):
         return self.storage().get_rev_links(model, rel, *item_types)
