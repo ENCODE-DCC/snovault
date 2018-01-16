@@ -159,8 +159,11 @@ class PickStorage(object):
         try:
             self.read.delete_by_uuid(rid, item_type)    # Deletes from ES
         except elasticsearch.exceptions.NotFoundError:
+            # Case: Not yet indexed
             print('Couldn\'t find ' + rid + ' in ElasticSearch. Continuing.')
-            pass
+        except elasticsearch.exceptions.UnknownItemTypeError:
+            # Case: Deleting in-database item for collection which no longer exists. Probably temporary.
+            print('Item type ' + str(item_type) + ' does not exist in ElasticSearch. Continuing.')
 
     def get_rev_links(self, model, rel, *item_types):
         return self.storage().get_rev_links(model, rel, *item_types)
