@@ -104,7 +104,11 @@ def create_item(type_info, request, properties, sheets=None):
     item_properties, propname_children = split_child_props(type_info, properties)
 
     if 'uuid' in item_properties:
-        uuid = UUID(item_properties.pop('uuid'))
+        try:
+            nonvalidated_uuid = item_properties.pop('uuid')
+            uuid = UUID(nonvalidated_uuid)
+        except ValueError as e:
+            raise ValueError(str(e) + ': ' + str(nonvalidated_uuid))
     else:
         uuid = uuid4()
 
