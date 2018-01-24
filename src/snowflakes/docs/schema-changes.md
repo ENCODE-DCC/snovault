@@ -94,7 +94,7 @@ Refer to [object-lifecycle.rst] to understand object rendering. Example of basic
             )
             class Treatment(Item):
                 item_type = 'treatment'
-                schema = load_schema('encoded:schemas/treatment.json')
+                schema = load_schema('snowflakes:schemas/treatment.json')
 
 
 5. Within in a class add in  *embedding*, *reverse links*, and *calculated properties* as necessary.

@@ -1,6 +1,6 @@
 import re
 from pyramid.view import view_config
-from snovault import (
+from snovault.resources import (
     AbstractCollection,
     TYPES,
 )

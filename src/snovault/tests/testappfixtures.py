@@ -39,7 +39,7 @@ def app(app_settings):
     '''WSGI application level functional testing.
        will have to make snovault dummy main app
     '''
-    from snovault import main
+    from snowflakes import main
     return main({}, **app_settings)
 
 

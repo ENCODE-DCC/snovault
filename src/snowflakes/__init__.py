@@ -7,7 +7,7 @@ try:
 except ImportError:
     import subprocess
 from pyramid.config import Configurator
-from snovault.app import (
+from snovault import (
     json_asset,
     app_version,
     session,
