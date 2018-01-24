@@ -44,6 +44,9 @@ from .resources import (  # noqa
     Resource,
     Root,
 )
+from .schema_utils import load_schema  # noqa
+from .upgrader import upgrade_step  # noqa
+
 from elasticsearch import Elasticsearch
 STATIC_MAX_AGE = 0
 
@@ -74,8 +77,6 @@ def includeme(config):
     config.include('.resource_views')
 
 
-from .json_renderer import json_renderer
-
 def json_asset(spec, **kw):
     utf8 = codecs.getreader("utf-8")
     asset = AssetResolver(caller_package()).resolve(spec)
@@ -90,6 +91,8 @@ def changelogs(config):
 def configure_engine(settings):
     engine_url = settings['sqlalchemy.url']
     engine_opts = {}
+    from .json_renderer import json_renderer
+
     if engine_url.startswith('postgresql'):
         if settings.get('indexer_worker'):
             application_name = 'indexer_worker'
