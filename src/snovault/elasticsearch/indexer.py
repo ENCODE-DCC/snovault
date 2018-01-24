@@ -408,10 +408,14 @@ def index(request):
                         txn_count=txn_count,
                         first_txn_timestamp=first_txn.isoformat(),
                     )
-            except TransportError:
-                log.error('Error too many uuids to look for: updated:%d  renamed: %d', len(updated), len(renamed), exc_info=True)
-                invalidated = list(all_uuids(request.registry))
-                flush = True
+            except TransportError as e:
+                if e.error == "search_phase_execution_exception":
+                    log.error('Error finding related uuids: updated:%d  renamed: %d', len(updated), len(renamed), exc_info=True)
+                    invalidated = list(all_uuids(request.registry))
+                    flush = True
+                    log.info('Continuing with full reindexing...')
+                else:
+                    raise
 
             if invalidated and not dry_run:
                 # Exporting a snapshot mints a new xid, so only do so when required.
