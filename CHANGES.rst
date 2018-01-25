@@ -1,3 +1,8 @@
+1.0.1: * Issues discovered while release of ENCD v65
+
+-SNO-6: Fix index query too many clauses failure
+-SNO-5: Update psycopg to match encoded version 2.7.3
+
 1.0.0:
 
 - 31 delete
