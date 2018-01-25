@@ -410,7 +410,7 @@ def index(request):
                     )
             except TransportError as e:
                 if e.error == "search_phase_execution_exception":
-                    log.error('Error finding related uuids: updated:%d  renamed: %d', len(updated), len(renamed), exc_info=True)
+                    log.error("Error finding related uuids: updated:{}  renamed:{}".format(len(updated), len(renamed)), exc_info=True)
                     invalidated = list(all_uuids(request.registry))
                     flush = True
                     log.info('Continuing with full reindexing...')
