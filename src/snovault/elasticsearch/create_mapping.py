@@ -876,6 +876,7 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
     import pdb; pdb.set_trace()
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
+    log.warn('___ES NODE INFO___:\n\n %s' % (str(es.nodes.info())))
     # keep a set of all uuids to be reindexed, which occurs after all indices
     # are created
     if index_uuids and isinstance(index_uuids, list):
@@ -950,7 +951,7 @@ def main():
     app = get_app(args.config_uri, args.app_name)
 
     # Loading app will have configured from config file. Reconfigure here:
-    logging.getLogger('snovault').setLevel(logging.WARN)
+    logging.getLogger('snovault').setLevel(logging.INFO)
 
     log.warn('_______CREATE-MAPPING_______\n\nRunning with: %s' % str(vars(args)))
 
