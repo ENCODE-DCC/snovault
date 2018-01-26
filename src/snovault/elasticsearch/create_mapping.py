@@ -873,6 +873,7 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
         items to reindex. Must be used with create_mapping or force.
     sync_index: if True, synchronously run reindexing instead of using uuid store.
     """
+    import pdb; pdb.set_trace()
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
     # keep a set of all uuids to be reindexed, which occurs after all indices
@@ -950,6 +951,8 @@ def main():
 
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.WARN)
+
+    log.warn('_______CREATE-MAPPING_______\n\nRunning with: %s' % str(vars(args)))
 
     uuids = run(app, args.item_type, args.dry_run, args.index_uuids, args.check_first, args.force,
                args.index_diff, args.strict, args.sync_index, args.no_meta, args.print_count_only)
