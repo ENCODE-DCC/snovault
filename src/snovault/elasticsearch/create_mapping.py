@@ -713,12 +713,12 @@ def check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff=Fals
     """
     db_count, es_count, db_uuids, diff_uuids = get_db_es_counts_and_db_uuids(app, es, in_type, index_diff)
     if print_counts:
-        log.warn("DB count is %s and ES count is %s for index: %s" %
+        log.warning("DB count is %s and ES count is %s for index: %s" %
                  (str(db_count), str(es_count), in_type))
         if index_diff and diff_uuids:
-            log.warn("The following UUIDs are found in the DB but not the ES index: %s" % (in_type))
+            log.warning("The following UUIDs are found in the DB but not the ES index: %s" % (in_type))
             for uuid in diff_uuids:
-                log.warn(uuid)
+                log.warning(uuid)
         return
     if es_count is None or es_count != db_count:
         if index_diff:
@@ -876,7 +876,7 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
     import pdb; pdb.set_trace()
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
-    log.warn('___ES NODE INFO___:\n\n %s' % (str(es.nodes.info())))
+    log.warning('___ES NODE INFO___:\n\n %s' % (str(es.nodes.info())))
     # keep a set of all uuids to be reindexed, which occurs after all indices
     # are created
     if index_uuids and isinstance(index_uuids, list):
@@ -953,7 +953,7 @@ def main():
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.INFO)
 
-    log.warn('_______CREATE-MAPPING_______\n\nRunning with: %s' % str(vars(args)))
+    log.warning('_______CREATE-MAPPING_______\n\nRunning with: %s' % str(vars(args)))
 
     uuids = run(app, args.item_type, args.dry_run, args.index_uuids, args.check_first, args.force,
                args.index_diff, args.strict, args.sync_index, args.no_meta, args.print_count_only)
