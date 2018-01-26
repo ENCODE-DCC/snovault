@@ -875,8 +875,8 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
     """
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
-    log.warning('___CREATE-MAPPING___:\n\index_uuids: %s\ncheck_first %s\n' % (index_uuids, check_first))
-    log.warning('___ES NODE INFO___:\n\n %s' % (str(es.nodes.info())))
+    log.warning('\n___CREATE-MAPPING___:\nindex_uuids: %s\ncheck_first %s\n' % (index_uuids, check_first))
+    log.warning('\n___ES NODE INFO___:\n %s\n' % (str(es.nodes.info())))
     # keep a set of all uuids to be reindexed, which occurs after all indices
     # are created
     if index_uuids and isinstance(index_uuids, list):
@@ -888,7 +888,7 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
             snovault_cleanup(es, registry)
         if not collections:
             collections = list(registry[COLLECTIONS].by_item_type.keys())
-        log.warning('___FOUND COLLECTIONS___:\n\n %s' % (str(collections)))
+        log.warning('\n___FOUND COLLECTIONS___:\n %s\n' % (str(collections)))
         # meta could be added through item-type arg
         if not no_meta and 'meta' not in collections:
             collections = ['meta'] + collections
@@ -901,7 +901,7 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
                 mapping = create_mapping_by_type(collection_name, registry)
                 build_index(app, es, collection_name, mapping, uuids_to_index,
                             dry_run, check_first, force, index_diff, print_count_only)
-    log.warning('___UUIDS TO INDEX___:\n\n %s' % (str(uuids_to_index)))
+    log.warning('\n___UUIDS TO INDEX___:\n %s\n' % (str(uuids_to_index)))
     if uuids_to_index:
         # if strict option and we have an item-type(s) provided,
         # find associated uuids for indexing
