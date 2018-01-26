@@ -29,6 +29,7 @@ es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
 log = logging.getLogger(__name__)
 SEARCH_MAX = 99999  # OutOfMemoryError if too high
+MAX_CLAUSES_FOR_ES = 8192
 
 def includeme(config):
     config.add_route('index', '/index')
@@ -369,8 +370,11 @@ def index(request):
             if txn_count == 0:
                 return result
 
-            es.indices.refresh('_all')
-            try:
+            if len(updated) + len(renamed) > MAX_CLAUSES_FOR_ES:
+                invalidated = list(all_uuids(request.registry))
+                flush = True
+            else:
+                es.indices.refresh('_all')
                 res = es.search(index='_all', size=SEARCH_MAX, request_timeout=60, body={
                     'query': {
                         'bool': {
@@ -408,14 +412,6 @@ def index(request):
                         txn_count=txn_count,
                         first_txn_timestamp=first_txn.isoformat(),
                     )
-            except TransportError as e:
-                if e.error == "search_phase_execution_exception":
-                    log.error("Error finding related uuids: updated:{}  renamed:{}".format(len(updated), len(renamed)), exc_info=True)
-                    invalidated = list(all_uuids(request.registry))
-                    flush = True
-                    log.info('Continuing with full reindexing...')
-                else:
-                    raise
 
             if invalidated and not dry_run:
                 # Exporting a snapshot mints a new xid, so only do so when required.
