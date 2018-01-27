@@ -873,6 +873,7 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
         items to reindex. Must be used with create_mapping or force.
     sync_index: if True, synchronously run reindexing instead of using uuid store.
     """
+    import pdb; pdb.set_trace()
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
     log.warning('\n___CREATE-MAPPING___:\nindex_uuids: %s\ncheck_first %s\n' % (index_uuids, check_first))
