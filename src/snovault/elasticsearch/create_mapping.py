@@ -606,7 +606,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
         if prev_index_record is not None and this_index_record == prev_index_record:
             if in_type != 'meta':
                 check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff, print_count_only)
-            print('MAPPING: using existing index for collection %s' % (in_type))
+            log.warning('MAPPING: using existing index for collection %s' % (in_type))
             return
 
     if dry_run or index_diff:
@@ -616,51 +616,51 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     if this_index_exists:
         res = es_safe_execute(es.indices.delete, index=in_type, ignore=[400,404])
         if res:
-            print('MAPPING: index successfully deleted for %s' % (in_type))
+            log.warning('MAPPING: index successfully deleted for %s' % (in_type))
         else:
-            print('MAPPING: could not delete index for %s' % (in_type))
+            log.warning('MAPPING: could not delete index for %s' % (in_type))
 
     # first, create the mapping. adds settings in the body
     put_settings = this_index_record['settings']
     res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, ignore=[400])
     if res:
-        print('MAPPING: new index created for %s' % (in_type))
+        log.warning('MAPPING: new index created for %s' % (in_type))
     else:
-        print('MAPPING: new index failed for %s' % (in_type))
+        log.warning('MAPPING: new index failed for %s' % (in_type))
 
     # update with mapping
     res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, ignore=[400])
     if res:
-        print('MAPPING: mapping successfully added for %s' % (in_type))
+        log.warning('MAPPING: mapping successfully added for %s' % (in_type))
     else:
-        print('MAPPING: mapping failed for %s' % (in_type))
+        log.warning('MAPPING: mapping failed for %s' % (in_type))
 
     # force means we want to forcibly re-index
     if force:
         coll_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
         uuids_to_index.update(coll_uuids)
-        print('MAPPING: forcibly queueing all items in the new index %s for reindexing' % (in_type))
+        log.warning('MAPPING: forcibly queueing all items in the new index %s for reindexing' % (in_type))
     else:
         # if 'indexing' doc exists within meta, then re-index for this type
         indexing_xmin = None
         try:
             status = es.get(index='meta', doc_type='meta', id='indexing', ignore=[404])
         except:
-            print('MAPPING: indexing record not found in meta for %s' % (in_type))
+            log.warning('MAPPING: indexing record not found in meta for %s' % (in_type))
         else:
             indexing_xmin = status.get('_source', {}).get('xmin')
         if indexing_xmin is not None:
             coll_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
             uuids_to_index.update(coll_uuids)
-            print('MAPPING: queueing all items in the new index %s for reindexing' % (in_type))
+            log.warning('MAPPING: queueing all items in the new index %s for reindexing' % (in_type))
 
     # put index_record in meta
     if meta_exists:
         res = es_safe_execute(es.index, index='meta', doc_type='meta', body=this_index_record, id=in_type)
         if res:
-            print("MAPPING: index record created for %s" % (in_type))
+            log.warning("MAPPING: index record created for %s" % (in_type))
         else:
-            print("MAPPING: index record failed for %s" % (in_type))
+            log.warning("MAPPING: index record failed for %s" % (in_type))
 
 
 def check_if_index_exists(es, in_type, check_first):
@@ -713,19 +713,19 @@ def check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff=Fals
     """
     db_count, es_count, db_uuids, diff_uuids = get_db_es_counts_and_db_uuids(app, es, in_type, index_diff)
     if print_counts:
-        log.warn("DB count is %s and ES count is %s for index: %s" %
+        log.warning("DB count is %s and ES count is %s for index: %s" %
                  (str(db_count), str(es_count), in_type))
         if index_diff and diff_uuids:
-            log.warn("The following UUIDs are found in the DB but not the ES index: %s" % (in_type))
+            log.warning("The following UUIDs are found in the DB but not the ES index: %s" % (in_type))
             for uuid in diff_uuids:
-                log.warn(uuid)
+                log.warning(uuid)
         return
     if es_count is None or es_count != db_count:
         if index_diff:
-            print('MAPPING: queueing %s items found in DB but not ES in the index %s for reindexing' % (str(len(diff_uuids)), in_type))
+            log.warning('MAPPING: queueing %s items found in DB but not ES in the index %s for reindexing' % (str(len(diff_uuids)), in_type))
             uuids_to_index.update(diff_uuids)
         else:
-            print('MAPPING: queueing all items in the existing index %s for reindexing' % (in_type))
+            log.warning('MAPPING: queueing all items in the existing index %s for reindexing' % (in_type))
             uuids_to_index.update(db_uuids)
 
 
@@ -804,7 +804,7 @@ def es_safe_execute(function, **kwargs):
             function(**kwargs)
         except ConnectionTimeout:
             exec_count += 1
-            print('ES connection issue! Retrying.', file=sys.stderr)
+            log.warning('ES connection issue! Retrying.', file=sys.stderr)
         else:
             return True
     return False
@@ -823,7 +823,7 @@ def snovault_cleanup(es, registry):
             snovault_index.delete(ignore=404)
     res = es_safe_execute(es.delete, index='meta', doc_type='meta', id='uuid_store', ignore=[404])
     if res:
-        print('MAPPING: removed previous UUID store from ES.')
+        log.warning('MAPPING: removed previous UUID store from ES.')
 
 
 def run_indexing(app, indexing_uuids):
@@ -846,9 +846,9 @@ def set_es_uuid_store(es, indexing_uuids):
     record['uuids'] = list(indexing_uuids)
     res = es_safe_execute(es.index, index='meta', doc_type='meta', body=record, id='uuid_store')
     if res:
-        print("MAPPING: uuids to index were stored succesfully.")
+        log.warning("MAPPING: uuids to index were stored succesfully.")
     else:
-        print("MAPPING: uuids to index were NOT stored succesfully.")
+        log.warning("MAPPING: uuids to index were NOT stored succesfully.")
 
 
 def run(app, collections=None, dry_run=False, index_uuids=None, check_first=False, force=False, index_diff=False, strict=False, sync_index=False, no_meta=False, print_count_only=False):
@@ -875,9 +875,15 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
     """
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
+    log.warning('\n___CREATE-MAPPING___:\nindex_uuids: %s\ncheck_first %s\n' % (index_uuids, check_first))
+    log.warning('\n___ES___:\n %s\n' % (str(es.cat.client)))
+    log.warning('\n___ES NODES___:\n %s\n' % (str(es.cat.nodes())))
+    log.warning('\n___ES HEALTH___:\n %s\n' % (str(es.cat.health())))
+    log.warning('\n___ES INDICES (PRE-MAPPING)___:\n %s\n' % (str(es.cat.indices())))
     # keep a set of all uuids to be reindexed, which occurs after all indices
     # are created
     if index_uuids and isinstance(index_uuids, list):
+        log.warning('\n___INDEX_UUIDS; SKIP MAPPING___:\n')
         # skip create_mapping and index these uuids directly
         uuids_to_index = set(index_uuids)
     else:
@@ -886,6 +892,7 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
             snovault_cleanup(es, registry)
         if not collections:
             collections = list(registry[COLLECTIONS].by_item_type.keys())
+        log.warning('\n___FOUND COLLECTIONS___:\n %s\n' % (str(collections)))
         # meta could be added through item-type arg
         if not no_meta and 'meta' not in collections:
             collections = ['meta'] + collections
@@ -896,8 +903,12 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
                             dry_run, check_first, force, index_diff, print_count_only)
             else:
                 mapping = create_mapping_by_type(collection_name, registry)
+                log.warning('\n___MAPPING MADE FOR %s___:\n' % (collection_name))
                 build_index(app, es, collection_name, mapping, uuids_to_index,
                             dry_run, check_first, force, index_diff, print_count_only)
+                log.warning('\n___INDEX MADE FOR %s___:\n' % (collection_name))
+    log.warning('\n___UUIDS TO INDEX___:\n %s\n' % (str(uuids_to_index)))
+    log.warning('\n___ES INDICES (POST-MAPPING)___:\n %s\n' % (str(es.cat.indices())))
     if uuids_to_index:
         # if strict option and we have an item-type(s) provided,
         # find associated uuids for indexing
@@ -908,11 +919,12 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
         # only index (synchronously) if --sync-index option is used
         # otherwise, store uuids for later indexing in ES uuid_store document
         if sync_index:
-            print("MAPPING: indexing %s items" % (str(len(uuids_to_index))))
+            log.warning("MAPPING: indexing %s items" % (str(len(uuids_to_index))))
             run_indexing(app, uuids_to_index)
         else:
-            print("MAPPING: storing %s items for reindexing..." % (str(len(uuids_to_index))))
+            log.warning("MAPPING: storing %s items for reindexing..." % (str(len(uuids_to_index))))
             set_es_uuid_store(es, uuids_to_index)
+    log.warning('\n___FINISHED CREATE-MAPPING___:\n')
     return list(uuids_to_index)
 
 
@@ -949,7 +961,7 @@ def main():
     app = get_app(args.config_uri, args.app_name)
 
     # Loading app will have configured from config file. Reconfigure here:
-    logging.getLogger('snovault').setLevel(logging.WARN)
+    logging.getLogger('snovault').setLevel(logging.INFO)
 
     uuids = run(app, args.item_type, args.dry_run, args.index_uuids, args.check_first, args.force,
                args.index_diff, args.strict, args.sync_index, args.no_meta, args.print_count_only)
