@@ -876,7 +876,7 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
     log.warning('\n___CREATE-MAPPING___:\nindex_uuids: %s\ncheck_first %s\n' % (index_uuids, check_first))
-    log.warning('\n___ES___:\n %s\n' % (str(es.cat.client())))
+    log.warning('\n___ES___:\n %s\n' % (str(es.cat.client))
     log.warning('\n___ES NODES___:\n %s\n' % (str(es.cat.nodes())))
     log.warning('\n___ES HEALTH___:\n %s\n' % (str(es.cat.health())))
     log.warning('\n___ES INDICES (PRE-MAPPING)___:\n %s\n' % (str(es.cat.indices())))
