@@ -31,6 +31,7 @@ es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
 log = logging.getLogger(__name__)
 SEARCH_MAX = 99999  # OutOfMemoryError if too high
+MAX_CLAUSES_FOR_ES = 8192
 
 def includeme(config):
     config.add_route('index', '/index')
@@ -181,10 +182,17 @@ class IndexerState(object):
                 uuids =  override.get('uuids',[])
                 uuid_count = len(uuids)
                 if uuid_count > 0:
-                    if uuid_count > SEARCH_MAX:
+                    (related_set, full_reindex) = get_related_uuids(request, self.es, uuids, uuids)
+                    if full_reindex:
+                        uuids = list(related_set)
                         self.delete_objs([self.override] + self.followup_lists)
                     else:
-                        self.delete_objs([self.override])
+                        uuids = list(set(uuids) | related_set)
+                        uuid_count = len(uuids)
+                        if uuid_count > SEARCH_MAX:
+                            self.delete_objs([self.override] + self.followup_lists)
+                        else:
+                            self.delete_objs([self.override])
                     return uuids
         return None
 
@@ -522,6 +530,73 @@ class IndexerState(object):
 
         return display
 
+def get_related_uuids(request, es, updated, renamed):
+    '''Returns (set of uuids, True if all_uuids)'''
+
+    updated_count = len(updated)
+    renamed_count = len(renamed)
+    if (updated_count + renamed_count) > MAX_CLAUSES_FOR_ES:
+        return (all_uuids(request.registry), True)
+
+    es.indices.refresh('_all')
+
+    # batching may allow us to drive a partial reindexing much greater than 99999
+    BATCH_COUNT = MAX_CLAUSES_FOR_ES  # TODO: Lower batch count, so that batching actually occurs
+    beg = 0
+    end = BATCH_COUNT
+    related_set = set()
+    updated_list = list(updated)
+    renamed_list = list(renamed)
+    while updated_count > beg or renamed_count > beg:
+        if updated_count > end or beg > 0:
+            log.error('Indexer looking for related uuids by BATCH[%d,%d]' % (beg, end))
+
+        updated_batch = []
+        renamed_batch = []
+        if updated_count > beg:
+            updated_batch = updated_list[beg:end]
+        if renamed_count > beg:
+            renamed_batch = renamed_list[beg:end]
+
+        res = es.search(index='_all', size=SEARCH_MAX, request_timeout=60, body={
+            'query': {
+                'bool': {
+                    'should': [
+                        {
+                            'terms': {
+                                'embedded_uuids': updated,
+                                '_cache': False,
+                            },
+                        },
+                        {
+                            'terms': {
+                                'linked_uuids': renamed,
+                                '_cache': False,
+                            },
+                        },
+                    ],
+                },
+            },
+            '_source': False,
+        })
+
+        if res['hits']['total'] > SEARCH_MAX:
+            if updated_count > end or beg > 0:
+                log.error('Indexer promoted to full reindex by BATCH[%d,%d]' % (beg, end))
+            return (all_uuids(request.registry), True)
+
+        related_set |= {hit['_id'] for hit in res['hits']['hits']}
+        if len(related_set) >  SEARCH_MAX:
+            if updated_count > end or beg > 0:
+                log.error('Indexer promoted to full reindex by cumulative BATCH[0,%d]' % (end))
+            return (all_uuids(request.registry), True)
+
+        beg += BATCH_COUNT
+        end += BATCH_COUNT
+
+    return (related_set, False)
+
+
 
 @view_config(route_name='_indexer_state', request_method='GET', permission="index")
 def indexer_state_show(request):
@@ -612,11 +687,8 @@ def index(request):
     # OPTIONAL: restart support
 
     result = state.get_initial_state()  # get after checking priority!
-    if len(invalidated) > 0:
-        if xmin == -1:
-            xmin = get_current_xmin(request)
-        flush = True
-    else:
+
+    if xmin == -1 or len(invalidated) == 0:
         xmin = get_current_xmin(request)
 
         last_xmin = None
@@ -624,13 +696,22 @@ def index(request):
             last_xmin = request.json['last_xmin']
         else:
             status = es.get(index=INDEX, doc_type='meta', id='indexing', ignore=[400, 404])
-            if status['found']:
+            if status['found'] and 'xmin' in status['_source']:
                 last_xmin = status['_source']['xmin']
+        if last_xmin is None:  # still!
+            if 'last_xmin' in result:
+                last_xmin = result['last_xmin']
+            elif 'xmin' in result and result['xmin'] < xmin:
+                last_xmin = result['state']
 
         result.update(
             xmin=xmin,
             last_xmin=last_xmin,
         )
+
+    if len(invalidated) > 0:  # Priority cycle already set up
+        flush = True
+    else:
 
         flush = False
         if last_xmin is None:
@@ -662,53 +743,20 @@ def index(request):
                 state.send_notices()
                 return result
 
-            es.indices.refresh('_all')
-            try:
-                res = es.search(index='_all', size=SEARCH_MAX, body={
-                    'query': {
-                        'bool': {
-                            'should': [
-                                {
-                                    'terms': {
-                                        'embedded_uuids': updated,
-                                        '_cache': False,
-                                    },
-                                },
-                                {
-                                    'terms': {
-                                        'linked_uuids': renamed,
-                                        '_cache': False,
-                                    },
-                                },
-                            ],
-                        },
-                    },
-                    '_source': False,
-                })
-
-                if res['hits']['total'] > SEARCH_MAX:
-                    invalidated = list(all_uuids(request.registry))
-                    flush = True
-                else:
-                    referencing = {hit['_id'] for hit in res['hits']['hits']}
-                    invalidated = referencing | updated
-                    result.update(
-                        max_xid=max_xid,
-                        renamed=renamed,
-                        updated=updated,
-                        referencing=len(referencing),
-                        invalidated=len(invalidated),
-                        txn_count=txn_count,
-                        first_txn_timestamp=first_txn.isoformat(),
-                    )
-            except TransportError as e:
-                if e.error == "search_phase_execution_exception":
-                    log.error("Error finding related uuids: updated:{}  renamed:{}".format(len(updated), len(renamed)), exc_info=True)
-                    invalidated = list(all_uuids(request.registry))
-                    flush = True
-                    log.info('Continuing with full reindexing...')
-                else:
-                    raise
+            (related_set, full_reindex) = get_related_uuids(request, es, updated, renamed)
+            if full_reindex:
+                flush = True
+            else:
+                invalidated = related_set | updated
+                result.update(
+                    max_xid=max_xid,
+                    renamed=renamed,
+                    updated=updated,
+                    referencing=len(related_set),
+                    invalidated=len(invalidated),
+                    txn_count=txn_count,
+                    first_txn_timestamp=first_txn.isoformat(),
+                )
 
             if invalidated and not dry_run:
                 # Exporting a snapshot mints a new xid, so only do so when required.
