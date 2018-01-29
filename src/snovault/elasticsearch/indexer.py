@@ -183,17 +183,10 @@ class IndexerState(object):
                 uuids =  override.get('uuids',[])
                 uuid_count = len(uuids)
                 if uuid_count > 0:
-                    (related_set, full_reindex) = get_related_uuids(request, self.es, uuids, uuids)
-                    if full_reindex:
-                        uuids = list(related_set)
+                    if uuid_count > SEARCH_MAX:
                         self.delete_objs([self.override] + self.followup_lists)
                     else:
-                        uuids = list(set(uuids) | related_set)
-                        uuid_count = len(uuids)
-                        if uuid_count > SEARCH_MAX:
-                            self.delete_objs([self.override] + self.followup_lists)
-                        else:
-                            self.delete_objs([self.override])
+                        self.delete_objs([self.override])
                     return uuids
         return None
 
@@ -548,62 +541,62 @@ def get_related_uuids(request, es, updated, renamed):
     renamed_count = len(renamed)
     if (updated_count + renamed_count) > MAX_CLAUSES_FOR_ES:
         return (all_uuids(request.registry), True)
+    elif (updated_count + renamed_count) == 0:
+        return (set(), False)
 
     es.indices.refresh('_all')
 
-    # batching may allow us to drive a partial reindexing much greater than 99999
-    BATCH_COUNT = MAX_CLAUSES_FOR_ES  # TODO: Lower batch count, so that batching actually occurs
-    beg = 0
-    end = BATCH_COUNT
-    related_set = set()
-    updated_list = list(updated)
-    renamed_list = list(renamed)
-    while updated_count > beg or renamed_count > beg:
-        if updated_count > end or beg > 0:
-            log.error('Indexer looking for related uuids by BATCH[%d,%d]' % (beg, end))
+    # TODO: batching may allow us to drive a partial reindexing much greater than 99999
+    #BATCH_COUNT = 100  # NOTE: 100 random uuids returned > 99999 results!
+    #beg = 0
+    #end = BATCH_COUNT
+    #related_set = set()
+    #updated_list = list(updated)  # Must be lists
+    #renamed_list = list(renamed)
+    #while updated_count > beg or renamed_count > beg:
+    #    if updated_count > end or beg > 0:
+    #        log.error('Indexer looking for related uuids by BATCH[%d,%d]' % (beg, end))
+    #
+    #    updated = []
+    #    if updated_count > beg:
+    #        updated = updated_list[beg:end]
+    #    renamed = []
+    #    if renamed_count > beg:
+    #        renamed = renamed_list[beg:end]
+    #
+    #     search ...
+    #     accumulate...
+    #
+    #    beg += BATCH_COUNT
+    #    end += BATCH_COUNT
 
-        updated_batch = []
-        renamed_batch = []
-        if updated_count > beg:
-            updated_batch = updated_list[beg:end]
-        if renamed_count > beg:
-            renamed_batch = renamed_list[beg:end]
 
-        res = es.search(index='_all', size=SEARCH_MAX, request_timeout=60, body={
-            'query': {
-                'bool': {
-                    'should': [
-                        {
-                            'terms': {
-                                'embedded_uuids': updated,
-                                '_cache': False,
-                            },
+    res = es.search(index='_all', size=SEARCH_MAX, request_timeout=60, body={
+        'query': {
+            'bool': {
+                'should': [
+                    {
+                        'terms': {
+                            'embedded_uuids': updated,
+                            '_cache': False,
                         },
-                        {
-                            'terms': {
-                                'linked_uuids': renamed,
-                                '_cache': False,
-                            },
+                    },
+                    {
+                        'terms': {
+                            'linked_uuids': renamed,
+                            '_cache': False,
                         },
-                    ],
-                },
+                    },
+                ],
             },
-            '_source': False,
-        })
+        },
+        '_source': False,
+    })
 
-        if res['hits']['total'] > SEARCH_MAX:
-            if updated_count > end or beg > 0:
-                log.error('Indexer promoted to full reindex by BATCH[%d,%d]' % (beg, end))
-            return (all_uuids(request.registry), True)
+    if res['hits']['total'] > SEARCH_MAX:
+        return (all_uuids(request.registry), True)
 
-        related_set |= {hit['_id'] for hit in res['hits']['hits']}
-        if len(related_set) >  SEARCH_MAX:
-            if updated_count > end or beg > 0:
-                log.error('Indexer promoted to full reindex by cumulative BATCH[0,%d]' % (end))
-            return (all_uuids(request.registry), True)
-
-        beg += BATCH_COUNT
-        end += BATCH_COUNT
+    related_set = {hit['_id'] for hit in res['hits']['hits']}
 
     return (related_set, False)
 
@@ -721,7 +714,7 @@ def index(request):
             last_xmin=last_xmin,
         )
 
-    if len(invalidated) > 0:  # Priority cycle already set up
+    if len(invalidated) > SEARCH_MAX:  # Priority cycle already set up
         flush = True
     else:
 
@@ -735,7 +728,7 @@ def index(request):
                 TransactionRecord.xid >= last_xmin,
             )
 
-            invalidated = set()
+            invalidated = set(invalidated)  # not empty if API index request occurred
             updated = set()
             renamed = set()
             max_xid = 0
@@ -750,13 +743,17 @@ def index(request):
                 renamed.update(txn.data.get('renamed', ()))
                 updated.update(txn.data.get('updated', ()))
 
+            if invalidated:        # reindex requested, treat like updated
+                updated |= invalidated
+
             result['txn_count'] = txn_count
-            if txn_count == 0:
+            if txn_count == 0 and len(invalidated) == 0:
                 state.send_notices()
                 return result
 
             (related_set, full_reindex) = get_related_uuids(request, es, updated, renamed)
             if full_reindex:
+                invalidated = related_set
                 flush = True
             else:
                 invalidated = related_set | updated
@@ -766,9 +763,10 @@ def index(request):
                     updated=updated,
                     referencing=len(related_set),
                     invalidated=len(invalidated),
-                    txn_count=txn_count,
-                    first_txn_timestamp=first_txn.isoformat(),
+                    txn_count=txn_count
                 )
+                if first_txn is not None:
+                    result['first_txn_timestamp'] = first_txn.isoformat()
 
             if invalidated and not dry_run:
                 # Exporting a snapshot mints a new xid, so only do so when required.
