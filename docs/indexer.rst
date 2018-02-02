@@ -75,6 +75,7 @@ These view will return the following values:
     :cycle_took: How long it took to complete the most recent indexer cycle.
     :cycle_started: When the most recent indexing cycle started.
     :indexed: Number of objects indexed in the most recent cycle.
+    :indexing_elapsed: When currently indexing, this will be the amount of time since indexing started.
     :invalidated: Number of uuids needing to be indexed.
     :renamed: uuids of objects renamed in postgres.
     :updated: uuids of objects updated in postgres.
