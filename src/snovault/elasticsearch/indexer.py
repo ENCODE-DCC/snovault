@@ -507,6 +507,9 @@ class IndexerState(object):
     def display(self):
         display = {}
         display['state'] = self.get()
+        if display['state'].get('status','') == 'indexing' and 'cycle_started' in display['state']:
+            started = datetime.datetime.strptime(display['state']['cycle_started'],'%Y-%m-%dT%H:%M:%S.%f')
+            display['state']['indexing_elapsed'] = str(datetime.datetime.now() - started)
         display['title'] = display['state'].get('title',self.state_id)
         display['uuids in progress'] = self.get_count(self.todo_set)
         display['uuids troubled'] = self.get_count(self.troubled_set)
