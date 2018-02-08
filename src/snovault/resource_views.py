@@ -129,6 +129,7 @@ def item_view(context, request):
 def item_links(context, request):
     # This works from the schema rather than the links table
     # so that upgrade on GET can work.
+    ### context.__json__ CALLS THE UPGRADER ###
     properties = context.__json__(request)
     for path in context.type_info.schema_links:
         uuid_to_path(request, properties, path)
