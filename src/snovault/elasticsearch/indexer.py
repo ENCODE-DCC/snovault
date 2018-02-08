@@ -371,7 +371,7 @@ def index(request):
 
             es.indices.refresh('_all')
             try:
-                res = es.search(index='_all', size=SEARCH_MAX, body={
+                res = es.search(index='_all', size=SEARCH_MAX, request_timeout=60, body={
                     'query': {
                         'bool': {
                             'should': [
