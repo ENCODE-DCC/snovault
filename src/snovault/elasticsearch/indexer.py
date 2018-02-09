@@ -24,6 +24,8 @@ import logging
 import pytz
 import time
 import copy
+import json
+import requests
 
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
@@ -33,14 +35,14 @@ MAX_CLAUSES_FOR_ES = 8192
 
 def includeme(config):
     config.add_route('index', '/index')
+    config.add_route('_indexer_state', '/_indexer_state')
     config.scan(__name__)
     registry = config.registry
     registry[INDEXER] = Indexer(registry)
 
-
 class IndexerState(object):
     # Keeps track of uuids and indexer state by cycle.  Also handles handoff of uuids to followup indexer
-    def __init__(self, es, index, title='primary'):
+    def __init__(self, es, index, title='primary', followups=[]):
         self.es = es
         self.index = index  # "index where indexerstate is stored"
 
@@ -56,35 +58,38 @@ class IndexerState(object):
         self.cleanup_last_cycle = [self.last_set,self.troubled_set]              # Clean up at beginning of next cycle
         self.override           = 'reindex_' + self.title      # If exists then reindex all
         # DO NOT INHERIT! These keys are for passing on to other indexers
-        self.followup_prep_list  = 'primary_followup_prep_list' # Setting up the uuids to be handled by a followup process
-        self.followup_ready_list = 'staged_by_primary_list'     # Followup list is added to here to pass baton
+        self.followup_prep_list      = 'primary_followup_prep_list' # Setting up the uuids to be handled by a followup process
+        self.staged_for_vis_list     = 'staged_for_vis_indexer' # Followup list is added to here to pass baton
+        self.staged_for_regions_list = 'staged_for_region_indexer'     # Followup list is added to here to pass baton
+        self.followup_lists = []                                     # filled dynamically
+        for name in followups:
+            if name != '':
+                list_id = 'staged_for_' + name
+                assert list_id == self.staged_for_vis_list or list_id == self.staged_for_regions_list
+                self.followup_lists.append(list_id)
         self.clock = {}
         # some goals:
-        # 1) Hand-off to secondary: working
-        # 2) Detect and recover from interrupted cycle - working but noisy
-        #    Investigate es.count(xmin) to see if it is worth the restart=True flag
-        #    "The _version field is not indexed, therefore you cannot query/filter on it."
-        #    Consider adding xmin to body?
-        # 3) Identify what is being currently worked on - Too expensive beyond invalidated list
-        # 4) Record (double?) failures and consider blacklisting them - not tried, could do.
+        # 1) Detect and recover from interrupted cycle - working but ignored for now
+        # 2) Record (double?) failures and consider blacklisting them - not tried, could do.
+        # 3) Make 2-pass indexing work
 
     # Private-ish primitives...
-    def get_obj(self, id):
+    def get_obj(self, id, type='meta'):
         try:
-            return self.es.get(index=self.index, doc_type='meta', id=id).get('_source',{})  # TODO: snovault/meta
+            return self.es.get(index=self.index, doc_type=type, id=id).get('_source',{})  # TODO: snovault/meta
         except:
             return {}
 
-    def put_obj(self, id, obj):
+    def put_obj(self, id, obj, type='meta'):
         try:
-            self.es.index(index=self.index, doc_type='meta', id=id, body=obj)
+            self.es.index(index=self.index, doc_type=type, id=id, body=obj)
         except:
             log.warn("Failed to save to es: " + id, exc_info=True)
 
-    def delete_objs(self, ids):
+    def delete_objs(self, ids, type='meta'):
         for id in ids:
             try:
-                self.es.delete(index=self.index, doc_type='meta', id=id)
+                self.es.delete(index=self.index, doc_type=type, id=id)
             except:
                 pass
 
@@ -107,13 +112,13 @@ class IndexerState(object):
     #                result_set = result_set.difference(set(subtract_list))
     #    return result_set
 
-    #def set_add(self, id, vals):
-    #    set_to_update = set(self.get_list(id))
-    #    if len(set_to_update) > 0:
-    #        set_to_update.update(vals)
-    #    else:
-    #        set_to_update = set(vals)
-    #    self.put_list(id, set_to_update)
+    def set_add(self, id, vals):
+        set_to_update = set(self.get_list(id))
+        if len(set_to_update) > 0:
+            set_to_update.update(vals)
+        else:
+            set_to_update = set(vals)
+        self.put_list(id, set_to_update)
 
     def list_extend(self, id, vals):
         list_to_extend = self.get_list(id)
@@ -146,14 +151,56 @@ class IndexerState(object):
         if errors is not None:
             state['errors'] = errors
 
+    def request_reindex(self,requested):
+        '''Requests full reindexing on next cycle'''
+        if requested == 'all':
+            if self.title == 'primary':  # If primary indexer delete the original master obj
+                self.delete_objs(["indexing"])  # http://localhost:9200/snovault/meta/indexing
+            else:
+                self.put_obj(self.override, {self.title : 'reindex', 'all_uuids': True})
+
+        else:
+            uuids = requested.split(',')
+            override_obj = self.get_obj(self.override)
+            if 'uuids' not in override_obj.keys():
+                override_obj['uuids'] = uuids
+            else:
+                override_obj['uuids'].extend(uuids)
+            self.put_obj(self.override, override_obj)
+
+    def all_indexable_uuids(self, request):
+        '''returns list of uuids pertinant to this indexer.'''
+        return list(all_uuids(request.registry))
+
+    def reindex_requested(self, request):
+        '''returns list of uuids if a reindex was requested.'''
+        override = self.get_obj(self.override)
+        if override:
+            if override.get('all_uuids', False):
+                self.delete_objs([self.override] + self.followup_lists)
+                return self.all_indexable_uuids(request)
+            else:
+                uuids =  override.get('uuids',[])
+                uuid_count = len(uuids)
+                if uuid_count > 0:
+                    if uuid_count > SEARCH_MAX:
+                        self.delete_objs([self.override] + self.followup_lists)
+                    else:
+                        self.delete_objs([self.override])
+                    return uuids
+        return None
+
+
     def get_initial_state(self):
         '''Useful to initialize at idle cycle'''
         new_state = { 'title': self.state_id, 'status': 'idle'}
         state = self.get()
         for var in ['cycles']:  # could expand this list
-            val = state.pop('cycles',None)
+            val = state.pop(var,None)
             if val is not None:
                 new_state[var] = val
+        # Make sure indexer is registered:
+        self.set_add("registered_indexers", [self.state_id])
         return new_state
 
     def start_clock(self, name):
@@ -168,13 +215,13 @@ class IndexerState(object):
         else:
             return str(datetime.datetime.now(pytz.utc) - start)
 
-    def priority_cycle(self, registry):
-        '''Initial startup, override, or interupted prior cycle can all lead to a priority cycle.
+    def priority_cycle(self, request):
+        '''Initial startup, reindex, or interupted prior cycle can all lead to a priority cycle.
            returns (discovered xmin, uuids, whether previous cycle was interupted).'''
         # Not yet started?
-        initialized = self.get_obj("indexing")
+        initialized = self.get_obj("indexing")  # http://localhost:9200/snovault/meta/indexing
         if not initialized:
-            self.delete_objs([self.override, self.followup_ready_list])
+            self.delete_objs([self.override] + self.followup_lists)
             state = self.get()
             state['status'] = 'uninitialized'
             self.put(state)
@@ -182,13 +229,12 @@ class IndexerState(object):
 
         state = self.get()
 
-        # Rare call for indexing all...
-        override = self.get_obj(self.override)
-        if override:
-            self.delete_objs([self.override,self.followup_ready_list])
-            uuids = list(all_uuids(registry))
-            log.warn('%s override doing all: %d' % (self.state_id, len(uuids)))
-            return (-1, uuids, False)
+        # Rare call for reindexing...
+        reindex_uuids = self.reindex_requested(request)
+        if reindex_uuids is not None and reindex_uuids != []:
+            uuids_count = len(reindex_uuids)
+            log.warn('%s reindex of %d uuids requested' % (self.state_id, uuids_count))
+            return (-1, reindex_uuids, False)
 
         if state.get('status', '') != 'indexing':
             return (-1, [], False)
@@ -221,6 +267,7 @@ class IndexerState(object):
         self.start_clock('cycle')
         if state is None:
             state = self.get()
+        state['cycle_started'] = datetime.datetime.now().isoformat()
         state['status'] = 'indexing'
         state['cycle_count'] = len(uuids)
 
@@ -269,7 +316,9 @@ class IndexerState(object):
             # TODO: send signal for 'all' when appropriate.  Saves the following expensive lines.
             hand_off_list = self.get_list(self.followup_prep_list)
             if len(hand_off_list) > 0:  # Have to push because ready_list may still have previous cycles in it
-                self.list_extend(self.followup_ready_list, hand_off_list)
+                for id in self.followup_lists:
+                    self.list_extend(id, hand_off_list)
+                    #log.warn("prmary added to %s" % id)
                 self.delete_objs([self.followup_prep_list])
 
         # cycle-level accounting so todo => done => last in this function
@@ -293,6 +342,325 @@ class IndexerState(object):
 
         return state
 
+    def registered_indexers(self):
+        '''Returns a list of registered indexers.'''
+        return self.get_list("registered_indexers")
+
+    def get_notice_user(self, user, bot_token):
+        '''Returns the user token for a named user.'''
+        slack_users = self.get_obj('slack_users',{})
+        if not slack_users:
+            try:
+                r = requests.get('https://slack.com/api/users.list?token=%s' % (bot_token))
+                resp = json.loads(r.text)
+                if not resp['ok']:  # and resp.get('error','') != 'ratelimited':
+                    log.warn(resp)  # too many at once: {'error': 'ratelimited', 'ok': False}
+                    return None
+                members = resp.get('members',[])
+                for member in members:
+                    slack_users[member['name']] = member['id']
+                self.put_obj('slack_users',slack_users)
+            except:
+                return None
+        return slack_users.get(user)
+
+    def set_notices(self, from_host, who=None, bot_token=None, which=None):
+        '''Set up notification so that slack bot can send a message when indexer finishes'''
+        if who is None and bot_token is None:
+            return "ERROR: must specify who to notify or bot_token"
+        if which is None:
+            which = self.state_id
+        if which == 'all':
+            which = 'all_indexers' # needed because of elasticsearch conflicts with 'all'
+        elif which not in self.get_list("registered_indexers"):
+            if which + '_indexer' in self.get_list("registered_indexers"):
+                which += '_indexer'
+            else:
+                return "ERROR: unknown indexer to monitor: %s" % (which)
+
+        notify = self.get_obj('notify', 'default')
+        if bot_token is not None:
+            notify['bot_token'] = bot_token
+
+        if 'from' not in notify:
+            notify['from'] = from_host
+
+        user_warns = ''
+        if who is not None:
+            indexer_notices = notify.get(which,{})
+            if who in ['none','noone','nobody','stop','']:
+                notify.pop(which, None)
+            else:
+                if which == 'all_indexers':  # each indexer will have to finish
+                    if 'indexers' not in indexer_notices:
+                        indexer_notices['indexers'] = self.get_list("registered_indexers")
+                users = who.split(',')
+                if 'bot_token' in notify:
+                    for name in users:
+                        if self.get_notice_user(name,notify['bot_token']) is None:
+                            user_warns += ', ' + name
+                who_all = indexer_notices.get('who',[])
+                who_all.extend(users)
+                indexer_notices['who'] = list(set(who_all))
+                notify[which] = indexer_notices
+                # either self.state_id: {who: [...]} or 'all_indexers': {'indexers': [...], 'who': [...]}
+
+        self.put_obj('notify', notify, 'default')
+        if user_warns != '':
+            user_warns = 'Unknown users: ' + user_warns[2:]
+        if 'bot_token' not in notify:
+            return "WARNING: bot_token is required. " + user_warns
+        elif user_warns != '':
+            return "WARNING: " + user_warns
+        else:
+            return notify
+
+    def get_notices(self, full=False):
+        '''Get the notifications'''
+        notify = self.get_obj('notify','default')
+        if full:
+            return notify
+        notify.pop('bot_token', None)
+        notify.pop('from', None)
+        for which in notify.keys():
+            if len(notify[which].get('who',[])) == 1:
+                notify[which] = notify[which]['who'][0]
+        indexers = self.get_list("registered_indexers")
+        if self.title == 'primary':  # Primary will show all notices
+            indexers.append('all_indexers')
+            for indexer in indexers:
+                if notify.get(indexer,{}):
+                    return notify  # return if anything
+        else:  # non-primary will show specific notice and all
+            indexers.remove(self.state_id)
+            for indexer in indexers:
+                notify.pop(indexer,None)
+            for indexer in [self.state_id, 'all_indexers']:
+                if notify.get(indexer,{}):
+                    return notify  # return if anything
+        return {}
+
+    def send_notices(self):
+        '''Sends notifications when indexer is done.'''
+        # https://slack.com/api/chat.postMessage?token=xoxb-1974789...&channel=U1KPQK1HN&text=Yay!
+        notify = self.get_obj('notify','default')
+        if not notify:
+            return
+        if 'bot_token' not in notify or 'from' not in notify:
+            return  # silent failure, but leaves notify unchanged for evidence
+
+        changed = False
+        text = None
+        who = []
+        if 'all_indexers' in notify:  # 'all_indexers': {'indexers': [...], 'who': [...]}
+            # if all indexers are done, then report
+            indexers = notify['all_indexers'].get('indexers',[])
+            if self.state_id in indexers:
+                # Primary must finish before follow up indexers can remove themselves from list
+                if self.state_id == 'primary_indexer' or 'primary_indexer' not in indexers:
+                    indexers.remove(self.state_id)
+                    if len(indexers) > 0:
+                        notify['all_indexers']['indexers'] = indexers
+                        changed = True
+            if len(indexers) == 0:
+                who.extend(notify['all_indexers'].get('who',[]))
+                notify.pop('all_indexers',None)
+                changed = True
+                text='All indexers are done for %s/_indexer_state' % (notify['from'])
+        if self.state_id in notify:  # self.state_id: {who: [...]}
+            who.extend(notify[self.state_id].get('who',[]))
+            notify.pop(self.state_id, None)
+            changed = True
+            if text is None:
+                text='%s is done for %s' % (self.state_id, notify['from'])
+                if self.title == 'primary':
+                    text += '/_indexer_state'
+                else:
+                    text += '/_%sindexer_state' % (self.title)
+        if len(who) > 0 and text is not None:
+            who = list(set(who))
+            users = ''
+            msg = ''
+            if len(who) == 1:
+                #channel='U1KPQK1HN'  # TODO: look up user token
+                channel = self.get_notice_user(who[0],notify['bot_token'])
+                if channel:
+                    msg = 'token=%s&channel=%s&text=%s' % (notify['bot_token'],channel,text)
+                # otherwise fall back on generic message.
+            if msg == '':  # This will catch multiple users AND single users for which a channel could not be found
+                channel='dcc-private'
+                for user in who:
+                    users += '@' + user + ', '
+                msg = 'token=%s&channel=%s&link_names=true&text=%s%s' % (notify['bot_token'],channel,users,text)
+
+            try:
+                r = requests.get('https://slack.com/api/chat.postMessage?' + msg)
+                resp = json.loads(r.text)
+                if not resp['ok']:
+                    log.warn(resp)
+            except:
+                log.warn("Failed to notify via slack: [%s]" % (msg))
+
+        if changed:  # alter notify even if error, so the same error doesn't flood log.
+            self.put_obj('notify', notify, 'default')
+
+    def display(self):
+        display = {}
+        display['state'] = self.get()
+        if display['state'].get('status','') == 'indexing' and 'cycle_started' in display['state']:
+            started = datetime.datetime.strptime(display['state']['cycle_started'],'%Y-%m-%dT%H:%M:%S.%f')
+            display['state']['indexing_elapsed'] = str(datetime.datetime.now() - started)
+        display['title'] = display['state'].get('title',self.state_id)
+        display['uuids in progress'] = self.get_count(self.todo_set)
+        display['uuids troubled'] = self.get_count(self.troubled_set)
+        display['uuids last cycle'] = self.get_count(self.last_set)
+        if self.followup_prep_list is not None:
+            display['to be handed off to other indexer(s)'] = self.get_count(self.followup_prep_list)
+        if self.title == 'primary':
+            for id in self.followup_lists:
+                display[id] = self.get_count(id)
+        else:
+            id = 'staged_for_%s_list' % (self.title)
+            display['staged by primary'] = self.get_count(id)
+
+        reindex = self.get_obj(self.override)
+        if reindex:
+            uuids = reindex.get('uuids')
+            if uuids is not None:
+                display['REINDEX requested'] = uuids
+            elif reindex.get('all_uuids',False):
+                display['REINDEX requested'] = 'all'
+        notify = self.get_notices()
+        if notify:
+            display['NOTIFY requested'] = notify
+        display['now'] = datetime.datetime.now().isoformat()
+
+        return display
+
+def get_related_uuids(request, es, updated, renamed):
+    '''Returns (set of uuids, True if all_uuids)'''
+
+    updated_count = len(updated)
+    renamed_count = len(renamed)
+    if (updated_count + renamed_count) > MAX_CLAUSES_FOR_ES:
+        return (all_uuids(request.registry), True)
+    elif (updated_count + renamed_count) == 0:
+        return (set(), False)
+
+    es.indices.refresh('_all')
+
+    # TODO: batching may allow us to drive a partial reindexing much greater than 99999
+    #BATCH_COUNT = 100  # NOTE: 100 random uuids returned > 99999 results!
+    #beg = 0
+    #end = BATCH_COUNT
+    #related_set = set()
+    #updated_list = list(updated)  # Must be lists
+    #renamed_list = list(renamed)
+    #while updated_count > beg or renamed_count > beg:
+    #    if updated_count > end or beg > 0:
+    #        log.error('Indexer looking for related uuids by BATCH[%d,%d]' % (beg, end))
+    #
+    #    updated = []
+    #    if updated_count > beg:
+    #        updated = updated_list[beg:end]
+    #    renamed = []
+    #    if renamed_count > beg:
+    #        renamed = renamed_list[beg:end]
+    #
+    #     search ...
+    #     accumulate...
+    #
+    #    beg += BATCH_COUNT
+    #    end += BATCH_COUNT
+
+
+    res = es.search(index='_all', size=SEARCH_MAX, request_timeout=60, body={
+        'query': {
+            'bool': {
+                'should': [
+                    {
+                        'terms': {
+                            'embedded_uuids': updated,
+                            '_cache': False,
+                        },
+                    },
+                    {
+                        'terms': {
+                            'linked_uuids': renamed,
+                            '_cache': False,
+                        },
+                    },
+                ],
+            },
+        },
+        '_source': False,
+    })
+
+    if res['hits']['total'] > SEARCH_MAX:
+        return (all_uuids(request.registry), True)
+
+    related_set = {hit['_id'] for hit in res['hits']['hits']}
+
+    return (related_set, False)
+
+
+
+@view_config(route_name='_indexer_state', request_method='GET', permission="index")
+def indexer_state_show(request):
+    es = request.registry[ELASTIC_SEARCH]
+    INDEX = request.registry.settings['snovault.elasticsearch.index']
+    state = IndexerState(es,INDEX)
+
+    # requesting reindex
+    reindex = request.params.get("reindex")
+    if reindex is not None:
+        state.request_reindex(reindex)
+
+    # Requested notification
+    who = request.params.get("notify")
+    bot_token = request.params.get("bot_token")
+    if who is not None or bot_token is not None:
+        notices = state.set_notices(request.host_url, who, bot_token, request.params.get("which"))
+        if isinstance(notices,str):
+            return notices
+
+    display = state.display()
+    # getting count is complicated in es5 as docs are separate indexes
+    item_types = all_types(request.registry)
+    count = 0
+    for item_type in item_types:
+        #all_count = es.count(index='_all').get('count',0)
+        #vis_count = es.count(index='vis_cache').get('count',0)  # TODO: 'vis_cache' should be obtained from vi_indexer.py
+        #chrom_count = es.count(index='chr*').get('count',0)
+        #resident_count = es.count(index='resident_regionsets').get('count',0)  # TODO: 'resident_regionsets' should be obtained from region_indexer.py
+        # count = all_count - vis_count - chrom_count - resident_count
+        try:
+            type_count = es.count(index=item_type).get('count',0)  # TODO: 'vis_composite' should be obtained from visualization.py
+            count += type_count
+        except:
+            pass
+        #all_count = es.count(index='_all').get('count',0)  # TODO: 'vis_composite' should be obtained from visualization.py
+    if count:
+        display['docs in index'] = count
+    else:
+        display['docs in index'] = 'Not Found'
+
+    if not request.registry.settings.get('testing',False):  # NOTE: _indexer not working on local instances
+        try:
+            r = requests.get(request.host_url + '/_indexer')
+            display['listener'] = json.loads(r.text)
+            display['status'] = display['listener']['status']
+        except:
+            log.error('Error getting /_indexer', exc_info=True)
+
+    display['registered indexers'] = state.get_list('registered_indexers')
+    # always return raw json
+    #if len(request.query_string) > 0:
+    #    request.query_string = "&format=json"
+    #else:
+    request.query_string = "format=json"
+    return display
+
 
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
@@ -304,7 +672,6 @@ def index(request):
     recovery = request.json.get('recovery', False)
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
-    stage_for_followup = request.registry.settings.get("stage_for_followup", False)
     session = request.registry[DBSESSION]()
     connection = session.connection()
     first_txn = None
@@ -313,19 +680,23 @@ def index(request):
     invalidated = []
     xmin = -1
 
-    # May have undone uuids from prior cycle
-    state = IndexerState(es,INDEX)
+    # Currently 2 possible followup indexers (base.ini [set stage_for_followup = vis_indexer, region_indexer])
+    stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').replace(' ','').split(','))
+    use_2pass = False #request.registry.settings.get("index_with_2pass", False)  # defined in base.ini for encoded
 
+    # May have undone uuids from prior cycle
+    state = IndexerState(es, INDEX, followups=stage_for_followup)
+
+    (xmin, invalidated, restart) = state.priority_cycle(request)
     # OPTIONAL: restart support
-    #(xmin, invalidated, restart) = state.priority_cycle(request.registry)
+    if restart:  # Currently not bothering with restart!!!
+        xmin = -1
+        invalidated = []
     # OPTIONAL: restart support
 
     result = state.get_initial_state()  # get after checking priority!
-    if len(invalidated) > 0:
-        if xmin == -1:
-            xmin = get_current_xmin(request)
-        flush = True
-    else:
+
+    if xmin == -1 or len(invalidated) == 0:
         xmin = get_current_xmin(request)
 
         last_xmin = None
@@ -333,13 +704,22 @@ def index(request):
             last_xmin = request.json['last_xmin']
         else:
             status = es.get(index=INDEX, doc_type='meta', id='indexing', ignore=[400, 404])
-            if status['found']:
+            if status['found'] and 'xmin' in status['_source']:
                 last_xmin = status['_source']['xmin']
+        if last_xmin is None:  # still!
+            if 'last_xmin' in result:
+                last_xmin = result['last_xmin']
+            elif 'xmin' in result and result['xmin'] < xmin:
+                last_xmin = result['state']
 
         result.update(
             xmin=xmin,
             last_xmin=last_xmin,
         )
+
+    if len(invalidated) > SEARCH_MAX:  # Priority cycle already set up
+        flush = True
+    else:
 
         flush = False
         if last_xmin is None:
@@ -351,7 +731,7 @@ def index(request):
                 TransactionRecord.xid >= last_xmin,
             )
 
-            invalidated = set()
+            invalidated = set(invalidated)  # not empty if API index request occurred
             updated = set()
             renamed = set()
             max_xid = 0
@@ -366,52 +746,30 @@ def index(request):
                 renamed.update(txn.data.get('renamed', ()))
                 updated.update(txn.data.get('updated', ()))
 
+            if invalidated:        # reindex requested, treat like updated
+                updated |= invalidated
+
             result['txn_count'] = txn_count
-            if txn_count == 0:
+            if txn_count == 0 and len(invalidated) == 0:
+                state.send_notices()
                 return result
 
-            if len(updated) + len(renamed) > MAX_CLAUSES_FOR_ES:
-                invalidated = list(all_uuids(request.registry))
+            (related_set, full_reindex) = get_related_uuids(request, es, updated, renamed)
+            if full_reindex:
+                invalidated = related_set
                 flush = True
             else:
-                es.indices.refresh('_all')
-                res = es.search(index='_all', size=SEARCH_MAX, request_timeout=60, body={
-                    'query': {
-                        'bool': {
-                            'should': [
-                                {
-                                    'terms': {
-                                        'embedded_uuids': updated,
-                                        '_cache': False,
-                                    },
-                                },
-                                {
-                                    'terms': {
-                                        'linked_uuids': renamed,
-                                        '_cache': False,
-                                    },
-                                },
-                            ],
-                        },
-                    },
-                    '_source': False,
-                })
-
-                if res['hits']['total'] > SEARCH_MAX:
-                    invalidated = list(all_uuids(request.registry))
-                    flush = True
-                else:
-                    referencing = {hit['_id'] for hit in res['hits']['hits']}
-                    invalidated = referencing | updated
-                    result.update(
-                        max_xid=max_xid,
-                        renamed=renamed,
-                        updated=updated,
-                        referencing=len(referencing),
-                        invalidated=len(invalidated),
-                        txn_count=txn_count,
-                        first_txn_timestamp=first_txn.isoformat(),
-                    )
+                invalidated = related_set | updated
+                result.update(
+                    max_xid=max_xid,
+                    renamed=renamed,
+                    updated=updated,
+                    referencing=len(related_set),
+                    invalidated=len(invalidated),
+                    txn_count=txn_count
+                )
+                if first_txn is not None:
+                    result['first_txn_timestamp'] = first_txn.isoformat()
 
             if invalidated and not dry_run:
                 # Exporting a snapshot mints a new xid, so only do so when required.
@@ -421,7 +779,7 @@ def index(request):
                     snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
 
     if invalidated and not dry_run:
-        if stage_for_followup:
+        if len(stage_for_followup) > 0:
             # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
             state.prep_for_followup(xmin, invalidated)
 
@@ -429,18 +787,19 @@ def index(request):
 
         # Do the work...
 
-        ### OPTIONAL: audit via 2-pass is coming...
-        #log.info("indexer starting pass 1 on %d uuids", len(invalidated))
-        ### OPTIONAL: audit via 2-pass is coming...
+        if use_2pass:
+            log.info("indexer starting pass 1 on %d uuids", len(invalidated))
         errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
 
-        ### OPTIONAL: audit via 2-pass is coming...
-        #result = state.start_pass2(result)
-        #log.info("indexer starting pass 2 on %d uuids", len(invalidated))
-        #audit_errors = indexer.update_audits(request, invalidated, xmin, snapshot_id)  # ignore restart
-        #if len(audit_errors):
-        #    errors.extend(audit_errors)
-        ### OPTIONAL: audit via 2-pass is coming...
+        if use_2pass:
+            # We need to make the recently pushed objects searchable
+            # Audit will fetch the most recent version after the refresh
+            self.es.indices.refresh(index='_all')
+            result = state.start_pass2(result)
+            log.info("indexer starting pass 2 on %d uuids", len(invalidated))
+            audit_errors = indexer.update_audits(request, invalidated, xmin, snapshot_id)  # ignore restart
+            if len(audit_errors):
+                errors.extend(audit_errors)
 
         result = state.finish_cycle(result,errors)
 
@@ -471,6 +830,7 @@ def index(request):
     if first_txn is not None:
         result['txn_lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
 
+    state.send_notices()
     return result
 
 
@@ -494,6 +854,11 @@ def get_current_xmin(request):
     # which is not available in recovery.
     xmin = query.scalar()  # lowest xid that is still in progress
     return xmin
+
+def all_types(registry):
+    collections = registry[COLLECTIONS]
+    return sorted(collections.by_item_type)
+
 
 def all_uuids(registry, types=None):
     # First index user and access_key so people can log in
@@ -521,6 +886,7 @@ class Indexer(object):
         self.es = registry[ELASTIC_SEARCH]
         self.esstorage = registry[STORAGE]
         self.index = registry.settings['snovault.elasticsearch.index']
+        self.use_2pass = False #registry.settings.get("index_with_2pass", False)
 
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         errors = []
@@ -550,10 +916,10 @@ class Indexer(object):
 
         last_exc = None
         try:
-            ### OPTIONAL: audit via 2-pass is coming...
-            #doc = request.embed('/%s/@@index-data/noaudit/' % uuid, as_user='INDEXER')
-            ### OPTIONAL: audit via 2-pass is coming...
-            doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
+            if self.use_2pass:
+                doc = request.embed('/%s/@@index-data/noaudit/' % uuid, as_user='INDEXER')
+            else:
+                doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
             raise
@@ -562,17 +928,16 @@ class Indexer(object):
             last_exc = repr(e)
 
         if last_exc is None:
-            ### OPTIONAL: audit via 2-pass is coming...
-            #try:
-            #    audit = self.es.get(index=self.index, id=str(uuid)).get('_source',{}).get('audit')  # Any version
-            #    if audit:
-            #        doc.update(
-            #            audit=audit,
-            #            audit_stale=True,
-            #        )
-            #except:
-            #    pass
-            ### OPTIONAL: audit via 2-pass is coming...
+            if self.use_2pass:
+                try:
+                    audit = self.es.get(index=self.index, id=str(uuid)).get('_source',{}).get('audit')  # Any version
+                    if audit:
+                        doc.update(
+                            audit=audit,
+                            audit_stale=True,
+                        )
+                except:
+                    pass
 
             for backoff in [0, 10, 20, 40, 80]:
                 time.sleep(backoff)
@@ -603,9 +968,8 @@ class Indexer(object):
         return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
 
     def update_audits(self, request, uuids, xmin, snapshot_id=None):
-        # We need to make the recently pushed objects searchable
-        # Audit will fetch the most recent version after the refresh
-        self.es.indices.refresh(index='_all')
+        # Only called when use_2pass is True
+        assert(self.use_2pass)
         errors = []
         for i, uuid in enumerate(uuids):
             error = self.update_audit(request, uuid, xmin)
@@ -617,6 +981,7 @@ class Indexer(object):
         return errors
 
     def update_audit(self, request, uuid, xmin):
+        # Only called when use_2pass is True
         request.datastore = 'elasticsearch'  # Audits are built on elastic search !!!
 
         last_exc = None
@@ -640,8 +1005,10 @@ class Indexer(object):
             # TODO assert('audit_stale' is in doc or doc.get('audit') is None)
 
             try:
+                #log.warning('2nd-pass audit for %s' % (uuid))
                 # using audit-now bypasses cached_views 'audit' ensureing the audit is recacluated.
-                audit = request.embed(str(uuid), '@@audit-now', as_user='INDEXER')['audit']
+                audit = request.embed(str(uuid) + '/@@audit-now', as_user='INDEXER')['audit']
+                #audit = request.embed(str(uuid), '@@audit-now', as_user='INDEXER')['audit']
                 if audit or doc.get('audit_stale',False):
                     doc.update(
                         audit=audit,
