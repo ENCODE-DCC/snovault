@@ -106,13 +106,6 @@ def update_object_in_snapshot(args):
         indexer = request.registry[INDEXER]
         return indexer.update_object(request, uuid, xmin, restart)
 
-def update_audit_in_snapshot(args):
-    uuid, xmin, snapshot_id = args
-    with snapshot(xmin, snapshot_id):
-        request = get_current_request()
-        indexer = request.registry[INDEXER]
-        return indexer.update_audit(request, uuid, xmin)
-
 
 # Running in main process
 
@@ -154,30 +147,6 @@ class MPIndexer(Indexer):
                     errors.append(error)
                 if (i + 1) % 50 == 0:
                     log.info('Indexing %d', i + 1)
-        except:
-            self.shutdown()
-            raise
-        return errors
-
-    def update_audits(self, request, uuids, xmin, snapshot_id=None):
-        # Ensure that we iterate over uuids in this thread not the pool task handler.
-        uuid_count = len(uuids)
-        workers = 1
-        if self.processes is not None and self.processes > 0:
-            workers = self.processes
-        chunkiness = int((uuid_count - 1) / workers) + 1
-        if chunkiness > self.chunksize:
-            chunkiness = self.chunksize
-
-        tasks = [(uuid, xmin, snapshot_id) for uuid in uuids]
-        errors = []
-        try:
-            for i, error in enumerate(self.pool.imap_unordered(
-                    update_audit_in_snapshot, tasks, chunkiness)):
-                if error is not None:
-                    errors.append(error)
-                if (i + 1) % 50 == 0:
-                    log.info('Auditing %d', i + 1)
         except:
             self.shutdown()
             raise
