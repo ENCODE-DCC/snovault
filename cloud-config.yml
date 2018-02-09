@@ -251,6 +251,8 @@ write_files:
     index.search.slowlog.threshold.fetch.warn: 1s
     index.indexing.slowlog.threshold.index.warn: 25s
 
+    indices.query.bool.max_clause_count: 8192
+
 - path: /etc/postgresql/9.3/main/custom.conf
   content: |
     hot_standby = on
