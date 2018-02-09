@@ -71,7 +71,6 @@ class IndexerState(object):
         # some goals:
         # 1) Detect and recover from interrupted cycle - working but ignored for now
         # 2) Record (double?) failures and consider blacklisting them - not tried, could do.
-        # 3) Make 2-pass indexing work
 
     # Private-ish primitives...
     def get_obj(self, id, type='meta'):
@@ -277,13 +276,6 @@ class IndexerState(object):
         self.put_list(self.todo_set, set(uuids))
         return state
 
-    def start_pass2(self, state):
-        state['pass1_took'] = self.elapsed('cycle')
-        self.put(state)
-        self.start_clock('pass2')
-        return state
-
-
     def add_errors(self, errors, finished=True):
         '''To avoid 16 worker concurency issues, errors are recorded at the end of a cycle.'''
         uuids = [err['uuid'] for err in errors]  # better be uuids!
@@ -304,9 +296,6 @@ class IndexerState(object):
 
     def finish_cycle(self, state, errors=None):
         '''Every indexing cycle must be properly closed.'''
-
-        if 'pass2' in self.clock.keys():
-            state['pass2_took'] = self.elapsed('pass2')
 
         if errors:  # By handling here, we avoid overhead and concurrency issues of uuid-level accounting
             self.add_errors(errors)
@@ -682,7 +671,6 @@ def index(request):
 
     # Currently 2 possible followup indexers (base.ini [set stage_for_followup = vis_indexer, region_indexer])
     stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').replace(' ','').split(','))
-    use_2pass = False #request.registry.settings.get("index_with_2pass", False)  # defined in base.ini for encoded
 
     # May have undone uuids from prior cycle
     state = IndexerState(es, INDEX, followups=stage_for_followup)
@@ -787,19 +775,7 @@ def index(request):
 
         # Do the work...
 
-        if use_2pass:
-            log.info("indexer starting pass 1 on %d uuids", len(invalidated))
         errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
-
-        if use_2pass:
-            # We need to make the recently pushed objects searchable
-            # Audit will fetch the most recent version after the refresh
-            self.es.indices.refresh(index='_all')
-            result = state.start_pass2(result)
-            log.info("indexer starting pass 2 on %d uuids", len(invalidated))
-            audit_errors = indexer.update_audits(request, invalidated, xmin, snapshot_id)  # ignore restart
-            if len(audit_errors):
-                errors.extend(audit_errors)
 
         result = state.finish_cycle(result,errors)
 
@@ -886,7 +862,6 @@ class Indexer(object):
         self.es = registry[ELASTIC_SEARCH]
         self.esstorage = registry[STORAGE]
         self.index = registry.settings['snovault.elasticsearch.index']
-        self.use_2pass = False #registry.settings.get("index_with_2pass", False)
 
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         errors = []
@@ -916,10 +891,7 @@ class Indexer(object):
 
         last_exc = None
         try:
-            if self.use_2pass:
-                doc = request.embed('/%s/@@index-data/noaudit/' % uuid, as_user='INDEXER')
-            else:
-                doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
+            doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
             raise
@@ -928,17 +900,6 @@ class Indexer(object):
             last_exc = repr(e)
 
         if last_exc is None:
-            if self.use_2pass:
-                try:
-                    audit = self.es.get(index=self.index, id=str(uuid)).get('_source',{}).get('audit')  # Any version
-                    if audit:
-                        doc.update(
-                            audit=audit,
-                            audit_stale=True,
-                        )
-                except:
-                    pass
-
             for backoff in [0, 10, 20, 40, 80]:
                 time.sleep(backoff)
                 try:
@@ -966,96 +927,6 @@ class Indexer(object):
 
         timestamp = datetime.datetime.now().isoformat()
         return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
-
-    def update_audits(self, request, uuids, xmin, snapshot_id=None):
-        # Only called when use_2pass is True
-        assert(self.use_2pass)
-        errors = []
-        for i, uuid in enumerate(uuids):
-            error = self.update_audit(request, uuid, xmin)
-            if error is not None:
-                errors.append(error)
-            if (i + 1) % 50 == 0:
-                log.info('Auditing %d', i + 1)
-
-        return errors
-
-    def update_audit(self, request, uuid, xmin):
-        # Only called when use_2pass is True
-        request.datastore = 'elasticsearch'  # Audits are built on elastic search !!!
-
-        last_exc = None
-        # First get the object currently in es
-        try:
-            # This slings the single result via PickStorage via CachedModel via ElasticSearchStorage
-            # Only works if request.datastore = 'elasticsearch'
-            result = self.esstorage.get_by_uuid(uuid)
-            doc = result.source
-        except StatementError:
-            # Can't reconnect until invalid transaction is rolled back
-            raise
-        except Exception as e:
-            log.error("Error can't find %s in %s", uuid, ELASTIC_SEARCH)
-            last_exc = repr(e)
-
-        ### # Handle audits:
-        index_audit = False
-        if last_exc is None:
-            # It might be possible to assert that the audit is either empty or stale
-            # TODO assert('audit_stale' is in doc or doc.get('audit') is None)
-
-            try:
-                #log.warning('2nd-pass audit for %s' % (uuid))
-                # using audit-now bypasses cached_views 'audit' ensureing the audit is recacluated.
-                audit = request.embed(str(uuid) + '/@@audit-now', as_user='INDEXER')['audit']
-                #audit = request.embed(str(uuid), '@@audit-now', as_user='INDEXER')['audit']
-                if audit or doc.get('audit_stale',False):
-                    doc.update(
-                        audit=audit,
-                        audit_stale=False,
-                    )
-                    index_audit = True
-            except StatementError:
-                print('statement error')
-                # Can't reconnect until invalid transaction is rolled back
-                raise
-            except Exception as e:
-                log.error('Error rendering /%s/@@index-audits', uuid, exc_info=True)
-                last_exc = repr(e)
-
-        if index_audit:
-            if last_exc is None:
-                for backoff in [0, 10, 20, 40, 80]:
-                    time.sleep(backoff)
-                    try:
-                        self.es.index(
-                            index=doc['item_type'], doc_type=doc['item_type'], body=doc,
-                            id=str(uuid), version=xmin, version_type='external_gte',
-                            request_timeout=30,
-                        )
-                    except StatementError:
-                        # Can't reconnect until invalid transaction is rolled back
-                        raise
-                    except ConflictError:
-                        #log.warning('Conflict indexing %s at version %d', uuid, xmin)
-                        # This case occurs when the primary indexer is cycles ahead of the secondary indexer
-                        # And this uuid will be secondarily indexed again on a second round
-                        # So no error, pretend it has indexed and move on.
-                        return  # No use doing any further secondary indexing
-                    except (ConnectionError, ReadTimeoutError, TransportError) as e:
-                        log.warning('Retryable error indexing %s: %r', uuid, e)
-                        last_exc = repr(e)
-                    except Exception as e:
-                        log.error('Error indexing %s', uuid, exc_info=True)
-                        last_exc = repr(e)
-                        break
-                    else:
-                        # Get here on success and outside of try
-                        return
-
-        if last_exc is not None:
-            timestamp = datetime.datetime.now().isoformat()
-            return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
 
     def shutdown(self):
         pass
