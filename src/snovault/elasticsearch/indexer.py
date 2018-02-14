@@ -154,7 +154,7 @@ class IndexerState(object):
         '''Requests full reindexing on next cycle'''
         if requested == 'all':
             if self.title == 'primary':  # If primary indexer delete the original master obj
-                self.delete_objs(["indexing"])  # http://localhost:9200/snovault/meta/indexing
+                self.delete_objs(["indexing"])  # http://localhost:9201/snovault/meta/indexing
             else:
                 self.put_obj(self.override, {self.title : 'reindex', 'all_uuids': True})
 
@@ -218,7 +218,7 @@ class IndexerState(object):
         '''Initial startup, reindex, or interupted prior cycle can all lead to a priority cycle.
            returns (discovered xmin, uuids, whether previous cycle was interupted).'''
         # Not yet started?
-        initialized = self.get_obj("indexing")  # http://localhost:9200/snovault/meta/indexing
+        initialized = self.get_obj("indexing")  # http://localhost:9201/snovault/meta/indexing
         if not initialized:
             self.delete_objs([self.override] + self.followup_lists)
             state = self.get()
@@ -742,6 +742,7 @@ def index(request):
                 state.send_notices()
                 return result
 
+<<<<<<< HEAD
             (related_set, full_reindex) = get_related_uuids(request, es, updated, renamed)
             if full_reindex:
                 invalidated = related_set
@@ -758,6 +759,50 @@ def index(request):
                 )
                 if first_txn is not None:
                     result['first_txn_timestamp'] = first_txn.isoformat()
+=======
+            if len(updated) + len(renamed) > MAX_CLAUSES_FOR_ES:
+                invalidated = list(all_uuids(request.registry))
+                flush = True
+            else:
+                es.indices.refresh('_all')
+                res = es.search(index='_all', size=SEARCH_MAX, request_timeout=60, body={
+                    'query': {
+                        'bool': {
+                            'should': [
+                                {
+                                    'terms': {
+                                        'embedded_uuids': updated,
+                                        '_cache': False,
+                                    },
+                                },
+                                {
+                                    'terms': {
+                                        'linked_uuids': renamed,
+                                        '_cache': False,
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                    '_source': False,
+                })
+
+                if res['hits']['total'] > SEARCH_MAX:
+                    invalidated = list(all_uuids(request.registry))
+                    flush = True
+                else:
+                    referencing = {hit['_id'] for hit in res['hits']['hits']}
+                    invalidated = referencing | updated
+                    result.update(
+                        max_xid=max_xid,
+                        renamed=renamed,
+                        updated=updated,
+                        referencing=len(referencing),
+                        invalidated=len(invalidated),
+                        txn_count=txn_count,
+                        first_txn_timestamp=first_txn.isoformat(),
+                    )
+>>>>>>> master
 
             if invalidated and not dry_run:
                 # Exporting a snapshot mints a new xid, so only do so when required.
