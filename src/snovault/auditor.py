@@ -215,6 +215,7 @@ def inherit_audits(request, embedded, embedded_paths):
         audit_paths.update(traversed_path_ids(request, embedded, embedded_path))
 
     audits = {}
+
     for audit_path in audit_paths:
         result = request.embed(audit_path, '@@audit-self')
         for audit in result['audit']:
@@ -225,8 +226,7 @@ def inherit_audits(request, embedded, embedded_paths):
     return audits
 
 
-@view_config(context=Item, permission='audit', request_method='GET',
-             name='audit-self')
+@view_config(context=Item, permission='audit', request_method='GET', name='audit-self')
 def item_view_audit_self(context, request):
     path = request.resource_path(context)
     types = [context.type_info.name] + context.type_info.base_types
@@ -235,9 +235,7 @@ def item_view_audit_self(context, request):
         'audit': request.audit(types=types, path=path),
     }
 
-
-@view_config(context=Item, permission='audit', request_method='GET',
-             name='audit')
+@view_config(context=Item, permission='audit', request_method='GET', name='audit')
 def item_view_audit(context, request):
     path = request.resource_path(context)
     properties = request.embed(path, '@@object')
