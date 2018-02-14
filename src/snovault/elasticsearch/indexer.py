@@ -754,6 +754,7 @@ def index(request):
                 state.send_notices()
                 return result
 
+<<<<<<< HEAD
             (related_set, full_reindex) = get_related_uuids(request, es, updated, renamed)
             if full_reindex:
                 invalidated = related_set
@@ -770,6 +771,50 @@ def index(request):
                 )
                 if first_txn is not None:
                     result['first_txn_timestamp'] = first_txn.isoformat()
+=======
+            if len(updated) + len(renamed) > MAX_CLAUSES_FOR_ES:
+                invalidated = list(all_uuids(request.registry))
+                flush = True
+            else:
+                es.indices.refresh('_all')
+                res = es.search(index='_all', size=SEARCH_MAX, request_timeout=60, body={
+                    'query': {
+                        'bool': {
+                            'should': [
+                                {
+                                    'terms': {
+                                        'embedded_uuids': updated,
+                                        '_cache': False,
+                                    },
+                                },
+                                {
+                                    'terms': {
+                                        'linked_uuids': renamed,
+                                        '_cache': False,
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                    '_source': False,
+                })
+
+                if res['hits']['total'] > SEARCH_MAX:
+                    invalidated = list(all_uuids(request.registry))
+                    flush = True
+                else:
+                    referencing = {hit['_id'] for hit in res['hits']['hits']}
+                    invalidated = referencing | updated
+                    result.update(
+                        max_xid=max_xid,
+                        renamed=renamed,
+                        updated=updated,
+                        referencing=len(referencing),
+                        invalidated=len(invalidated),
+                        txn_count=txn_count,
+                        first_txn_timestamp=first_txn.isoformat(),
+                    )
+>>>>>>> master
 
             if invalidated and not dry_run:
                 # Exporting a snapshot mints a new xid, so only do so when required.

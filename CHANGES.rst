@@ -1,3 +1,8 @@
+1.0.2: * Issues discovered while release of ENCD v65 part 2
+
+-SNO-12: Set max clause parameter in es indexer search #75
+-SNO-11: Add timeout to ES indexer search query #74
+
 1.0.1: * Issues discovered while release of ENCD v65
 
 -SNO-6: Fix index query too many clauses failure
