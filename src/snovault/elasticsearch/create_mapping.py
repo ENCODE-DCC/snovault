@@ -761,10 +761,10 @@ def get_db_es_counts_and_db_uuids(app, es, in_type, index_diff=False):
 
 @contextmanager
 def set_datastore(app, datastore_to_set):
-    original = app.datastore
+    original = getattr(app, 'datastore')
     app.datastore = datastore_to_set
     yield
-    app.datstore = original
+    app.datastore = original
 
 
 def get_collection_uuids_and_count(app, in_type):
