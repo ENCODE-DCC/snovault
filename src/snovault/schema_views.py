@@ -60,7 +60,7 @@ def schemas(context, request):
         schemas[name] = _annotated_schema(type_info, request)
 
     schemas['_subtypes'] = subtypes = {}
-    schemas['@type'] = ['JSONSchemas'];
+    schemas['@type'] = ['JSONSchemas']
     for name, type_info in types.abstract.items():
         subtypes[name] = type_info.subtypes
 
