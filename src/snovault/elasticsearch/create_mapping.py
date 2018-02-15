@@ -764,6 +764,8 @@ def get_collection_uuids_and_count(app, in_type):
     items. Returns only the items of the exact type specified, and not types
     that inherit from it (for example, experiment_set_replicate count will
     be subtracted from experiment_set count)
+
+    This will always use the databse, not ES, counts.
     """
     # logic for datastore
     datastore = None
