@@ -804,7 +804,7 @@ def es_safe_execute(function, **kwargs):
             function(**kwargs)
         except ConnectionTimeout:
             exec_count += 1
-            log.warning('ES connection issue! Retrying.', file=sys.stderr)
+            log.warning('ES connection issue! Retrying.')
         else:
             return True
     return False
