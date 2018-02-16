@@ -36,7 +36,6 @@ from .indexer_utils import find_uuids_for_indexing
 import transaction
 import os
 import argparse
-from contextlib import contextmanager
 
 
 EPILOG = __doc__
@@ -759,43 +758,42 @@ def get_db_es_counts_and_db_uuids(app, es, in_type, index_diff=False):
     return db_count, es_count, db_uuids, diff_uuids
 
 
-@contextmanager
-def set_datastore(app, datastore_to_set):
-    if not hasattr(app, 'datastore'):
-        yield
-    original = app.datastore
-    app.datastore = datastore_to_set
-    yield
-    app.datastore = original
-
-
 def get_collection_uuids_and_count(app, in_type):
     """
     Return a count of items in a collection and a list of the uuids of those
     items. Returns only the items of the exact type specified, and not types
     that inherit from it (for example, experiment_set_replicate count will
     be subtracted from experiment_set count)
-
-    This will always use the databse, not ES, counts.
     """
-    with set_datastore(app, 'database'):
-        # must handle collections that have children inheriting from them
-        # use specific collections and adjust if necessary
-        db_count = 0
-        coll_uuids = []
-        non_coll_uuids = []
-        check_collections = get_jsonld_types_from_collection_type(app, in_type, [in_type])
-        for coll_type in check_collections:
-            collection = app.registry[COLLECTIONS].get(coll_type)
-            coll_count = len(collection) if collection is not None else 0
-            if coll_type == in_type:
-                db_count += coll_count
-                coll_uuids.extend([str(uuid) for uuid in collection])
-            else:
-                db_count -= coll_count
-                non_coll_uuids.extend([str(uuid) for uuid in collection])
-        # remove uuids that aren't from the set we need
-        final_uuids = [uuid for uuid in coll_uuids if uuid not in non_coll_uuids]
+    # logic for datastore
+    datastore = None
+    try:
+        datastore = app.datastore
+    except AttributeError:
+        pass
+    else:
+        if datastore == 'elasticsearch':
+            app.datastore = 'database'
+    # must handle collections that have children inheriting from them
+    # use specific collections and adjust if necessary
+    db_count = 0
+    coll_uuids = []
+    non_coll_uuids = []
+    check_collections = get_jsonld_types_from_collection_type(app, in_type, [in_type])
+    for coll_type in check_collections:
+        collection = app.registry[COLLECTIONS].get(coll_type)
+        coll_count = len(collection) if collection is not None else 0
+        if coll_type == in_type:
+            db_count += coll_count
+            coll_uuids.extend([str(uuid) for uuid in collection])
+        else:
+            db_count -= coll_count
+            non_coll_uuids.extend([str(uuid) for uuid in collection])
+    # remove uuids that aren't from the set we need
+    final_uuids = [uuid for uuid in coll_uuids if uuid not in non_coll_uuids]
+    # reset datastore
+    if datastore:
+        app.datastore = datastore
     return db_count, final_uuids
 
 
