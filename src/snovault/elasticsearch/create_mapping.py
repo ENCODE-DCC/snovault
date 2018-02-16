@@ -761,6 +761,8 @@ def get_db_es_counts_and_db_uuids(app, es, in_type, index_diff=False):
 
 @contextmanager
 def set_datastore(app, datastore_to_set):
+    if not hasattr(app, 'datastore'):
+        yield
     original = app.datastore
     app.datastore = datastore_to_set
     yield
