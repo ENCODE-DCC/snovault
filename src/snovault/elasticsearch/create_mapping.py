@@ -748,19 +748,7 @@ def get_db_es_counts_and_db_uuids(app, es, in_type, index_diff=False):
     else:
         es_count = 0
         es_uuids = []
-    # logic for datastore
-    datastore = None
-    try:
-        datastore = app.datastore
-    except AttributeError:
-        pass
-    else:
-        if datastore == 'elasticsearch':
-            app.datastore = 'database'
     db_count, db_uuids = get_collection_uuids_and_count(app, in_type)
-    # reset datastore
-    if datastore:
-        app.datastore = datastore
     # find db uuids not in es uuids
     # maybe save time by skipping set operation if we don't need it
     if index_diff:
@@ -777,6 +765,15 @@ def get_collection_uuids_and_count(app, in_type):
     that inherit from it (for example, experiment_set_replicate count will
     be subtracted from experiment_set count)
     """
+    # logic for datastore
+    datastore = None
+    try:
+        datastore = app.datastore
+    except AttributeError:
+        pass
+    else:
+        if datastore == 'elasticsearch':
+            app.datastore = 'database'
     # must handle collections that have children inheriting from them
     # use specific collections and adjust if necessary
     db_count = 0
@@ -794,6 +791,9 @@ def get_collection_uuids_and_count(app, in_type):
             non_coll_uuids.extend([str(uuid) for uuid in collection])
     # remove uuids that aren't from the set we need
     final_uuids = [uuid for uuid in coll_uuids if uuid not in non_coll_uuids]
+    # reset datastore
+    if datastore:
+        app.datastore = datastore
     return db_count, final_uuids
 
 
