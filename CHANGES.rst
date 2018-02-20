@@ -1,3 +1,7 @@
+1.0.3:
+-SNO-8 Add JSONSchemas type to profiles page (#73)
+
+
 1.0.2: * Issues discovered while release of ENCD v65 part 2
 
 -SNO-12: Set max clause parameter in es indexer search #75
