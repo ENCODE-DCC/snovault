@@ -490,7 +490,7 @@ class IndexerState(object):
         if changed:  # alter notify even if error, so the same error doesn't flood log.
             self.put_obj('notify', notify, 'default')
 
-    def display(self):
+    def display(self, uuids=None):
         display = {}
         display['state'] = self.get()
         if display['state'].get('status','') == 'indexing' and 'cycle_started' in display['state']:
@@ -521,6 +521,30 @@ class IndexerState(object):
             display['NOTIFY requested'] = notify
         display['now'] = datetime.datetime.now().isoformat()
 
+        if uuids is not None:
+            uuids_to_show = []
+            uuid_list = self.get_obj(self.todo_set)
+            if not uuid_list:
+                uuids_to_show = 'No uuids indexing'
+            else:
+                uuid_start = 0
+                try:
+                    uuid_start = int(uuids)
+                except:
+                    pass
+                if uuid_start < uuid_list.get('count',0):
+                    uuid_end = uuid_start+100
+                    if uuid_start > 0:
+                        uuids_to_show.append("... skipped first %d uuids" % (uuid_start))
+                    uuids_to_show.extend(uuid_list['list'][uuid_start:uuid_end])
+                    if uuid_list.get('count',0) > uuid_end:
+                        uuids_to_show.append("another %d uuids..." % (uuid_list.get('count',0) - uuid_end))
+                elif uuid_start > 0:
+                    uuids_to_show.append("skipped past all %d uuids" % (uuid_list.get('count',0)))
+                else:
+                    uuids_to_show = 'No uuids indexing'
+            display['uuids in progress'] = uuids_to_show
+
         return display
 
 @view_config(route_name='_indexer_state', request_method='GET', permission="index")
@@ -542,7 +566,7 @@ def indexer_state_show(request):
         if isinstance(notices,str):
             return notices
 
-    display = state.display()
+    display = state.display(uuids=request.params.get("uuids"))
     # getting count is complicated in es5 as docs are separate indexes
     item_types = all_types(request.registry)
     count = 0

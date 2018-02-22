@@ -88,6 +88,7 @@ These view will return the following values:
 
 Several requests can be made of the ``/_indexer_state`` path with use of ?request=value appended to the url:
 
+  :uuids: Displays up to 100 uuids currently indexing starting with the uuids=Nth in the list.
   :reindex: Use 'all' for complete reindexing or comma separated uuids for specific reindexing.  This powerful method necessitates being logged on with admin permissions.
   :notify: One or more comma separated slack ids to be notified when the specific indexer is done.
 
