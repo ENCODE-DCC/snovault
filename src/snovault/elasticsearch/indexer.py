@@ -39,7 +39,7 @@ es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
 log = logging.getLogger(__name__)
 MAX_CLAUSES_FOR_ES = 8192
-WORKER_RSS_CAP = 3000000  # 3GB of ram.
+WORKER_RSS_CAP = 2000000  # 2GB of ram.
 
 def includeme(config):
     config.add_route('index', '/index')
@@ -251,7 +251,6 @@ def index(request):
             uuid_count = len(invalidated)
             if uuid_count:
                 log.warn("Indexing continues on %d uuids dropped by recycled workers" % (uuid_count))
-
         result = state.finish_cycle(result,errors)
 
         if errors:
