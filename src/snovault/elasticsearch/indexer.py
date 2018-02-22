@@ -32,11 +32,14 @@ import time
 import copy
 import json
 import requests
+import os
+import resource
 
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
 log = logging.getLogger(__name__)
 MAX_CLAUSES_FOR_ES = 8192
+WORKER_RSS_CAP = 3000000  # 3GB of ram.
 
 def includeme(config):
     config.add_route('index', '/index')
@@ -236,7 +239,18 @@ def index(request):
 
         # Do the work...
 
-        errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
+        #errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
+        errors = []
+        while invalidated:
+            some_errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
+            invalidated = []
+            for error in some_errors:
+                # These unindexed uuids were waiting on an worker that ran over the WORKER_RSS_CAP
+                invalidated.extend(error.pop('unindexed',[]))
+            errors.extend(some_errors)
+            uuid_count = len(invalidated)
+            if uuid_count:
+                log.warn("Indexing continues on %d uuids dropped by recycled workers" % (uuid_count))
 
         result = state.finish_cycle(result,errors)
 
@@ -311,6 +325,8 @@ class Indexer(object):
 
     def update_object(self, request, uuid, xmin, restart=False):
         request.datastore = 'database'  # required by 2-step indexer
+        #rss_start = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss  # For trapping large mem objs
+        #start_time = datetime.datetime.now(pytz.utc)                    # For trapping large mem objs
 
         # OPTIONAL: restart support
         # If a restart occurred in the middle of indexing, this uuid might have already been indexd, so skip redoing it.
@@ -343,6 +359,18 @@ class Indexer(object):
                         id=str(uuid), version=xmin, version_type='external_gte',
                         request_timeout=30,
                     )
+                    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                    if rss > WORKER_RSS_CAP:
+                        err_msg = "Blew past cap of %.1fGB" % ((WORKER_RSS_CAP/1000000.0))
+                        log.error('PID:%d RSS:%d uuid:%s  *** %s ***' \
+                                    % (os.getpid(), rss, uuid, err_msg))
+                        timestamp = datetime.datetime.now().isoformat()
+                        return {'error_message': err_msg, 'timestamp': timestamp, 'uuid': str(uuid), 'recycle': True}
+                    #else:                                # For trapping large mem objs
+                    #    rss_diff = (rss - rss_start)     # For trapping large mem objs
+                    #    if rss_diff > 150000:            # For trapping large mem objs
+                    #        took = str(datetime.datetime.now(pytz.utc) - start_time)
+                    #        log.error('PID:%d RSS_diff:%d uuid:%s took:%s' % (os.getpid(), rss_diff, uuid, took))
                 except StatementError:
                     # Can't reconnect until invalid transaction is rolled back
                     raise

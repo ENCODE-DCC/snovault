@@ -99,12 +99,28 @@ def snapshot(xmin, snapshot_id):
     signal.alarm(5)
 
 
-def update_object_in_snapshot(args):
-    uuid, xmin, snapshot_id, restart = args
+def update_objects_in_snapshot(args):
+    uuids, xmin, snapshot_id, restart = args
     with snapshot(xmin, snapshot_id):
         request = get_current_request()
         indexer = request.registry[INDEXER]
-        return indexer.update_object(request, uuid, xmin, restart)
+        errors = []
+        dones = []
+        while uuids:
+            uuid = uuids.pop(0)
+            error = indexer.update_object(request, uuid, xmin, restart)
+            dones.append(uuid)
+            if error is not None:
+                recycle = error.pop('recycle', None)
+                if recycle:
+                    if uuids:
+                        error['unindexed'] = uuids
+                    error['indexed'] = dones
+                    errors.append(error)
+                    break
+                errors.append(error)
+
+        return errors
 
 
 # Running in main process
@@ -138,13 +154,19 @@ class MPIndexer(Indexer):
         if chunkiness > self.chunksize:
             chunkiness = self.chunksize
 
-        tasks = [(uuid, xmin, snapshot_id, restart) for uuid in uuids]
+        #tasks = [(uuid, xmin, snapshot_id, restart) for uuid in uuids]
+        # We do the chunking ourselves
+        uuids = list(uuids)
+        uuid_lists = [uuids[i:i + chunkiness] for i in range(0, len(uuids), chunkiness)]
+        tasks = [(uuid_list, xmin, snapshot_id, restart) for uuid_list in uuid_lists]
+        chunkiness = 1
+
         errors = []
         try:
             for i, error in enumerate(self.pool.imap_unordered(
-                    update_object_in_snapshot, tasks, chunkiness)):
+                    update_objects_in_snapshot, tasks, chunkiness)):
                 if error is not None:
-                    errors.append(error)
+                    errors.extend(error)
                 if (i + 1) % 50 == 0:
                     log.info('Indexing %d', i + 1)
         except:
