@@ -39,7 +39,7 @@ es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
 log = logging.getLogger(__name__)
 MAX_CLAUSES_FOR_ES = 8192
-WORKER_RSS_CAP = 2000000  # 2GB of ram.
+WORKER_RSS_CAP = 2000000  # ~2GB of ram.
 
 def includeme(config):
     config.add_route('index', '/index')
@@ -245,7 +245,7 @@ def index(request):
             some_errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
             invalidated = []
             for error in some_errors:
-                # These unindexed uuids were waiting on an worker that ran over the WORKER_RSS_CAP
+                # These unindexed uuids were waiting on a worker that ran over the WORKER_RSS_CAP
                 invalidated.extend(error.pop('unindexed',[]))
             errors.extend(some_errors)
             uuid_count = len(invalidated)

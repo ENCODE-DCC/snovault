@@ -154,8 +154,7 @@ class MPIndexer(Indexer):
         if chunkiness > self.chunksize:
             chunkiness = self.chunksize
 
-        #tasks = [(uuid, xmin, snapshot_id, restart) for uuid in uuids]
-        # We do the chunking ourselves
+        # We do the chunking ourselves, allowing us to recycle hi mem workers faster
         uuids = list(uuids)
         uuid_lists = [uuids[i:i + chunkiness] for i in range(0, len(uuids), chunkiness)]
         tasks = [(uuid_list, xmin, snapshot_id, restart) for uuid_list in uuid_lists]
