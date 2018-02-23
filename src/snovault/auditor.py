@@ -210,53 +210,10 @@ def traversed_path_ids(request, obj, path):
             yield item_uri
 
 
-def traverse_one_path(embedded_obj, path):
-    terms = path.split('.')
-    cur_obj = embedded_obj
-    while terms:
-        if not isinstance(cur_obj, dict):
-            break
-        term = terms.pop(0)
-        cur_obj = cur_obj.get(term)
-        if cur_obj is None:
-            return None
-        if len(terms) > 0:
-            continue
-        if isinstance(cur_obj, basestring):
-            return [ cur_obj ]
-        if isinstance(cur_obj, dict):
-            return [ cur_obj['@id'] ]
-        if isinstance(cur_obj, list):
-            if len(cur_obj) == 0 or isinstance(cur_obj[0], basestring):
-                return cur_obj
-            if isinstance(cur_obj[0], dict):
-                return [ ob['@d'] for ob in cur_obj ]
-    return None
-
-
-def traverse_embedded(request, embedded_obj, paths):
-    if isinstance(paths, basestring):
-        paths = [ paths ]
-    if not paths:
-        if isinstance(embedded_obj, basestring):
-            return {embedded_obj}
-        else:
-            return {embedded_obj['@id']}
-    obj_paths = set()
-    for path in paths:
-        path_list = traverse_one_path(embedded_obj, path)
-        if path_list is not None:
-            obj_paths.update(path_list)
-        else:
-            # fall back which may not be needed.
-            obj_paths.update(traversed_path_ids(request, embedded_obj, path))
-    return obj_paths
-
-
 def inherit_audits(request, embedded, embedded_paths):
     audit_paths = {embedded['@id']}
     for embedded_path in embedded_paths:
-        audit_paths.update(traverse_embedded(request, embedded, embedded_path))
+        audit_paths.update(traversed_path_ids(request, embedded, embedded_path))
 
     audits = {}
     for audit_path in audit_paths:
