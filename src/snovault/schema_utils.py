@@ -347,7 +347,12 @@ def validate_request(schema, request, data=None, current=None):
 
     validated, errors = validate(schema, data, current)
     for error in errors:
-        request.errors.add('body', list(error.path), error.message)
+        messages = list([x.message for x in error.context])
+        schema_paths = [list(x.absolute_schema_path) for x in error.context]
+        context = {}
+        for i in range(len(schema_paths)):
+          context["->".join([str(x) for x in schema_paths[i]])] = messages[i]
+        request.errors.add('body', list(error.path), error.message,json.dumps(context,indent=2))
 
     if not errors:
         request.validated.update(validated)
