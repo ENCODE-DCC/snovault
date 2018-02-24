@@ -1,3 +1,7 @@
+1.0.4:
+-SNO-15 Add index to storage propertysheet
+-SNO-14 Update delete script
+
 1.0.3:
 -SNO-8 Add JSONSchemas type to profiles page (#73)
 
