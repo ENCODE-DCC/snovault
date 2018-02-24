@@ -422,7 +422,8 @@ class PropertySheet(Base):
                  ForeignKey('resources.rid',
                             deferrable=True,
                             initially='DEFERRED'),
-                 nullable=False)
+                 nullable=False,
+                 index=True)
     name = Column(types.String, nullable=False)
     properties = Column(JSON)
     tid = Column(UUID,
