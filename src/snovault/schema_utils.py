@@ -250,6 +250,17 @@ def permission(validator, permission, instance, schema):
         yield IgnoreUnchanged(error)
 
 
+orig_uniqueItems = Draft4Validator.VALIDATORS['uniqueItems']
+
+
+def uniqueItems(validator, uI, instance, schema):
+    # Use serialized items if available
+    # (this gives the linkTo validator a chance to normalize paths into uuids)
+    if validator._serialize and validator._validated[-1]:
+        instance = validator._validated[-1]
+    yield from orig_uniqueItems(validator, uI, instance, schema)
+
+
 VALIDATOR_REGISTRY = {}
 
 
@@ -279,6 +290,7 @@ class SchemaValidator(Draft4Validator):
     VALIDATORS['linkFrom'] = linkFrom
     VALIDATORS['permission'] = permission
     VALIDATORS['requestMethod'] = requestMethod
+    VALIDATORS['uniqueItems'] = uniqueItems
     VALIDATORS['validators'] = validators
     SERVER_DEFAULTS = SERVER_DEFAULTS
 
