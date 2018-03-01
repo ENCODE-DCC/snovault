@@ -93,3 +93,13 @@ Several requests can be made of the ``/_indexer_state`` path with use of ?reques
   :notify: One or more comma separated slack ids to be notified when the specific indexer is done.
 
     :bot_token: For the time being this is required for slack notification to work.
+
+**Examples:**
+
+1. | Request reindexing a single uuid (which will be expanded to related uuids). Notify Ben when indexing is done.
+   | ``.../_indexer_state?reindex=4871cc67-c9c7-4f11-8628-8e9653ddb2a4&notify=hitz&bot_token=<bot_token_not_shown_here>``
+2. | Request reindexing all uuids. Notify Ben when done. *NOTE: bot_token once set for this machine (previous request) is never needed again.*
+   | ``.../_indexer_state?reindex=all&notify=hitz``
+3. | Request up to 100 uuids currently being indexed, starting at the beginning:
+   | ``.../_indexer_state?uuids=0``
+
