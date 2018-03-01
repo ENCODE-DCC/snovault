@@ -70,22 +70,22 @@ class IndexerState(object):
         # 2) Record (double?) failures and consider blacklisting them - not tried, could do.
 
     # Private-ish primitives...
-    def get_obj(self, id, type='meta'):
+    def get_obj(self, id, doc_type='meta'):
         try:
-            return self.es.get(index=self.index, doc_type=type, id=id).get('_source',{})  # TODO: snovault/meta
+            return self.es.get(index=self.index, doc_type=doc_type, id=id).get('_source',{})  # TODO: snovault/meta
         except:
             return {}
 
-    def put_obj(self, id, obj, type='meta'):
+    def put_obj(self, id, obj, doc_type='meta'):
         try:
-            self.es.index(index=self.index, doc_type=type, id=id, body=obj)
+            self.es.index(index=self.index, doc_type=doc_type, id=id, body=obj)
         except:
             log.warn("Failed to save to es: " + id, exc_info=True)
 
-    def delete_objs(self, ids, type='meta'):
+    def delete_objs(self, ids, doc_type='meta'):
         for id in ids:
             try:
-                self.es.delete(index=self.index, doc_type=type, id=id)
+                self.es.delete(index=self.index, doc_type=doc_type, id=id)
             except:
                 pass
 
@@ -328,10 +328,6 @@ class IndexerState(object):
 
         return state
 
-    def registered_indexers(self):
-        '''Returns a list of registered indexers.'''
-        return self.get_list("registered_indexers")
-
     def get_notice_user(self, user, bot_token):
         '''Returns the user token for a named user.'''
         slack_users = self.get_obj('slack_users',{})
@@ -373,10 +369,10 @@ class IndexerState(object):
 
         user_warns = ''
         if who is not None:
-            indexer_notices = notify.get(which,{})
             if who in ['none','noone','nobody','stop','']:
                 notify.pop(which, None)
             else:
+                indexer_notices = notify.get(which,{})
                 if which == 'all_indexers':  # each indexer will have to finish
                     if 'indexers' not in indexer_notices:
                         indexer_notices['indexers'] = self.get_list("registered_indexers")
@@ -398,8 +394,8 @@ class IndexerState(object):
             return "WARNING: bot_token is required. " + user_warns
         elif user_warns != '':
             return "WARNING: " + user_warns
-        else:
-            return notify
+
+        return None
 
     def get_notices(self, full=False):
         '''Get the notifications'''
@@ -563,7 +559,7 @@ def indexer_state_show(request):
     bot_token = request.params.get("bot_token")
     if who is not None or bot_token is not None:
         notices = state.set_notices(request.host_url, who, bot_token, request.params.get("which"))
-        if isinstance(notices,str):
+        if notices is not None:
             return notices
 
     display = state.display(uuids=request.params.get("uuids"))
