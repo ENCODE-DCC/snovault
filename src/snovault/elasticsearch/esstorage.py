@@ -80,11 +80,17 @@ class PickStorage(object):
             return self.read
         return self.write
 
+    def force_database(self):
+        request = get_current_request()
+        if request:
+            request.datastore = 'database'
+
     def get_by_uuid(self, uuid):
         storage = self.storage()
         model = storage.get_by_uuid(uuid)
         if storage is self.read:
             if model is None or model.invalidated():
+                self.force_database()
                 return self.write.get_by_uuid(uuid)
         return model
 
@@ -93,6 +99,7 @@ class PickStorage(object):
         model = storage.get_by_unique_key(unique_key, name)
         if storage is self.read:
             if model is None or model.invalidated():
+                self.force_database()
                 return self.write.get_by_unique_key(unique_key, name)
         return model
 
