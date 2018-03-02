@@ -142,7 +142,7 @@ module.exports.encodeVersion = function(context) {
 module.exports.dbxref_prefix_map = {
     "PMID": "http://www.ncbi.nlm.nih.gov/pubmed/?term=",
     "PMCID": "http://www.ncbi.nlm.nih.gov/pmc/articles/",
-    "doi": "http://dx.doi.org/doi:",
+    "doi": "https://doi.org/doi:",
     // Antibody RRids
     "AR": "http://antibodyregistry.org/search.php?q="
 };
