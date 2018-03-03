@@ -156,12 +156,18 @@ class IndexerState(object):
                 self.put_obj(self.override, {self.title : 'reindex', 'all_uuids': True})
 
         else:
-            uuids = requested.split(',')
+            uuid_list = requested.split(',')
+            uuids = set()
+            while uuid_list:
+                uuid = uuid_list.pop(0)
+                if len(uuid) > 0:
+                    uuids.add(uuid)
             override_obj = self.get_obj(self.override)
             if 'uuids' not in override_obj.keys():
-                override_obj['uuids'] = uuids
+                override_obj['uuids'] = list(uuids)
             else:
-                override_obj['uuids'].extend(uuids)
+                uuids |= override_obj['uuids']
+                override_obj['uuids'] = list(uuids)
             self.put_obj(self.override, override_obj)
 
     def all_indexable_uuids(self, request):
@@ -493,28 +499,28 @@ class IndexerState(object):
             started = datetime.datetime.strptime(display['state']['cycle_started'],'%Y-%m-%dT%H:%M:%S.%f')
             display['state']['indexing_elapsed'] = str(datetime.datetime.now() - started)
         display['title'] = display['state'].get('title',self.state_id)
-        display['uuids in progress'] = self.get_count(self.todo_set)
-        display['uuids troubled'] = self.get_count(self.troubled_set)
-        display['uuids last cycle'] = self.get_count(self.last_set)
+        display['uuids_in_progress'] = self.get_count(self.todo_set)
+        display['uuids_troubled'] = self.get_count(self.troubled_set)
+        display['uuids_last_cycle'] = self.get_count(self.last_set)
         if self.followup_prep_list is not None:
-            display['to be handed off to other indexer(s)'] = self.get_count(self.followup_prep_list)
+            display['to_be_staged_for_follow_up_indexers'] = self.get_count(self.followup_prep_list)
         if self.title == 'primary':
             for id in self.followup_lists:
                 display[id] = self.get_count(id)
         else:
             id = 'staged_for_%s_list' % (self.title)
-            display['staged by primary'] = self.get_count(id)
+            display['staged_by_primary'] = self.get_count(id)
 
         reindex = self.get_obj(self.override)
         if reindex:
             uuids = reindex.get('uuids')
             if uuids is not None:
-                display['REINDEX requested'] = uuids
+                display['reindex_requested'] = uuids
             elif reindex.get('all_uuids',False):
-                display['REINDEX requested'] = 'all'
+                display['reindex_requested'] = 'all'
         notify = self.get_notices()
         if notify:
-            display['NOTIFY requested'] = notify
+            display['notify_requested'] = notify
         display['now'] = datetime.datetime.now().isoformat()
 
         if uuids is not None:
@@ -539,7 +545,7 @@ class IndexerState(object):
                     uuids_to_show.append("skipped past all %d uuids" % (uuid_list.get('count',0)))
                 else:
                     uuids_to_show = 'No uuids indexing'
-            display['uuids in progress'] = uuids_to_show
+            display['uuids_in_progress'] = uuids_to_show
 
         return display
 
@@ -567,21 +573,17 @@ def indexer_state_show(request):
     item_types = all_types(request.registry)
     count = 0
     for item_type in item_types:
-        #all_count = es.count(index='_all').get('count',0)
-        #vis_count = es.count(index='vis_cache').get('count',0)  # TODO: 'vis_cache' should be obtained from vi_indexer.py
-        #chrom_count = es.count(index='chr*').get('count',0)
-        #resident_count = es.count(index='resident_regionsets').get('count',0)  # TODO: 'resident_regionsets' should be obtained from region_indexer.py
-        # count = all_count - vis_count - chrom_count - resident_count
+        # TODO: index list should be replaced by index alias:
+        #       https://www.elastic.co/guide/en/elasticsearch/reference/6.2/indices-aliases.html
         try:
-            type_count = es.count(index=item_type).get('count',0)  # TODO: 'vis_composite' should be obtained from visualization.py
+            type_count = es.count(index=item_type).get('count',0)
             count += type_count
         except:
             pass
-        #all_count = es.count(index='_all').get('count',0)  # TODO: 'vis_composite' should be obtained from visualization.py
     if count:
-        display['docs in index'] = count
+        display['docs_in_index'] = count
     else:
-        display['docs in index'] = 'Not Found'
+        display['docs_in_index'] = 'Not Found'
 
     if not request.registry.settings.get('testing',False):  # NOTE: _indexer not working on local instances
         try:
@@ -591,11 +593,8 @@ def indexer_state_show(request):
         except:
             log.error('Error getting /_indexer', exc_info=True)
 
-    display['registered indexers'] = state.get_list('registered_indexers')
+    display['registered_indexers'] = state.get_list('registered_indexers')
     # always return raw json
-    #if len(request.query_string) > 0:
-    #    request.query_string = "&format=json"
-    #else:
     request.query_string = "format=json"
     return display
 
