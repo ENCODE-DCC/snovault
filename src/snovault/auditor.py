@@ -76,7 +76,7 @@ class Auditor(object):
     def __init__(self):
         self.type_checkers = {}
 
-    def add_audit_checker(self, checker, item_type, condition=None, frame='embedded'):
+    def add_audit_checker(self, checker, item_type, condition=None, frame='object'):
         checkers = self.type_checkers.setdefault(item_type, [])
         self._order += 1  # consistent execution ordering
         if isinstance(frame, list):
@@ -149,7 +149,7 @@ class Auditor(object):
 
 
 # Imperative configuration
-def add_audit_checker(config, checker, type_, condition=None, frame='embedded'):
+def add_audit_checker(config, checker, type_, condition=None, frame='object'):
     def callback():
         types = config.registry[TYPES]
         ti = types[type_]
@@ -160,7 +160,7 @@ def add_audit_checker(config, checker, type_, condition=None, frame='embedded'):
 
 
 # Declarative configuration
-def audit_checker(type_, condition=None, frame='embedded'):
+def audit_checker(type_, condition=None, frame='object'):
     """ Register an audit checker
     """
 
