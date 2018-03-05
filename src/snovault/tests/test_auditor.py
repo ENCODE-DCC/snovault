@@ -58,14 +58,14 @@ def dummy_request(registry):
 
 def test_audit_pass(auditor, dummy_request):
     value = {'checker1': True}
-    dummy_request._embed['/foo/@@embedded'] = value
+    dummy_request._embed['/foo/@@object'] = value
     errors = auditor.audit(request=dummy_request, path='/foo/', types='test')
     assert errors == []
 
 
 def test_audit_failure(auditor, dummy_request):
     value = {}
-    dummy_request._embed['/foo/@@embedded'] = value
+    dummy_request._embed['/foo/@@object'] = value
     error, = auditor.audit(request=dummy_request, path='/foo/', types='test')
     assert error['detail'] == 'Missing checker1'
     assert error['category'] == 'testchecker'
@@ -75,10 +75,10 @@ def test_audit_failure(auditor, dummy_request):
 
 def test_audit_conditions(auditor_conditions, dummy_request):
     value = {}
-    dummy_request._embed['/foo/@@embedded'] = value
+    dummy_request._embed['/foo/@@object'] = value
     assert auditor_conditions.audit(request=dummy_request, path='/foo/', types='test') == []
     value = {'condition1': True}
-    dummy_request._embed['/foo/@@embedded'] = value
+    dummy_request._embed['/foo/@@object'] = value
     error, = auditor_conditions.audit(request=dummy_request, path='/foo/', types='test')
     assert error['detail'] == 'Missing checker1'
     assert error['category'] == 'testchecker'
@@ -97,7 +97,7 @@ def test_declarative_config(dummy_request):
 
     auditor = config.registry[AUDITOR]
     value = {'condition1': True}
-    dummy_request._embed['/foo/@@embedded'] = value
+    dummy_request._embed['/foo/@@object'] = value
     error, = auditor.audit(request=dummy_request, path='/foo/', types='TestingLinkSource')
     assert error['detail'] == 'Missing checker1'
     assert error['category'] == 'testchecker'
