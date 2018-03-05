@@ -26,6 +26,7 @@ import time
 import copy
 import json
 import requests
+import re
 
 SEARCH_MAX = 99999  # OutOfMemoryError if too high
 
@@ -160,15 +161,18 @@ class IndexerState(object):
             uuids = set()
             while uuid_list:
                 uuid = uuid_list.pop(0)
-                if len(uuid) > 0:
+                if len(uuid) > 0 and re.match("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", uuid):
                     uuids.add(uuid)
+                else:
+                    return "Requesting reindex of at least one uninterpretable uuid: '%s'" % (uuid)
             override_obj = self.get_obj(self.override)
             if 'uuids' not in override_obj.keys():
                 override_obj['uuids'] = list(uuids)
             else:
-                uuids |= override_obj['uuids']
+                uuids |= set(override_obj['uuids'])
                 override_obj['uuids'] = list(uuids)
             self.put_obj(self.override, override_obj)
+        return None
 
     def all_indexable_uuids(self, request):
         '''returns list of uuids pertinant to this indexer.'''
@@ -558,7 +562,9 @@ def indexer_state_show(request):
     # requesting reindex
     reindex = request.params.get("reindex")
     if reindex is not None:
-        state.request_reindex(reindex)
+        msg = state.request_reindex(reindex)
+        if msg is not None:
+            return msg
 
     # Requested notification
     who = request.params.get("notify")
