@@ -166,3 +166,23 @@ class QueueManager(object):
             )
             failed.extend(response.get('Failed', []))
         return failed
+
+
+    def number_of_messages(self):
+        """
+        Returns a dict with number of waiting messages in the queue and
+        number of inflight (i.e. not currently visible) messages.
+        """
+        client = boto3.client('sqs')
+        response = client.get_queue_attributes(
+            QueueUrl=self.queue_url,
+            AttributeNames=[
+                'ApproximateNumberOfMessages',
+                'ApproximateNumberOfMessagesNotVisible'
+            ]
+        )
+        formatted = {
+            'waiting': response.get('Attributes', {}).get('ApproximateNumberOfMessages')
+            'inflight': response.get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible')
+        }
+        return formatted
