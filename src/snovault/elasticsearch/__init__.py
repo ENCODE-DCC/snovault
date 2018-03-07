@@ -34,6 +34,7 @@ def includeme(config):
     config.include('.cached_views')
     config.include('.esstorage')
     config.include('.indexer')
+    config.include('.indexer_queue')
     if asbool(settings.get('mpindexer')) and not PY2:
         config.include('.mpindexer')
 
