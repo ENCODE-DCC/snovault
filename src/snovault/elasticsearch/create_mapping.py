@@ -24,7 +24,7 @@ from snovault import (
 )
 from snovault.schema_utils import combine_schemas
 from snovault.fourfront_utils import add_default_embeds, get_jsonld_types_from_collection_type
-from .interfaces import ELASTIC_SEARCH
+from .interfaces import ELASTIC_SEARCH, INDEXER_QUEUE
 import collections
 import json
 import logging
@@ -835,22 +835,6 @@ def run_indexing(app, indexing_uuids):
     run_index_data(app, uuids=indexing_uuids)
 
 
-def set_es_uuid_store(es, indexing_uuids):
-    """
-    Takes a set of uuids to be indexed and puts them in the meta/meta/uuid_store
-    for later reindexing
-    """
-    timestamp = datetime.datetime.now().isoformat()
-    record = {}
-    record['timestamp'] = timestamp
-    record['uuids'] = list(indexing_uuids)
-    res = es_safe_execute(es.index, index='meta', doc_type='meta', body=record, id='uuid_store')
-    if res:
-        log.warning("MAPPING: uuids to index were stored succesfully.")
-    else:
-        log.warning("MAPPING: uuids to index were NOT stored succesfully.")
-
-
 def run(app, collections=None, dry_run=False, index_uuids=None, check_first=False, force=False, index_diff=False, strict=False, sync_index=False, no_meta=False, print_count_only=False):
     """
     Run create_mapping. Has the following options:
@@ -892,10 +876,10 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
             snovault_cleanup(es, registry)
         if not collections:
             collections = list(registry[COLLECTIONS].by_item_type.keys())
+            # automatically add meta to start when going through all collections
+            if not no_meta:
+                collections = ['meta'] + collections
         log.warning('\n___FOUND COLLECTIONS___:\n %s\n' % (str(collections)))
-        # meta could be added through item-type arg
-        if not no_meta and 'meta' not in collections:
-            collections = ['meta'] + collections
         for collection_name in collections:
             if collection_name == 'meta':
                 # meta mapping just contains settings
@@ -910,20 +894,15 @@ def run(app, collections=None, dry_run=False, index_uuids=None, check_first=Fals
     log.warning('\n___UUIDS TO INDEX___:\n %s\n' % (str(uuids_to_index)))
     log.warning('\n___ES INDICES (POST-MAPPING)___:\n %s\n' % (str(es.cat.indices())))
     if uuids_to_index:
-        # if strict option and we have an item-type(s) provided,
-        # find associated uuids for indexing
-        if strict:
-            uuids_to_index = uuids_to_index
-        else:
-            uuids_to_index, _, _ = find_uuids_for_indexing(app.registry, uuids_to_index, uuids_to_index, log)
         # only index (synchronously) if --sync-index option is used
-        # otherwise, store uuids for later indexing in ES uuid_store document
+        # otherwise, queue uuids with our without --strict option
         if sync_index:
             log.warning("MAPPING: indexing %s items" % (str(len(uuids_to_index))))
             run_indexing(app, uuids_to_index)
         else:
-            log.warning("MAPPING: storing %s items for reindexing..." % (str(len(uuids_to_index))))
-            set_es_uuid_store(es, uuids_to_index)
+            log.warning("MAPPING: queueing %s items for reindexing" % (str(len(uuids_to_index))))
+            indexer_queue = app.registry[INDEXER_QUEUE]
+            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=strict)
     log.warning('\n___FINISHED CREATE-MAPPING___:\n')
     return list(uuids_to_index)
 

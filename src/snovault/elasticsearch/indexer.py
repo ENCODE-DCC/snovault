@@ -26,8 +26,7 @@ import copy
 from .indexer_utils import (
     find_uuids_for_indexing,
     get_uuids_for_types,
-    get_xmin_from_es,
-    get_uuid_store_from_es
+    get_xmin_from_es
 )
 
 
@@ -52,7 +51,8 @@ def index(request):
     record = request.json.get('record', False)
     dry_run = request.json.get('dry_run', False)
     recovery = request.json.get('recovery', False)
-    req_uuids = request.json.get('uuids', None)
+    # these are uuids that should be forcibly indexed without being queued
+    force_uuids = request.json.get('uuids', None)
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
     if not indexer:
@@ -78,7 +78,7 @@ def index(request):
     first_txn = None
     last_xmin = None
     stored_uuids = None
-    if req_uuids is not None:
+    if force_uuids is not None:
         pass
     # when given last_xmin in request, we know where to begin indexing
     elif 'last_xmin' in request.json:
@@ -88,8 +88,6 @@ def index(request):
     # if that fails, re-index everything (last_xmin = None).
     else:
         last_xmin = get_xmin_from_es(es)
-        # set the specifically requested uuids to those held in the store
-        stored_uuids = get_uuid_store_from_es(es)
 
     result = {
         'xmin': xmin,
@@ -97,9 +95,9 @@ def index(request):
     }
 
     flush = False
-    if req_uuids is not None:
-        result['forcibly_indexed'] = req_uuids
-        invalidated = updated = set(req_uuids)
+    if force_uuids is not None:
+        result['forcibly_indexed'] = force_uuids
+        invalidated = updated = set(force_uuids)
     elif last_xmin is None:
         # this will invalidate only the uuids of given types and does not
         # consider embedded/linked uuids.

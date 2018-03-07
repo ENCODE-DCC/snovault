@@ -30,7 +30,6 @@ def queue_indexing(request):
     queue_mode = None  # either queueing 'uuids' or 'collection'
     response = {
         'notification': 'Failure',
-        'requested_uuids': [],
         'number_queued': 0,
         'detail': 'Nothing was queued. Make sure to past in a list of uuids in in "uuids" key OR list of collections in the "collections" key of request the POST request.'
     }
@@ -41,21 +40,20 @@ def queue_indexing(request):
     if req_uuids and not isinstance(req_uuids, list):
         response['detail'] = 'Nothing was queued. When queueing uuids, make to sure to put a list of string uuids in the POST request.'
         return response
-    if req_collections and not ininstance(req_collections, list):
+    if req_collections and not isinstance(req_collections, list):
         response['detail'] = 'Nothing was queued. When queueing a collection, make sure to provide a list of string collection names in the POST request.'
         return response
     queue_indexer = request.registry[INDEXER_QUEUE]
+    # strict mode means uuids should be indexed without finding associates
+    strict = request.json.get('strict', False)
     if req_uuids:
-        # strict mode means uuids should be indexed without finding associates
-        if request.json.get('strict') == True:
-            queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=True)
-        else:
-            queued, failed = queue_indexer.add_uuids(request.registry, req_uuids)
+        queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=strict)
+        response['requested_uuids'] = req_uuids
     else:
-        queued, failed = queue_indexer.add_collections(request.registry, req_collections)
+        queued, failed = queue_indexer.add_collections(request.registry, req_collections, strict=strict)
+        response['requested_collections'] = req_collections
     response['notification'] = 'Success'
     response['number_queued'] = len(queued)
-    response['requested_uuids'] = req_uuids
     response['detail'] = 'Successfuly queued items!'
     response['errors'] = failed
     return response
@@ -93,7 +91,7 @@ class QueueManager(object):
         return uuids_to_index, failed
 
 
-    def add_collections(self, registry, collections):
+    def add_collections(self, registry, collections, strict=False):
         """
         Takes a list of collection name, finds all associated uuids using the
         indexer_utils, and then queues them all up. Also requires a registry,
@@ -102,7 +100,12 @@ class QueueManager(object):
         Returns a list of queued uuids and a list of any uuids that failed to
         be queued.
         """
-        uuids_to_index = list(get_uuids_for_types(registry, collections))
+        uuids = get_uuids_for_types(registry, collections)
+        if not strict:
+            uuids_to_index, _, _ = find_uuids_for_indexing(registry, uuids, uuids, log)
+            uuids_to_index = list(uuids_to_index)
+        else:
+            uuids_to_index = list(uuids)
         timestamp = datetime.datetime.now().isoformat()
         failed = self.send_messages(uuids_to_index, timestamp)
         return uuids_to_index, failed

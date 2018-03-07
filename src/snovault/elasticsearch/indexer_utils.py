@@ -100,23 +100,3 @@ def get_xmin_from_es(es):
         return None
     else:
         return status['_source']['xmin']
-
-
-def get_uuid_store_from_es(es):
-    try:
-        record = es.get(index='meta', doc_type='meta', id='uuid_store', ignore=[404])
-    except:
-        return None
-    else:
-        uuids = record.get('_source', {}).get('uuids', None)
-        if uuids:
-            # remove the record
-            try:
-                es.delete(index='meta', doc_type='meta', id='uuid_store', refresh=True)
-            except:
-                # delete failed, return no uuids for now
-                return None
-            else:
-                return uuids
-        else:
-            return None
