@@ -5,10 +5,13 @@ import boto3
 import json
 import math
 import logging
-import datetime
 from pyramid.view import view_config
 from .interfaces import INDEXER_QUEUE
-from .indexer_utils import find_uuids_for_indexing, get_uuids_for_types
+from .indexer_utils import (
+    find_uuids_for_indexing,
+    get_uuids_for_types,
+    index_timestamp
+)
 
 log = logging.getLogger(__name__)
 
@@ -67,9 +70,9 @@ class QueueManager(object):
             'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
             'ReceiveMessageWaitTimeSeconds': '2'  # 2 seconds of long polling
         }
+        self.client = boto3.client('sqs')
         self.queue_name = self.env_name + '-indexer-queue'
         self.queue_url = self.init_queue()
-        self.client = boto3.client('sqs')
 
 
     def add_uuids(self, registry, uuids, strict=False):
@@ -87,7 +90,7 @@ class QueueManager(object):
             uuids_to_index = list(uuids_to_index)
         else:
             uuids_to_index = uuids
-        timestamp = datetime.datetime.now().isoformat()
+        timestamp = index_timestamp()
         failed = self.send_messages(uuids_to_index, timestamp)
         log.warning('\n___QUEUED %s ITEMS___:\n' % (len(uuids_to_index)))
         return uuids_to_index, failed
@@ -109,7 +112,7 @@ class QueueManager(object):
             uuids_to_index = list(uuids_to_index)
         else:
             uuids_to_index = list(uuids)
-        timestamp = datetime.datetime.now().isoformat()
+        timestamp = index_timestamp()
         failed = self.send_messages(uuids_to_index, timestamp)
         log.warning('\n___QUEUED %s ITEMS___:\n' % (len(uuids_to_index)))
         return uuids_to_index, failed
@@ -182,12 +185,12 @@ class QueueManager(object):
         """
         failed = []
         for n in range(int(math.ceil(len(messages) / 10))):  # 10 messages per batch
-            batch = messages[n:n+10]
+            batch = messages[n*10:n*10+10]
             entries = []
             for batch_msg in batch:
                 entry = {
-                    'Id': '_'.join([batch_msg, timestamp.replace(':', '-').replace('.', '-')]),
-                    'MessageBody': json.dumps({'uuid':batch_msg, 'timestamp':timestamp})
+                    'Id': '_'.join([batch_msg, str(timestamp)]),
+                    'MessageBody': batch_msg
                 }
                 entries.append(entry)
             response = self.client.send_message_batch(
@@ -223,6 +226,14 @@ class QueueManager(object):
         failed = []
         for n in range(int(math.ceil(len(messages) / 10))):  # 10 messages per batch
             batch = messages[n:n+10]
+            # need to change message format, since deleting takes slightly
+            # different fields what's return from receiving
+            for i in range(len(batch)):
+                to_delete = {
+                    'Id': batch[i]['MessageId'],
+                    'ReceiptHandle': batch[i]['ReceiptHandle']
+                }
+                batch[i] = to_delete
             response = self.client.delete_message_batch(
                 QueueUrl=self.queue_url,
                 Entries=batch

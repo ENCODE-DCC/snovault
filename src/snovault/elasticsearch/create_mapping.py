@@ -847,7 +847,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     """
     registry = app.registry
     es = app.registry[ELASTIC_SEARCH]
-    log.warning('\n___CREATE-MAPPING___:\nindex_uuids: %s\ncheck_first %s\n' % (index_uuids, check_first))
+    log.warning('\n___CREATE-MAPPING___:\ncollections: %s\ncheck_first %s\n index_diff %s\n' % (collections, check_first, index_diff))
     log.warning('\n___ES___:\n %s\n' % (str(es.cat.client)))
     log.warning('\n___ES NODES___:\n %s\n' % (str(es.cat.nodes())))
     log.warning('\n___ES HEALTH___:\n %s\n' % (str(es.cat.health())))
@@ -868,14 +868,14 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         if collection_name == 'meta':
             # meta mapping just contains settings
             build_index(app, es, collection_name, META_MAPPING, uuids_to_index,
-                        dry_run, check_first, force, index_diff, print_count_only)
+                        dry_run, check_first, index_diff, print_count_only)
         else:
             mapping = create_mapping_by_type(collection_name, registry)
             log.warning('\n___MAPPING MADE FOR %s___:\n' % (collection_name))
             build_index(app, es, collection_name, mapping, uuids_to_index,
-                        dry_run, check_first, force, index_diff, print_count_only)
+                        dry_run, check_first, index_diff, print_count_only)
             log.warning('\n___INDEX MADE FOR %s___:\n' % (collection_name))
-    log.warning('\n___UUIDS TO INDEX___:\n %s\n' % (str(uuids_to_index)))
+    log.warning('\n___UUIDS TO INDEX___:\n %s\n' % (len(uuids_to_index)))
     log.warning('\n___ES INDICES (POST-MAPPING)___:\n %s\n' % (str(es.cat.indices())))
 
     # now, queue items for indexing
@@ -890,7 +890,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         else:
             log.warning("MAPPING: queueing %s items for reindexing" % (str(len(uuids_to_index))))
             indexer_queue = app.registry[INDEXER_QUEUE]
-            indexer_queue.add_uuids(app.registry, list(uuids_to_index))
+            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True)
     log.warning('\n___FINISHED CREATE-MAPPING___:\n')
 
 

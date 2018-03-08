@@ -11,11 +11,11 @@ from .interfaces import (
     INDEXER,
     INDEXER_QUEUE
 )
+from .indexer_utils import index_timestamp
 import datetime
 import logging
 import time
 import copy
-import json
 
 log = logging.getLogger(__name__)
 
@@ -45,12 +45,10 @@ def index(request):
 
     # indexing is either run with forced uuids passed through the request
     # (which is synchronous) OR uuids from the queue (see Indexer class)
-    force_uuids = request.json.get('uuids', None)
-    if not force_uuids:
+    forced_uuids = request.json.get('uuids', None)
 
-
-    log.debug("Indexing %s total items; %s primary items" %
-             (str(len(invalidated)), str(len(updated))))
+    # log.debug("Indexing %s total items; %s primary items" %
+    #          (str(len(invalidated)), str(len(updated))))
     if not dry_run:
         index_start_time = datetime.datetime.now()
         index_start_str = index_start_time.isoformat()
@@ -59,7 +57,7 @@ def index(request):
         indexing_record = {
             'uuid': index_start_str,
             'indexing_status': 'started',
-            'to_index': len(invalidated)
+            # 'to_index': len(invalidated)
         }
         # initially index the indexing record
         if record:
@@ -71,14 +69,14 @@ def index(request):
         indexing_record['indexing_started'] = index_start_str
         # actually index
         if forced_uuids:
-            errors = indexer.update_objects_forced(request, forced_uuids, index_start_str)
+            errors = indexer.update_objects_forced(request, forced_uuids)
         else:
-            errors = indexer.update_object_queued(request)
-        indexing_record['errors'] = errors)
+            errors = indexer.update_objects_queued(request)
+        indexing_record['errors'] = errors
         index_finish_time = datetime.datetime.now()
         indexing_record['indexing_finished'] = index_finish_time.isoformat()
         indexing_record['indexing_elapsed'] = str(index_finish_time - index_start_time)
-        indexing_record['indexed'] = len(invalidated)
+        # indexing_record['indexed'] = len(invalidated)
         indexing_record['indexing_status'] = 'finished'
 
         if record:
@@ -115,13 +113,15 @@ class Indexer(object):
         errors = []
         count = 0
         messages = self.queue.recieve_messages()  # long polling used in SQS
+        print('%s messages to go!' % len(messages))
         while len(messages) > 0:
             for msg in messages:
-                msg = json.loads(msg)
-                error = self.update_object(request, msg['uuid'], msg['timestamp'])
+                # msg['Body'] is just a uuid string at the moment
+                error = self.update_object(request, msg['Body'])
                 if error is not None:
                     errors.append(error)
                 count += 1
+                print('Finished %s' % count)
                 if (count) % 50 == 0:
                     log.info('Indexing %d (queued)', count)
             self.queue.delete_messages(messages)
@@ -129,14 +129,14 @@ class Indexer(object):
         return errors
 
 
-    def update_objects_forced(self, request, forced_uuids, timestamp):
+    def update_objects_forced(self, request, forced_uuids):
         """
         Used with forced uuids (simply loop through)
         forced_uuids is a list of string uuids. Use timestamp of index run
         """
         errors = []
         for i, uuid in enumerate(forced_uuids):
-            error = self.update_object(request, uuid, timestamp)
+            error = self.update_object(request, uuid)
             if error is not None:
                 errors.append(error)
             if (i + 1) % 50 == 0:
@@ -144,8 +144,9 @@ class Indexer(object):
         return errors
 
 
-    def update_object(self, request, uuid, timestamp):
+    def update_object(self, request, uuid):
         curr_time = datetime.datetime.now().isoformat()
+        timestamp = index_timestamp()
         try:
             result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
         except StatementError:

@@ -1,3 +1,5 @@
+import datetime
+
 def find_uuids_for_indexing(registry, updated, log=None):
     from .interfaces import ELASTIC_SEARCH
     from .create_mapping import index_settings
@@ -98,3 +100,11 @@ def get_xmin_from_es(es):
         return None
     else:
         return status['_source']['xmin']
+
+
+def index_timestamp():
+    """
+    Returns an int datetime.utcnow() to microsecond resolution
+    """
+    float_ts = datetime.datetime.utcnow().timestamp()
+    return int(float_ts * 1000000)

@@ -51,8 +51,6 @@ def queue_item_and_invalidate_new_back_revs(event):
     Invalidate objects that rev_link to us
 
     Catch those objects which newly rev_link us
-
-
     '''
     context = event.object
     updated = event.request._updated_uuid_paths
@@ -66,7 +64,7 @@ def queue_item_and_invalidate_new_back_revs(event):
     if event.__class__.__name__ == 'Created':
         indexer_queue.add_uuids(context.registry, [str(context.uuid)], strict=True)
     else:  # otherwise, event is AfterModified and need non-strict queueing
-        # indexer_queue.add_uuids(context.registry, [str(context.uuid)])
+        indexer_queue.add_uuids(context.registry, [str(context.uuid)])
         pass
     current = {
         path: set(simple_path_ids(properties, path))
