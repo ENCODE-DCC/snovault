@@ -139,7 +139,7 @@ class PickStorage(object):
         if not item_type: # ES deletion requires index & doc_type, which are both == item_type
             model = self.get_by_uuid(rid)
             item_type = model.item_type
-        uuids_linking_to_item = find_uuids_for_indexing(self.registry, set(), set([rid]))[0] - set([rid])
+        uuids_linking_to_item = find_uuids_for_indexing(self.registry, set([rid])) - set([rid])
         if len(uuids_linking_to_item) > 0:
             # Return list of { '@id', 'display_title', 'uuid' } in 'comment' property of HTTPException response to assist with any manual unlinking.
             conflicts = []

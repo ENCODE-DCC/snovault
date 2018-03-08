@@ -1,4 +1,4 @@
-def find_uuids_for_indexing(registry, updated, renamed, log=None):
+def find_uuids_for_indexing(registry, updated, log=None):
     from .interfaces import ELASTIC_SEARCH
     from .create_mapping import index_settings
     from elasticsearch.exceptions import ConnectionTimeout
@@ -10,14 +10,13 @@ def find_uuids_for_indexing(registry, updated, renamed, log=None):
     """
     invalidated = set()
     referencing = set()
-    flush = False
 
     # if meta does not exist (shouldn't ever happen on deploy)
     # invalidate all uuids to avoid errors
     meta_exists = es.indices.exists(index='meta')
     if not meta_exists or len(updated) > SEARCH_MAX:
         invalidated = referencing = set(get_uuids_for_types(registry))
-        return invalidated, referencing, True
+        return invalidated
 
     es.indices.refresh(index='_all')
     try:
@@ -35,7 +34,7 @@ def find_uuids_for_indexing(registry, updated, renamed, log=None):
                                 },
                                 {
                                     'terms': {
-                                        'linked_uuids': list(renamed),
+                                        'linked_uuids': list(updated),
                                         '_cache': False,
                                     },
                                 },
@@ -49,19 +48,18 @@ def find_uuids_for_indexing(registry, updated, renamed, log=None):
     except ConnectionTimeout:
         # on timeout, queue everything for reindexing to avoid errors
         invalidated = referencing = set(get_uuids_for_types(registry))
-        return invalidated, referencing, True
+        return invalidated
     else:
         if (log):
             log.debug("Found %s associated items for indexing" %
                     (str(res['hits']['total'])))
         if res['hits']['total'] > SEARCH_MAX:
             referencing = set(get_uuids_for_types(registry))
-            flush = True
         else:
             found_uuids = {hit['_id'] for hit in res['hits']['hits']}
             referencing = referencing | found_uuids
         invalidated = referencing | updated
-        return invalidated, referencing, flush
+        return invalidated
 
 
 def get_uuids_for_types(registry, types=None):

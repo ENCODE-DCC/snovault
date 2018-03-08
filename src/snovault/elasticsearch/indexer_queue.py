@@ -69,6 +69,7 @@ class QueueManager(object):
         }
         self.queue_name = self.env_name + '-indexer-queue'
         self.queue_url = self.init_queue()
+        self.client = boto3.client('sqs')
 
 
     def add_uuids(self, registry, uuids, strict=False):
@@ -82,12 +83,13 @@ class QueueManager(object):
         """
         if not strict:
             uuids = set(uuids)
-            uuids_to_index, _, _ = find_uuids_for_indexing(registry, uuids, uuids, log)
+            uuids_to_index = find_uuids_for_indexing(registry, uuids, log)
             uuids_to_index = list(uuids_to_index)
         else:
             uuids_to_index = uuids
         timestamp = datetime.datetime.now().isoformat()
         failed = self.send_messages(uuids_to_index, timestamp)
+        log.warning('\n___QUEUED %s ITEMS___:\n' % (len(uuids_to_index)))
         return uuids_to_index, failed
 
 
@@ -100,14 +102,16 @@ class QueueManager(object):
         Returns a list of queued uuids and a list of any uuids that failed to
         be queued.
         """
+        ### IS THIS USING DATASTORE HERE?
         uuids = get_uuids_for_types(registry, collections)
         if not strict:
-            uuids_to_index, _, _ = find_uuids_for_indexing(registry, uuids, uuids, log)
+            uuids_to_index = find_uuids_for_indexing(registry, uuids, log)
             uuids_to_index = list(uuids_to_index)
         else:
             uuids_to_index = list(uuids)
         timestamp = datetime.datetime.now().isoformat()
         failed = self.send_messages(uuids_to_index, timestamp)
+        log.warning('\n___QUEUED %s ITEMS___:\n' % (len(uuids_to_index)))
         return uuids_to_index, failed
 
 
@@ -115,9 +119,9 @@ class QueueManager(object):
         """
         Simple function that returns url of associated queue name
         """
-        client = boto3.client('sqs')
+
         try:
-            response = client.get_queue_url(
+            response = self.client.get_queue_url(
                 QueueName=self.queue_name
             )
         except:
@@ -133,15 +137,13 @@ class QueueManager(object):
 
         Returns a queue url that is guaranteed to link to the right queue.
         """
-
-        client = boto3.client('sqs')
         queue_url = self.get_queue_url()
         should_init = False
         if not queue_url:
             should_init = True
         else:  # see if current settings are up to date
             try:
-                curr_attrs = client.get_queue_attributes(
+                curr_attrs = self.client.get_queue_attributes(
                     QueueUrl=queue_url,
                     AttributeNames=list(self.queue_attrs.keys())
                 )
@@ -150,7 +152,7 @@ class QueueManager(object):
             else:
                 should_init = self.queue_attrs != curr_attrs['Attributes']  # init if attrs off
         if should_init:
-            response = client.create_queue(
+            response = self.client.create_queue(
                 QueueName=self.queue_name,
                 Attributes=self.queue_attrs
             )
@@ -163,8 +165,7 @@ class QueueManager(object):
         Clear out the queue completely. You can no longer retrieve these
         messages. Takes up to 60 seconds.
         """
-        client = boto3.client('sqs')
-        response = client.purge_queue(
+        response = self.client.purge_queue(
             QueueUrl=self.queue_url
         )
         return response
@@ -180,7 +181,6 @@ class QueueManager(object):
         Returns Ids of failed messages, in form uuid-timestamp.
         """
         failed = []
-        client = boto3.client('sqs')
         for n in range(int(math.ceil(len(messages) / 10))):  # 10 messages per batch
             batch = messages[n:n+10]
             entries = []
@@ -190,7 +190,7 @@ class QueueManager(object):
                     'MessageBody': json.dumps({'uuid':batch_msg, 'timestamp':timestamp})
                 }
                 entries.append(entry)
-            response = client.send_message_batch(
+            response = self.client.send_message_batch(
                 QueueUrl=self.queue_url,
                 Entries=entries
             )
@@ -203,8 +203,7 @@ class QueueManager(object):
         Recieves up to 10 messages from the queue. Fewer (even 0) messages
         may be returned on any given run. Returns a list of messages with info
         """
-        client = boto3.client('sqs')
-        response = client.receive_message(
+        response = self.client.receive_message(
             QueueUrl=self.queue_url,
             MaxNumberOfMessages=10,
             VisibilityTimeout=int(self.queue_attrs['VisibilityTimeout'])
@@ -222,10 +221,9 @@ class QueueManager(object):
         Returns a list with any failed attempts.
         """
         failed = []
-        client = boto3.client('sqs')
         for n in range(int(math.ceil(len(messages) / 10))):  # 10 messages per batch
             batch = messages[n:n+10]
-            response = client.delete_message_batch(
+            response = self.client.delete_message_batch(
                 QueueUrl=self.queue_url,
                 Entries=batch
             )
@@ -243,12 +241,11 @@ class QueueManager(object):
         Returns a list with any failed attempts.
         """
         failed = []
-        client = boto3.client('sqs')
         for n in range(int(math.ceil(len(messages) / 10))):  # 10 messages per batch
             batch = messages[n:n+10]
             for msg in batch:
                 msg['VisibilityTimeout'] = 0
-            response = client.change_message_visibility_batch(
+            response = self.client.change_message_visibility_batch(
                 QueueUrl=self.queue_url,
                 Entries=batch
             )
@@ -261,8 +258,7 @@ class QueueManager(object):
         Returns a dict with number of waiting messages in the queue and
         number of inflight (i.e. not currently visible) messages.
         """
-        client = boto3.client('sqs')
-        response = client.get_queue_attributes(
+        response = self.client.get_queue_attributes(
             QueueUrl=self.queue_url,
             AttributeNames=[
                 'ApproximateNumberOfMessages',
