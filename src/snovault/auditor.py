@@ -250,8 +250,10 @@ def item_view_audit(context, request):
 
 
 def audit_condition(context, request):
-    # Don't embed audits unless they are precached in elasticsearch
-    if not ICachedItem.providedBy(context):
+    # Audits must be explicitly requested if they
+    # are not available in precached form from elasticsearch
+    force_audit = request.params.get('audit', False)
+    if not ICachedItem.providedBy(context) and not force_audit:
         return False
     # Don't embed audits unless user has permission to see them
     if not request.has_permission('audit'):
