@@ -1,3 +1,12 @@
+1.0.5:
+01. SNO-30 Split Indexer State from indexer file and update
+02. SNO-10 Remove audit indexing via 2-pass
+03. SNO-9 Add api end points to new indexer meta objects
+04. SNO-25 Make uniqueItems to check the serialized values (#85)
+05. SNO-26 Add schemas map view to profiles (#86)
+06. SNO-29 Limit audits on form update (#87)
+07. SNO-19 Update DOI preferred resolver url (#80)
+
 1.0.4:
 -SNO-15 Add index to storage propertysheet
 -SNO-14 Update delete script
