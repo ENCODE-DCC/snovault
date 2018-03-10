@@ -101,7 +101,7 @@ def test_indexing_simple(testapp, indexer_testapp):
 
 
 def test_indexer_state(dummy_request):
-    from snovault.elasticsearch.indexer import IndexerState
+    from snovault.elasticsearch.indexer_state import IndexerState
     INDEX = dummy_request.registry.settings['snovault.elasticsearch.index']
     es = dummy_request.registry['elasticsearch']
     state = IndexerState(es,INDEX)

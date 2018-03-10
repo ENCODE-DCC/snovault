@@ -10,8 +10,8 @@ indexer.processes = ${indexer_processes}
 [composite:indexer]
 use = config:base.ini#indexer
 
-[composite:fileindexer]
-use = config:base.ini#fileindexer
+[composite:regionindexer]
+use = config:base.ini#regionindexer
 
 [pipeline:main]
 pipeline =
