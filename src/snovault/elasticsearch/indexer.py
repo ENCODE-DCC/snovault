@@ -1,14 +1,12 @@
 from elasticsearch.exceptions import (
     ConflictError,
     ConnectionError,
-    NotFoundError,
     TransportError,
 )
 from pyramid.view import view_config
 from pyramid.settings import asbool
 from sqlalchemy.exc import StatementError
 from snovault import (
-    COLLECTIONS,
     DBSESSION,
     STORAGE
 )
@@ -24,7 +22,6 @@ from .interfaces import (
 from .indexer_state import (
     IndexerState,
     all_uuids,
-    all_types,
     SEARCH_MAX
 )
 from .simple_queue import SimpleUuidServer
@@ -34,8 +31,6 @@ import logging
 import pytz
 import time
 import copy
-import json
-import requests
 
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
@@ -258,7 +253,7 @@ def index(request):
         if record:
             try:
                 es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
-            except:
+            except Exception as exc:
                 error_messages = copy.deepcopy(result['errors'])
                 del result['errors']
                 es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
