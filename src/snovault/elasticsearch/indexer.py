@@ -248,15 +248,8 @@ def index(request):
 
         # Do the work...
 
-        errors, err_msg = indexer.serve_objects(
-            request,
-            invalidated,
-            xmin,
-            snapshot_id=snapshot_id,
-            restart=restart,
-        )
-        if err_msg:
-            log.warning('Could not start indexing: %s', err_msg)
+        errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
+
         result = state.finish_cycle(result,errors)
 
         if errors:
