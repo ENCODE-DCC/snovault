@@ -5,6 +5,8 @@ import boto3
 import json
 import math
 import logging
+import socket
+import time
 from pyramid.view import view_config
 from .interfaces import INDEXER_QUEUE
 from .indexer_utils import (
@@ -64,15 +66,31 @@ def queue_indexing(request):
 
 class QueueManager(object):
     def __init__(self, registry):
-        self.env_name = registry.settings.get('env.name', 'fourfront-backup')
+        self.uuid_threshold = 100  # maximum number of uuids in a message
+        self.env_name = registry.settings.get('env.name')
+        # local development
+        if not self.env_name:
+            backup = socket.gethostname()
+            # last case scenario
+            self.env_name = backup if backup else 'fourfront-backup'
         self.queue_attrs = {
-            'VisibilityTimeout': '3600',  # 1 hour, in seconds
+            'VisibilityTimeout': '120',  # should this be 1 hour?
             'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
-            'ReceiveMessageWaitTimeSeconds': '2'  # 2 seconds of long polling
+            'ReceiveMessageWaitTimeSeconds': '3',  # 3 seconds of long polling
         }
         self.client = boto3.client('sqs')
         self.queue_name = self.env_name + '-indexer-queue'
-        self.queue_url = self.init_queue()
+        self.dlq_name = self.queue_name + '-dlq'
+        self.dlq_url = self.init_queue(self.dlq_name)
+        if self.dlq_url:
+            dlq_arn = self.get_queue_arn(self.dlq_url)
+            redrive_policy = {  # maintain this order of settings
+                'deadLetterTargetArn': dlq_arn,
+                'maxReceiveCount': 4  # 4 fails in the queue will send to dlq
+            }
+            self.queue_attrs['RedrivePolicy'] = json.dumps(redrive_policy)
+        self.queue_url = self.init_queue(self.queue_name)
+
 
 
     def add_uuids(self, registry, uuids, strict=False):
@@ -83,6 +101,11 @@ class QueueManager(object):
 
         Returns a list of queued uuids and a list of any uuids that failed to
         be queued.
+
+        NOTE: using find_uuids_for_indexing is smart, since it uses ES to find
+        all items that either embed or link this uuid. If items are not yet
+        indexed, they won't be queued for possibly redudanct re-indexing
+        (those items should be independently queued)
         """
         if not strict:
             uuids = set(uuids)
@@ -92,7 +115,7 @@ class QueueManager(object):
             uuids_to_index = uuids
         timestamp = index_timestamp()
         failed = self.send_messages(uuids_to_index, timestamp)
-        log.warning('\n___QUEUED %s ITEMS___:\n' % (len(uuids_to_index)))
+        log.info('\n___QUEUED %s ITEMS___\n' % (len(uuids_to_index)))
         return uuids_to_index, failed
 
 
@@ -114,64 +137,107 @@ class QueueManager(object):
             uuids_to_index = list(uuids)
         timestamp = index_timestamp()
         failed = self.send_messages(uuids_to_index, timestamp)
-        log.warning('\n___QUEUED %s ITEMS___:\n' % (len(uuids_to_index)))
+        log.warning('\n___QUEUED %s ITEMS___\n' % (len(uuids_to_index)))
         return uuids_to_index, failed
 
 
-    def get_queue_url(self):
+    def get_queue_url(self, queue_name):
         """
         Simple function that returns url of associated queue name
         """
 
         try:
             response = self.client.get_queue_url(
-                QueueName=self.queue_name
+                QueueName=queue_name
             )
         except:
             response = {}
         return response.get('QueueUrl')
 
 
-    def init_queue(self):
+    def get_queue_arn(self, queue_url):
+        """
+        Get the ARN of the specified queue
+        """
+        response = self.client.get_queue_attributes(
+            QueueUrl=queue_url,
+            AttributeNames=['QueueArn']
+        )
+        return response['Attributes']['QueueArn']
+
+
+    def init_queue(self, queue_name):
         """
         Initialize the queue that is used by this manager.
-        For now, this is an AWS SQS queue, with a DLQ associated.
-        Define relevant settings in this function.
+        For now, this is an AWS SQS standard queue.
+        Will use whatever attributes are defined within self.attributes.
 
         Returns a queue url that is guaranteed to link to the right queue.
         """
-        queue_url = self.get_queue_url()
-        should_init = False
-        if not queue_url:
-            should_init = True
-        else:  # see if current settings are up to date
-            try:
-                curr_attrs = self.client.get_queue_attributes(
-                    QueueUrl=queue_url,
-                    AttributeNames=list(self.queue_attrs.keys())
-                )
-            except:
-                should_init = True
+        queue_url = self.get_queue_url(queue_name)
+        should_init = True
+        if queue_url:  # see if current settings are up to date
+            curr_attrs = self.client.get_queue_attributes(
+                QueueUrl=queue_url,
+                AttributeNames=list(self.queue_attrs.keys())
+            ).get('Attributes', {})
+            # must remove JSON formatting from redrivePolicy to compare
+            compare_attrs = self.queue_attrs.copy()
+            if 'RedrivePolicy' in compare_attrs:
+                compare_attrs['RedrivePolicy'] = json.loads(compare_attrs['RedrivePolicy'])
+            if 'RedrivePolicy' in curr_attrs:
+                curr_attrs['RedrivePolicy'] = json.loads(curr_attrs['RedrivePolicy'])
+            if compare_attrs == curr_attrs:
+                should_init = False
             else:
-                should_init = self.queue_attrs != curr_attrs['Attributes']  # init if attrs off
+                # NOTE: you must wait 60 seconds before re-creating a queue
+                self.delete_queue(queue_url)
         if should_init:
-            response = self.client.create_queue(
-                QueueName=self.queue_name,
-                Attributes=self.queue_attrs
-            )
-            queue_url = response['QueueUrl']
+            for backoff in [30, 30, 10, 20, 30]:  # totally arbitrary
+                try:
+                    response = self.client.create_queue(
+                        QueueName=queue_name,
+                        Attributes=self.queue_attrs
+                    )
+                except self.client.exceptions.QueueDeletedRecently:
+                    log.warning('\n___MUST WAIT TO CREATE QUEUE FOR %ss___\n' % str(backoff))
+                    time.sleep(backoff)
+                else:
+                    log.warning('\n___CREATED QUEUE WITH NAME %s___\n' % queue_name)
+                    queue_url = response['QueueUrl']
+                    break
         return queue_url
 
 
     def clear_queue(self):
         """
-        Clear out the queue completely. You can no longer retrieve these
-        messages. Takes up to 60 seconds.
+        Clear out the queue and dlq completely. You can no longer retrieve
+        these messages. Takes up to 60 seconds.
         """
-        response = self.client.purge_queue(
-            QueueUrl=self.queue_url
+        for queue_url in [self.queue_url, self.dlq_url]:
+            self.client.purge_queue(
+                QueueUrl=queue_url
+            )
+
+
+    def delete_queue(self, queue_url):
+        """
+        Remove the SQS queue with given queue_url from AWS
+        Should really only be needed for local development.
+        """
+        response = self.client.delete_queue(
+            QueueUrl=queue_url
         )
+        self.queue_url = None
         return response
+
+
+    def chunk_messages(self, messages, chunksize):
+        """
+        Chunk a given number of messages into chunks of given chunksize
+        """
+        for i in range(0, len(messages), chunksize):
+            yield messages[i:i + chunksize]
 
 
     def send_messages(self, messages, timestamp):
@@ -184,19 +250,20 @@ class QueueManager(object):
         Returns Ids of failed messages, in form uuid-timestamp.
         """
         failed = []
-        for n in range(int(math.ceil(len(messages) / 10))):  # 10 messages per batch
-            batch = messages[n*10:n*10+10]
+        # we can handle 10 * self.uuid_threshold number of messages per go
+        for total_batch in self.chunk_messages(messages, self.uuid_threshold * 10):
             entries = []
-            for batch_msg in batch:
-                entry = {
-                    'Id': '_'.join([batch_msg, str(timestamp)]),
-                    'MessageBody': batch_msg
-                }
-                entries.append(entry)
+            for msg_batch in self.chunk_messages(total_batch, self.uuid_threshold):
+                entries.append({
+                    'Id': str(timestamp),
+                    'MessageBody': ','.join(msg_batch)
+                })
             response = self.client.send_message_batch(
                 QueueUrl=self.queue_url,
                 Entries=entries
             )
+            log.warn('___SENT %s UUIDs OVER %s MESSAGES___' % (len(total_batch), len(entries)))
+            self.stored_uuids = self.stored_uuids[self.uuid_threshold:]
             failed.extend(response.get('Failed', []))
         return failed
 
@@ -268,6 +335,7 @@ class QueueManager(object):
         """
         Returns a dict with number of waiting messages in the queue and
         number of inflight (i.e. not currently visible) messages.
+        Also returns info on items in the dlq.
         """
         response = self.client.get_queue_attributes(
             QueueUrl=self.queue_url,
@@ -276,8 +344,17 @@ class QueueManager(object):
                 'ApproximateNumberOfMessagesNotVisible'
             ]
         )
+        dlq_response = self.client.get_queue_attributes(
+            QueueUrl=self.dlq_url,
+            AttributeNames=[
+                'ApproximateNumberOfMessages',
+                'ApproximateNumberOfMessagesNotVisible'
+            ]
+        )
         formatted = {
             'waiting': response.get('Attributes', {}).get('ApproximateNumberOfMessages'),
-            'inflight': response.get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible')
+            'inflight': response.get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible'),
+            'dlq_waiting': dlq_response.get('Attributes', {}).get('ApproximateNumberOfMessages'),
+            'dlq_inflight': dlq_response.get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible')
         }
         return formatted

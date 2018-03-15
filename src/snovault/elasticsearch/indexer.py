@@ -76,6 +76,9 @@ def index(request):
         index_finish_time = datetime.datetime.now()
         indexing_record['indexing_finished'] = index_finish_time.isoformat()
         indexing_record['indexing_elapsed'] = str(index_finish_time - index_start_time)
+        print('_____TIME ELAPSED_____\n\n')
+        print(indexing_record['indexing_elapsed'] )
+        print('_____________________\n\n')
         # indexing_record['indexed'] = len(invalidated)
         indexing_record['indexing_status'] = 'finished'
 
@@ -116,14 +119,22 @@ class Indexer(object):
         print('%s messages to go!' % len(messages))
         while len(messages) > 0:
             for msg in messages:
-                # msg['Body'] is just a uuid string at the moment
-                error = self.update_object(request, msg['Body'])
-                if error is not None:
-                    errors.append(error)
-                count += 1
-                print('Finished %s' % count)
-                if (count) % 50 == 0:
-                    log.info('Indexing %d (queued)', count)
+                # msg['Body'] is just a string of uuids joined by commas
+                for msg_uuid in msg['Body'].split(','):
+                    error = self.update_object(request, msg_uuid)
+                    if error is not None:
+                        errors.append(error)
+                    count += 1
+                    if (count) % 50 == 0:
+                        log.info('Indexing %d (queued)', count)
+            # for msg in messages:
+            #     # msg['Body'] is just a uuid string at the moment
+            #     error = self.update_object(request, msg['Body'])
+            #     if error is not None:
+            #         errors.append(error)
+            #     count += 1
+            #     if (count) % 50 == 0:
+            #         log.info('Indexing %d (queued)', count)
             self.queue.delete_messages(messages)
             messages = self.queue.recieve_messages()
         return errors
