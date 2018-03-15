@@ -263,7 +263,6 @@ class QueueManager(object):
                 Entries=entries
             )
             log.warn('___SENT %s UUIDs OVER %s MESSAGES___' % (len(total_batch), len(entries)))
-            self.stored_uuids = self.stored_uuids[self.uuid_threshold:]
             failed.extend(response.get('Failed', []))
         return failed
 
