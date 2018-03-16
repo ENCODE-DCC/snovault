@@ -128,7 +128,6 @@ class Indexer(object):
         Used with the queue
         """
         errors = []
-        count = 0
         messages = self.queue.recieve_messages()  # long polling used in SQS
         while len(messages) > 0:
             for msg in messages:
@@ -137,9 +136,6 @@ class Indexer(object):
                     error = self.update_object(request, msg_uuid)
                     if error is not None:
                         errors.append(error)
-                    count += 1
-                    if (count) % 50 == 0:
-                        log.info('Indexing %d (queue)', count)
             self.queue.delete_messages(messages)
             messages = self.queue.recieve_messages()
         return errors
@@ -155,8 +151,6 @@ class Indexer(object):
             error = self.update_object(request, uuid)
             if error is not None:
                 errors.append(error)
-            if (i + 1) % 50 == 0:
-                log.info('Indexing %d (sync)', i + 1)
         return errors
 
 

@@ -139,10 +139,12 @@ class MPIndexer(Indexer):
             errors = []
             # imap_unordered to hopefully shuffle item types and come up with
             # a more or less equal workload for each process
-            for error in pool.imap_unordered(
-                sync_update_helper, sync_uuids, chunkiness):
+            for i, error in enumerate(pool.imap_unordered(
+                sync_update_helper, sync_uuids, chunkiness)):
                 if error is not None:
                     errors.append(error)
+                if (i + 1) % 50 == 0:
+                    log.info('Indexing %d (sync)', i + 1)
         else:
             for i in range(workers):
                 pool.apply_async(queue_update_helper, callback=queue_error_callback)
