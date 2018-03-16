@@ -215,9 +215,12 @@ class QueueManager(object):
         these messages. Takes up to 60 seconds.
         """
         for queue_url in [self.queue_url, self.dlq_url]:
-            self.client.purge_queue(
-                QueueUrl=queue_url
-            )
+            try:
+                self.client.purge_queue(
+                    QueueUrl=queue_url
+                )
+            except self.client.exceptions.PurgeQueueInProgress:
+                log.warning('\n___QUEUE IS ALREADY BEING PURGED: %s___\n' % queue_url)
 
 
     def delete_queue(self, queue_url):

@@ -4,7 +4,6 @@ from elasticsearch.exceptions import (
     TransportError,
 )
 from pyramid.view import view_config
-from sqlalchemy.exc import StatementError
 from urllib3.exceptions import ReadTimeoutError
 from .interfaces import (
     ELASTIC_SEARCH,
@@ -43,10 +42,6 @@ def index(request):
         log.debug("Skipping indexing since this machine is not set to index.")
         return {}
 
-    # indexing is either run with forced uuids passed through the request
-    # (which is synchronous) OR uuids from the queue (see Indexer class)
-    forced_uuids = request.json.get('uuids', None)
-
     # log.debug("Indexing %s total items; %s primary items" %
     #          (str(len(invalidated)), str(len(updated))))
     if not dry_run:
@@ -65,14 +60,9 @@ def index(request):
                 es.index(index='meta', doc_type='meta', body=indexing_record, id=index_start_str)
             except:
                 log.error('Could not initialize indexing record for %s.', index_start_str)
-
         indexing_record['indexing_started'] = index_start_str
         # actually index
-        if forced_uuids:
-            errors = indexer.update_objects_forced(request, forced_uuids)
-        else:
-            errors = indexer.update_objects_queued(request)
-        indexing_record['errors'] = errors
+        indexing_record['errors'] = indexer.update_objects(request)
         index_finish_time = datetime.datetime.now()
         indexing_record['indexing_finished'] = index_finish_time.isoformat()
         indexing_record['indexing_elapsed'] = str(index_finish_time - index_start_time)
@@ -109,7 +99,22 @@ class Indexer(object):
         self.es = registry[ELASTIC_SEARCH]
         self.queue = registry[INDEXER_QUEUE]
 
-    def update_objects_queued(self, request):
+    def update_objects(self, request):
+        """
+        Top level update routing
+        """
+        print('----->')
+        # indexing is either run with sync uuids passed through the request
+        # (which is synchronous) OR uuids from the queue
+        sync_uuids = request.json.get('uuids', None)
+        # actually index
+        if sync_uuids:
+            errors = self.update_objects_sync(request, sync_uuids)
+        else:
+            errors = self.update_objects_queue(request)
+
+
+    def update_objects_queue(self, request):
         """
         Used with the queue
         """
@@ -126,32 +131,24 @@ class Indexer(object):
                         errors.append(error)
                     count += 1
                     if (count) % 50 == 0:
-                        log.info('Indexing %d (queued)', count)
-            # for msg in messages:
-            #     # msg['Body'] is just a uuid string at the moment
-            #     error = self.update_object(request, msg['Body'])
-            #     if error is not None:
-            #         errors.append(error)
-            #     count += 1
-            #     if (count) % 50 == 0:
-            #         log.info('Indexing %d (queued)', count)
+                        log.info('Indexing %d (queue)', count)
             self.queue.delete_messages(messages)
             messages = self.queue.recieve_messages()
         return errors
 
 
-    def update_objects_forced(self, request, forced_uuids):
+    def update_objects_sync(self, request, sync_uuids):
         """
-        Used with forced uuids (simply loop through)
-        forced_uuids is a list of string uuids. Use timestamp of index run
+        Used with sync uuids (simply loop through)
+        sync_uuids is a list of string uuids. Use timestamp of index run
         """
         errors = []
-        for i, uuid in enumerate(forced_uuids):
+        for i, uuid in enumerate(sync_uuids):
             error = self.update_object(request, uuid)
             if error is not None:
                 errors.append(error)
             if (i + 1) % 50 == 0:
-                log.info('Indexing %d (forced)', i + 1)
+                log.info('Indexing %d (sync)', i + 1)
         return errors
 
 
@@ -160,16 +157,13 @@ class Indexer(object):
         timestamp = index_timestamp()
         try:
             result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
-        except StatementError:
-            # Can't reconnect until invalid transaction is rolled back
-            raise
         except Exception as e:
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
         last_exc = None
-        for backoff in [0, 10, 20, 40, 80]:
+        for backoff in [0, 1, 2, 3]:
             time.sleep(backoff)
-            # timestamp from the queue or /index call (for forced uuids)
+            # timestamp from the queue or /index call (for sync uuids)
             # is used as the version number
             try:
                 self.es.index(
@@ -177,9 +171,6 @@ class Indexer(object):
                     id=str(uuid), version=timestamp, version_type='external_gt',
                     request_timeout=30
                 )
-            except StatementError:
-                # Can't reconnect until invalid transaction is rolled back
-                raise
             except ConflictError:
                 log.warning('Conflict indexing %s at version %d', uuid, timestamp)
                 return
