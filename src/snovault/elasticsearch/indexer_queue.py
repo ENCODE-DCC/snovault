@@ -79,7 +79,7 @@ class QueueManager(object):
             'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
             'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
         }
-        self.client = boto3.client('sqs')
+        self.client = boto3.client('sqs', region_name='us-east-1')
         self.queue_name = self.env_name + '-indexer-queue'
         self.dlq_name = self.queue_name + '-dlq'
         # code below can cause SQS deletion/creation
