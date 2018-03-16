@@ -2,7 +2,6 @@ from snovault import DBSESSION
 from contextlib import contextmanager
 from multiprocessing import get_context
 from multiprocessing.pool import Pool
-from pyramid.decorator import reify
 from pyramid.request import apply_request_extensions
 from pyramid.threadlocal import (
     get_current_request,
@@ -10,7 +9,6 @@ from pyramid.threadlocal import (
 )
 import atexit
 import logging
-import time
 import transaction
 from .indexer import (
     INDEXER,
@@ -22,7 +20,7 @@ from .interfaces import (
 )
 
 log = logging.getLogger(__name__)
-
+queue_errors = []
 
 def includeme(config):
     if config.registry.settings.get('indexer_worker'):
@@ -88,10 +86,14 @@ def sync_update_helper(uuid):
 
 
 def queue_update_helper():
-    with threadlocal_manager:
+    with threadlocal_manager():
         request = get_current_request()
         indexer = request.registry[INDEXER]
         return indexer.update_objects_queue(request)
+
+
+def queue_error_callback(error):
+    queue_errors.extend(error)
 
 ### Running in main process
 
@@ -105,34 +107,47 @@ class MPIndexer(Indexer):
         # to free memory
         self.maxtasks = 1
 
-    @reify
-    def pool(self):
+    def init_pool(self):
         return Pool(
             processes=self.processes,
             initializer=initializer,
             initargs=self.initargs,
             maxtasksperchild=self.maxtasks,
-            context=get_context('forkserver'),
+            context=get_context('fork'),  # maybe should this be 'forkserver'?
         )
 
     def update_objects(self, request):
+        """
+        Initializes a multiprocessing pool with args given in __init__ and
+        indexes in one of two mode: synchronous or queued.
+        If a list of uuids is passed in the request, sync indexing will occur,
+        breaking the list up among all available workers in the pool.
+        Otherwise, all available workers will asynchronously pull uuids of the
+        queue for indexing (see indexer.py).
+        Close the pool at the end of the function and return list of errors.
+        """
+        pool = self.init_pool()
         sync_uuids = request.json.get('uuids', None)
+        workers = pool._processes if self.processes is None else self.processes
+        # ensure workers != 0
+        workers = 1 if workers == 0 else workers
         if sync_uuids:
             # determine how many uuids should be used for each process
-            workers = self.pool._processes if self.processes is None else self.processes
             chunkiness = int((len(sync_uuids) - 1) / workers) + 1
             if chunkiness > self.chunksize:
                 chunkiness = self.chunksize
             errors = []
             # imap_unordered to hopefully shuffle item types and come up with
             # a more or less equal workload for each process
-            for error in self.pool.imap_unordered(
+            for error in pool.imap_unordered(
                 sync_update_helper, sync_uuids, chunkiness):
                 if error is not None:
                     errors.append(error)
-            log.warn('___ERRORS (ASYNC): %s' % str(errors))
         else:
-            errors = [self.pool.apply_async(queue_update_helper).get()]
-        self.pool.close()
-        self.pool.join()
+            for i in range(workers):
+                pool.apply_async(queue_update_helper, callback=queue_error_callback)
+            # queue_errors is global list of errors
+            errors = queue_errors
+        pool.close()
+        pool.join()
         return errors

@@ -856,7 +856,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     # keep a set of all uuids to be reindexed, which occurs after all indices
     # are created
     uuids_to_index = set()
-    total_reindex = collections == None
+    total_reindex = (collections == None and not dry_run and not check_first and not index_diff)
     if not dry_run:
         snovault_cleanup(es, registry)
     if not collections:
@@ -872,12 +872,13 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
                         dry_run, check_first, index_diff, print_count_only)
         else:
             mapping = create_mapping_by_type(collection_name, registry)
-            log.warning('\n___MAPPING MADE FOR %s___\n' % (collection_name))
             build_index(app, es, collection_name, mapping, uuids_to_index,
                         dry_run, check_first, index_diff, print_count_only)
-            log.warning('\n___INDEX MADE FOR %s___\n' % (collection_name))
-    log.warning('\n___UUIDS TO INDEX___: %s\n' % (len(uuids_to_index)))
+            log.warning('___Finished %s___\n' % (collection_name))
     log.warning('\n___ES INDICES (POST-MAPPING)___:\n %s\n' % (str(es.cat.indices())))
+    log.warning('\n___FINISHED CREATE-MAPPING___\n')
+    if skip_indexing:
+        return
 
     # clear the indexer queue on a total reindex
     if total_reindex:
@@ -889,12 +890,12 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             uuids_to_index = find_uuids_for_indexing(registry, uuids_to_index, log)
         # only index (synchronously) if --sync-index option is used
         if sync_index:
-            log.warning("MAPPING: indexing %s items" % (str(len(uuids_to_index))))
+            log.warning('\n___UUIDS TO INDEX (SYNC)___: %s\n' % (len(uuids_to_index)))
             run_indexing(app, uuids_to_index)
         else:
-            log.warning("MAPPING: queueing %s items for reindexing" % (str(len(uuids_to_index))))
+            log.warning('\n___UUIDS TO INDEX (QUEUED)___: %s\n' % (len(uuids_to_index)))
             indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True)
-    log.warning('\n___FINISHED CREATE-MAPPING___\n')
+
 
 
 def main():

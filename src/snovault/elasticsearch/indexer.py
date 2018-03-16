@@ -21,7 +21,6 @@ log = logging.getLogger(__name__)
 
 def includeme(config):
     config.add_route('index', '/index')
-
     config.scan(__name__)
     registry = config.registry
     if registry.settings.get('indexer'):
@@ -54,6 +53,17 @@ def index(request):
             'indexing_status': 'started',
             # 'to_index': len(invalidated)
         }
+
+        # get info on what actually is being indexed
+        indexing_content = {
+            'type': 'sync' if request.json.get('uuids') else 'queue',
+        }
+        if indexing_content['type'] == 'sync':
+            indexing_content['sync_uuids'] = len(request.json.get('uuids'))
+        else:
+            indexing_content['initial_queue_status'] = indexer.queue.number_of_messages()
+        indexing_record['indexing_content'] = indexing_content
+
         # initially index the indexing record
         if record:
             try:
@@ -66,10 +76,10 @@ def index(request):
         index_finish_time = datetime.datetime.now()
         indexing_record['indexing_finished'] = index_finish_time.isoformat()
         indexing_record['indexing_elapsed'] = str(index_finish_time - index_start_time)
-        print('_____TIME ELAPSED_____\n\n')
-        print(indexing_record['indexing_elapsed'] )
-        print('_____________________\n\n')
-        # indexing_record['indexed'] = len(invalidated)
+        log.warning('___INDEXING FINISHED IN %s___' % indexing_record['indexing_elapsed'])
+        # update record with final queue snapshot
+        if indexing_content['type'] == 'queue':
+            indexing_content['finished_queue_status'] = indexer.queue.number_of_messages()
         indexing_record['indexing_status'] = 'finished'
 
         if record:
@@ -103,7 +113,6 @@ class Indexer(object):
         """
         Top level update routing
         """
-        print('----->')
         # indexing is either run with sync uuids passed through the request
         # (which is synchronous) OR uuids from the queue
         sync_uuids = request.json.get('uuids', None)
@@ -121,7 +130,6 @@ class Indexer(object):
         errors = []
         count = 0
         messages = self.queue.recieve_messages()  # long polling used in SQS
-        print('%s messages to go!' % len(messages))
         while len(messages) > 0:
             for msg in messages:
                 # msg['Body'] is just a string of uuids joined by commas

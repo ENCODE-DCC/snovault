@@ -8,6 +8,7 @@ import logging
 import socket
 import time
 from pyramid.view import view_config
+from pyramid.decorator import reify
 from .interfaces import INDEXER_QUEUE
 from .indexer_utils import (
     find_uuids_for_indexing,
@@ -66,7 +67,7 @@ def queue_indexing(request):
 
 class QueueManager(object):
     def __init__(self, registry):
-        self.uuid_threshold = 100  # maximum number of uuids in a message
+        self.uuid_threshold = 1  # maximum number of uuids in a message
         self.env_name = registry.settings.get('env.name')
         # local development
         if not self.env_name:
@@ -74,15 +75,19 @@ class QueueManager(object):
             # last case scenario
             self.env_name = backup if backup else 'fourfront-backup'
         self.queue_attrs = {
-            'VisibilityTimeout': '120',  # should this be 1 hour?
+            'VisibilityTimeout': '120',  # increase if messages going to dlq
             'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
-            'ReceiveMessageWaitTimeSeconds': '3',  # 3 seconds of long polling
+            'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
         }
         self.client = boto3.client('sqs')
         self.queue_name = self.env_name + '-indexer-queue'
         self.dlq_name = self.queue_name + '-dlq'
+        # code below can cause SQS deletion/creation
+        # if run from MPIndexer, will work, but not gracefully.
+        # changes to queue config should be followed by running create_mapping
         self.dlq_url = self.init_queue(self.dlq_name)
         if self.dlq_url:
+            # update queue_attrs with dlq info
             dlq_arn = self.get_queue_arn(self.dlq_url)
             redrive_policy = {  # maintain this order of settings
                 'deadLetterTargetArn': dlq_arn,
@@ -90,8 +95,6 @@ class QueueManager(object):
             }
             self.queue_attrs['RedrivePolicy'] = json.dumps(redrive_policy)
         self.queue_url = self.init_queue(self.queue_name)
-
-
 
     def add_uuids(self, registry, uuids, strict=False):
         """
@@ -113,11 +116,8 @@ class QueueManager(object):
             uuids_to_index = list(uuids_to_index)
         else:
             uuids_to_index = uuids
-        timestamp = index_timestamp()
-        failed = self.send_messages(uuids_to_index, timestamp)
-        log.info('\n___QUEUED %s ITEMS___\n' % (len(uuids_to_index)))
+        failed = self.send_messages(uuids_to_index)
         return uuids_to_index, failed
-
 
     def add_collections(self, registry, collections, strict=False):
         """
@@ -129,17 +129,14 @@ class QueueManager(object):
         be queued.
         """
         ### IS THIS USING DATASTORE HERE?
-        uuids = get_uuids_for_types(registry, collections)
+        uuids = set(get_uuids_for_types(registry, collections))
         if not strict:
             uuids_to_index = find_uuids_for_indexing(registry, uuids, log)
             uuids_to_index = list(uuids_to_index)
         else:
             uuids_to_index = list(uuids)
-        timestamp = index_timestamp()
-        failed = self.send_messages(uuids_to_index, timestamp)
-        log.warning('\n___QUEUED %s ITEMS___\n' % (len(uuids_to_index)))
+        failed = self.send_messages(uuids_to_index)
         return uuids_to_index, failed
-
 
     def get_queue_url(self, queue_name):
         """
@@ -154,7 +151,6 @@ class QueueManager(object):
             response = {}
         return response.get('QueueUrl')
 
-
     def get_queue_arn(self, queue_url):
         """
         Get the ARN of the specified queue
@@ -164,7 +160,6 @@ class QueueManager(object):
             AttributeNames=['QueueArn']
         )
         return response['Attributes']['QueueArn']
-
 
     def init_queue(self, queue_name):
         """
@@ -208,7 +203,6 @@ class QueueManager(object):
                     break
         return queue_url
 
-
     def clear_queue(self):
         """
         Clear out the queue and dlq completely. You can no longer retrieve
@@ -222,7 +216,6 @@ class QueueManager(object):
             except self.client.exceptions.PurgeQueueInProgress:
                 log.warning('\n___QUEUE IS ALREADY BEING PURGED: %s___\n' % queue_url)
 
-
     def delete_queue(self, queue_url):
         """
         Remove the SQS queue with given queue_url from AWS
@@ -234,7 +227,6 @@ class QueueManager(object):
         self.queue_url = None
         return response
 
-
     def chunk_messages(self, messages, chunksize):
         """
         Chunk a given number of messages into chunks of given chunksize
@@ -242,15 +234,14 @@ class QueueManager(object):
         for i in range(0, len(messages), chunksize):
             yield messages[i:i + chunksize]
 
-
-    def send_messages(self, messages, timestamp):
+    def send_messages(self, messages):
         """
         Send any number of 'messages' in a list.
-        Can batch up to 10 messages. For now, one item per message.
-        messages argument should be a list of Python messages.
-        For now, messages are a list of uuids.
-        MessageId is just uuid+timestamp.
-        Returns Ids of failed messages, in form uuid-timestamp.
+        Can batch up to 10 messages. For now, one item per message...
+        This is easily controlled by self.uuid_threshold.
+
+        messages argument should be a list of uuid strings.
+        Returns information on messages that failed to queue
         """
         failed = []
         # we can handle 10 * self.uuid_threshold number of messages per go
@@ -258,17 +249,15 @@ class QueueManager(object):
             entries = []
             for msg_batch in self.chunk_messages(total_batch, self.uuid_threshold):
                 entries.append({
-                    'Id': str(timestamp),
+                    'Id': str(index_timestamp()),
                     'MessageBody': ','.join(msg_batch)
                 })
             response = self.client.send_message_batch(
                 QueueUrl=self.queue_url,
                 Entries=entries
             )
-            log.warn('___SENT %s UUIDs OVER %s MESSAGES___' % (len(total_batch), len(entries)))
             failed.extend(response.get('Failed', []))
         return failed
-
 
     def recieve_messages(self):
         """
@@ -282,7 +271,6 @@ class QueueManager(object):
         )
         # messages in response include ReceiptHandle and Body, most importantly
         return response.get('Messages', [])
-
 
     def delete_messages(self, messages):
         """
@@ -310,7 +298,6 @@ class QueueManager(object):
             failed.extend(response.get('Failed', []))
         return failed
 
-
     def replace_message(self, messages):
         """
         Called using received messages to place them back on the queue.
@@ -331,7 +318,6 @@ class QueueManager(object):
             )
             failed.extend(response.get('Failed', []))
         return failed
-
 
     def number_of_messages(self):
         """
