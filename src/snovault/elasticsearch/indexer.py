@@ -37,12 +37,6 @@ def index(request):
     dry_run = request.json.get('dry_run', False)  # if True, do not actually index
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
-    if not indexer:
-        log.debug("Skipping indexing since this machine is not set to index.")
-        return {}
-
-    # log.debug("Indexing %s total items; %s primary items" %
-    #          (str(len(invalidated)), str(len(updated))))
     if not dry_run:
         index_start_time = datetime.datetime.now()
         index_start_str = index_start_time.isoformat()
@@ -51,7 +45,6 @@ def index(request):
         indexing_record = {
             'uuid': index_start_str,
             'indexing_status': 'started',
-            # 'to_index': len(invalidated)
         }
 
         # get info on what actually is being indexed
