@@ -6,7 +6,6 @@ Example.
 """
 
 from webtest import TestApp
-from snovault import STORAGE
 from snovault.elasticsearch import ELASTIC_SEARCH
 import atexit
 import datetime
@@ -15,9 +14,7 @@ import json
 import logging
 import os
 import psycopg2
-import select
 import signal
-import socket
 import sqlalchemy.exc
 import sys
 import threading
@@ -27,7 +24,7 @@ from urllib.parse import parse_qsl
 log = logging.getLogger(__name__)
 
 EPILOG = __doc__
-DEFAULT_TIMEOUT = 60
+DEFAULT_INTERVAL = 15  # 15 seconds default
 PY2 = sys.version_info[0] == 2
 
 # We need this because of MVCC visibility.
@@ -35,15 +32,14 @@ PY2 = sys.version_info[0] == 2
 # https://devcenter.heroku.com/articles/postgresql-concurrency
 
 
-def run(testapp, timeout=DEFAULT_TIMEOUT, dry_run=False, path='/index', control=None, update_status=None):
-
-    assert update_status is not None
-
+def run(testapp, interval=DEFAULT_INTERVAL, dry_run=False, path='/index', update_status=None):
+    log.warn('___INDEXER LISTENER STARTING___')
+    listening = False
     timestamp = datetime.datetime.now().isoformat()
     update_status(
-        status='connecting',
-        timestamp=timestamp,
-        timeout=timeout,
+        listening=listening,
+        status='indexing',
+        timestamp=timestamp
     )
 
     # Make sure elasticsearch is up before trying to index.
@@ -53,101 +49,34 @@ def run(testapp, timeout=DEFAULT_TIMEOUT, dry_run=False, path='/index', control=
         es = testapp.app.registry[ELASTIC_SEARCH]
     es.info()
 
-    max_xid = 0
-    DBSession = testapp.app.registry[STORAGE].write.DBSession
-    engine = DBSession.bind  # DBSession.bind is configured by app init
-    # noqa http://docs.sqlalchemy.org/en/latest/faq.html#how-do-i-get-at-the-raw-dbapi-connection-when-using-an-engine
-    connection = engine.pool.unique_connection()
-    try:
-        connection.detach()
-        conn = connection.connection
-        conn.autocommit = True
-        conn.set_session(readonly=True)
-        sockets = [conn]
-        if control is not None:
-            sockets.append(control)
-        recovery = None
-        listening = False
-        with conn.cursor() as cursor:
-            while True:
-                if not listening:
-                    # cannot execute LISTEN during recovery
-                    cursor.execute("""SELECT pg_is_in_recovery();""")
-                    recovery, = cursor.fetchone()
-                    if not recovery:
-                        # http://initd.org/psycopg/docs/advanced.html#asynchronous-notifications
-                        cursor.execute("""LISTEN "snovault.transaction";""")
-                        log.debug("Listener connected")
-                        listening = True
-
-                cursor.execute("""SELECT txid_current_snapshot();""")
-                snapshot, = cursor.fetchone()
-                timestamp = datetime.datetime.now().isoformat()
-                update_status(
-                    listening=listening,
-                    recovery=recovery,
-                    snapshot=snapshot,
-                    status='indexing',
-                    timestamp=timestamp,
-                    max_xid=max_xid,
-                )
-
-                try:
-                    res = testapp.post_json(path, {
-                        'record': True,
-                        'dry_run': dry_run,
-                        'recovery': recovery,
-                    })
-                except Exception as e:
-                    timestamp = datetime.datetime.now().isoformat()
-                    log.exception('index failed at max xid: %d', max_xid)
-                    update_status(error={
-                        'error': repr(e),
-                        'max_xid': max_xid,
-                        'timestamp': timestamp,
-                    })
-                else:
-                    timestamp = datetime.datetime.now().isoformat()
-                    result = res.json
-                    result['stats'] = {
-                        k: int(v) for k, v in parse_qsl(
-                            res.headers.get('X-Stats', ''))
-                    }
-                    result['timestamp'] = timestamp
-                    update_status(last_result=result)
-                    if result.get('indexed', 0):
-                        update_status(result=result)
-                        log.info(result)
-
-                update_status(
-                    status='waiting',
-                    timestamp=timestamp,
-                    max_xid=max_xid,
-                )
-                # Wait on notifcation
-                readable, writable, err = select.select(sockets, [], sockets, timeout)
-
-                if err:
-                    raise Exception('Socket error')
-
-                if control in readable:
-                    command = control.recv(1)
-                    log.debug('received command: %r', command)
-                    if not command:
-                        # Other end shutdown
-                        return
-
-                if conn in readable:
-                    conn.poll()
-
-                while conn.notifies:
-                    notify = conn.notifies.pop()
-                    xid = int(notify.payload)
-                    max_xid = max(max_xid, xid)
-                    log.debug('NOTIFY %s, %s', notify.channel, notify.payload)
-
-    finally:
-        connection.close()
+    # main listening loop
+    while True:
+        log.warn('___INDEXER LISTENER RUNNING___')
+        try:
+            res = testapp.post_json(path, {
+                'record': True,
+                'dry_run': dry_run
+            })
+        except Exception as e:
+            timestamp = datetime.datetime.now().isoformat()
+            log.exception('index failed')
+            update_status(error={
+                'error': repr(e),
+                'timestamp': timestamp,
+            })
+        else:
+            timestamp = datetime.datetime.now().isoformat()
+            result = res.json
+            result['stats'] = {
+                k: int(v) for k, v in parse_qsl(
+                    res.headers.get('X-Stats', ''))
+            }
+            result['timestamp'] = timestamp
+            update_status(last_result=result)
+            if result.get('indexing_status') == 'finished':
+                update_status(result=result)
+                log.warn('___INDEX LISTENER RESULT:___\n%s\n' % result)
+        time.sleep(interval)
 
 
 class ErrorHandlingThread(threading.Thread):
@@ -165,9 +94,8 @@ class ErrorHandlingThread(threading.Thread):
             return self._Thread__target
 
     def run(self):
-        timeout = self._kwargs.get('timeout', DEFAULT_TIMEOUT)
+        interval = self._kwargs.get('interval', DEFAULT_INTERVAL)
         update_status = self._kwargs['update_status']
-        control = self._kwargs['control']
         while True:
             try:
                 self._target(*self._args, **self._kwargs)
@@ -180,17 +108,8 @@ class ErrorHandlingThread(threading.Thread):
                     status='sleeping',
                     error={'error': repr(e), 'timestamp': timestamp},
                 )
-
-                readable, _, _ = select.select([control], [], [], timeout)
-                if control in readable:
-                    command = control.recv(1)
-                    log.debug('received command: %r', command)
-                    if not command:
-                        # Other end shutdown
-                        return
-
                 log.debug('sleeping')
-                time.sleep(timeout)
+                time.sleep(interval)
                 continue
             except Exception:
                 # Unfortunately mod_wsgi does not restart immediately
@@ -221,8 +140,6 @@ def composite(loader, global_conf, **settings):
     }
     testapp = TestApp(app, environ)
 
-    # Use sockets to integrate with select
-    controller, control = socket.socketpair()
 
     timestamp = datetime.datetime.now().isoformat()
     status_holder = {
@@ -246,12 +163,11 @@ def composite(loader, global_conf, **settings):
 
     kwargs = {
         'testapp': testapp,
-        'control': control,
         'update_status': update_status,
         'path': path,
     }
-    if 'timeout' in settings:
-        kwargs['timeout'] = float(settings['timeout'])
+    if 'interval' in settings:
+        kwargs['interval'] = float(settings['interval'])
 
     listener = ErrorHandlingThread(target=run, name='listener', kwargs=kwargs)
     listener.daemon = True
@@ -262,8 +178,6 @@ def composite(loader, global_conf, **settings):
     @atexit.register
     def shutdown_listener():
         log.debug('shutting down listening thread')
-        control  # Prevent early gc
-        controller.shutdown(socket.SHUT_RDWR)
 
     def status_app(environ, start_response):
         status = '200 OK'
@@ -302,7 +216,7 @@ def main():
     parser.add_argument(
         '-v', '--verbose', action='store_true', help="Print debug level logging")
     parser.add_argument(
-        '--poll-interval', type=int, default=DEFAULT_TIMEOUT,
+        '--poll-interval', type=int, default=DEFAULT_INTERVAL,
         help="Poll interval between notifications")
     parser.add_argument(
         '--path', default='/index',
