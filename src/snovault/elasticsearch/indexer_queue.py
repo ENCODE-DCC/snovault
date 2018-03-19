@@ -128,12 +128,12 @@ class QueueManager(object):
         be queued.
         """
         ### IS THIS USING DATASTORE HERE?
-        uuids = get_uuids_for_types(registry, collections)
+        uuids = list(get_uuids_for_types(registry, collections))
         if not strict:
             associated_uuids = find_uuids_for_indexing(registry, set(uuids), log)
             uuids_to_index = self.order_uuids_to_queue(uuids, list(associated_uuids))
         else:
-            uuids_to_index = list(uuids)
+            uuids_to_index = uuids
         failed = self.send_messages(uuids_to_index)
         return uuids_to_index, failed
 
@@ -351,5 +351,6 @@ class QueueManager(object):
         to be indexed, extends the first list with the second without
         introducting duplicates. Returns extended list
         """
+
         unique_to_add = [uuid for uuid in to_add if uuid not in original]
-        return original.extend(unique_to_add)
+        return original + unique_to_add
