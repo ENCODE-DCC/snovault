@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 
 def includeme(config):
     config.add_route('queue_indexing', '/queue_indexing')
+    config.add_route('indexing_status', '/indexing_status')
     config.registry[INDEXER_QUEUE] = QueueManager(config.registry)
     config.scan(__name__)
 
@@ -62,6 +63,24 @@ def queue_indexing(request):
     response['number_queued'] = len(queued)
     response['detail'] = 'Successfuly queued items!'
     response['errors'] = failed
+    return response
+
+
+@view_config(route_name='indexing_status', request_method='GET', permission="index")
+def indexing_status(request):
+    """
+    Endpoint to check what is currently on the queue. Uses GET requests
+    """
+    queue_indexer = request.registry[INDEXER_QUEUE]
+    response = {}
+    try:
+        numbers = queue_indexer.number_of_messages()
+    except Exception as e:
+        response['detail'] = str(e)
+        response['status'] = 'Failure'
+    else:
+        response['detail'] = numbers
+        response['status'] = 'Success'
     return response
 
 
