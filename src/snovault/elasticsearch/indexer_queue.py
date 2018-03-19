@@ -128,7 +128,7 @@ class QueueManager(object):
         be queued.
         """
         ### IS THIS USING DATASTORE HERE?
-        uuids = set(get_uuids_for_types(registry, collections))
+        uuids = get_uuids_for_types(registry, collections)
         if not strict:
             associated_uuids = find_uuids_for_indexing(registry, set(uuids), log)
             uuids_to_index = self.order_uuids_to_queue(uuids, list(associated_uuids))
