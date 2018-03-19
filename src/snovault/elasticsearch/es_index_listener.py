@@ -24,7 +24,7 @@ from urllib.parse import parse_qsl
 log = logging.getLogger(__name__)
 
 EPILOG = __doc__
-DEFAULT_INTERVAL = 15  # 15 seconds default
+DEFAULT_INTERVAL = 5  # 5 seconds default
 PY2 = sys.version_info[0] == 2
 
 # We need this because of MVCC visibility.
