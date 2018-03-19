@@ -7,8 +7,12 @@ def find_uuids_for_indexing(registry, updated, log=None):
     es = registry[ELASTIC_SEARCH]
     SEARCH_MAX = 99999  # OutOfMemoryError if too high
     """
-    Run a search to find uuids of objects with embedded uuids in updated
-    or linked uuids in renamed. Only runs over the given indices.
+    Run a search to find uuids of objects with that contain the given updated
+    uuids either in their linked_uuids or embedded_uuids. Only runs over the
+    given indices.
+    Returns a set containing original uuids and the found uuids.
+    If something goes wrong with the search or it's too large, return a set
+    of all uuids.
     """
     invalidated = set()
     referencing = set()

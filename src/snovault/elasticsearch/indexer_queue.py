@@ -111,9 +111,8 @@ class QueueManager(object):
         (those items should be independently queued)
         """
         if not strict:
-            uuids = set(uuids)
-            uuids_to_index = find_uuids_for_indexing(registry, uuids, log)
-            uuids_to_index = list(uuids_to_index)
+            associated_uuids = find_uuids_for_indexing(registry, set(uuids), log)
+            uuids_to_index = self.order_uuids_to_queue(uuids, list(associated_uuids))
         else:
             uuids_to_index = uuids
         failed = self.send_messages(uuids_to_index)
@@ -131,8 +130,8 @@ class QueueManager(object):
         ### IS THIS USING DATASTORE HERE?
         uuids = set(get_uuids_for_types(registry, collections))
         if not strict:
-            uuids_to_index = find_uuids_for_indexing(registry, uuids, log)
-            uuids_to_index = list(uuids_to_index)
+            associated_uuids = find_uuids_for_indexing(registry, set(uuids), log)
+            uuids_to_index = self.order_uuids_to_queue(uuids, list(associated_uuids))
         else:
             uuids_to_index = list(uuids)
         failed = self.send_messages(uuids_to_index)
@@ -142,7 +141,6 @@ class QueueManager(object):
         """
         Simple function that returns url of associated queue name
         """
-
         try:
             response = self.client.get_queue_url(
                 QueueName=queue_name
@@ -165,7 +163,7 @@ class QueueManager(object):
         """
         Initialize the queue that is used by this manager.
         For now, this is an AWS SQS standard queue.
-        Will use whatever attributes are defined within self.attributes.
+        Will use whatever attributes are defined within self.queue_attrs.
 
         Returns a queue url that is guaranteed to link to the right queue.
         """
@@ -346,3 +344,12 @@ class QueueManager(object):
             'dlq_inflight': dlq_response.get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible')
         }
         return formatted
+
+    def order_uuids_to_queue(self, original, to_add):
+        """
+        Given a list of original uuids and list of associated uuids that need
+        to be indexed, extends the first list with the second without
+        introducting duplicates. Returns extended list
+        """
+        unique_to_add = [uuid for uuid in to_add if uuid not in original]
+        return original.extend(unique_to_add)
