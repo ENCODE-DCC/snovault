@@ -56,13 +56,6 @@ def index(request):
         else:
             indexing_content['initial_queue_status'] = indexer.queue.number_of_messages()
         indexing_record['indexing_content'] = indexing_content
-
-        # initially index the indexing record
-        if record:
-            try:
-                es.index(index='meta', doc_type='meta', body=indexing_record, id=index_start_str)
-            except:
-                log.error('Could not initialize indexing record for %s.', index_start_str)
         indexing_record['indexing_started'] = index_start_str
         # actually index
         indexing_record['errors'] = indexer.update_objects(request)
@@ -74,6 +67,13 @@ def index(request):
         if indexing_content['type'] == 'queue':
             indexing_content['finished_queue_status'] = indexer.queue.number_of_messages()
         indexing_record['indexing_status'] = 'finished'
+
+        # with the index listener running more frequently, we don't want to
+        # store a ton of useless records. Only store records using the queue
+        # if the queue counts have changed. Use default 'record' settings for
+        # sync records or records with errors.
+        if record and indexing_content['type'] == 'queue' and not indexing_record['errors']:
+            record = indexing_content['initial_queue_status'] != indexing_content['finished_queue_status']
 
         if record:
             try:
