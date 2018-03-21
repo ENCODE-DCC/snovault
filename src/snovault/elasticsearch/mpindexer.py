@@ -2,6 +2,7 @@ from snovault import DBSESSION
 from contextlib import contextmanager
 from multiprocessing import get_context
 from multiprocessing.pool import Pool
+from functools import partial
 from pyramid.request import apply_request_extensions
 from pyramid.threadlocal import (
     get_current_request,
@@ -20,7 +21,6 @@ from .interfaces import (
 )
 
 log = logging.getLogger(__name__)
-queue_errors = []
 
 def includeme(config):
     if config.registry.settings.get('indexer_worker'):
@@ -36,7 +36,6 @@ def includeme(config):
 ### Running in subprocess
 
 app = None
-
 
 def initializer(app_factory, settings):
     """
@@ -79,6 +78,10 @@ def clear_manager(signum=None, frame=None):
 ### These helper functions are needed for multiprocessing
 
 def sync_update_helper(uuid):
+    """
+    Used with synchronous indexing. Counter is controlled at a higher level
+    (MPIndexer.update_objects)
+    """
     with threadlocal_manager():
         request = get_current_request()
         indexer = request.registry[INDEXER]
@@ -86,14 +89,23 @@ def sync_update_helper(uuid):
 
 
 def queue_update_helper():
+    """
+    Used with the queue. Keeps a local counter and errors, which are returned
+    to the callback function and synchronized with overall values
+    """
     with threadlocal_manager():
+        local_counter = [0]
         request = get_current_request()
         indexer = request.registry[INDEXER]
-        return indexer.update_objects_queue(request)
+        local_errors = indexer.update_objects_queue(request, local_counter)
+        return (local_errors, local_counter)
 
 
-def queue_error_callback(error):
-    queue_errors.extend(error)
+def queue_error_callback(cb_args, counter, errors):
+    local_errors, local_counter = cb_args
+    if counter:
+        counter[0] = local_counter[0] + counter[0]
+    errors.extend(local_errors)
 
 ### Running in main process
 
@@ -116,7 +128,7 @@ class MPIndexer(Indexer):
             context=get_context('fork'),  # maybe should this be 'forkserver'?
         )
 
-    def update_objects(self, request):
+    def update_objects(self, request, counter=None):
         """
         Initializes a multiprocessing pool with args given in __init__ and
         indexes in one of two mode: synchronous or queued.
@@ -131,25 +143,26 @@ class MPIndexer(Indexer):
         workers = pool._processes if self.processes is None else self.processes
         # ensure workers != 0
         workers = 1 if workers == 0 else workers
+        errors = []
         if sync_uuids:
             # determine how many uuids should be used for each process
             chunkiness = int((len(sync_uuids) - 1) / workers) + 1
             if chunkiness > self.chunksize:
                 chunkiness = self.chunksize
-            errors = []
             # imap_unordered to hopefully shuffle item types and come up with
             # a more or less equal workload for each process
-            for i, error in enumerate(pool.imap_unordered(
-                sync_update_helper, sync_uuids, chunkiness)):
+            for error in pool.imap_unordered(sync_update_helper, sync_uuids, chunkiness):
                 if error is not None:
                     errors.append(error)
-                if (i + 1) % 50 == 0:
-                    log.info('Indexing %d (sync)', i + 1)
+                elif counter:  # don't increment counter on an error
+                    counter[0] += 1
+                if counter[0] % 10 == 0:
+                    log.info('Indexing %d (sync)', counter[0])
         else:
+            # use partial here so the callback can use counter and errors
+            callback_w_errors = partial(queue_error_callback, counter=counter, errors=errors)
             for i in range(workers):
-                pool.apply_async(queue_update_helper, callback=queue_error_callback)
-            # queue_errors is global list of errors
-            errors = queue_errors
+                pool.apply_async(queue_update_helper, callback=callback_w_errors)
         pool.close()
         pool.join()
         return errors

@@ -63,6 +63,7 @@ def queue_indexing(request):
     response['number_queued'] = len(queued)
     response['detail'] = 'Successfuly queued items!'
     response['errors'] = failed
+    response['strict'] = strict
     return response
 
 

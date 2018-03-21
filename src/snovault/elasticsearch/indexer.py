@@ -23,10 +23,7 @@ def includeme(config):
     config.add_route('index', '/index')
     config.scan(__name__)
     registry = config.registry
-    if registry.settings.get('indexer'):
-        registry[INDEXER] = Indexer(registry)
-    else:
-        registry[INDEXER] = None
+    registry[INDEXER] = Indexer(registry)
 
 
 @view_config(route_name='index', request_method='POST', permission="index")
@@ -57,23 +54,23 @@ def index(request):
             indexing_content['initial_queue_status'] = indexer.queue.number_of_messages()
         indexing_record['indexing_content'] = indexing_content
         indexing_record['indexing_started'] = index_start_str
+        indexing_counter = [0]  # do this so I can pass it as a reference
         # actually index
-        indexing_record['errors'] = indexer.update_objects(request)
+        indexing_record['errors'] = indexer.update_objects(request, indexing_counter)
         index_finish_time = datetime.datetime.now()
         indexing_record['indexing_finished'] = index_finish_time.isoformat()
         indexing_record['indexing_elapsed'] = str(index_finish_time - index_start_time)
-        log.warning('___INDEXING FINISHED IN %s___' % indexing_record['indexing_elapsed'])
         # update record with final queue snapshot
         if indexing_content['type'] == 'queue':
             indexing_content['finished_queue_status'] = indexer.queue.number_of_messages()
+        indexing_record['indexing_count'] = indexing_counter[0]
         indexing_record['indexing_status'] = 'finished'
 
         # with the index listener running more frequently, we don't want to
-        # store a ton of useless records. Only store records using the queue
-        # if the queue counts have changed. Use default 'record' settings for
-        # sync records or records with errors.
+        # store a ton of useless records. Only store queue records that have
+        # errors or have non-zero indexing count
         if record and indexing_content['type'] == 'queue' and not indexing_record['errors']:
-            record = indexing_content['initial_queue_status'] != indexing_content['finished_queue_status']
+            record = indexing_record['indexing_count'] > 0
 
         if record:
             try:
@@ -102,7 +99,7 @@ class Indexer(object):
         self.es = registry[ELASTIC_SEARCH]
         self.queue = registry[INDEXER_QUEUE]
 
-    def update_objects(self, request):
+    def update_objects(self, request, counter=None):
         """
         Top level update routing
         """
@@ -111,12 +108,12 @@ class Indexer(object):
         sync_uuids = request.json.get('uuids', None)
         # actually index
         if sync_uuids:
-            errors = self.update_objects_sync(request, sync_uuids)
+            errors = self.update_objects_sync(request, sync_uuids, counter)
         else:
-            errors = self.update_objects_queue(request)
+            errors = self.update_objects_queue(request, counter)
 
 
-    def update_objects_queue(self, request):
+    def update_objects_queue(self, request, counter):
         """
         Used with the queue
         """
@@ -129,12 +126,14 @@ class Indexer(object):
                     error = self.update_object(request, msg_uuid)
                     if error is not None:
                         errors.append(error)
+                    elif counter:  # don't increment counter on an error
+                        counter[0] += 1
             self.queue.delete_messages(messages)
             messages = self.queue.recieve_messages()
         return errors
 
 
-    def update_objects_sync(self, request, sync_uuids):
+    def update_objects_sync(self, request, sync_uuids, counter):
         """
         Used with sync uuids (simply loop through)
         sync_uuids is a list of string uuids. Use timestamp of index run
@@ -142,8 +141,10 @@ class Indexer(object):
         errors = []
         for i, uuid in enumerate(sync_uuids):
             error = self.update_object(request, uuid)
-            if error is not None:
+            if error is not None:  # don't increment counter on an error
                 errors.append(error)
+            elif counter:
+                counter[0] += 1
         return errors
 
 
