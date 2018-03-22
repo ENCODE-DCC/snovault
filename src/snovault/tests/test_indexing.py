@@ -61,30 +61,9 @@ def DBSession(app):
 
 
 @pytest.fixture(autouse=True)
-def teardown(app, dbapi_conn):
+def teardown(app):
     from snovault.elasticsearch import create_mapping
     create_mapping.run(app)
-    cursor = dbapi_conn.cursor()
-    cursor.execute("""TRUNCATE resources, transactions CASCADE;""")
-    cursor.close()
-
-
-@pytest.yield_fixture
-def dbapi_conn(DBSession):
-    connection = DBSession.bind.pool.unique_connection()
-    connection.detach()
-    conn = connection.connection
-    conn.autocommit = True
-    yield conn
-    conn.close()
-
-
-@pytest.yield_fixture
-def listening_conn(dbapi_conn):
-    cursor = dbapi_conn.cursor()
-    cursor.execute("""LISTEN "snovault.transaction";""")
-    yield dbapi_conn
-    cursor.close()
 
 
 def test_indexing_simple(app, testapp, indexer_testapp):
@@ -157,16 +136,6 @@ def test_es_indices(app, elasticsearch):
         meta_record = item_meta.get('_source', None)
         assert meta_record
         assert item_record == meta_record
-
-
-def test_listening(testapp, listening_conn):
-    testapp.post_json('/testing-post-put-patch/', {'required': ''})
-    time.sleep(1)
-    listening_conn.poll()
-    assert len(listening_conn.notifies) == 1
-    notify = listening_conn.notifies.pop()
-    assert notify.channel == 'snovault.transaction'
-    assert int(notify.payload) > 0
 
 
 def test_index_settings(app, testapp, indexer_testapp):

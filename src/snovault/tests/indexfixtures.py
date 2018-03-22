@@ -45,27 +45,6 @@ def DBSession(app):
 
 
 @pytest.fixture(autouse=True)
-def teardown(app, dbapi_conn):
+def teardown(app):
     from snovault.elasticsearch import create_mapping
     create_mapping.run(app)
-    cursor = dbapi_conn.cursor()
-    cursor.execute("""TRUNCATE resources, transactions CASCADE;""")
-    cursor.close()
-
-
-@pytest.yield_fixture
-def dbapi_conn(DBSession):
-    connection = DBSession.bind.pool.unique_connection()
-    connection.detach()
-    conn = connection.connection
-    conn.autocommit = True
-    yield conn
-    conn.close()
-
-
-@pytest.yield_fixture
-def listening_conn(dbapi_conn):
-    cursor = dbapi_conn.cursor()
-    cursor.execute("""LISTEN "snovault.transaction";""")
-    yield dbapi_conn
-    cursor.close()
