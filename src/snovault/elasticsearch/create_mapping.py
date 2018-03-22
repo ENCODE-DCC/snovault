@@ -450,6 +450,10 @@ def set_index_mapping(es, index, doc_type, mapping):
     es.indices.put_mapping(index=index, doc_type=doc_type, body=mapping, ignore=[400], request_timeout=300)
 
 
+def create_snovault_index_alias(es, indices):
+    es.indices.put_alias(index=','.join(indices), name='snovault-resources', request_timeout=300)
+
+
 def run(app, collections=None, dry_run=False):
     index = app.registry.settings['snovault.elasticsearch.index']
     registry = app.registry
@@ -460,6 +464,7 @@ def run(app, collections=None, dry_run=False):
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
 
+    indices = []
     for collection_name in collections:
         if collection_name == 'meta':
             doc_type = 'meta'
@@ -476,6 +481,9 @@ def run(app, collections=None, dry_run=False):
             continue
         create_elasticsearch_index(es, index, index_settings())
         set_index_mapping(es, index, doc_type, {doc_type: mapping})
+        indices.append(index)
+
+    create_snovault_index_alias(es, indices)
 
 
 def main():

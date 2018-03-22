@@ -606,7 +606,7 @@ def search(context, request, search_type=None, return_generator=False):
     }
     principals = effective_principals(request)
     es = request.registry[ELASTIC_SEARCH]
-    es_index = '_all'
+    es_index = 'snovault-resources'
     search_audit = request.has_permission('search_audit')
 
 
@@ -731,7 +731,7 @@ def search(context, request, search_type=None, return_generator=False):
 
     # Send search request to proper indices
     if not request.params.get('type') or 'Item' in doc_types:
-        es_index = '_all'
+        es_index = 'snovault-resources'
     else:
         es_index = [types[type_name].item_type for type_name in doc_types if hasattr(types[type_name], 'item_type')]
     
