@@ -374,3 +374,6 @@ class QueueManager(object):
 
         unique_to_add = [uuid for uuid in to_add if uuid not in original]
         return original + unique_to_add
+
+    def shutdown(self):
+        pass

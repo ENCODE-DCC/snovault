@@ -56,16 +56,24 @@ def queue_item_and_invalidate_new_back_revs(event):
     updated = event.request._updated_uuid_paths
     initial = event.request._initial_back_rev_links.get(context.uuid, {})
     properties = context.upgrade_properties()
+
     # add item to queue
     # use strict mode if creating, otherwise should queue associated uuids
     # POSSIBLE ISSUES:
     # - on bin/load data, things get queued twice, once as created on once as modified
-    indexer_queue = context.registry[INDEXER_QUEUE]
-    if event.__class__.__name__ == 'Created':
-        indexer_queue.add_uuids(context.registry, [str(context.uuid)], strict=True)
-    else:  # otherwise, event is AfterModified and need non-strict queueing
-        indexer_queue.add_uuids(context.registry, [str(context.uuid)], strict=False)
-        pass
+    indexer_queue = context.registry.get(INDEXER_QUEUE)
+    if indexer_queue:  # Should only happen during testing... should we check something in registry?
+        if event.__class__.__name__ == 'Created':
+            indexer_queue.add_uuids(context.registry, [str(context.uuid)], strict=True)
+        else:  # otherwise, event is AfterModified and need non-strict queueing
+            indexer_queue.add_uuids(context.registry, [str(context.uuid)], strict=False)
+    else:
+        # if the indexer queue is not configured but ES is, raise an exception
+        from .elasticsearch.interfaces import ELASTIC_SEARCH
+        es = context.registry[ELASTIC_SEARCH]
+        if es:
+            raise Exception("Indexer queue not configured!")
+
     current = {
         path: set(simple_path_ids(properties, path))
         for path in context.type_info.merged_back_rev
