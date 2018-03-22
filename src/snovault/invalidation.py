@@ -70,7 +70,7 @@ def queue_item_and_invalidate_new_back_revs(event):
     else:
         # if the indexer queue is not configured but ES is, raise an exception
         from .elasticsearch.interfaces import ELASTIC_SEARCH
-        es = context.registry[ELASTIC_SEARCH]
+        es = context.registry.get(ELASTIC_SEARCH)
         if es:
             raise Exception("Indexer queue not configured!")
 
