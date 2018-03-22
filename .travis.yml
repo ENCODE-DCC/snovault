@@ -64,7 +64,7 @@ before_install:
 install:
 - curl -O  ${ES_DOWNLOAD_URL}
 - sudo dpkg -i --force-confnew elasticsearch-${ES_VERSION}.deb
-- python bootstrap.py --buildout-version 2.9.5 --setuptools-version 36.6.0
+- python bootstrap.py --buildout-version 2.9.5 --setuptools-version 37.0.0
 - bin/buildout -c || (echo "Retrying buildout" && bin/buildout )
 - pip install coveralls
 - pip install codacy-coverage
