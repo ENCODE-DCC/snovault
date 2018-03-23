@@ -39,17 +39,8 @@ def app(app_settings):
     from snovault.elasticsearch import create_mapping
     app = main({}, **app_settings)
 
-    create_mapping.run(app)
+    create_mapping.run(app, skip_indexing=True)
     yield app
-
-    # Shutdown multiprocessing pool to close db conns.
-    from snovault.elasticsearch import INDEXER
-    app.registry[INDEXER].shutdown()
-
-    from snovault import DBSESSION
-    DBSession = app.registry[DBSESSION]
-    # Dispose connections so postgres can tear down.
-    DBSession.bind.pool.dispose()
 
 
 @pytest.mark.fixture_cost(500)

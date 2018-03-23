@@ -32,4 +32,4 @@ def app(app_settings):
 @pytest.fixture(autouse=True)
 def teardown(app):
     from snovault.elasticsearch import create_mapping
-    create_mapping.run(app)
+    create_mapping.run(app, skip_indexing=True)
