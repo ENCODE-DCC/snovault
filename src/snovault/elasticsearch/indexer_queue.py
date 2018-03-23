@@ -335,8 +335,13 @@ class QueueManager(object):
         """
         failed = []
         for batch in self.chunk_messages(messages, self.replace_batch_size):
-            for msg in batch:
-                msg['VisibilityTimeout'] = 0
+            for i in range(len(batch)):
+                to_replace = {
+                    'Id': batch[i]['MessageId'],
+                    'ReceiptHandle': batch[i]['ReceiptHandle'],
+                    'VisibilityTimeout': 0
+                }
+                batch[i] = to_replace
             response = self.client.change_message_visibility_batch(
                 QueueUrl=self.queue_url,
                 Entries=batch

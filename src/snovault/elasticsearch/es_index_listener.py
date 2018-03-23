@@ -24,7 +24,7 @@ from urllib.parse import parse_qsl
 log = logging.getLogger(__name__)
 
 EPILOG = __doc__
-DEFAULT_INTERVAL = 5  # 5 seconds default
+DEFAULT_INTERVAL = 3  # 3 second default
 PY2 = sys.version_info[0] == 2
 
 # We need this because of MVCC visibility.
@@ -33,7 +33,7 @@ PY2 = sys.version_info[0] == 2
 
 
 def run(testapp, interval=DEFAULT_INTERVAL, dry_run=False, path='/index', update_status=None):
-    log.warn('___INDEXER LISTENER STARTING___')
+    log.info('___INDEXER LISTENER STARTING___')
     listening = False
     timestamp = datetime.datetime.now().isoformat()
     update_status(
@@ -51,7 +51,6 @@ def run(testapp, interval=DEFAULT_INTERVAL, dry_run=False, path='/index', update
 
     # main listening loop
     while True:
-        log.warn('___INDEXER LISTENER RUNNING___')
         try:
             res = testapp.post_json(path, {
                 'record': True,
@@ -75,7 +74,7 @@ def run(testapp, interval=DEFAULT_INTERVAL, dry_run=False, path='/index', update
             update_status(last_result=result)
             if result.get('indexing_status') == 'finished':
                 update_status(result=result)
-                log.warn('___INDEX LISTENER RESULT:___\n%s\n' % result)
+                log.info('___INDEX LISTENER RESULT:___\n%s\n' % result)
         time.sleep(interval)
 
 
@@ -94,7 +93,8 @@ class ErrorHandlingThread(threading.Thread):
             return self._Thread__target
 
     def run(self):
-        interval = self._kwargs.get('interval', DEFAULT_INTERVAL)
+        # interval = self._kwargs.get('interval', DEFAULT_INTERVAL)
+        interval = 60  # DB polling can and should be slower
         update_status = self._kwargs['update_status']
         while True:
             try:

@@ -137,7 +137,7 @@ class Indexer(object):
                         counter[0] += 1
                 # put the message back in the queue if we hit an error
                 if errored:
-                    self.queue_replace_messages([msg])
+                    self.queue.replace_messages([msg])
                 else:
                     to_delete.append(msg)
                 # delete messages when we have the right number
