@@ -323,7 +323,7 @@ class QueueManager(object):
             failed.extend(response.get('Failed', []))
         return failed
 
-    def replace_message(self, messages):
+    def replace_messages(self, messages):
         """
         Called using received messages to place them back on the queue.
         Using a VisibilityTimeout of 0 means these messages are instantly

@@ -182,7 +182,7 @@ def test_indexing_es(app, testapp, indexer_testapp):
     # run create_mapping with check_first=False (do not expect a re-index)
     # this will purge the queue then add items to index to it
     create_mapping.run(app)
-    time.sleep(4)
+    time.sleep(6)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 0
     with pytest.raises(NotFoundError):
@@ -203,12 +203,12 @@ def test_indexing_es(app, testapp, indexer_testapp):
     # should queue the single uuid for indexing in stored_uuids
     es.indices.delete(index=test_type)
     create_mapping.run(app, check_first=True)
-    time.sleep(4)
+    time.sleep(6)
     assert indexer_queue.number_of_messages()['waiting'] == 1
     # reindex with --sync-index, and --item-type
     # this will NOT cause the queue to clear
     create_mapping.run(app, collections=[test_type], sync_index=True)
-    time.sleep(4)
+    time.sleep(6)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
     indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
@@ -221,7 +221,6 @@ def test_indexing_es(app, testapp, indexer_testapp):
     # doc_count has not yet updated
     assert doc_count == 1
     assert indexer_queue.number_of_messages()['waiting'] == 2
-    import pdb; pdb.set_trace()
     # run create mapping to queue the all items
     create_mapping.run(app, collections=[test_type])
     assert indexer_queue.number_of_messages()['waiting'] == 2

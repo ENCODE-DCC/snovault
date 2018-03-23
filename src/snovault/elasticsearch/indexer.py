@@ -125,13 +125,21 @@ class Indexer(object):
         while len(messages) > 0:
             for msg in messages:
                 # msg['Body'] is just a string of uuids joined by commas
+                errored = False
                 for msg_uuid in msg['Body'].split(','):
                     error = self.update_object(request, msg_uuid)
                     if error is not None:
+                        # on an error, replace the message back in the queue
                         errors.append(error)
+                        errored = True
+                        break
                     elif counter:  # don't increment counter on an error
                         counter[0] += 1
-                to_delete.append(msg)
+                # put the message back in the queue if we hit an error
+                if errored:
+                    self.queue_replace_messages([msg])
+                else:
+                    to_delete.append(msg)
                 # delete messages when we have the right number
                 if len(to_delete) == self.queue.delete_batch_size:
                     self.queue.delete_messages(to_delete)
