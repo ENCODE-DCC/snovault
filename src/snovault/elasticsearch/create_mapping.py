@@ -874,7 +874,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             mapping = create_mapping_by_type(collection_name, registry)
             build_index(app, es, collection_name, mapping, uuids_to_index,
                         dry_run, check_first, index_diff, print_count_only)
-            log.warning('___Finished %s___\n' % (collection_name))
+            log.warning('___FINISHED %s___\n' % (collection_name))
     log.warning('\n___ES INDICES (POST-MAPPING)___:\n %s\n' % (str(es.cat.indices())))
     log.warning('\n___FINISHED CREATE-MAPPING___\n')
     if skip_indexing:
@@ -882,6 +882,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
 
     # clear the indexer queue on a total reindex
     if total_reindex:
+        log.warning('___PURGING THE QUEUE___\n')
         indexer_queue.clear_queue()
     # now, queue items for indexing
     if uuids_to_index:
@@ -915,7 +916,7 @@ def main():
     parser.add_argument('--index-diff', action='store_true',
                         help="reindex any items in the db but not es store for all/given collections")
     parser.add_argument('--strict', action='store_true',
-                        help="used with force or check_first in combination with item-type. Only index the given types (ignore associated items). Advanced users only")
+                        help="used with check_first in combination with item-type. Only index the given types (ignore associated items). Advanced users only")
     parser.add_argument('--sync-index', action='store_true',
                         help="add to cause reindexing to occur synchronously instead of using the meta uuid_store")
     parser.add_argument('--no-meta', action='store_true',

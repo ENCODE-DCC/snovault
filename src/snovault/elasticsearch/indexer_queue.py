@@ -363,6 +363,12 @@ class QueueManager(object):
             'dlq_waiting': dlq_response.get('Attributes', {}).get('ApproximateNumberOfMessages'),
             'dlq_inflight': dlq_response.get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible')
         }
+        # transform in integers
+        for entry in formatted:
+            try:
+                formatted[entry] = int(formatted[entry])
+            except ValueError:
+                formatted[entry] = None
         return formatted
 
     def order_uuids_to_queue(self, original, to_add):

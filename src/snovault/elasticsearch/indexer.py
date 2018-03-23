@@ -75,11 +75,13 @@ def index(request):
         if record:
             try:
                 es.index(index='meta', doc_type='meta', body=indexing_record, id=index_start_str)
+                es.index(index='meta', doc_type='meta', body=indexing_record, id='latest_indexing')
             except:
                 indexing_record['indexing_status'] = 'errored'
                 error_messages = copy.deepcopy(indexing_record['errors'])
                 del indexing_record['errors']
                 es.index(index='meta', doc_type='meta', body=indexing_record, id=index_start_str)
+                es.index(index='meta', doc_type='meta', body=indexing_record, id='latest_indexing')
                 for item in error_messages:
                     if 'error_message' in item:
                         log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
