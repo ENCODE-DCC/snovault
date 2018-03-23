@@ -87,7 +87,13 @@ def indexing_status(request):
 
 class QueueManager(object):
     def __init__(self, registry):
-        self.uuid_threshold = 1  # maximum number of uuids in a message
+        # batch sizes of messages. __all of these should be 10 at maximum__
+        self.send_batch_size = 10
+        self.recieve_batch_size = 10
+        self.delete_batch_size = 10
+        self.replace_batch_size = 10
+        # maximum number of uuids in a message
+        self.send_uuid_threshold = 1
         self.env_name = registry.settings.get('env.name')
         # local development
         if not self.env_name:
@@ -206,7 +212,7 @@ class QueueManager(object):
                 # NOTE: you must wait 60 seconds before re-creating a queue
                 self.delete_queue(queue_url)
         if should_init:
-            for backoff in [30, 30, 10, 20, 30]:  # totally arbitrary
+            for backoff in [30, 30, 10, 20, 30, 60, 90]:  # totally arbitrary
                 try:
                     response = self.client.create_queue(
                         QueueName=queue_name,
@@ -255,17 +261,17 @@ class QueueManager(object):
     def send_messages(self, messages):
         """
         Send any number of 'messages' in a list.
-        Can batch up to 10 messages. For now, one item per message...
-        This is easily controlled by self.uuid_threshold.
+        Can batch up to 10 messages, controlled by self.send_batch_size.
+        This is easily controlled by self.send_uuid_threshold.
 
         messages argument should be a list of uuid strings.
         Returns information on messages that failed to queue
         """
         failed = []
-        # we can handle 10 * self.uuid_threshold number of messages per go
-        for total_batch in self.chunk_messages(messages, self.uuid_threshold * 10):
+        # we can handle 10 * self.send_uuid_threshold number of messages per go
+        for total_batch in self.chunk_messages(messages, self.send_uuid_threshold * self.send_batch_size):
             entries = []
-            for msg_batch in self.chunk_messages(total_batch, self.uuid_threshold):
+            for msg_batch in self.chunk_messages(total_batch, self.send_uuid_threshold):
                 entries.append({
                     'Id': str(index_timestamp()),
                     'MessageBody': ','.join(msg_batch)
@@ -279,12 +285,13 @@ class QueueManager(object):
 
     def recieve_messages(self):
         """
-        Recieves up to 10 messages from the queue. Fewer (even 0) messages
-        may be returned on any given run. Returns a list of messages with info
+        Recieves up to self.recieve_batch_size number of messages from the queue.
+        Fewer (even 0) messages may be returned on any given run.
+        Returns a list of messages with message metdata
         """
         response = self.client.receive_message(
             QueueUrl=self.queue_url,
-            MaxNumberOfMessages=10,
+            MaxNumberOfMessages=self.recieve_batch_size,
             VisibilityTimeout=int(self.queue_attrs['VisibilityTimeout'])
         )
         # messages in response include ReceiptHandle and Body, most importantly
@@ -294,13 +301,13 @@ class QueueManager(object):
         """
         Called after a message has been successfully received and processed.
         Removes message from the queue.
+        Splits messages into a batch size given by self.delete_batch_size.
         Input should be the messages directly from recieve messages. At the
         very least, needs a list of messages with 'Id' and 'ReceiptHandle'.
         Returns a list with any failed attempts.
         """
         failed = []
-        for n in range(int(math.ceil(len(messages) / 10))):  # 10 messages per batch
-            batch = messages[n:n+10]
+        for batch in self.chunk_messages(messages, self.delete_batch_size):
             # need to change message format, since deleting takes slightly
             # different fields what's return from receiving
             for i in range(len(batch)):
@@ -321,13 +328,13 @@ class QueueManager(object):
         Called using received messages to place them back on the queue.
         Using a VisibilityTimeout of 0 means these messages are instantly
         available to consumers.
+        Number of messages in a batch is controlled by self.replace_batch_size
         Input should be the messages directly from recieve messages. At the
         very least, needs a list of messages with 'Id' and 'ReceiptHandle'.
         Returns a list with any failed attempts.
         """
         failed = []
-        for n in range(int(math.ceil(len(messages) / 10))):  # 10 messages per batch
-            batch = messages[n:n+10]
+        for batch in self.chunk_messages(messages, self.replace_batch_size):
             for msg in batch:
                 msg['VisibilityTimeout'] = 0
             response = self.client.change_message_visibility_batch(

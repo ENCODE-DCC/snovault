@@ -120,6 +120,7 @@ class Indexer(object):
         Used with the queue
         """
         errors = []
+        to_delete = []  # hold messages that will be deleted
         messages = self.queue.recieve_messages()  # long polling used in SQS
         while len(messages) > 0:
             for msg in messages:
@@ -130,8 +131,15 @@ class Indexer(object):
                         errors.append(error)
                     elif counter:  # don't increment counter on an error
                         counter[0] += 1
-            self.queue.delete_messages(messages)
+                to_delete.append(msg)
+                # delete messages when we have the right number
+                if len(to_delete) == self.queue.delete_batch_size:
+                    self.queue.delete_messages(to_delete)
+                    to_delete = []
             messages = self.queue.recieve_messages()
+        # delete any outstanding messages
+        if to_delete:
+            self.queue.delete_messages(to_delete)
         return errors
 
 
