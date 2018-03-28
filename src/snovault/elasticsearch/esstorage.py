@@ -5,6 +5,7 @@ from zope.interface import alsoProvides
 from .interfaces import (
     ELASTIC_SEARCH,
     ICachedItem,
+    RESOURCES_INDEX,
 )
 
 
@@ -15,7 +16,7 @@ def includeme(config):
     from snovault import STORAGE
     registry = config.registry
     es = registry[ELASTIC_SEARCH]
-    es_index = 'snovault-resources'
+    es_index = RESOURCES_INDEX
     wrapped_storage = registry[STORAGE]
     registry[STORAGE] = PickStorage(ElasticSearchStorage(es, es_index), wrapped_storage)
 

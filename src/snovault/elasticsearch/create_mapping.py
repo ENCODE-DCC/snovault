@@ -13,7 +13,10 @@ from snovault import (
     TYPES,
 )
 from snovault.schema_utils import combine_schemas
-from .interfaces import ELASTIC_SEARCH
+from .interfaces import (
+    ELASTIC_SEARCH,
+    RESOURCES_INDEX,
+)
 import collections
 import json
 import logging
@@ -451,7 +454,7 @@ def set_index_mapping(es, index, doc_type, mapping):
 
 
 def create_snovault_index_alias(es, indices):
-    es.indices.put_alias(index=','.join(indices), name='snovault-resources', request_timeout=300)
+    es.indices.put_alias(index=','.join(indices), name=RESOURCES_INDEX, request_timeout=300)
 
 
 def run(app, collections=None, dry_run=False):
@@ -481,7 +484,8 @@ def run(app, collections=None, dry_run=False):
             continue
         create_elasticsearch_index(es, index, index_settings())
         set_index_mapping(es, index, doc_type, {doc_type: mapping})
-        indices.append(index)
+        if collection_name != 'meta':
+            indices.append(index)
 
     create_snovault_index_alias(es, indices)
 
