@@ -90,7 +90,6 @@ def main():
         finally:
             shutil.rmtree(datadir)
 
-    sys.stdout.write('\nElasticSearch is Ready')
     print('Started. ^C to exit.')
 
     try:
