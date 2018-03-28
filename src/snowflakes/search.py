@@ -4,10 +4,8 @@ from snovault import (
     AbstractCollection,
     TYPES,
 )
-from snovault.elasticsearch import (
-    ELASTIC_SEARCH,
-    RESOURCES_INDEX,
-)
+from snovault.elasticsearch import ELASTIC_SEARCH
+from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.resource_views import collection_view_listing_db
 from elasticsearch.helpers import scan
 from pyramid.httpexceptions import HTTPBadRequest
