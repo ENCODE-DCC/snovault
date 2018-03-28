@@ -110,6 +110,7 @@ def main():
         load_test_data = DottedNameResolver().resolve(load_test_data)
         load_test_data(app, args.access_key)
 
+    sys.stdout.write('\nElasticSearch is Ready')
     print('Started. ^C to exit.')
 
     stdouts = [p.stdout for p in processes]
