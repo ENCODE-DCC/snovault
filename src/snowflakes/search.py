@@ -5,6 +5,7 @@ from snovault import (
     TYPES,
 )
 from snovault.elasticsearch import ELASTIC_SEARCH
+from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.resource_views import collection_view_listing_db
 from elasticsearch.helpers import scan
 from pyramid.httpexceptions import HTTPBadRequest
@@ -606,7 +607,7 @@ def search(context, request, search_type=None, return_generator=False):
     }
     principals = effective_principals(request)
     es = request.registry[ELASTIC_SEARCH]
-    es_index = '_all'
+    es_index = RESOURCES_INDEX
     search_audit = request.has_permission('search_audit')
 
 
@@ -731,10 +732,10 @@ def search(context, request, search_type=None, return_generator=False):
 
     # Send search request to proper indices
     if not request.params.get('type') or 'Item' in doc_types:
-        es_index = '_all'
+        es_index = RESOURCES_INDEX
     else:
         es_index = [types[type_name].item_type for type_name in doc_types if hasattr(types[type_name], 'item_type')]
-    
+
     # Execute the query
     if do_scan:
         es_results = es.search(body=query, index=es_index, search_type='query_then_fetch')
