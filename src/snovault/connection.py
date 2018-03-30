@@ -62,14 +62,14 @@ class Connection(object):
         self.item_cache[uuid] = item
         return item
 
-    def get_by_unique_key(self, unique_key, name, default=None):
+    def get_by_unique_key(self, unique_key, name, default=None, index=None):
         pkey = (unique_key, name)
 
         cached = self.unique_key_cache.get(pkey)
         if cached is not None:
             return self.get_by_uuid(cached)
 
-        model = self.storage.get_by_unique_key(unique_key, name)
+        model = self.storage.get_by_unique_key(unique_key, name, index=index)
         if model is None:
             return default
 

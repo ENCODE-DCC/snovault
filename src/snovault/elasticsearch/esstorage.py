@@ -96,13 +96,13 @@ class PickStorage(object):
                 return self.write.get_by_uuid(uuid)
         return model
 
-    def get_by_unique_key(self, unique_key, name):
+    def get_by_unique_key(self, unique_key, name, index=None):
         storage = self.storage()
-        model = storage.get_by_unique_key(unique_key, name)
+        model = storage.get_by_unique_key(unique_key, name, index=index)
         if storage is self.read:
             if model is None or model.invalidated():
                 force_database_for_request()
-                return self.write.get_by_unique_key(unique_key, name)
+                return self.write.get_by_unique_key(unique_key, name, index=index)
         return model
 
     def get_rev_links(self, model, rel, *item_types):
@@ -128,8 +128,10 @@ class ElasticSearchStorage(object):
         self.es = es
         self.index = index
 
-    def _one(self, query):
-        data = self.es.search(index=self.index, body=query)
+    def _one(self, query, index=None):
+        if index is None:
+            index = self.index
+        data = self.es.search(index=index, body=query)
         hits = data['hits']['hits']
         if len(hits) != 1:
             return None
@@ -151,7 +153,7 @@ class ElasticSearchStorage(object):
         hit = result['hits']['hits'][0]
         return CachedModel(hit)
 
-    def get_by_unique_key(self, unique_key, name):
+    def get_by_unique_key(self, unique_key, name, index=None):
         term = 'unique_keys.' + unique_key
         query = {
             'query': {
@@ -159,7 +161,7 @@ class ElasticSearchStorage(object):
             },
             'version': True,
         }
-        return self._one(query)
+        return self._one(query, index)
 
     def get_rev_links(self, model, rel, *item_types):
         filter_ = {'term': {'links.' + rel: str(model.uuid)}}
