@@ -313,9 +313,9 @@ def test_es_delete_simple(app, testapp, session):
     check_and_reindex_existing(app, app.registry[ELASTIC_SEARCH], test_type, test_uuids)
 
     assert test_uuid in test_uuids # Assert that this newly added Item is not yet indexed.
-
     # Then index it:
-    run_create_mapping(app, index_uuids=list(test_uuids), strict=True, sync_index=True)
+    run_create_mapping(app, collections=[test_type,], strict=True, sync_index=True)
+
     time.sleep(5) # INDEXER performs a network request to ES server to index things. Whether we like it or not, this means it's async and we must wait.
 
     ## Now ensure that we do has it in ES:
