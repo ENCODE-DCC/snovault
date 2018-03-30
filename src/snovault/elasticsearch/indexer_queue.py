@@ -97,7 +97,8 @@ class QueueManager(object):
         self.env_name = registry.settings.get('env.name')
         # local development
         if not self.env_name:
-            backup = socket.gethostname()
+            # make sure it's something aws likes 
+            backup = socket.gethostname()[:80].replace('.','-')
             # last case scenario
             self.env_name = backup if backup else 'fourfront-backup'
         self.queue_attrs = {
