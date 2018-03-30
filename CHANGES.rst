@@ -1,3 +1,7 @@
+1.0.6:
+01. SNO-33 specify index for get_by_unique_key from collection (#94)
+02. SNO-28 limit ES storage to indices created for snovault resources (#93)
+
 1.0.5:
 01. SNO-30 Split Indexer State from indexer file and update
 02. SNO-10 Remove audit indexing via 2-pass
