@@ -50,7 +50,6 @@ def teardown(app):
     # connection = DBSession.connection().connect()
     # DBMetaData = MetaData(bind=DBSession.connection(), reflect=True)
     # or
-    import pdb; pdb.set_trace()
     from snovault import DBSESSION
     session = app.registry[DBSESSION]
     DBMetaData = MetaData(bind=session.connection(), reflect=True)
