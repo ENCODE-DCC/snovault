@@ -1,5 +1,5 @@
 ### Class to manage the items for indexing
-# First round will use a standard SQS queue from AWS without Elasticache
+# First round will use a standard SQS queue from AWS without Elasticache.
 
 import boto3
 import json
