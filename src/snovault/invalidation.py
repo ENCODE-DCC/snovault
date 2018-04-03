@@ -9,6 +9,7 @@ from .interfaces import (
     BeforeModified,
     Created,
 )
+from .elasticsearch.interfaces import INDEXER_QUEUE, INDEXER_QUEUE_MIRROR
 from .util import simple_path_ids
 import transaction
 
@@ -43,8 +44,11 @@ def record_initial_back_revs(event):
 
 @subscriber(Created)
 @subscriber(AfterModified)
-def invalidate_new_back_revs(event):
-    ''' Invalidate objects that rev_link to us
+def queue_item_and_invalidate_new_back_revs(event):
+    '''
+    Add item(s) to the INDEXER_QUEUE
+
+    Invalidate objects that rev_link to us
 
     Catch those objects which newly rev_link us
     '''
@@ -52,6 +56,26 @@ def invalidate_new_back_revs(event):
     updated = event.request._updated_uuid_paths
     initial = event.request._initial_back_rev_links.get(context.uuid, {})
     properties = context.upgrade_properties()
+
+    # add item to queue
+    # use strict mode if creating, otherwise should queue associated uuids
+    # POSSIBLE ISSUES:
+    # - on bin/load data, things get queued twice, once as created on once as modified
+    # Must consider buth INDEXER_QUEUE and INDEXER_QUEUE_MIRROR
+    indexer_queue = context.registry.get(INDEXER_QUEUE)
+    indexer_queue_mirror = context.registry.get(INDEXER_QUEUE_MIRROR)
+    if indexer_queue:
+        # use strict mode if the event is 'Created', else do not
+        indexer_queue.add_uuids(context.registry, [str(context.uuid)], strict=event.__class__.__name__ == 'Created')
+        if indexer_queue_mirror:
+            indexer_queue_mirror.add_uuids(context.registry, [str(context.uuid)], strict=event.__class__.__name__ == 'Created')
+    else:
+        # if the indexer queue is not configured but ES is, raise an exception
+        from .elasticsearch.interfaces import ELASTIC_SEARCH
+        es = context.registry.get(ELASTIC_SEARCH)
+        if es:
+            raise Exception("Indexer queue not configured!")
+
     current = {
         path: set(simple_path_ids(properties, path))
         for path in context.type_info.merged_back_rev

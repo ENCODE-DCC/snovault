@@ -9,8 +9,7 @@ from pyramid.settings import (
 )
 from .interfaces import (
     APP_FACTORY,
-    ELASTIC_SEARCH,
-    INDEXER,
+    ELASTIC_SEARCH
 )
 import json
 import sys
@@ -33,6 +32,7 @@ def includeme(config):
 
     config.include('.cached_views')
     config.include('.esstorage')
+    config.include('.indexer_queue')
     config.include('.indexer')
     if asbool(settings.get('mpindexer')) and not PY2:
         config.include('.mpindexer')

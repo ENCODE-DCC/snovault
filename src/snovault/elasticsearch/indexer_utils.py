@@ -1,23 +1,28 @@
-def find_uuids_for_indexing(registry, updated, renamed, log=None):
+import datetime
+
+def find_uuids_for_indexing(registry, updated, log=None):
     from .interfaces import ELASTIC_SEARCH
     from .create_mapping import index_settings
     from elasticsearch.exceptions import ConnectionTimeout
     es = registry[ELASTIC_SEARCH]
     SEARCH_MAX = 99999  # OutOfMemoryError if too high
     """
-    Run a search to find uuids of objects with embedded uuids in updated
-    or linked uuids in renamed. Only runs over the given indices.
+    Run a search to find uuids of objects with that contain the given updated
+    uuids either in their linked_uuids or embedded_uuids. Only runs over the
+    given indices.
+    Returns a set containing original uuids and the found uuids.
+    If something goes wrong with the search or it's too large, return a set
+    of all uuids.
     """
     invalidated = set()
     referencing = set()
-    flush = False
 
     # if meta does not exist (shouldn't ever happen on deploy)
     # invalidate all uuids to avoid errors
     meta_exists = es.indices.exists(index='meta')
     if not meta_exists or len(updated) > SEARCH_MAX:
         invalidated = referencing = set(get_uuids_for_types(registry))
-        return invalidated, referencing, True
+        return invalidated
 
     es.indices.refresh(index='_all')
     try:
@@ -35,7 +40,7 @@ def find_uuids_for_indexing(registry, updated, renamed, log=None):
                                 },
                                 {
                                     'terms': {
-                                        'linked_uuids': list(renamed),
+                                        'linked_uuids': list(updated),
                                         '_cache': False,
                                     },
                                 },
@@ -49,19 +54,18 @@ def find_uuids_for_indexing(registry, updated, renamed, log=None):
     except ConnectionTimeout:
         # on timeout, queue everything for reindexing to avoid errors
         invalidated = referencing = set(get_uuids_for_types(registry))
-        return invalidated, referencing, True
+        return invalidated
     else:
         if (log):
             log.debug("Found %s associated items for indexing" %
                     (str(res['hits']['total'])))
         if res['hits']['total'] > SEARCH_MAX:
             referencing = set(get_uuids_for_types(registry))
-            flush = True
         else:
             found_uuids = {hit['_id'] for hit in res['hits']['hits']}
             referencing = referencing | found_uuids
         invalidated = referencing | updated
-        return invalidated, referencing, flush
+        return invalidated
 
 
 def get_uuids_for_types(registry, types=None):
@@ -102,21 +106,9 @@ def get_xmin_from_es(es):
         return status['_source']['xmin']
 
 
-def get_uuid_store_from_es(es):
-    try:
-        record = es.get(index='meta', doc_type='meta', id='uuid_store', ignore=[404])
-    except:
-        return None
-    else:
-        uuids = record.get('_source', {}).get('uuids', None)
-        if uuids:
-            # remove the record
-            try:
-                es.delete(index='meta', doc_type='meta', id='uuid_store', refresh=True)
-            except:
-                # delete failed, return no uuids for now
-                return None
-            else:
-                return uuids
-        else:
-            return None
+def index_timestamp():
+    """
+    Returns an int datetime.utcnow() to microsecond resolution
+    """
+    float_ts = datetime.datetime.utcnow().timestamp()
+    return int(float_ts * 1000000)
