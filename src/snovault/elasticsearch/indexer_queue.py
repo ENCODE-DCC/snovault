@@ -96,7 +96,7 @@ class QueueManager(object):
     def __init__(self, registry, forced_env=None):
         # batch sizes of messages. __all of these should be 10 at maximum__
         self.send_batch_size = 10
-        self.recieve_batch_size = 10
+        self.receive_batch_size = 10
         self.delete_batch_size = 10
         self.replace_batch_size = 10
         # maximum number of uuids in a message
@@ -104,7 +104,7 @@ class QueueManager(object):
         self.env_name = forced_env if forced_env else registry.settings.get('env.name')
         # local development
         if not self.env_name:
-            # make sure it's something aws likes 
+            # make sure it's something aws likes
             backup = socket.gethostname()[:80].replace('.','-')
             # last case scenario
             self.env_name = backup if backup else 'fourfront-backup'
@@ -291,15 +291,15 @@ class QueueManager(object):
             failed.extend(response.get('Failed', []))
         return failed
 
-    def recieve_messages(self):
+    def receive_messages(self):
         """
-        Recieves up to self.recieve_batch_size number of messages from the queue.
+        Recieves up to self.receive_batch_size number of messages from the queue.
         Fewer (even 0) messages may be returned on any given run.
         Returns a list of messages with message metdata
         """
         response = self.client.receive_message(
             QueueUrl=self.queue_url,
-            MaxNumberOfMessages=self.recieve_batch_size,
+            MaxNumberOfMessages=self.receive_batch_size,
             VisibilityTimeout=int(self.queue_attrs['VisibilityTimeout'])
         )
         # messages in response include ReceiptHandle and Body, most importantly
@@ -310,7 +310,7 @@ class QueueManager(object):
         Called after a message has been successfully received and processed.
         Removes message from the queue.
         Splits messages into a batch size given by self.delete_batch_size.
-        Input should be the messages directly from recieve messages. At the
+        Input should be the messages directly from receive messages. At the
         very least, needs a list of messages with 'Id' and 'ReceiptHandle'.
         Returns a list with any failed attempts.
         """
@@ -337,7 +337,7 @@ class QueueManager(object):
         Using a VisibilityTimeout of 0 means these messages are instantly
         available to consumers.
         Number of messages in a batch is controlled by self.replace_batch_size
-        Input should be the messages directly from recieve messages. At the
+        Input should be the messages directly from receive messages. At the
         very least, needs a list of messages with 'Id' and 'ReceiptHandle'.
         Returns a list with any failed attempts.
         """

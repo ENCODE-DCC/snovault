@@ -121,7 +121,7 @@ class Indexer(object):
         """
         errors = []
         to_delete = []  # hold messages that will be deleted
-        messages = self.queue.recieve_messages()  # long polling used in SQS
+        messages = self.queue.receive_messages()  # long polling used in SQS
         while len(messages) > 0:
             for msg in messages:
                 # msg['Body'] is just a string of uuids joined by commas
@@ -144,7 +144,7 @@ class Indexer(object):
                 if len(to_delete) == self.queue.delete_batch_size:
                     self.queue.delete_messages(to_delete)
                     to_delete = []
-            messages = self.queue.recieve_messages()
+            messages = self.queue.receive_messages()
         # delete any outstanding messages
         if to_delete:
             self.queue.delete_messages(to_delete)

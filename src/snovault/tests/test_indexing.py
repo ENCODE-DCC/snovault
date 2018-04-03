@@ -7,7 +7,7 @@ Does not include data dependent tests
 
 import pytest
 import time
-from snovault.elasticsearch.interfaces import ELASTIC_SEARCH, INDEXER_QUEUE
+from snovault.elasticsearch.interfaces import ELASTIC_SEARCH, INDEXER_QUEUE, INDEXER_QUEUE_MIRROR
 from snovault import (
     COLLECTIONS,
     TYPES,
@@ -133,8 +133,38 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
 
 
 def test_indexer_queue(app):
+    indexer_queue_mirror = app.registry[INDEXER_QUEUE_MIRROR]
+    # this is only set up for webprod/webprod2
+    assert indexer_queue_mirror is None
+
     indexer_queue = app.registry[INDEXER_QUEUE]
-    assert True
+    # unittesting the QueueManager
+    assert indexer_queue.queue_url is not None
+    assert indexer_queue.dlq_url is not None
+    # first, purge the queue
+    indexer_queue.clear_queue()
+    received = indexer_queue.receive_messages()
+    assert len(received) == 0
+    test_message = 'abc123'
+    to_index, failed = indexer_queue.add_uuids(app.registry, [test_message], strict=True)
+    assert to_index == [test_message]
+    assert not failed
+    received = indexer_queue.receive_messages()
+    assert len(received) == 1
+    assert received[0]['Body'] == test_message
+    # try to receive again (should be empty)
+    received_2 = indexer_queue.receive_messages()
+    assert len(received_2) == 0
+    # replace into queue
+    indexer_queue.replace_messages(received)
+    received = indexer_queue.receive_messages()
+    assert len(received) == 1
+    # finally, delete
+    indexer_queue.delete_messages(received)
+    time.sleep(2)
+    msg_count = indexer_queue.number_of_messages()
+    assert msg_count['waiting'] == 0
+    assert msg_count['inflight'] == 0
 
 
 def test_es_indices(app, elasticsearch):
