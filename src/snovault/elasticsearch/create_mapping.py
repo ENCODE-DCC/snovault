@@ -846,6 +846,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     print_count_only: if True, print counts for existing indices instead of
         queueing items for reindexing. Must to be used with check_first.
     """
+    ### TODO: Lock the indexer when create_mapping is running
     registry = app.registry
     es = registry[ELASTIC_SEARCH]
     indexer_queue = registry[INDEXER_QUEUE]
@@ -878,13 +879,16 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             log.warning('___FINISHED %s___\n' % (collection_name))
     log.warning('\n___ES INDICES (POST-MAPPING)___:\n %s\n' % (str(es.cat.indices())))
     log.warning('\n___FINISHED CREATE-MAPPING___\n')
-    if skip_indexing:
-        return
 
     # clear the indexer queue on a total reindex
     if total_reindex:
         log.warning('___PURGING THE QUEUE___\n')
         indexer_queue.clear_queue()
+
+    # this is probably only used with tests
+    if skip_indexing:
+        return
+
     # now, queue items for indexing
     if uuids_to_index:
         # we need to find associated uuids if all items are not indexed or not strict mode
