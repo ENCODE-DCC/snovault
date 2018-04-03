@@ -713,7 +713,7 @@ def check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff=Fals
             log.warning('MAPPING: queueing %s items found in DB but not ES in the index %s for reindexing' % (str(len(diff_uuids)), in_type))
             uuids_to_index.update(diff_uuids)
         else:
-            log.warning('MAPPING: queueing %s items found in DB but not ES in the index %s for reindexing' % (str(len(diff_uuids)), in_type))
+            log.warning('MAPPING: queueing %s items found in the existing index %s for reindexing' % (str(len(diff_uuids)), in_type))
             uuids_to_index.update(db_uuids)
 
 
