@@ -191,7 +191,6 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     time.sleep(6)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
-    assert indexer_queue.number_of_messages()['waiting'] == 1
     indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
     assert indexing_doc['_source']['indexing_content']['type'] == 'sync'
     assert indexing_doc['_source']['indexing_count'] == 1
@@ -199,7 +198,6 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     # queued on post - total of two items queued
     res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
     time.sleep(2)
-    assert indexer_queue.number_of_messages()['waiting'] == 2
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     # doc_count has not yet updated
     assert doc_count == 1
@@ -208,7 +206,6 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     assert res.json['indexing_count'] == 2
     time.sleep(2)
     create_mapping.run(app, collections=[test_type])
-    assert indexer_queue.number_of_messages()['waiting'] == 2
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 2
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
