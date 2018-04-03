@@ -639,7 +639,8 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     # for this collection
     coll_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
     uuids_to_index.update(coll_uuids)
-    log.warning('MAPPING: queueing all items in the new index %s for reindexing' % (in_type))
+    log.warning('MAPPING: queueing all %s items in the new index %s for reindexing' %
+                (str(coll_count), in_type))
 
     # put index_record in meta
     if meta_exists:
@@ -712,7 +713,7 @@ def check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff=Fals
             log.warning('MAPPING: queueing %s items found in DB but not ES in the index %s for reindexing' % (str(len(diff_uuids)), in_type))
             uuids_to_index.update(diff_uuids)
         else:
-            log.warning('MAPPING: queueing all items in the existing index %s for reindexing' % (in_type))
+            log.warning('MAPPING: queueing %s items found in DB but not ES in the index %s for reindexing' % (str(len(diff_uuids)), in_type))
             uuids_to_index.update(db_uuids)
 
 

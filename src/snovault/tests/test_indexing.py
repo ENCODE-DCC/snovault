@@ -260,7 +260,6 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
     check_and_reindex_existing(app, app.registry[ELASTIC_SEARCH], test_type, test_uuids)
 
     assert test_uuid in test_uuids # Assert that this newly added Item is not yet indexed.
-
     # Then index it:
     indexer_queue.add_uuids(app.registry, list(test_uuids), strict=True)
     res = indexer_testapp.post_json('/index', {'record': True})
