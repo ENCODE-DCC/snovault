@@ -1,6 +1,7 @@
 import pytest
 import transaction
 from sqlalchemy import MetaData
+from zope.sqlalchemy import mark_changed
 from snovault import DBSESSION
 
 @pytest.fixture(autouse=True)
@@ -37,18 +38,17 @@ def app(app_settings):
 
 @pytest.fixture(autouse=True)
 def teardown(app):
+
     from snovault.elasticsearch import create_mapping
     create_mapping.run(app, skip_indexing=True)
     session = app.registry[DBSESSION]
     connection = session.connection().connect()
     meta = MetaData(bind=session.connection(), reflect=True)
-    # print('BEFORE -->', str(connection.cursor().scalar("SELECT COUNT(*) FROM current_propsheets")))
-    # meta.drop_all()
-    # meta.create_all()
-    # print('AFTER -->', str(connection.cursor().scalar("SELECT COUNT(*) FROM current_propsheets")), '\n')
     for table in meta.sorted_tables:
-        print('BEFORE -->', str(connection.scalar("SELECT COUNT(*) FROM current_propsheets")))
         print('Clear table %s' % table)
-        connection.execute(table.delete())
-        print('AFTER -->', str(connection.scalar("SELECT COUNT(*) FROM current_propsheets")), '\n')
+        print('Count before -->', str(connection.scalar("SELECT COUNT(*) FROM %s" % table)))
+        connection.execute(table.delete(synchronize_session=False))
+        print('Count after -->', str(connection.scalar("SELECT COUNT(*) FROM %s" % table)), '\n')
+    session.flush()
+    mark_changed(session())
     transaction.commit()

@@ -107,6 +107,7 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     es = app.registry[ELASTIC_SEARCH]
     indexer_queue = app.registry[INDEXER_QUEUE]
     test_type = 'testing_post_put_patch'
+    # queued on post - total of one item queued
     res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
     # synchronously index
     create_mapping.run(app, collections=[test_type], sync_index=True)
@@ -118,16 +119,22 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     assert indexing_doc['_source']['indexing_content']['type'] == 'sync'
     assert indexing_doc['_source']['indexing_count'] == 1
     # post second item to database but do not index (don't load into es)
+    # queued on post - total of two items queued
     res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
     time.sleep(2)
+    assert indexer_queue.number_of_messages()['waiting'] == 2
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     # doc_count has not yet updated
     assert doc_count == 1
-    # run create mapping to queue the all items
+    # clear the queue by indexing and then run create mapping to queue the all items
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexing_count'] == 2
+    time.sleep(2)
+    assert indexer_queue.number_of_messages()['waiting'] == 0
     create_mapping.run(app, collections=[test_type])
     assert indexer_queue.number_of_messages()['waiting'] == 2
     res = indexer_testapp.post_json('/index', {'record': True})
-    assert indexing_doc_source.get('indexing_count') == 2
+    assert res.json['indexing_count'] == 2
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 2
 
@@ -141,10 +148,6 @@ def test_indexer_queue(app):
     # unittesting the QueueManager
     assert indexer_queue.queue_url is not None
     assert indexer_queue.dlq_url is not None
-    # first, purge the queue
-    indexer_queue.clear_queue()
-    received = indexer_queue.receive_messages()
-    assert len(received) == 0
     test_message = 'abc123'
     to_index, failed = indexer_queue.add_uuids(app.registry, [test_message], strict=True)
     assert to_index == [test_message]
@@ -165,6 +168,46 @@ def test_indexer_queue(app):
     msg_count = indexer_queue.number_of_messages()
     assert msg_count['waiting'] == 0
     assert msg_count['inflight'] == 0
+
+
+def test_queue_indexing_endpoint(app, testapp, indexer_testapp):
+    es = app.registry[ELASTIC_SEARCH]
+    # post a couple things
+    testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    # index these initial bad boys to get them out of the queue
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexing_count'] == 2
+    # now use the queue_indexing endpoint to reindex them
+    post_body = {
+        'collections': ['testing_post_put_patch'],
+        'strict': True
+    }
+    res = indexer_testapp.post_json('/queue_indexing', post_body)
+    assert res.json['notification'] == 'Success'
+    assert res.json['number_queued'] == 2
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexing_count'] == 2
+    doc_count = es.count(index='testing_post_put_patch', doc_type='testing_post_put_patch').get('count')
+    assert doc_count == 2
+
+    # here are some failure situations
+    post_body = {
+        'collections': 'testing_post_put_patch',
+        'strict': False
+    }
+    res = indexer_testapp.post_json('/queue_indexing', post_body)
+    assert res.json['notification'] == 'Failure'
+    assert res.json['number_queued'] == 0
+
+    post_body = {
+        'uuids': ['abc123'],
+        'collections': ['testing_post_put_patch'],
+        'strict': False
+    }
+    res = indexer_testapp.post_json('/queue_indexing', post_body)
+    assert res.json['notification'] == 'Failure'
+    assert res.json['number_queued'] == 0
 
 
 def test_es_indices(app, elasticsearch):

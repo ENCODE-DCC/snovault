@@ -51,6 +51,7 @@ def queue_indexing(request):
         return response
     if req_uuids and req_collections:
         response['detail'] = 'Nothing was queued. You cannot provide both uuids and a collection for queueing at once.'
+        return response
     if req_uuids and not isinstance(req_uuids, list):
         response['detail'] = 'Nothing was queued. When queueing uuids, make to sure to put a list of string uuids in the POST request.'
         return response
