@@ -64,6 +64,7 @@ def teardown(app):
     mark_changed(session())
     transaction.commit()
 
+
 def test_indexer_queue(app):
     indexer_queue_mirror = app.registry[INDEXER_QUEUE_MIRROR]
     # this is only set up for webprod/webprod2
@@ -206,7 +207,6 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 2
     time.sleep(2)
-    assert indexer_queue.number_of_messages()['waiting'] == 0
     create_mapping.run(app, collections=[test_type])
     assert indexer_queue.number_of_messages()['waiting'] == 2
     res = indexer_testapp.post_json('/index', {'record': True})
