@@ -1,5 +1,5 @@
 ### Class to manage the items for indexing
-# First round will use a FIFO SQS queue from AWS
+# First round will use a standard SQS queue from AWS without Elasticache
 
 import boto3
 import json
@@ -9,7 +9,7 @@ import socket
 import time
 from pyramid.view import view_config
 from pyramid.decorator import reify
-from .interfaces import INDEXER_QUEUE
+from .interfaces import INDEXER_QUEUE, INDEXER_QUEUE_MIRROR
 from .indexer_utils import (
     find_uuids_for_indexing,
     get_uuids_for_types,
@@ -21,7 +21,14 @@ log = logging.getLogger(__name__)
 def includeme(config):
     config.add_route('queue_indexing', '/queue_indexing')
     config.add_route('indexing_status', '/indexing_status')
+    env_name = config.registry.settings.get('env.name')
     config.registry[INDEXER_QUEUE] = QueueManager(config.registry)
+    # INDEXER_QUEUE_MIRROR is used because webprod and webprod2 share a DB
+    if env_name and 'fourfront-webprod' in env_name:
+        mirror_env = 'fourfront-webprod2' if env_name == 'fourfront-webprod' else 'fourfront-webprod'
+        config.registry[INDEXER_QUEUE_MIRROR] = QueueManager(config.registry, forced_env=mirror_env)
+    else:
+        config.registry[INDEXER_QUEUE_MIRROR] = None
     config.scan(__name__)
 
 
@@ -86,7 +93,7 @@ def indexing_status(request):
 
 
 class QueueManager(object):
-    def __init__(self, registry):
+    def __init__(self, registry, forced_env=None):
         # batch sizes of messages. __all of these should be 10 at maximum__
         self.send_batch_size = 10
         self.recieve_batch_size = 10
@@ -94,7 +101,7 @@ class QueueManager(object):
         self.replace_batch_size = 10
         # maximum number of uuids in a message
         self.send_uuid_threshold = 1
-        self.env_name = registry.settings.get('env.name')
+        self.env_name = forced_env if forced_env else registry.settings.get('env.name')
         # local development
         if not self.env_name:
             backup = socket.gethostname()

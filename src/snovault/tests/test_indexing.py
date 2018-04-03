@@ -14,41 +14,9 @@ from snovault import (
 )
 
 pytestmark = [pytest.mark.indexing]
-
-
-@pytest.fixture(autouse=True)
-def autouse_external_tx(external_tx):
-    pass
-
-
-@pytest.fixture(scope='session')
-def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server):
-    from .testappfixtures import _app_settings
-    settings = _app_settings.copy()
-    settings['create_tables'] = True
-    settings['persona.audiences'] = 'http://%s:%s' % wsgi_server_host_port
-    settings['elasticsearch.server'] = elasticsearch_server
-    settings['sqlalchemy.url'] = postgresql_server
-    settings['collection_datastore'] = 'elasticsearch'
-    settings['item_datastore'] = 'elasticsearch'
-    settings['indexer'] = True
-    settings['should_index'] = True
-    settings['indexer.processes'] = 2
-    return settings
-
-
-@pytest.yield_fixture(scope='session')
-def app(app_settings):
-    from snovault import main
-    app = main({}, **app_settings)
-
-    yield app
-
-
-@pytest.fixture(autouse=True)
-def teardown(app):
-    from snovault.elasticsearch import create_mapping
-    create_mapping.run(app, skip_indexing=True)
+pytest_plugins = [
+    'snovault.tests.indexfixtures',
+]
 
 
 def test_indexing_simple(app, testapp, indexer_testapp):
@@ -86,6 +54,87 @@ def test_indexing_simple(app, testapp, indexer_testapp):
     testing_ppp_source = testing_ppp_meta['_source']
     assert 'mappings' in testing_ppp_source
     assert 'settings' in testing_ppp_source
+
+
+def test_indexing_queue_records(app, testapp, indexer_testapp):
+    """
+    Do a full test using different forms of create mapping and both sync
+    and queued indexing.
+    """
+    from snovault.elasticsearch import create_mapping, indexer_utils
+    from elasticsearch.exceptions import NotFoundError
+    from datetime import datetime
+    es = app.registry[ELASTIC_SEARCH]
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    test_type = 'testing_post_put_patch'
+    # no documents added yet
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 0
+    # post a document but do not yet index
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 0
+    # indexing record should not yet exist (expect error)
+    with pytest.raises(NotFoundError):
+        es.get(index='meta', doc_type='meta', id='latest_indexing')
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexing_count'] == 1
+    assert res.json['indexing_content']['type'] == 'queue'
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 1
+    # make sure latest_indexing doc matches
+    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
+    indexing_doc_source = indexing_doc.get('_source', {})
+    assert indexing_doc_source.get('indexing_count') == 1
+    # test timing in indexing doc
+    assert indexing_doc_source.get('indexing_elapsed')
+    indexing_start = indexing_doc_source.get('indexing_started')
+    indexing_end = indexing_doc_source.get('indexing_finished')
+    assert indexing_start and indexing_end
+    time_start =  datetime.strptime(indexing_start, '%Y-%m-%dT%H:%M:%S.%f')
+    time_done = datetime.strptime(indexing_end, '%Y-%m-%dT%H:%M:%S.%f')
+    assert time_start < time_done
+    # get indexing record by start_time
+    indexing_record = es.get(index='meta', doc_type='meta', id=indexing_start)
+    assert indexing_record.get('_source', {}).get('indexing_status') == 'finished'
+    assert indexing_record.get('_source') == indexing_doc_source
+
+
+def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
+    from snovault.elasticsearch import create_mapping, indexer_utils
+    from elasticsearch.exceptions import NotFoundError
+    from datetime import datetime
+    es = app.registry[ELASTIC_SEARCH]
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    test_type = 'testing_post_put_patch'
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    # synchronously index
+    create_mapping.run(app, collections=[test_type], sync_index=True)
+    time.sleep(6)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 1
+    assert indexer_queue.number_of_messages()['waiting'] == 0
+    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
+    assert indexing_doc['_source']['indexing_content']['type'] == 'sync'
+    assert indexing_doc['_source']['indexing_count'] == 1
+    # post second item to database but do not index (don't load into es)
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    time.sleep(2)
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    # doc_count has not yet updated
+    assert doc_count == 1
+    # run create mapping to queue the all items
+    create_mapping.run(app, collections=[test_type])
+    assert indexer_queue.number_of_messages()['waiting'] == 2
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert indexing_doc_source.get('indexing_count') == 2
+    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
+    assert doc_count == 2
+
+
+def test_indexer_queue(app):
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    assert True
 
 
 def test_es_indices(app, elasticsearch):
@@ -137,109 +186,6 @@ def test_index_settings(app, testapp, indexer_testapp):
     assert int(found_max_window) == max_result_window
 
 
-def test_indexing_es(app, testapp, indexer_testapp):
-    """
-    Do a full test using different forms of create mapping and both sync
-    and queued indexing.
-    """
-    from snovault.elasticsearch import create_mapping, indexer_utils
-    from elasticsearch.exceptions import NotFoundError
-    from datetime import datetime
-    es = app.registry[ELASTIC_SEARCH]
-    indexer_queue = app.registry[INDEXER_QUEUE]
-    test_type = 'testing_post_put_patch'
-    # no documents added yet
-    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
-    assert doc_count == 0
-    # post a document but do not yet index
-    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
-    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
-    assert doc_count == 0
-    # indexing record should not yet exist (expect error)
-    with pytest.raises(NotFoundError):
-        es.get(index='meta', doc_type='meta', id='latest_indexing')
-    res = indexer_testapp.post_json('/index', {'record': True})
-    assert res.json['indexing_count'] == 1
-    assert res.json['indexing_content']['type'] == 'queue'
-    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
-    assert doc_count == 1
-    # make sure latest_indexing doc matches
-    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
-    indexing_doc_source = indexing_doc.get('_source', {})
-    assert indexing_doc_source.get('indexing_count') == 1
-    # test timing in indexing doc
-    assert indexing_doc_source.get('indexing_elapsed')
-    indexing_start = indexing_doc_source.get('indexing_started')
-    indexing_end = indexing_doc_source.get('indexing_finished')
-    assert indexing_start and indexing_end
-    time_start =  datetime.strptime(indexing_start, '%Y-%m-%dT%H:%M:%S.%f')
-    time_done = datetime.strptime(indexing_end, '%Y-%m-%dT%H:%M:%S.%f')
-    assert time_start < time_done
-    # get indexing record by start_time
-    indexing_record = es.get(index='meta', doc_type='meta', id=indexing_start)
-    assert indexing_record.get('_source', {}).get('indexing_status') == 'finished'
-    assert indexing_record.get('_source') == indexing_doc_source
-    # run create_mapping with check_first=False (do not expect a re-index)
-    # this will purge the queue then add items to index to it
-    create_mapping.run(app)
-    time.sleep(6)
-    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
-    assert doc_count == 0
-    with pytest.raises(NotFoundError):
-        es.get(index='meta', doc_type='meta', id='latest_indexing')
-    # make sure there is one item in the queue
-    assert indexer_queue.number_of_messages()['waiting'] == 1
-    # index to create the indexing doc
-    res = indexer_testapp.post_json('/index', {'record': True})
-    assert res.json.get('indexing_count') == 1
-    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
-    assert doc_count == 1
-    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
-    assert indexing_doc.get('_source', {}).get('indexing_count') == 1
-
-    # make sure the queue is empty
-    assert indexer_queue.number_of_messages()['waiting'] == 0
-    # delete index and re-run create_mapping
-    # should queue the single uuid for indexing in stored_uuids
-    es.indices.delete(index=test_type)
-    create_mapping.run(app, check_first=True)
-    time.sleep(6)
-    assert indexer_queue.number_of_messages()['waiting'] == 1
-    # reindex with --sync-index, and --item-type
-    # this will NOT cause the queue to clear
-    create_mapping.run(app, collections=[test_type], sync_index=True)
-    time.sleep(6)
-    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
-    assert doc_count == 1
-    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
-    assert indexing_doc['_source']['indexing_content']['type'] == 'sync'
-    assert indexing_doc['_source']['indexing_count'] == 1
-    # post second item to database but do not index (don't load into es)
-    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
-    time.sleep(2)
-    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
-    # doc_count has not yet updated
-    assert doc_count == 1
-    assert indexer_queue.number_of_messages()['waiting'] == 2
-    # run create mapping to queue the all items
-    create_mapping.run(app, collections=[test_type])
-    assert indexer_queue.number_of_messages()['waiting'] == 2
-    res = indexer_testapp.post_json('/index', {'record': True})
-    assert indexing_doc_source.get('indexing_count') == 2
-    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
-    assert doc_count == 2
-    res = indexer_testapp.post_json('/index', {'record': True})
-    # remove the index again
-    es.indices.delete(index=test_type)
-    # reindex only test_type items, strictly and synchronously
-    create_mapping.run(app, collections=[test_type], strict=True, sync_index=True)
-    doc_count = es.count(index=test_type, doc_type=test_type).get('count')
-    assert doc_count == 2
-    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
-    assert indexing_doc['_source']['indexing_content']['type'] == 'sync'
-    assert indexing_doc['_source']['indexing_count'] == 2
-
-
 # some unit tests associated with build_index in create_mapping
 def test_check_if_index_exists(app):
     from snovault.elasticsearch.create_mapping import check_if_index_exists
@@ -284,7 +230,7 @@ def test_check_and_reindex_existing(app, testapp):
     assert(len(test_uuids)) == 1
 
 
-def test_es_delete_simple(app, testapp, session):
+def test_es_delete_simple(app, testapp, indexer_testapp, session):
     from snovault.interfaces import STORAGE
     from snovault.storage import (
         Resource,
@@ -298,6 +244,7 @@ def test_es_delete_simple(app, testapp, session):
        check_and_reindex_existing
     )
     from snovault.commands.es_index_data import run as run_index_data
+    indexer_queue = app.registry[INDEXER_QUEUE]
     ## Adding new test resource to DB
     storage = app.registry[STORAGE]
     test_type = 'testing_post_put_patch'
@@ -315,10 +262,11 @@ def test_es_delete_simple(app, testapp, session):
     assert test_uuid in test_uuids # Assert that this newly added Item is not yet indexed.
 
     # Then index it:
-    run_create_mapping(app, index_uuids=list(test_uuids), strict=True, sync_index=True)
+    indexer_queue.add_uuids(app.registry, list(test_uuids), strict=True)
+    res = indexer_testapp.post_json('/index', {'record': True})
     time.sleep(5) # INDEXER performs a network request to ES server to index things. Whether we like it or not, this means it's async and we must wait.
 
-    ## Now ensure that we do has it in ES:
+    ## Now ensure that we do have it in ES:
     test_uuids_2 = set()
     check_and_reindex_existing(app, app.registry[ELASTIC_SEARCH], test_type, test_uuids_2)
     assert bool(test_uuids_2) == False # Ensure we don't have any more indices to reindex after indexing our newly added UUID/Item

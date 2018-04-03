@@ -9,7 +9,7 @@ from .interfaces import (
     BeforeModified,
     Created,
 )
-from .elasticsearch.interfaces import INDEXER_QUEUE
+from .elasticsearch.interfaces import INDEXER_QUEUE, INDEXER_QUEUE_MIRROR
 from .util import simple_path_ids
 import transaction
 
@@ -61,10 +61,14 @@ def queue_item_and_invalidate_new_back_revs(event):
     # use strict mode if creating, otherwise should queue associated uuids
     # POSSIBLE ISSUES:
     # - on bin/load data, things get queued twice, once as created on once as modified
+    # Must consider buth INDEXER_QUEUE and INDEXER_QUEUE_MIRROR
     indexer_queue = context.registry.get(INDEXER_QUEUE)
+    indexer_queue_mirror = context.registry.get(INDEXER_QUEUE_MIRROR)
     if indexer_queue:
         # use strict mode if the event is 'Created', else do not
         indexer_queue.add_uuids(context.registry, [str(context.uuid)], strict=event.__class__.__name__ == 'Created')
+        if indexer_queue_mirror:
+            indexer_queue_mirror.add_uuids(context.registry, [str(context.uuid)], strict=event.__class__.__name__ == 'Created')
     else:
         # if the indexer queue is not configured but ES is, raise an exception
         from .elasticsearch.interfaces import ELASTIC_SEARCH
