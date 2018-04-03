@@ -42,6 +42,11 @@ def app(app_settings):
     create_mapping.run(app, skip_indexing=True)
     yield app
 
+    from snovault import DBSESSION
+    DBSession = app.registry[DBSESSION]
+    # Dispose connections so postgres can tear down.
+    DBSession.bind.pool.dispose()
+
 
 @pytest.mark.fixture_cost(500)
 @pytest.yield_fixture(scope='session')

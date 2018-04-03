@@ -18,6 +18,36 @@ pytest_plugins = [
     'snovault.tests.indexfixtures',
 ]
 
+def test_indexer_queue(app):
+    indexer_queue_mirror = app.registry[INDEXER_QUEUE_MIRROR]
+    # this is only set up for webprod/webprod2
+    assert indexer_queue_mirror is None
+
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    # unittesting the QueueManager
+    assert indexer_queue.queue_url is not None
+    assert indexer_queue.dlq_url is not None
+    test_message = 'abc123'
+    to_index, failed = indexer_queue.add_uuids(app.registry, [test_message], strict=True)
+    assert to_index == [test_message]
+    assert not failed
+    received = indexer_queue.receive_messages()
+    assert len(received) == 1
+    assert received[0]['Body'] == test_message
+    # try to receive again (should be empty)
+    received_2 = indexer_queue.receive_messages()
+    assert len(received_2) == 0
+    # replace into queue
+    indexer_queue.replace_messages(received)
+    received = indexer_queue.receive_messages()
+    assert len(received) == 1
+    # finally, delete
+    indexer_queue.delete_messages(received)
+    time.sleep(2)
+    msg_count = indexer_queue.number_of_messages()
+    assert msg_count['waiting'] == 0
+    assert msg_count['inflight'] == 0
+
 
 def test_indexing_simple(app, testapp, indexer_testapp):
     from snovault.elasticsearch import indexer_utils
@@ -114,7 +144,7 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     time.sleep(6)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
-    assert indexer_queue.number_of_messages()['waiting'] == 0
+    assert indexer_queue.number_of_messages()['waiting'] == 1
     indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
     assert indexing_doc['_source']['indexing_content']['type'] == 'sync'
     assert indexing_doc['_source']['indexing_count'] == 1
@@ -137,37 +167,6 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     assert res.json['indexing_count'] == 2
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 2
-
-
-def test_indexer_queue(app):
-    indexer_queue_mirror = app.registry[INDEXER_QUEUE_MIRROR]
-    # this is only set up for webprod/webprod2
-    assert indexer_queue_mirror is None
-
-    indexer_queue = app.registry[INDEXER_QUEUE]
-    # unittesting the QueueManager
-    assert indexer_queue.queue_url is not None
-    assert indexer_queue.dlq_url is not None
-    test_message = 'abc123'
-    to_index, failed = indexer_queue.add_uuids(app.registry, [test_message], strict=True)
-    assert to_index == [test_message]
-    assert not failed
-    received = indexer_queue.receive_messages()
-    assert len(received) == 1
-    assert received[0]['Body'] == test_message
-    # try to receive again (should be empty)
-    received_2 = indexer_queue.receive_messages()
-    assert len(received_2) == 0
-    # replace into queue
-    indexer_queue.replace_messages(received)
-    received = indexer_queue.receive_messages()
-    assert len(received) == 1
-    # finally, delete
-    indexer_queue.delete_messages(received)
-    time.sleep(2)
-    msg_count = indexer_queue.number_of_messages()
-    assert msg_count['waiting'] == 0
-    assert msg_count['inflight'] == 0
 
 
 def test_queue_indexing_endpoint(app, testapp, indexer_testapp):

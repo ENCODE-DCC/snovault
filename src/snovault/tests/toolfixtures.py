@@ -45,12 +45,6 @@ def elasticsearch(registry):
 
 
 @pytest.fixture
-def indexer_queue(registry):
-    from snovault.elasticsearch.interfaces import INDEXER_QUEUE
-    return registry[INDEXER_QUEUE]
-
-
-@pytest.fixture
 def storage(registry):
     import snovault.interfaces
     return registry[snovault.interfaces.STORAGE]

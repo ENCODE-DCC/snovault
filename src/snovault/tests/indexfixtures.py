@@ -1,12 +1,4 @@
 import pytest
-import transaction
-from sqlalchemy import MetaData
-from zope.sqlalchemy import mark_changed
-from snovault import DBSESSION
-
-@pytest.fixture(autouse=True)
-def autouse_external_tx(external_tx):
-    pass
 
 
 @pytest.fixture(scope='session')
@@ -31,6 +23,7 @@ def app(app_settings):
 
     yield app
 
+    from snovault import DBSESSION
     DBSession = app.registry[DBSESSION]
     # Dispose connections so postgres can tear down.
     DBSession.bind.pool.dispose()
@@ -38,7 +31,10 @@ def app(app_settings):
 
 @pytest.fixture(autouse=True)
 def teardown(app):
-
+    import transaction
+    from sqlalchemy import MetaData
+    from zope.sqlalchemy import mark_changed
+    from snovault import DBSESSION
     from snovault.elasticsearch import create_mapping
     create_mapping.run(app, skip_indexing=True)
     session = app.registry[DBSESSION]
