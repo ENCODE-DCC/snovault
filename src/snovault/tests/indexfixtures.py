@@ -40,8 +40,15 @@ def teardown(app):
     from snovault.elasticsearch import create_mapping
     create_mapping.run(app, skip_indexing=True)
     session = app.registry[DBSESSION]
-    meta = MetaData(bind=session.connection(), reflect=True)
     connection = session.connection().connect()
+    meta = MetaData(bind=session.connection(), reflect=True)
+    # print('BEFORE -->', str(connection.cursor().scalar("SELECT COUNT(*) FROM current_propsheets")))
+    # meta.drop_all()
+    # meta.create_all()
+    # print('AFTER -->', str(connection.cursor().scalar("SELECT COUNT(*) FROM current_propsheets")), '\n')
     for table in meta.sorted_tables:
+        print('BEFORE -->', str(connection.scalar("SELECT COUNT(*) FROM current_propsheets")))
+        print('Clear table %s' % table)
         connection.execute(table.delete())
+        print('AFTER -->', str(connection.scalar("SELECT COUNT(*) FROM current_propsheets")), '\n')
     transaction.commit()
