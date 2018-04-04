@@ -126,7 +126,7 @@ class QueueManager(object):
             dlq_arn = self.get_queue_arn(self.dlq_url)
             redrive_policy = {  # maintain this order of settings
                 'deadLetterTargetArn': dlq_arn,
-                'maxReceiveCount': 4  # 4 fails in the queue will send to dlq
+                'maxReceiveCount': 2  # num of fails before sending to dlq
             }
             self.queue_attrs['RedrivePolicy'] = json.dumps(redrive_policy)
         self.queue_url = self.init_queue(self.queue_name)

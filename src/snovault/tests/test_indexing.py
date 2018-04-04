@@ -58,7 +58,7 @@ def teardown(app):
     for table in meta.sorted_tables:
         print('Clear table %s' % table)
         print('Count before -->', str(connection.scalar("SELECT COUNT(*) FROM %s" % table)))
-        connection.execute(table.delete(synchronize_session=False))
+        connection.execute(table.delete())
         print('Count after -->', str(connection.scalar("SELECT COUNT(*) FROM %s" % table)), '\n')
     session.flush()
     mark_changed(session())
