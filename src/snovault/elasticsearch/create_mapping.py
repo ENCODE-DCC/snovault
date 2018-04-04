@@ -866,6 +866,11 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         # automatically add meta to start when going through all collections
         if not no_meta:
             collections = ['meta'] + collections
+
+    # if meta doesn't exist, always add it
+    if not check_if_index_exists(es, 'meta', False) and 'meta' not in collections:
+        collections = ['meta'] + collections
+
     log.warning('\n___FOUND COLLECTIONS___:\n %s\n' % (str(collections)))
     for collection_name in collections:
         if collection_name == 'meta':
