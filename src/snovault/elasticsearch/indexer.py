@@ -10,7 +10,6 @@ from .interfaces import (
     INDEXER,
     INDEXER_QUEUE
 )
-from .indexer_utils import index_timestamp
 import datetime
 import logging
 import time
@@ -92,7 +91,11 @@ def index(request):
                 es.indices.flush_synced(index='meta')
             except ConflictError:
                 pass
-
+    # refresh all indices
+    try:
+        es.indices.refresh(index='_all')
+    except Exception as e:
+        log.warning('Error refreshing indices after indexing: %s' % str(e))
     return indexing_record
 
 
@@ -168,14 +171,14 @@ class Indexer(object):
 
     def update_object(self, request, uuid):
         curr_time = datetime.datetime.now().isoformat()
-        timestamp = index_timestamp()
+        timestamp = int(time.time() * 1000000)
         try:
             result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
         except Exception as e:
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
         last_exc = None
-        for backoff in [0, 1, 2, 3]:
+        for backoff in [0, 1, 2]:
             time.sleep(backoff)
             # timestamp from the queue or /index call (for sync uuids)
             # is used as the version number
@@ -186,8 +189,9 @@ class Indexer(object):
                     request_timeout=30
                 )
             except ConflictError:
-                log.warning('Conflict indexing %s at version %d', uuid, timestamp)
-                return
+                last_exc = 'Conflict indexing %s at version %s' % (uuid, timestamp)
+                log.warning(last_exc)
+                break
             except (ConnectionError, ReadTimeoutError, TransportError) as e:
                 log.warning('Retryable error indexing %s: %r', uuid, e)
                 last_exc = repr(e)

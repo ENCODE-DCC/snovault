@@ -12,8 +12,7 @@ from pyramid.decorator import reify
 from .interfaces import INDEXER_QUEUE, INDEXER_QUEUE_MIRROR
 from .indexer_utils import (
     find_uuids_for_indexing,
-    get_uuids_for_types,
-    index_timestamp
+    get_uuids_for_types
 )
 
 log = logging.getLogger(__name__)
@@ -282,9 +281,10 @@ class QueueManager(object):
             entries = []
             for msg_batch in self.chunk_messages(total_batch, self.send_uuid_threshold):
                 entries.append({
-                    'Id': str(index_timestamp()),
+                    'Id': str(int(time.time() * 1000000)),
                     'MessageBody': ','.join(msg_batch)
                 })
+                time.sleep(0.001)  # in edge cases, Ids were repeated?
             response = self.client.send_message_batch(
                 QueueUrl=self.queue_url,
                 Entries=entries
