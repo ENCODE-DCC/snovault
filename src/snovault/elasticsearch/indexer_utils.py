@@ -96,7 +96,4 @@ def get_xmin_from_es(es):
 
 
 def index_timestamp():
-    """
-    Returns an int datetime.utcnow() to microsecond resolution
-    """
     return int(time.time() * 1000000)
