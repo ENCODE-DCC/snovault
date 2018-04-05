@@ -1,3 +1,5 @@
+import time
+
 def find_uuids_for_indexing(registry, updated, log=None):
     from .interfaces import ELASTIC_SEARCH
     from .create_mapping import index_settings
@@ -97,5 +99,4 @@ def index_timestamp():
     """
     Returns an int datetime.utcnow() to microsecond resolution
     """
-    import time
     return int(time.time() * 1000000)
