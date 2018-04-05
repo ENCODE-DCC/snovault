@@ -122,7 +122,6 @@ def test_indexing_simple(app, testapp, indexer_testapp):
     es = app.registry[ELASTIC_SEARCH]
     indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
     indexing_source = indexing_doc['_source']
-    utils_xmin = indexer_utils.get_xmin_from_es(es)
     assert 'indexing_finished' in indexing_source
     assert 'indexing_content' in indexing_source
     assert indexing_source['indexing_status'] == 'finished'

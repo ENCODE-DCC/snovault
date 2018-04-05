@@ -10,7 +10,6 @@ from .interfaces import (
     INDEXER,
     INDEXER_QUEUE
 )
-from .indexer_utils import index_timestamp
 import datetime
 import logging
 import time
@@ -172,7 +171,7 @@ class Indexer(object):
 
     def update_object(self, request, uuid):
         curr_time = datetime.datetime.now().isoformat()
-        timestamp = index_timestamp()
+        timestamp = int(time.time() * 1000000)
         try:
             result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
         except Exception as e:

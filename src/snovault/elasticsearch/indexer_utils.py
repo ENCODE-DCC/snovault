@@ -1,9 +1,8 @@
-import time
-
 def find_uuids_for_indexing(registry, updated, log=None):
     from .interfaces import ELASTIC_SEARCH
     from .create_mapping import index_settings
     from elasticsearch.exceptions import ConnectionTimeout
+    import time
     es = registry[ELASTIC_SEARCH]
     SEARCH_MAX = 99999  # OutOfMemoryError if too high
     """
@@ -81,19 +80,3 @@ def get_uuids_for_types(registry, types=None):
         collection = collections.by_item_type[collection_name]
         for uuid in collection:
             yield str(uuid)
-
-
-def get_xmin_from_es(es):
-    from elasticsearch.exceptions import NotFoundError
-    try:
-        status = es.get(index='meta', doc_type='meta', id='indexing')
-    except NotFoundError:
-        interval_settings = {"index": {"refresh_interval": "30s"}}
-        es.indices.put_settings(index='meta', body=interval_settings)
-        return None
-    else:
-        return status['_source']['xmin']
-
-
-def index_timestamp():
-    return int(time.time() * 1000000)
