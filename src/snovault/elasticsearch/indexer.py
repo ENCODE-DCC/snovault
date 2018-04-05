@@ -232,6 +232,7 @@ def index(request):
             # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
             state.prep_for_followup(xmin, invalidated)
 
+        invalidated = invalidated[:1000]
         result = state.start_cycle(invalidated, result)
 
         # Do the work...
@@ -300,7 +301,6 @@ class Indexer(object):
 
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         errors = []
-        uuids = uuids[:1000]
         for i, uuid in enumerate(uuids):
             error = self.update_object(request, uuid, xmin)
             if error is not None:
