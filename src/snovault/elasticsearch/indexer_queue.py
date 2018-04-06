@@ -93,7 +93,24 @@ def indexing_status(request):
 
 
 class QueueManager(object):
+    """
+    Class for handling the queues responsible for coordinating indexing.
+    Contains methods to inititalize queues, add both uuids and collections of
+    uuids to the queue, and also various helper methods to receive/delete/replace
+    messages on the queue.
+    Currently the set up uses 3 queues:
+    1. Primary queue for items that are directly posted, patched, or added.
+    2. Secondary queue for associated items of those in the primary queue.
+    3. Dead letter queue (dlq) for handling items that have issues processing
+       from either the primary or secondary queues.
+    """
     def __init__(self, registry, forced_env=None):
+        """
+        __init__ will build all three queues needed with the desired settings.
+        send_uuid_threshold and batch_size parameters are used to how many
+        uuids are in a message and how many messages are batched together,
+        respectively.
+        """
         # batch sizes of messages. __all of these should be 10 at maximum__
         self.send_batch_size = 10
         self.receive_batch_size = 10
@@ -114,7 +131,10 @@ class QueueManager(object):
             'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
         }
         self.client = boto3.client('sqs', region_name='us-east-1')
+        # primary queue name
         self.queue_name = self.env_name + '-indexer-queue'
+        # secondary queue name
+        self.second_queue_name = self.env_name + '-secondary-indexer-queue'
         self.dlq_name = self.queue_name + '-dlq'
         # code below can cause SQS deletion/creation
         # if run from MPIndexer, will work, but not gracefully.
@@ -128,7 +148,9 @@ class QueueManager(object):
                 'maxReceiveCount': 2  # num of fails before sending to dlq
             }
             self.queue_attrs['RedrivePolicy'] = json.dumps(redrive_policy)
+        # init the primary and secondary queues with dlq attrs included
         self.queue_url = self.init_queue(self.queue_name)
+        self.second_queue_url = self.init_queue(self.second_queue_name)
 
     def add_uuids(self, registry, uuids, strict=False):
         """
@@ -240,7 +262,7 @@ class QueueManager(object):
         Clear out the queue and dlq completely. You can no longer retrieve
         these messages. Takes up to 60 seconds.
         """
-        for queue_url in [self.queue_url, self.dlq_url]:
+        for queue_url in [self.queue_url, self.second_queue_url, self.dlq_url]:
             try:
                 self.client.purge_queue(
                     QueueUrl=queue_url
@@ -256,7 +278,7 @@ class QueueManager(object):
         response = self.client.delete_queue(
             QueueUrl=queue_url
         )
-        self.queue_url = None
+        setattr(self, queue_url, None)
         return response
 
     def chunk_messages(self, messages, chunksize):
@@ -266,11 +288,13 @@ class QueueManager(object):
         for i in range(0, len(messages), chunksize):
             yield messages[i:i + chunksize]
 
-    def send_messages(self, messages):
+    def send_messages(self, messages, secondary=False):
         """
         Send any number of 'messages' in a list.
         Can batch up to 10 messages, controlled by self.send_batch_size.
         This is easily controlled by self.send_uuid_threshold.
+        If secondary is True, then the secondary queue will be used. Otherwise,
+        the primary queue is used by default.
 
         messages argument should be a list of uuid strings.
         Returns information on messages that failed to queue
@@ -286,33 +310,39 @@ class QueueManager(object):
                 })
                 time.sleep(0.001)  # in edge cases, Ids were repeated?
             response = self.client.send_message_batch(
-                QueueUrl=self.queue_url,
+                QueueUrl=self.second_queue_url if secondary else self.queue_url,
                 Entries=entries
             )
             failed.extend(response.get('Failed', []))
         return failed
 
-    def receive_messages(self):
+    def receive_messages(self, secondary=False):
         """
         Recieves up to self.receive_batch_size number of messages from the queue.
         Fewer (even 0) messages may be returned on any given run.
+        If secondary is True, then the secondary queue will be used. Otherwise,
+        the primary queue is used by default.
+
         Returns a list of messages with message metdata
         """
         response = self.client.receive_message(
-            QueueUrl=self.queue_url,
+            QueueUrl=self.second_queue_url if secondary else self.queue_url,
             MaxNumberOfMessages=self.receive_batch_size,
             VisibilityTimeout=int(self.queue_attrs['VisibilityTimeout'])
         )
         # messages in response include ReceiptHandle and Body, most importantly
         return response.get('Messages', [])
 
-    def delete_messages(self, messages):
+    def delete_messages(self, messages, secondary=False):
         """
         Called after a message has been successfully received and processed.
         Removes message from the queue.
         Splits messages into a batch size given by self.delete_batch_size.
         Input should be the messages directly from receive messages. At the
         very least, needs a list of messages with 'Id' and 'ReceiptHandle'.
+        If secondary is True, then the secondary queue will be used. Otherwise,
+        the primary queue is used by default.
+
         Returns a list with any failed attempts.
         """
         failed = []
@@ -326,13 +356,13 @@ class QueueManager(object):
                 }
                 batch[i] = to_delete
             response = self.client.delete_message_batch(
-                QueueUrl=self.queue_url,
+                QueueUrl=self.second_queue_url if secondary else self.queue_url,
                 Entries=batch
             )
             failed.extend(response.get('Failed', []))
         return failed
 
-    def replace_messages(self, messages):
+    def replace_messages(self, messages, secondary=False):
         """
         Called using received messages to place them back on the queue.
         Using a VisibilityTimeout of 0 means these messages are instantly
@@ -340,6 +370,9 @@ class QueueManager(object):
         Number of messages in a batch is controlled by self.replace_batch_size
         Input should be the messages directly from receive messages. At the
         very least, needs a list of messages with 'Id' and 'ReceiptHandle'.
+        If secondary is True, then the secondary queue will be used. Otherwise,
+        the primary queue is used by default.
+
         Returns a list with any failed attempts.
         """
         failed = []
@@ -352,7 +385,7 @@ class QueueManager(object):
                 }
                 batch[i] = to_replace
             response = self.client.change_message_visibility_batch(
-                QueueUrl=self.queue_url,
+                QueueUrl=self.second_queue_url if secondary else self.queue_url,
                 Entries=batch
             )
             failed.extend(response.get('Failed', []))
@@ -364,25 +397,23 @@ class QueueManager(object):
         number of inflight (i.e. not currently visible) messages.
         Also returns info on items in the dlq.
         """
-        response = self.client.get_queue_attributes(
-            QueueUrl=self.queue_url,
-            AttributeNames=[
-                'ApproximateNumberOfMessages',
-                'ApproximateNumberOfMessagesNotVisible'
-            ]
-        )
-        dlq_response = self.client.get_queue_attributes(
-            QueueUrl=self.dlq_url,
-            AttributeNames=[
-                'ApproximateNumberOfMessages',
-                'ApproximateNumberOfMessagesNotVisible'
-            ]
-        )
+        responses = []
+        for queue_url in [self.queue_url, self.second_queue_url, self.dlq_url]:
+            response = self.client.get_queue_attributes(
+                QueueUrl=queue_url,
+                AttributeNames=[
+                    'ApproximateNumberOfMessages',
+                    'ApproximateNumberOfMessagesNotVisible'
+                ]
+            )
+            responses.append(response)
         formatted = {
-            'waiting': response.get('Attributes', {}).get('ApproximateNumberOfMessages'),
-            'inflight': response.get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible'),
-            'dlq_waiting': dlq_response.get('Attributes', {}).get('ApproximateNumberOfMessages'),
-            'dlq_inflight': dlq_response.get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible')
+            'primary_waiting': responses[0].get('Attributes', {}).get('ApproximateNumberOfMessages'),
+            'primary_inflight': responses[0].get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible'),
+            'secondary_waiting': responses[1].get('Attributes', {}).get('ApproximateNumberOfMessages'),
+            'secondary_inflight': responses[1].get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible'),
+            'dlq_waiting': responses[2].get('Attributes', {}).get('ApproximateNumberOfMessages'),
+            'dlq_inflight': responses[2].get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible')
         }
         # transform in integers
         for entry in formatted:
