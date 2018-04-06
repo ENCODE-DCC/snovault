@@ -10,10 +10,7 @@ import time
 from pyramid.view import view_config
 from pyramid.decorator import reify
 from .interfaces import INDEXER_QUEUE, INDEXER_QUEUE_MIRROR
-from .indexer_utils import (
-    find_uuids_for_indexing,
-    get_uuids_for_types
-)
+from .indexer_utils import get_uuids_for_types
 
 log = logging.getLogger(__name__)
 
@@ -152,51 +149,38 @@ class QueueManager(object):
         self.queue_url = self.init_queue(self.queue_name)
         self.second_queue_url = self.init_queue(self.second_queue_name)
 
-    def add_uuids(self, registry, uuids, strict=False):
+    def add_uuids(self, registry, uuids, strict=False, secondary=False):
         """
-        Takes a list of string uuids, finds all associated uuids using the
-        indexer_utils, and then queues them all up. Also requires a registry,
+        Takes a list of string uuids queues them up. Also requires a registry,
         which is passed in automatically when using the /queue_indexing route.
+
+        If strict, the uuids will be queued with info instructing associated
+        uuids NOT to be queued.
 
         Returns a list of queued uuids and a list of any uuids that failed to
         be queued.
-
-        NOTE: using find_uuids_for_indexing is smart, since it uses ES to find
-        all items that either embed or link this uuid. If items are not yet
-        indexed, they won't be queued for possibly redudanct re-indexing
-        (those items should be independently queued)
         """
-        all_uuids = []
-        failed = self.send_messages(uuids)
-        # add secondary uuids if not strict
-        if not strict:
-            associated_uuids = find_uuids_for_indexing(registry, set(uuids), log)
-            # remove uuids from associated uuids and make into list
-            secondary_uuids = list(associated_uuids - set(uuids))
-            failed.extend(self.send_messages(secondary_uuids, secondary=True))
-            all_uuids = uuids + secondary_uuids
-        return all_uuids, failed
+        # never allow the secondary queue to be used with strict
+        if strict: secondary = False
+        failed = self.send_messages(uuids, strict=strict, secondary=secondary)
+        return uuids, failed
 
     def add_collections(self, registry, collections, strict=False):
         """
-        Takes a list of collection name, finds all associated uuids using the
-        indexer_utils, and then queues them all up. Also requires a registry,
-        which is passed in automatically when using the /queue_indexing route.
+        Takes a list of collection name and queues all uuids for them.
+        Also requires a registry, which is passed in automatically when using
+        the /queue_indexing route.
+
+        If strict, the uuids will be queued with info instructing associated
+        uuids NOT to be queued. Never uses secondary.
 
         Returns a list of queued uuids and a list of any uuids that failed to
         be queued.
         """
         ### IS THIS USING DATASTORE HERE?
-        all_uuids = []
-        uuids = get_uuids_for_types(registry, collections)  # this is a set
-        failed = self.send_messages(list(uuids))
-        if not strict:
-            associated_uuids = find_uuids_for_indexing(registry, uuids, log)
-            # remove uuids from associated uuids and make into list
-            secondary_uuids = list(associated_uuids - uuids)
-            failed.extend(self.send_messages(secondary_uuids, secondary=True))
-            all_uuids = list(uuids) + secondary_uuids
-        return all_uuids, failed
+        uuids = list(get_uuids_for_types(registry, collections))
+        failed = self.send_messages(uuids_to_index, strict=strict)
+        return uuids, failed
 
     def get_queue_url(self, queue_name):
         """
@@ -293,7 +277,7 @@ class QueueManager(object):
         for i in range(0, len(messages), chunksize):
             yield messages[i:i + chunksize]
 
-    def send_messages(self, messages, secondary=False):
+    def send_messages(self, messages, strict=False, secondary=False):
         """
         Send any number of 'messages' in a list.
         Can batch up to 10 messages, controlled by self.send_batch_size.
@@ -302,6 +286,8 @@ class QueueManager(object):
         the primary queue is used by default.
 
         messages argument should be a list of uuid strings.
+        strict is a boolean that determines whether or not associated uuids
+        will be found for these uuids.
         Returns information on messages that failed to queue
         """
         failed = []
@@ -309,9 +295,10 @@ class QueueManager(object):
         for total_batch in self.chunk_messages(messages, self.send_uuid_threshold * self.send_batch_size):
             entries = []
             for msg_batch in self.chunk_messages(total_batch, self.send_uuid_threshold):
+                proc_batch = ['/'.join([msg, str(strict)]) for msg in msg_batch]
                 entries.append({
                     'Id': str(int(time.time() * 1000000)),
-                    'MessageBody': ','.join(msg_batch)
+                    'MessageBody': ','.join(proc_batch)
                 })
                 time.sleep(0.001)  # in edge cases, Ids were repeated?
             response = self.client.send_message_batch(
