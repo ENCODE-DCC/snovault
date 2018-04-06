@@ -10,6 +10,7 @@ from .interfaces import (
     INDEXER,
     INDEXER_QUEUE
 )
+from .indexer_utils import find_uuids_for_indexing
 import datetime
 import logging
 import time
@@ -101,6 +102,7 @@ def index(request):
 
 class Indexer(object):
     def __init__(self, registry):
+        self.registry = registry
         self.es = registry[ELASTIC_SEARCH]
         self.queue = registry[INDEXER_QUEUE]
 
@@ -132,18 +134,38 @@ class Indexer(object):
         return messages, is_secondary
 
 
+    def find_and_queue_secondary_items(self, uuids):
+        """
+        Should be used when strict is False
+        Find all associated uuids of the given set of uuid using ES and queue
+        them in the secondary queue.
+        """
+        associated_uuids = find_uuids_for_indexing(self.registry, uuids, log)
+        # remove already indexed primary uuids used to find them
+        secondary_uuids = list(associated_uuids - uuids)
+        return self.queue.add_uuids(self.registry, secondary_uuids, strict=True, secondary=True)
+
+
     def update_objects_queue(self, request, counter):
         """
         Used with the queue
         """
         errors = []
+        # hold uuids that will be used to find secondary uuids
+        non_strict_uuids = set()
         to_delete = []  # hold messages that will be deleted
         messages, is_secondary = self.get_messages_from_queue()
         while len(messages) > 0:
             for msg in messages:
                 # msg['Body'] is just a comma separated string of uuids
                 errored = False
-                for msg_uuid in msg['Body'].split(','):
+                for msg_body in msg['Body'].split(','):
+                    # handle cases with old message body
+                    if len(msg_body.split('/')) == 2:
+                        msg_uuid, strict = split_msg
+                        if strict == 'False': non_strict_uuids.add(msg_uuid)
+                    else:  # back up old case, where msg is just uuid
+                        msg_uuid = msg_body
                     error = self.update_object(request, msg_uuid)
                     if error is not None:
                         # on an error, replace the message back in the queue
@@ -161,6 +183,12 @@ class Indexer(object):
                 if len(to_delete) == self.queue.delete_batch_size:
                     self.queue.delete_messages(to_delete, secondary=is_secondary)
                     to_delete = []
+            # add to secondary queue, if applicable
+            if non_strict_uuids:
+                failed = self.find_and_queue_secondary_items(non_strict_uuids)
+                if failed:
+                    errors.append({'error_message': 'Failure(s) queueing secondary uuids: %s' % str(failed)})
+                non_strict_uuids = set()
             prev_is_secondary = is_secondary
             messages, is_secondary = self.get_messages_from_queue()
             # if we have switched between primary and secondary queues, delete
@@ -190,6 +218,9 @@ class Indexer(object):
 
 
     def update_object(self, request, uuid):
+        """
+        Actually index the uuid using the index-data view.
+        """
         curr_time = datetime.datetime.now().isoformat()
         timestamp = int(time.time() * 1000000)
         try:

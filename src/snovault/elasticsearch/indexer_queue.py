@@ -160,8 +160,8 @@ class QueueManager(object):
         Returns a list of queued uuids and a list of any uuids that failed to
         be queued.
         """
-        # never allow the secondary queue to be used with strict
-        if strict: secondary = False
+        # secondary queue is always strict
+        if secondary: strict = True
         failed = self.send_messages(uuids, strict=strict, secondary=secondary)
         return uuids, failed
 
