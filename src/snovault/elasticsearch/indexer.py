@@ -118,16 +118,30 @@ class Indexer(object):
             errors = self.update_objects_queue(request, counter)
 
 
+    def get_messages_from_queue(self):
+        """
+        Simple helper method. Attempt to get items from primary queue first,
+        and if none are found, attempt from secondary queue. Both use
+        long polling. Returns list of messages received and bool is_secondary
+        """
+        is_secondary = False
+        messages = self.queue.receive_messages()  # long polling used in SQS
+        if not messages:
+            messages = self.queue.receive_messages(secondary=True)
+            is_secondary = True
+        return messages, is_secondary
+
+
     def update_objects_queue(self, request, counter):
         """
         Used with the queue
         """
         errors = []
         to_delete = []  # hold messages that will be deleted
-        messages = self.queue.receive_messages()  # long polling used in SQS
+        messages, is_secondary = self.get_messages_from_queue()
         while len(messages) > 0:
             for msg in messages:
-                # msg['Body'] is just a string of uuids joined by commas
+                # msg['Body'] is just a comma separated string of uuids
                 errored = False
                 for msg_uuid in msg['Body'].split(','):
                     error = self.update_object(request, msg_uuid)
@@ -140,17 +154,23 @@ class Indexer(object):
                         counter[0] += 1
                 # put the message back in the queue if we hit an error
                 if errored:
-                    self.queue.replace_messages([msg])
+                    self.queue.replace_messages([msg], secondary=is_secondary)
                 else:
                     to_delete.append(msg)
                 # delete messages when we have the right number
                 if len(to_delete) == self.queue.delete_batch_size:
-                    self.queue.delete_messages(to_delete)
+                    self.queue.delete_messages(to_delete, secondary=is_secondary)
                     to_delete = []
-            messages = self.queue.receive_messages()
+            prev_is_secondary = is_secondary
+            messages, is_secondary = self.get_messages_from_queue()
+            # if we have switched between primary and secondary queues, delete
+            # outstanding messages using previous queue
+            if prev_is_secondary != is_secondary and to_delete:
+                self.queue.delete_messages(to_delete, secondary=prev_is_secondary)
+                to_delete = []
         # delete any outstanding messages
         if to_delete:
-            self.queue.delete_messages(to_delete)
+            self.queue.delete_messages(to_delete, secondary=is_secondary)
         return errors
 
 

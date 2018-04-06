@@ -145,7 +145,7 @@ class QueueManager(object):
             dlq_arn = self.get_queue_arn(self.dlq_url)
             redrive_policy = {  # maintain this order of settings
                 'deadLetterTargetArn': dlq_arn,
-                'maxReceiveCount': 2  # num of fails before sending to dlq
+                'maxReceiveCount': 4  # num of fails before sending to dlq
             }
             self.queue_attrs['RedrivePolicy'] = json.dumps(redrive_policy)
         # init the primary and secondary queues with dlq attrs included
@@ -166,13 +166,16 @@ class QueueManager(object):
         indexed, they won't be queued for possibly redudanct re-indexing
         (those items should be independently queued)
         """
+        all_uuids = []
+        failed = self.send_messages(uuids)
+        # add secondary uuids if not strict
         if not strict:
             associated_uuids = find_uuids_for_indexing(registry, set(uuids), log)
-            uuids_to_index = self.order_uuids_to_queue(uuids, list(associated_uuids))
-        else:
-            uuids_to_index = uuids
-        failed = self.send_messages(uuids_to_index)
-        return uuids_to_index, failed
+            # remove uuids from associated uuids and make into list
+            secondary_uuids = list(associated_uuids - set(uuids))
+            failed.extend(self.send_messages(secondary_uuids, secondary=True))
+            all_uuids = uuids + secondary_uuids
+        return all_uuids, failed
 
     def add_collections(self, registry, collections, strict=False):
         """
@@ -184,14 +187,16 @@ class QueueManager(object):
         be queued.
         """
         ### IS THIS USING DATASTORE HERE?
-        uuids = list(get_uuids_for_types(registry, collections))
+        all_uuids = []
+        uuids = get_uuids_for_types(registry, collections)  # this is a set
+        failed = self.send_messages(list(uuids))
         if not strict:
-            associated_uuids = find_uuids_for_indexing(registry, set(uuids), log)
-            uuids_to_index = self.order_uuids_to_queue(uuids, list(associated_uuids))
-        else:
-            uuids_to_index = uuids
-        failed = self.send_messages(uuids_to_index)
-        return uuids_to_index, failed
+            associated_uuids = find_uuids_for_indexing(registry, uuids, log)
+            # remove uuids from associated uuids and make into list
+            secondary_uuids = list(associated_uuids - uuids)
+            failed.extend(self.send_messages(secondary_uuids, secondary=True))
+            all_uuids = list(uuids) + secondary_uuids
+        return all_uuids, failed
 
     def get_queue_url(self, queue_name):
         """
@@ -422,16 +427,6 @@ class QueueManager(object):
             except ValueError:
                 formatted[entry] = None
         return formatted
-
-    def order_uuids_to_queue(self, original, to_add):
-        """
-        Given a list of original uuids and list of associated uuids that need
-        to be indexed, extends the first list with the second without
-        introducting duplicates. Returns extended list
-        """
-
-        unique_to_add = [uuid for uuid in to_add if uuid not in original]
-        return original + unique_to_add
 
     def shutdown(self):
         pass
