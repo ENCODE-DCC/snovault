@@ -23,9 +23,9 @@ def includeme(config):
     if env_name and 'fourfront-webprod' in env_name:
         mirror_env = 'fourfront-webprod2' if env_name == 'fourfront-webprod' else 'fourfront-webprod'
         mirror_queue = QueueManager(config.registry, mirror_env=mirror_env)
-        if not mirror_queue.queue_url:
-            log.error('INDEXING: Mirror queue %s is not available!' % mirror_queue.queue_name)
-            raise Exception('INDEXING: Mirror queue %s is not available!' % mirror_queue.queue_name)
+        if not mirror_queue.queue_url or not mirror_queue.secondary_queue_url:
+            log.error('INDEXING: Mirror queues %s and %s are not available!' % (mirror_queue.queue_name, mirror_queue.secondary_queue_url))
+            raise Exception('INDEXING: Mirror queues %s and %s are not available!' % (mirror_queue.queue_name, mirror_queue.secondary_queue_url))
     else:
         config.registry[INDEXER_QUEUE_MIRROR] = None
     config.scan(__name__)
@@ -107,17 +107,13 @@ class QueueManager(object):
     def __init__(self, registry, mirror_env=None):
         """
         __init__ will build all three queues needed with the desired settings.
-        send_uuid_threshold and batch_size parameters are used to how many
-        uuids are in a message and how many messages are batched together,
-        respectively.
+        batch_size parameters conntrol how many messages are batched together
         """
         # batch sizes of messages. __all of these should be 10 at maximum__
         self.send_batch_size = 10
         self.receive_batch_size = 10
         self.delete_batch_size = 10
         self.replace_batch_size = 10
-        # maximum number of uuids in a message
-        self.send_uuid_threshold = 1
         self.env_name = mirror_env if mirror_env else registry.settings.get('env.name')
         # local development
         if not self.env_name:
@@ -246,6 +242,12 @@ class QueueManager(object):
                             QueueName=queue_name,
                             Attributes=queue_attrs
                         )
+                    except self.client.exceptions.QueueAlreadyExists:
+                        # try to get queue url again
+                        queue_url = self.get_queue_url(queue_name)
+                        if queue_url:
+                            should_set_attrs = True
+                            break
                     except self.client.exceptions.QueueDeletedRecently:
                         log.warning('\n___MUST WAIT TO CREATE QUEUE FOR %ss___\n' % str(backoff))
                         time.sleep(backoff)
@@ -308,7 +310,6 @@ class QueueManager(object):
         """
         Send any number of 'messages' in a list.
         Can batch up to 10 messages, controlled by self.send_batch_size.
-        This is easily controlled by self.send_uuid_threshold.
         If secondary is True, then the secondary queue will be used. Otherwise,
         the primary queue is used by default.
 
@@ -318,14 +319,18 @@ class QueueManager(object):
         Returns information on messages that failed to queue
         """
         failed = []
-        # we can handle 10 * self.send_uuid_threshold number of messages per go
-        for total_batch in self.chunk_messages(messages, self.send_uuid_threshold * self.send_batch_size):
+        for msg_batch in self.chunk_messages(messages, self.send_batch_size):
             entries = []
-            for msg_batch in self.chunk_messages(total_batch, self.send_uuid_threshold):
-                proc_batch = ['/'.join([msg, str(strict)]) for msg in msg_batch]
+            for msg in msg_batch:
+                # message contains a uuid, strict (bool), and detail
+                full_msg = {
+                    'uuid': msg,
+                    'strict': strict,
+                    'detail': None
+                }
                 entries.append({
                     'Id': str(int(time.time() * 1000000)),
-                    'MessageBody': ','.join(proc_batch)
+                    'MessageBody': json.dumps(full_msg)
                 })
                 time.sleep(0.001)  # in edge cases, Ids were repeated?
             response = self.client.send_message_batch(
@@ -441,6 +446,3 @@ class QueueManager(object):
             except ValueError:
                 formatted[entry] = None
         return formatted
-
-    def shutdown(self):
-        pass

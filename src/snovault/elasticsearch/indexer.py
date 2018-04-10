@@ -159,27 +159,25 @@ class Indexer(object):
         messages, is_secondary = self.get_messages_from_queue()
         while len(messages) > 0:
             for msg in messages:
-                # msg['Body'] is just a comma separated string of uuids
-                errored = False
-                for msg_body in msg['Body'].split(','):
-                    # handle cases with old message body
-                    if len(msg_body.split('/')) == 2:
-                        msg_uuid, strict = split_msg
-                        if strict == 'False': non_strict_uuids.add(msg_uuid)
-                    else:  # back up old case, where msg is just uuid
-                        msg_uuid = msg_body
-                    error = self.update_object(request, msg_uuid)
-                    if error is not None:
-                        # on an error, replace the message back in the queue
-                        errors.append(error)
-                        errored = True
-                        break
-                    elif counter:  # don't increment counter on an error
-                        counter[0] += 1
-                # put the message back in the queue if we hit an error
-                if errored:
+                msg_body = json.loads(msg['Body'])
+                if isinstance(msg_body, dict):
+                    msg_uuid = msg_body['uuid']
+                    if msg_body['strict'] is False:
+                        non_strict_uuids.add(msg_uuid)
+                else:  # old uuid message format
+                    msg_uuids = msg_body
+                error = self.update_object(request, msg_uuid)
+                if error:
+                    import pdb; pdb.set_trace()
+                    # ADD ERROR TO MSG BODY 'DETAIL'
+
+
+                    # on an error, replace the message back in the queue
                     self.queue.replace_messages([msg], secondary=is_secondary)
+                    errors.append(error)
+                    break
                 else:
+                    if counter: counter[0] += 1  # do not increment on error
                     to_delete.append(msg)
                 # delete messages when we have the right number
                 if len(to_delete) == self.queue.delete_batch_size:
@@ -223,6 +221,12 @@ class Indexer(object):
         """
         Actually index the uuid using the index-data view.
         """
+        try:
+            a = 1/0
+        except Exception as e:
+            return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
+
+            
         curr_time = datetime.datetime.now().isoformat()
         timestamp = int(time.time() * 1000000)
         try:
