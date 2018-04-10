@@ -206,6 +206,7 @@ class QueueManager(object):
 
         Returns a queue url that is guaranteed to link to the right queue.
         """
+        # dlq MUST be initialized first if used
         queue_names = [self.dlq_name, self.queue_name] if dlq else [self.queue_name]
         queue_urls = {}
         for queue_name in queue_names:
@@ -223,10 +224,9 @@ class QueueManager(object):
                     compare_attrs['RedrivePolicy'] = json.loads(compare_attrs['RedrivePolicy'])
                 if 'RedrivePolicy' in curr_attrs:
                     curr_attrs['RedrivePolicy'] = json.loads(curr_attrs['RedrivePolicy'])
-                if compare_attrs != curr_attrs:
-                    should_set_attrs = True
+                should_set_attrs = compare_attrs != curr_attrs
             else:  # queue needs to be created
-                for backoff in [30, 30, 10, 20, 30, 60, 90]:  # totally arbitrary
+                for backoff in [30, 30, 10, 20, 30, 60, 90, 120]:  # totally arbitrary
                     try:
                         response = self.client.create_queue(
                             QueueName=queue_name,
@@ -241,7 +241,7 @@ class QueueManager(object):
                         break
             # update the queue attributes with dlq information, which can only
             # be obtained after the dlq is created
-            if queue_url and queue_name == self.dlq_name:
+            if queue_name == self.dlq_name:
                 dlq_arn = self.get_queue_arn(queue_url)
                 redrive_policy = {  # maintain this order of settings
                     'deadLetterTargetArn': dlq_arn,
@@ -249,7 +249,7 @@ class QueueManager(object):
                 }
                 # set redrive policy for main queue
                 self.queue_attrs['RedrivePolicy'] = json.dumps(redrive_policy)
-            # set attributes on an existing queue. not hit if queue didn't exist
+            # set attributes on an existing queue. not hit if queue was just created
             if should_set_attrs:
                 self.client.set_queue_attributes(
                     QueueUrl=queue_url,
