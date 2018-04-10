@@ -56,6 +56,8 @@ def index(request):
         indexing_record['indexing_started'] = index_start_str
         indexing_counter = [0]  # do this so I can pass it as a reference
         # actually index
+        # try to ensure ES is reasonably up to date
+        es.indices.refresh(index='_all')
         indexing_record['errors'] = indexer.update_objects(request, indexing_counter)
         index_finish_time = datetime.datetime.now()
         indexing_record['indexing_finished'] = index_finish_time.isoformat()
