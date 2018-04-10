@@ -25,7 +25,10 @@ def includeme(config):
     # INDEXER_QUEUE_MIRROR is used because webprod and webprod2 share a DB
     if env_name and 'fourfront-webprod' in env_name:
         mirror_env = 'fourfront-webprod2' if env_name == 'fourfront-webprod' else 'fourfront-webprod'
-        config.registry[INDEXER_QUEUE_MIRROR] = QueueManager(config.registry, forced_env=mirror_env)
+        mirror_queue = QueueManager(config.registry, mirror_env=mirror_env)
+        if not mirror_queue.queue_url:
+            log.error('INDEXING: Mirror queue %s is not available!' % mirror_queue.queue_name)
+            raise Exception('INDEXING: Mirror queue %s is not available!' % mirror_queue.queue_name)
     else:
         config.registry[INDEXER_QUEUE_MIRROR] = None
     config.scan(__name__)
@@ -93,7 +96,7 @@ def indexing_status(request):
 
 
 class QueueManager(object):
-    def __init__(self, registry, forced_env=None):
+    def __init__(self, registry, mirror_env=None):
         # batch sizes of messages. __all of these should be 10 at maximum__
         self.send_batch_size = 10
         self.receive_batch_size = 10
@@ -101,7 +104,7 @@ class QueueManager(object):
         self.replace_batch_size = 10
         # maximum number of uuids in a message
         self.send_uuid_threshold = 1
-        self.env_name = forced_env if forced_env else registry.settings.get('env.name')
+        self.env_name = mirror_env if mirror_env else registry.settings.get('env.name')
         # local development
         if not self.env_name:
             # make sure it's something aws likes
@@ -113,22 +116,22 @@ class QueueManager(object):
             'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
             'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
         }
+        self.dlq_attrs = {
+            'VisibilityTimeout': '120',  # increase if messages going to dlq
+            'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
+            'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
+        }
         self.client = boto3.client('sqs', region_name='us-east-1')
         self.queue_name = self.env_name + '-indexer-queue'
         self.dlq_name = self.queue_name + '-dlq'
-        # code below can cause SQS deletion/creation
-        # if run from MPIndexer, will work, but not gracefully.
-        # changes to queue config should be followed by running create_mapping
-        self.dlq_url = self.init_queue(self.dlq_name)
-        if self.dlq_url:
-            # update queue_attrs with dlq info
-            dlq_arn = self.get_queue_arn(self.dlq_url)
-            redrive_policy = {  # maintain this order of settings
-                'deadLetterTargetArn': dlq_arn,
-                'maxReceiveCount': 4  # num of fails before sending to dlq
-            }
-            self.queue_attrs['RedrivePolicy'] = json.dumps(redrive_policy)
-        self.queue_url = self.init_queue(self.queue_name)
+        # initialize the queue and dlq here, but not on mirror queue
+        if not mirror_env:
+            response_urls = self.initialize(dlq=True)
+            self.queue_url = response_urls.get(self.queue_name)
+            self.dlq_url = response_urls.get(self.dlq_name)
+        else:  # assume the urls exist
+            self.queue_url = self.get_queue_url(self.queue_name)
+            self.dlq_url = self.get_queue_url(self.dlq_name)
 
     def add_uuids(self, registry, uuids, strict=False):
         """
@@ -193,47 +196,68 @@ class QueueManager(object):
         )
         return response['Attributes']['QueueArn']
 
-    def init_queue(self, queue_name):
+    def initialize(self, dlq=False):
         """
         Initialize the queue that is used by this manager.
         For now, this is an AWS SQS standard queue.
         Will use whatever attributes are defined within self.queue_attrs.
+        If dlq arg is True, then the dead letter queue will be initialized
+        as well.
 
         Returns a queue url that is guaranteed to link to the right queue.
         """
-        queue_url = self.get_queue_url(queue_name)
-        should_init = True
-        if queue_url:  # see if current settings are up to date
-            curr_attrs = self.client.get_queue_attributes(
-                QueueUrl=queue_url,
-                AttributeNames=list(self.queue_attrs.keys())
-            ).get('Attributes', {})
-            # must remove JSON formatting from redrivePolicy to compare
-            compare_attrs = self.queue_attrs.copy()
-            if 'RedrivePolicy' in compare_attrs:
-                compare_attrs['RedrivePolicy'] = json.loads(compare_attrs['RedrivePolicy'])
-            if 'RedrivePolicy' in curr_attrs:
-                curr_attrs['RedrivePolicy'] = json.loads(curr_attrs['RedrivePolicy'])
-            if compare_attrs == curr_attrs:
-                should_init = False
-            else:
-                # NOTE: you must wait 60 seconds before re-creating a queue
-                self.delete_queue(queue_url)
-        if should_init:
-            for backoff in [30, 30, 10, 20, 30, 60, 90]:  # totally arbitrary
-                try:
-                    response = self.client.create_queue(
-                        QueueName=queue_name,
-                        Attributes=self.queue_attrs
-                    )
-                except self.client.exceptions.QueueDeletedRecently:
-                    log.warning('\n___MUST WAIT TO CREATE QUEUE FOR %ss___\n' % str(backoff))
-                    time.sleep(backoff)
-                else:
-                    log.warning('\n___CREATED QUEUE WITH NAME %s___\n' % queue_name)
-                    queue_url = response['QueueUrl']
-                    break
-        return queue_url
+        # dlq MUST be initialized first if used
+        queue_names = [self.dlq_name, self.queue_name] if dlq else [self.queue_name]
+        queue_urls = {}
+        for queue_name in queue_names:
+            queue_attrs = self.dlq_attrs if queue_name == self.dlq_name else self.queue_attrs
+            queue_url = self.get_queue_url(queue_name)
+            should_set_attrs = False
+            if queue_url:  # see if current settings are up to date
+                curr_attrs = self.client.get_queue_attributes(
+                    QueueUrl=queue_url,
+                    AttributeNames=list(queue_attrs.keys())
+                ).get('Attributes', {})
+                # must remove JSON formatting from redrivePolicy to compare
+                compare_attrs = queue_attrs.copy()
+                if 'RedrivePolicy' in compare_attrs:
+                    compare_attrs['RedrivePolicy'] = json.loads(compare_attrs['RedrivePolicy'])
+                if 'RedrivePolicy' in curr_attrs:
+                    curr_attrs['RedrivePolicy'] = json.loads(curr_attrs['RedrivePolicy'])
+                should_set_attrs = compare_attrs != curr_attrs
+            else:  # queue needs to be created
+                for backoff in [30, 30, 10, 20, 30, 60, 90, 120]:  # totally arbitrary
+                    try:
+                        response = self.client.create_queue(
+                            QueueName=queue_name,
+                            Attributes=queue_attrs
+                        )
+                    except self.client.exceptions.QueueDeletedRecently:
+                        log.warning('\n___MUST WAIT TO CREATE QUEUE FOR %ss___\n' % str(backoff))
+                        time.sleep(backoff)
+                    else:
+                        log.warning('\n___CREATED QUEUE WITH NAME %s___\n' % queue_name)
+                        queue_url = response['QueueUrl']
+                        break
+            # update the queue attributes with dlq information, which can only
+            # be obtained after the dlq is created
+            if queue_name == self.dlq_name:
+                dlq_arn = self.get_queue_arn(queue_url)
+                redrive_policy = {  # maintain this order of settings
+                    'deadLetterTargetArn': dlq_arn,
+                    'maxReceiveCount': 4  # num of fails before sending to dlq
+                }
+                # set redrive policy for main queue
+                self.queue_attrs['RedrivePolicy'] = json.dumps(redrive_policy)
+            # set attributes on an existing queue. not hit if queue was just created
+            if should_set_attrs:
+                self.client.set_queue_attributes(
+                    QueueUrl=queue_url,
+                    Attributes=queue_attrs
+                )
+            queue_urls[queue_name] = queue_url
+        return queue_urls
+
 
     def clear_queue(self):
         """
@@ -348,7 +372,7 @@ class QueueManager(object):
                 to_replace = {
                     'Id': batch[i]['MessageId'],
                     'ReceiptHandle': batch[i]['ReceiptHandle'],
-                    'VisibilityTimeout': 0
+                    'VisibilityTimeout': 5
                 }
                 batch[i] = to_replace
             response = self.client.change_message_visibility_batch(

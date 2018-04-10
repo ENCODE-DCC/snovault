@@ -86,6 +86,9 @@ def test_indexer_queue(app):
     assert len(received_2) == 0
     # replace into queue
     indexer_queue.replace_messages(received)
+    # replace sets vis timeout to 5 seconds... so wait a bit first
+    import time
+    time.sleep(5.1)
     received = indexer_queue.receive_messages()
     assert len(received) == 1
     # finally, delete
