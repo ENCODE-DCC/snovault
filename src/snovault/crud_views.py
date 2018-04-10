@@ -169,6 +169,7 @@ def collection_add(context, request, render=None):
 
     item = create_item(context.type_info, request, request.validated)
     rendered, item_uri = render_item(request, item, render, True)
+
     request.response.status = 201
     request.response.location = item_uri
     result = {

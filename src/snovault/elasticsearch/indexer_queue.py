@@ -26,6 +26,7 @@ def includeme(config):
         if not mirror_queue.queue_url or not mirror_queue.secondary_queue_url:
             log.error('INDEXING: Mirror queues %s and %s are not available!' % (mirror_queue.queue_name, mirror_queue.secondary_queue_url))
             raise Exception('INDEXING: Mirror queues %s and %s are not available!' % (mirror_queue.queue_name, mirror_queue.secondary_queue_url))
+        config.registry[INDEXER_QUEUE_MIRROR] = mirror_queue
     else:
         config.registry[INDEXER_QUEUE_MIRROR] = None
     config.scan(__name__)
@@ -154,13 +155,11 @@ class QueueManager(object):
         which is passed in automatically when using the /queue_indexing route.
 
         If strict, the uuids will be queued with info instructing associated
-        uuids NOT to be queued.
+        uuids NOT to be queued. If secondary is true, strict should also be.
 
         Returns a list of queued uuids and a list of any uuids that failed to
         be queued.
         """
-        # secondary queue is always strict
-        if secondary: strict = True
         failed = self.send_messages(uuids, strict=strict, secondary=secondary)
         return uuids, failed
 
@@ -178,7 +177,7 @@ class QueueManager(object):
         """
         ### IS THIS USING DATASTORE HERE?
         uuids = list(get_uuids_for_types(registry, collections))
-        failed = self.send_messages(uuids_to_index, strict=strict)
+        failed = self.send_messages(uuids, strict=strict)
         return uuids, failed
 
     def get_queue_url(self, queue_name):
@@ -325,8 +324,7 @@ class QueueManager(object):
                 # message contains a uuid, strict (bool), and detail
                 full_msg = {
                     'uuid': msg,
-                    'strict': strict,
-                    'detail': None
+                    'strict': strict
                 }
                 entries.append({
                     'Id': str(int(time.time() * 1000000)),

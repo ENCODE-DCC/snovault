@@ -10,11 +10,15 @@ from .interfaces import (
     INDEXER,
     INDEXER_QUEUE
 )
+from snovault import (
+    DBSESSION,
+)
 from .indexer_utils import find_uuids_for_indexing
 import datetime
 import logging
 import time
 import copy
+import json
 
 log = logging.getLogger(__name__)
 
@@ -168,11 +172,8 @@ class Indexer(object):
                     msg_uuids = msg_body
                 error = self.update_object(request, msg_uuid)
                 if error:
-                    import pdb; pdb.set_trace()
-                    # ADD ERROR TO MSG BODY 'DETAIL'
-
-
                     # on an error, replace the message back in the queue
+                    # could do something with error, like putting on elasticache
                     self.queue.replace_messages([msg], secondary=is_secondary)
                     errors.append(error)
                     break
@@ -185,9 +186,11 @@ class Indexer(object):
                     to_delete = []
             # add to secondary queue, if applicable
             if non_strict_uuids:
-                failed = self.find_and_queue_secondary_items(non_strict_uuids)
+                queued, failed = self.find_and_queue_secondary_items(non_strict_uuids)
                 if failed:
-                    errors.append({'error_message': 'Failure(s) queueing secondary uuids: %s' % str(failed)})
+                    error_msg = 'Failure(s) queueing secondary uuids: %s' % str(failed)
+                    log.error('INDEXER: ' + error_msg)
+                    errors.append({'error_message': error_msg})
                 non_strict_uuids = set()
             prev_is_secondary = is_secondary
             messages, is_secondary = self.get_messages_from_queue()
@@ -221,12 +224,6 @@ class Indexer(object):
         """
         Actually index the uuid using the index-data view.
         """
-        try:
-            a = 1/0
-        except Exception as e:
-            return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
-
-            
         curr_time = datetime.datetime.now().isoformat()
         timestamp = int(time.time() * 1000000)
         try:

@@ -44,19 +44,31 @@ def record_initial_back_revs(event):
 
 @subscriber(Created)
 @subscriber(AfterModified)
-def queue_item_and_invalidate_new_back_revs(event):
+def invalidate_new_back_revs(event):
     '''
-    Add item(s) to the INDEXER_QUEUE
-
     Invalidate objects that rev_link to us
-
     Catch those objects which newly rev_link us
     '''
     context = event.object
     updated = event.request._updated_uuid_paths
     initial = event.request._initial_back_rev_links.get(context.uuid, {})
     properties = context.upgrade_properties()
+    current = {
+        path: set(simple_path_ids(properties, path))
+        for path in context.type_info.merged_back_rev
+    }
+    for rel, uuids in current.items():
+        for uuid in uuids.difference(initial.get(rel, ())):
+            updated[uuid]
 
+
+@subscriber(Created)
+@subscriber(AfterModified)
+def queue_item_for_indexing(event):
+    '''
+    Add item(s) to the INDEXER_QUEUE
+    '''
+    context = event.object
     # add item to queue
     # use strict mode if creating, otherwise should queue associated uuids
     # POSSIBLE ISSUES:
@@ -75,14 +87,6 @@ def queue_item_and_invalidate_new_back_revs(event):
         es = context.registry.get(ELASTIC_SEARCH)
         if es:
             raise Exception("Indexer queue not configured!")
-
-    current = {
-        path: set(simple_path_ids(properties, path))
-        for path in context.type_info.merged_back_rev
-    }
-    for rel, uuids in current.items():
-        for uuid in uuids.difference(initial.get(rel, ())):
-            updated[uuid]
 
 
 @subscriber(BeforeRender)
