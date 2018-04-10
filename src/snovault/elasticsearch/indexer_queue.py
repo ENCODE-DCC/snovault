@@ -29,6 +29,7 @@ def includeme(config):
         if not mirror_queue.queue_url:
             log.error('INDEXING: Mirror queue %s is not available!' % mirror_queue.queue_name)
             raise Exception('INDEXING: Mirror queue %s is not available!' % mirror_queue.queue_name)
+        config.registry[INDEXER_QUEUE_MIRROR] = mirror_queue
     else:
         config.registry[INDEXER_QUEUE_MIRROR] = None
     config.scan(__name__)
