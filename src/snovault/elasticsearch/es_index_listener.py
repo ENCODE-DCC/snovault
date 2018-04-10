@@ -74,7 +74,10 @@ def run(testapp, interval=DEFAULT_INTERVAL, dry_run=False, path='/index', update
             update_status(last_result=result)
             if result.get('indexing_status') == 'finished':
                 update_status(result=result)
-                log.info('___INDEX LISTENER RESULT:___\n%s\n' % result)
+                if result.get('errors'):
+                    log.error('___INDEX LISTENER RESULT:___\n%s\n' % result)
+                else:
+                    log.debug('___INDEX LISTENER RESULT:___\n%s\n' % result)
         time.sleep(interval)
 
 
