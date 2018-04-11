@@ -38,6 +38,13 @@ def index(request):
     dry_run = request.json.get('dry_run', False)  # if True, do not actually index
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
+
+    # ensure we get the latest version of what is in the db as much as possible
+    session = request.registry[DBSESSION]()
+    connection = session.connection()
+    connection.execute('SET TRANSACTION ISOLATION LEVEL READ COMMITTED READ ONLY')
+
+
     if not dry_run:
         index_start_time = datetime.datetime.now()
         index_start_str = index_start_time.isoformat()
@@ -170,6 +177,7 @@ class Indexer(object):
                         non_strict_uuids.add(msg_uuid)
                 else:  # old uuid message format
                     msg_uuids = msg_body
+
                 error = self.update_object(request, msg_uuid)
                 if error:
                     # on an error, replace the message back in the queue
@@ -226,6 +234,9 @@ class Indexer(object):
         """
         curr_time = datetime.datetime.now().isoformat()
         timestamp = int(time.time() * 1000000)
+
+        props = request.registry['storage'].write.get_by_uuid(uuid).properties
+        print(props)
         try:
             result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
         except Exception as e:
