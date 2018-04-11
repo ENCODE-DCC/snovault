@@ -38,6 +38,13 @@ def index(request):
     dry_run = request.json.get('dry_run', False)  # if True, do not actually index
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
+
+    # ensure we get the latest version of what is in the db as much as possible
+    session = request.registry[DBSESSION]()
+    connection = session.connection()
+    connection.execute('SET TRANSACTION ISOLATION LEVEL READ COMMITTED READ ONLY')
+
+
     if not dry_run:
         index_start_time = datetime.datetime.now()
         index_start_str = index_start_time.isoformat()
