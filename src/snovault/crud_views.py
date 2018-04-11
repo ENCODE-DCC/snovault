@@ -30,6 +30,8 @@ from .validators import (
     validate_item_content_post,
     validate_item_content_put,
 )
+from .invalidation import add_to_indexing_queue
+import transaction
 
 
 def includeme(config):
@@ -164,10 +166,15 @@ def render_item(request, context, render, return_uri_also=False):
              validators=[no_validate_item_content_post],
              request_param=['validate=false'])
 def collection_add(context, request, render=None):
+    txn = transaction.get()
+
     if render is None:
         render = request.params.get('render', True)
 
     item = create_item(context.type_info, request, request.validated)
+    # set up hook for queueing indexing
+    uuid = str(item.uuid)
+    txn.addAfterCommitHook(add_to_indexing_queue, args=(request,uuid,'add',))
     rendered, item_uri = render_item(request, item, render, True)
 
     request.response.status = 201
@@ -198,6 +205,11 @@ def item_edit(context, request, render=None):
     Note validators will handle the PATH ?delete_fields parameter if you want
     field to be deleted
     """
+    # set up hook for queueing indexing
+    txn = transaction.get()
+    uuid = str(request.context.uuid)
+    txn.addAfterCommitHook(add_to_indexing_queue, args=(request,uuid,'edit',))
+
     if render is None:
         render = request.params.get('render', True)
 

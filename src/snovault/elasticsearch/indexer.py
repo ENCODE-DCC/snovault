@@ -169,7 +169,7 @@ class Indexer(object):
                     if msg_body['strict'] is False:
                         non_strict_uuids.add(msg_uuid)
                 else:  # old uuid message format
-                    msg_uuids = msg_body
+                    msg_uuid = msg_body
                 error = self.update_object(request, msg_uuid)
                 if error:
                     # on an error, replace the message back in the queue
@@ -220,22 +220,24 @@ class Indexer(object):
         return errors
 
 
-    def update_object(self, request, uuid):
+    def update_object(self, request, uuid, curr_time=None):
         """
         Actually index the uuid using the index-data view.
         """
-        curr_time = datetime.datetime.now().isoformat()
-        timestamp = int(time.time() * 1000000)
+        if not curr_time:
+            curr_time = datetime.datetime.utcnow().isoformat()  # utc
         try:
             result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
         except Exception as e:
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
+        if uuid == '431106bc-8535-4448-903e-854af460b121':
+            print('\n\INDEXER:\n%s\n\n' % request.registry['storage'].write.get_by_uuid(uuid).properties['description'])
         last_exc = None
+        # epoch timestamp is used as ES version number
+        timestamp = int(time.time() * 1000000)
         for backoff in [0, 1, 2]:
             time.sleep(backoff)
-            # timestamp from the queue or /index call (for sync uuids)
-            # is used as the version number
             try:
                 self.es.index(
                     index=result['item_type'], doc_type=result['item_type'], body=result,
