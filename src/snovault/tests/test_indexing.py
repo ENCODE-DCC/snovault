@@ -66,6 +66,7 @@ def teardown(app):
 
 
 def test_indexer_queue(app):
+    import json
     indexer_queue_mirror = app.registry[INDEXER_QUEUE_MIRROR]
     # this is only set up for webprod/webprod2
     assert indexer_queue_mirror is None
@@ -82,8 +83,10 @@ def test_indexer_queue(app):
     assert not failed
     received = indexer_queue.receive_messages()
     assert len(received) == 1
-    assert received[0]['Body']['uuid'] == test_message
-    assert received[0]['Body']['strict'] is True
+    msg_body = json.loads(received[0]['Body'])
+    assert isinstance(msg_body, dict)
+    assert msg_body['uuid'] == test_message
+    assert msg_body['strict'] is True
     # try to receive again (should be empty)
     received_2 = indexer_queue.receive_messages()
     assert len(received_2) == 0
