@@ -502,9 +502,11 @@ class Resource(Base):
 
     @property
     def sid(self):
-        sids = (str(self.data[k].propsheet.sid) for k in self.data.keys())
-        # index 0 should be the primary item here
-        return sorted(set(sids))[0]
+        """
+        In some cases there may be more than one sid, but we care about the
+        primary one (with '' key)
+        """
+        return self.data[''].sid
 
     def invalidated(self):
         return False
