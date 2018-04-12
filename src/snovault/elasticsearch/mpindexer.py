@@ -107,6 +107,7 @@ def queue_error_callback(cb_args, counter, errors):
         counter[0] = local_counter[0] + counter[0]
     errors.extend(local_errors)
 
+
 ### Running in main process
 
 class MPIndexer(Indexer):
@@ -125,7 +126,7 @@ class MPIndexer(Indexer):
             initializer=initializer,
             initargs=self.initargs,
             maxtasksperchild=self.maxtasks,
-            context=get_context('forkserver'),
+            context=get_context('fork'),
         )
 
     def update_objects(self, request, counter=None):

@@ -75,6 +75,10 @@ class CachedModel(object):
     def tid(self):
         return self.source['tid']
 
+    @property
+    def sid(self):
+        return self.source.get('sid')
+
     def invalidated(self):
         request = get_root_request()
         if request is None:

@@ -173,10 +173,10 @@ def collection_add(context, request, render=None):
 
     item = create_item(context.type_info, request, request.validated)
     # set up hook for queueing indexing
-    uuid = str(item.uuid)
-    txn.addAfterCommitHook(add_to_indexing_queue, args=(request,uuid,'add',))
-    rendered, item_uri = render_item(request, item, render, True)
+    to_queue = {'uuid': str(item.uuid), 'sid': item.sid}
+    txn.addAfterCommitHook(add_to_indexing_queue, args=(request, to_queue, 'add',))
 
+    rendered, item_uri = render_item(request, item, render, True)
     request.response.status = 201
     request.response.location = item_uri
     result = {
@@ -205,16 +205,19 @@ def item_edit(context, request, render=None):
     Note validators will handle the PATH ?delete_fields parameter if you want
     field to be deleted
     """
-    # set up hook for queueing indexing
+
     txn = transaction.get()
-    uuid = str(request.context.uuid)
-    txn.addAfterCommitHook(add_to_indexing_queue, args=(request,uuid,'edit',))
 
     if render is None:
         render = request.params.get('render', True)
 
     # This *sets* the property sheet
     update_item(context, request, request.validated)
+
+    # set up hook for queueing indexing
+    to_queue = {'uuid': str(context.uuid), 'sid': context.sid}
+    txn.addAfterCommitHook(add_to_indexing_queue, args=(request, to_queue, 'edit',))
+
     rendered = render_item(request, context, render)
     request.response.status = 200
     result = {

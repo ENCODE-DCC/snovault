@@ -500,6 +500,12 @@ class Resource(Base):
         tids = (str(self.data[k].propsheet.tid) for k in self.data.keys())
         return ','.join(sorted(set(tids)))
 
+    @property
+    def sid(self):
+        sids = (str(self.data[k].propsheet.sid) for k in self.data.keys())
+        # index 0 should be the primary item here
+        return sorted(set(sids))[0]
+
     def invalidated(self):
         return False
 

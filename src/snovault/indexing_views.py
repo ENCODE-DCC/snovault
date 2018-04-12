@@ -63,6 +63,7 @@ def item_index_data(context, request):
             for name in context.propsheets.keys() if name != ''
         },
         'tid': context.tid,
+        'sid': context.sid,
         'unique_keys': unique_keys,
         'uuid': uuid,
     }
