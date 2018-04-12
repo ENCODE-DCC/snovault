@@ -1,3 +1,5 @@
+import copy
+
 from snovault import DBSESSION
 from contextlib import contextmanager
 from multiprocessing import get_context
@@ -25,6 +27,8 @@ def includeme(config):
     if config.registry.settings.get('indexer_worker'):
         return
     processes = config.registry.settings.get('indexer.processes')
+    if config.registry.settings.get('queue_server_address') != 'localhost':
+        processes = None
     try:
         processes = int(processes)
     except:

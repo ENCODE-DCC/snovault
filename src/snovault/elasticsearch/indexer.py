@@ -32,6 +32,10 @@ import time
 import copy
 import json
 import requests
+import random
+
+from snovault.multiprocessing_queue import QueueClient
+from snovault.multiprocessing_queue import QueueServer
 
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
@@ -111,9 +115,27 @@ def get_related_uuids(request, es, updated, renamed):
     return (related_set, False)
 
 
+def index_in_batches(request, indexer, size, queue_client=None):
+    try:
+        if queue_client is None
+            queue_client = QueueClient(request.registry)
+        while queue_client.queue.qsize() > 0:
+            chunk = queue_client.get_chunk_of_uuids(size)
+            random.shuffle(chunk)
+            (queue_client.result_queue.put(result) for result in indexer.update_objects(request, chunk))
+    except Exception as e:
+        log.warn("connection error {}".format(repr(e)))
+        pass
+    return {}
+
 
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
+    indexer = request.registry[INDEXER]
+
+    if not request.registry.settings.get('queue_server_address') == 'localhost':
+        return index_in_batches(request, indexer, 100)
+
     INDEX = request.registry.settings['snovault.elasticsearch.index']
     # Setting request.datastore here only works because routed views are not traversed.
     request.datastore = 'database'
@@ -121,7 +143,6 @@ def index(request):
     dry_run = request.json.get('dry_run', False)
     recovery = request.json.get('recovery', False)
     es = request.registry[ELASTIC_SEARCH]
-    indexer = request.registry[INDEXER]
     session = request.registry[DBSESSION]()
     connection = session.connection()
     first_txn = None
@@ -236,10 +257,21 @@ def index(request):
         result = state.start_cycle(invalidated, result)
 
         # Do the work...
+        ### New Stuff START
+        queue_server = QueueServer(request.registry)
+        queue_server.populate_shared_queue(invalidated, xmin, snapshot_id)
+        result = index_in_batches(request, indexer, 100, queue_client=queue_server)
 
-        errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
+        # Failed uuids??
+        failed_uuids = list(set(invalidated) - set(queue_server.to_list(queue_server.done_queue)))
+        queue_server.populate_shared_queue(failed_uuids, xmin, snapshot_id)
+        index_in_batches(request, indexer, queue_server, 1000)
 
-        result = state.finish_cycle(result,errors)
+        errors = queue_server.to_list(queue_server.result_queue)
+        queue_server.shutdown()
+        ## New Stuff END
+
+        result = state.finish_cycle(result, errors)
 
         if errors:
             result['errors'] = errors
@@ -298,6 +330,7 @@ class Indexer(object):
         self.es = registry[ELASTIC_SEARCH]
         self.esstorage = registry[STORAGE]
         self.index = registry.settings['snovault.elasticsearch.index']
+        self.queue_client = QueueClient(registry)
 
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         errors = []
@@ -344,6 +377,7 @@ class Indexer(object):
                         id=str(uuid), version=xmin, version_type='external_gte',
                         request_timeout=30,
                     )
+                    self.queue_client.done_queue.put(str(uuid))
                 except StatementError:
                     # Can't reconnect until invalid transaction is rolled back
                     raise
