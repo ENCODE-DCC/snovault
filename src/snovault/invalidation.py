@@ -142,7 +142,7 @@ def add_to_indexing_queue(success, request, item, edit_or_add):
                 indexer_queue.send_messages([item], target_queue='primary')
                 if indexer_queue_mirror:
                     # need to handle change of queued message form in FF-1075
-                    if indexer_queue_mirror.second_queue_name:
+                    if indexer_queue_mirror.second_queue_url:
                         # sends to primary queue for the mirror
                         indexer_queue_mirror.send_messages([item], target_queue='primary')
                     else:

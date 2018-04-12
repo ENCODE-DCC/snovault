@@ -177,7 +177,11 @@ class Indexer(object):
         messages, target_queue = self.get_messages_from_queue(skip_deferred=False)
         while len(messages) > 0:
             for idx, msg in enumerate(messages):
-                msg_body = json.loads(msg['Body'])
+                # this code is needed for integration with old style messages
+                try:
+                    msg_body = json.loads(msg['Body'])
+                except ValueError:
+                    msg_body = msg['Body']
                 if isinstance(msg_body, dict):
                     msg_uuid= msg_body['uuid']
                     msg_sid = msg_body['sid']
