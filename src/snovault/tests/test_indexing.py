@@ -74,6 +74,8 @@ def test_indexer_queue(app):
     # unittesting the QueueManager
     assert indexer_queue.queue_url is not None
     assert indexer_queue.dlq_url is not None
+    assert indexer_queue.second_queue_url is not None
+    assert indexer_queue.defer_queue_url is not None
     test_message = 'abc123'
     to_index, failed = indexer_queue.add_uuids(app.registry, [test_message], strict=True)
     assert to_index == [test_message]
