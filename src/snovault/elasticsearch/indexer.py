@@ -194,7 +194,7 @@ class Indexer(object):
                     if msg_body['strict'] is False:
                         non_strict_uuids.add(msg_uuid)
                 else:  # old uuid message format
-                    msg_uuid = msg_body
+                    msg_uuid = str(msg_body)
                     msg_sid = None
                     msg_curr_time = None
                 error = self.update_object(request, msg_uuid, sid=msg_sid, curr_time=msg_curr_time)
