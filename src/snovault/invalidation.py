@@ -147,7 +147,8 @@ def add_to_indexing_queue(success, request, item, edit_or_add):
                         indexer_queue_mirror.send_messages([item], target_queue='primary')
                     else:
                         # old form of sending uuids (when they were just strings)
-                        indexer_queue_mirror.add_uuids(request.registry, [item['uuid']], strict=(edit_or_add == 'add'))
+                        # strict won't be handled... c'est la vie, it is temporary
+                        indexer_queue_mirror.send_messages([item['uuid']], target_queue='primary')
             else:
                 # if the indexer queue is not configured but ES is, log an error
                 from .elasticsearch.interfaces import ELASTIC_SEARCH

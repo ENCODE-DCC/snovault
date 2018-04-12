@@ -101,8 +101,8 @@ def test_indexer_queue(app):
     indexer_queue.delete_messages(received)
     time.sleep(2)
     msg_count = indexer_queue.number_of_messages()
-    assert msg_count['waiting'] == 0
-    assert msg_count['inflight'] == 0
+    assert msg_count['primary_waiting'] == 0
+    assert msg_count['primary_inflight'] == 0
 
 
 def test_indexing_simple(app, testapp, indexer_testapp):
