@@ -80,7 +80,8 @@ def test_indexer_queue(app):
     assert not failed
     received = indexer_queue.receive_messages()
     assert len(received) == 1
-    assert received[0]['Body'] == test_message
+    assert received[0]['Body']['uuid'] == test_message
+    assert received[0]['Body']['strict'] is True
     # try to receive again (should be empty)
     received_2 = indexer_queue.receive_messages()
     assert len(received_2) == 0

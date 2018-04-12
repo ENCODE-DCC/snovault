@@ -13,6 +13,7 @@ from .elasticsearch.interfaces import INDEXER_QUEUE, INDEXER_QUEUE_MIRROR
 from .util import simple_path_ids
 import logging
 import datetime
+import transaction
 
 log = logging.getLogger(__name__)
 
