@@ -65,6 +65,59 @@ def invalidate_new_back_revs(event):
             updated[uuid]
 
 
+# Can we get rid of this?
+@subscriber(BeforeRender)
+def es_update_data(event):
+    request = event['request']
+    updated_uuid_paths = request._updated_uuid_paths
+
+    if not updated_uuid_paths:
+        return
+
+    txn = transaction.get()
+    data = txn._extension
+    renamed = data['renamed'] = [
+        uuid for uuid, names in updated_uuid_paths.items()
+        if len(names) > 1
+    ]
+    updated = data['updated'] = list(updated_uuid_paths.keys())
+
+    response = request.response
+    response.headers['X-Updated'] = ','.join(updated)
+    if renamed:
+        response.headers['X-Renamed'] = ','.join(renamed)
+
+    record = data.get('_snovault_transaction_record')
+    if record is None:
+        return
+
+    xid = record.xid
+    if xid is None:
+        return
+
+    response.headers['X-Transaction'] = str(xid)
+
+    # Only set session cookie for web users
+    namespace = None
+    login = request.authenticated_userid
+    if login is not None:
+        namespace, userid = login.split('.', 1)
+
+    if namespace == 'mailto':
+        edits = request.session.setdefault('edits', [])
+        edits.append([xid, list(updated), list(renamed)])
+        edits[:] = edits[-10:]
+
+    # XXX How can we ensure consistency here but update written records
+    # immediately? The listener might already be indexing on another
+    # connection. SERIALIZABLE isolation insufficient because ES writes not
+    # serialized. Could either:
+    # - Queue up another reindex on the listener
+    # - Use conditional puts to ES based on serial before commit.
+    # txn = transaction.get()
+    # txn.addAfterCommitHook(es_update_object_in_txn, (request, updated))
+
+
 def add_to_indexing_queue(success, request, item, edit_or_add):
     """
     Add item to queue for indexing. This function should be called from
