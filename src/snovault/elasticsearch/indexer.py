@@ -3,6 +3,7 @@ from elasticsearch.exceptions import (
     ConnectionError,
     TransportError,
 )
+from ..indexing_views import SidException
 from pyramid.view import view_config
 from urllib3.exceptions import ReadTimeoutError
 from .interfaces import (
@@ -262,19 +263,26 @@ class Indexer(object):
         """
         if not curr_time:
             curr_time = datetime.datetime.utcnow().isoformat()  # utc
-        try:
-            result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
-        except Exception as e:
-            log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
-            return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
 
-        if sid and result['sid'] < sid:
+        # check the sid with a less intensive view than @@index-data
+        if sid:
+            index_data_query = '/%s/@@index-data?sid=%s' % (uuid, sid)
+        else:
+            index_data_query = '/%s/@@index-data' % uuid
+
+        try:
+            result = request.embed(index_data_query, as_user='INDEXER')
+        except SidException as e:
             log.warning('Invalid sid found for %s with value %s. time: %s' % (uuid, sid, curr_time))
             # this will cause the item to be sent to the deferred queue
             return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
-        # this must be equal or greater to our desired sid, if present
-        # sid is used as es version number
-        sid = result['sid']
+        except KeyError as e:
+            log.warning('KeyError for %s with sid %s. time: %s' % (uuid, sid, curr_time))
+            # this will cause the item to be sent to the deferred queue
+            return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
+        except Exception as e:
+            log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
+            return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
 
         last_exc = None
         for backoff in [0, 1, 2]:
@@ -282,7 +290,7 @@ class Indexer(object):
             try:
                 self.es.index(
                     index=result['item_type'], doc_type=result['item_type'], body=result,
-                    id=str(uuid), version=sid, version_type='external_gte',
+                    id=str(uuid), version=result['sid'], version_type='external_gte',
                     request_timeout=30
                 )
             except ConflictError:

@@ -126,7 +126,7 @@ class MPIndexer(Indexer):
             initializer=initializer,
             initargs=self.initargs,
             maxtasksperchild=self.maxtasks,
-            context=get_context('fork'),
+            context=get_context('forkserver'),
         )
 
     def update_objects(self, request, counter=None):
