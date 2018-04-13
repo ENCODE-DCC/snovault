@@ -7,13 +7,11 @@ import math
 import logging
 import socket
 import time
+import datetime
 from pyramid.view import view_config
 from pyramid.decorator import reify
 from .interfaces import INDEXER_QUEUE, INDEXER_QUEUE_MIRROR
-from .indexer_utils import (
-    find_uuids_for_indexing,
-    get_uuids_for_types
-)
+from .indexer_utils import get_uuids_for_types
 
 log = logging.getLogger(__name__)
 
@@ -27,8 +25,8 @@ def includeme(config):
         mirror_env = 'fourfront-webprod2' if env_name == 'fourfront-webprod' else 'fourfront-webprod'
         mirror_queue = QueueManager(config.registry, mirror_env=mirror_env)
         if not mirror_queue.queue_url:
-            log.error('INDEXING: Mirror queue %s is not available!' % mirror_queue.queue_name)
-            raise Exception('INDEXING: Mirror queue %s is not available!' % mirror_queue.queue_name)
+            log.error('INDEXING: Mirror queues %s are not available!' % mirror_queue.queue_name)
+            raise Exception('INDEXING: Mirror queues %s are not available!' % mirror_queue.queue_name)
         config.registry[INDEXER_QUEUE_MIRROR] = mirror_queue
     else:
         config.registry[INDEXER_QUEUE_MIRROR] = None
@@ -65,10 +63,12 @@ def queue_indexing(request):
     # strict mode means uuids should be indexed without finding associates
     strict = request.json.get('strict', False)
     if req_uuids:
-        queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=strict)
+        # queue these as secondary
+        queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=strict, target_queue='secondary')
         response['requested_uuids'] = req_uuids
     else:
-        queued, failed = queue_indexer.add_collections(request.registry, req_collections, strict=strict)
+        # queue these as secondary
+        queued, failed = queue_indexer.add_collections(request.registry, req_collections, strict=strict, target_queue='secondary')
         response['requested_collections'] = req_collections
     response['notification'] = 'Success'
     response['number_queued'] = len(queued)
@@ -97,14 +97,29 @@ def indexing_status(request):
 
 
 class QueueManager(object):
+    """
+    Class for handling the queues responsible for coordinating indexing.
+    Contains methods to inititalize queues, add both uuids and collections of
+    uuids to the queue, and also various helper methods to receive/delete/replace
+    messages on the queue.
+    Currently the set up uses 4 queues:
+    1. Primary queue for items that are directly posted, patched, or added.
+    2. Secondary queue for associated items of those in the primary queue.
+    3. Deferred queue for items that are outside of the transaction scope
+       of any indexing process and need to be tracked separately.
+    4. Dead letter queue (dlq) for handling items that have issues processing
+       from either the primary or secondary queues.
+    """
     def __init__(self, registry, mirror_env=None):
+        """
+        __init__ will build all three queues needed with the desired settings.
+        batch_size parameters conntrol how many messages are batched together
+        """
         # batch sizes of messages. __all of these should be 10 at maximum__
         self.send_batch_size = 10
         self.receive_batch_size = 10
         self.delete_batch_size = 10
         self.replace_batch_size = 10
-        # maximum number of uuids in a message
-        self.send_uuid_threshold = 1
         self.env_name = mirror_env if mirror_env else registry.settings.get('env.name')
         # local development
         if not self.env_name:
@@ -112,68 +127,85 @@ class QueueManager(object):
             backup = socket.gethostname()[:80].replace('.','-')
             # last case scenario
             self.env_name = backup if backup else 'fourfront-backup'
-        self.queue_attrs = {
-            'VisibilityTimeout': '120',  # increase if messages going to dlq
-            'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
-            'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
-        }
-        self.dlq_attrs = {
-            'VisibilityTimeout': '120',  # increase if messages going to dlq
-            'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
-            'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
-        }
         self.client = boto3.client('sqs', region_name='us-east-1')
+        # primary queue name
         self.queue_name = self.env_name + '-indexer-queue'
+        # secondary queue name
+        self.second_queue_name = self.env_name + '-secondary-indexer-queue'
+        # deferred queue name
+        self.defer_queue_name = self.env_name + '-deferred-indexer-queue'
         self.dlq_name = self.queue_name + '-dlq'
+        # dictionary storing attributes for each queue, keyed by name
+        self.queue_attrs = {
+            self.queue_name: {
+                'DelaySeconds': '1',  # messages initially inivisble for 1 sec
+                'VisibilityTimeout': '120',  # increase if messages going to dlq
+                'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
+                'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
+            },
+            self.second_queue_name: {
+                'VisibilityTimeout': '120',  # increase if messages going to dlq
+                'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
+                'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
+            },
+            self.defer_queue_name: {
+                'VisibilityTimeout': '120',
+                'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
+                'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
+            },
+            self.dlq_name: {
+                'VisibilityTimeout': '120',  # increase if messages going to dlq
+                'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
+                'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
+            }
+        }
         # initialize the queue and dlq here, but not on mirror queue
         if not mirror_env:
             response_urls = self.initialize(dlq=True)
             self.queue_url = response_urls.get(self.queue_name)
+            self.second_queue_url = response_urls.get(self.second_queue_name)
+            self.defer_queue_url = response_urls.get(self.defer_queue_name)
             self.dlq_url = response_urls.get(self.dlq_name)
         else:  # assume the urls exist
             self.queue_url = self.get_queue_url(self.queue_name)
+            self.second_queue_url = self.get_queue_url(self.second_queue_name)
+            self.defer_queue_url = self.get_queue_url(self.defer_queue_name)
             self.dlq_url = self.get_queue_url(self.dlq_name)
 
-    def add_uuids(self, registry, uuids, strict=False):
+    def add_uuids(self, registry, uuids, strict=False, target_queue='primary'):
         """
-        Takes a list of string uuids, finds all associated uuids using the
-        indexer_utils, and then queues them all up. Also requires a registry,
+        Takes a list of string uuids queues them up. Also requires a registry,
         which is passed in automatically when using the /queue_indexing route.
 
-        Returns a list of queued uuids and a list of any uuids that failed to
-        be queued.
-
-        NOTE: using find_uuids_for_indexing is smart, since it uses ES to find
-        all items that either embed or link this uuid. If items are not yet
-        indexed, they won't be queued for possibly redudanct re-indexing
-        (those items should be independently queued)
-        """
-        if not strict:
-            associated_uuids = find_uuids_for_indexing(registry, set(uuids), log)
-            uuids_to_index = self.order_uuids_to_queue(uuids, list(associated_uuids))
-        else:
-            uuids_to_index = uuids
-        failed = self.send_messages(uuids_to_index)
-        return uuids_to_index, failed
-
-    def add_collections(self, registry, collections, strict=False):
-        """
-        Takes a list of collection name, finds all associated uuids using the
-        indexer_utils, and then queues them all up. Also requires a registry,
-        which is passed in automatically when using the /queue_indexing route.
+        If strict, the uuids will be queued with info instructing associated
+        uuids NOT to be queued. If the secondary queue is targeted, strict
+        should be true (though this is not enforced).
 
         Returns a list of queued uuids and a list of any uuids that failed to
         be queued.
         """
-        ### IS THIS USING DATASTORE HERE?
+        curr_time = datetime.datetime.utcnow().isoformat()
+        items = [{'uuid': uuid, 'sid': None, 'strict': strict, 'timestamp': curr_time} for uuid in uuids]
+        failed = self.send_messages(items, target_queue=target_queue)
+        return uuids, failed
+
+    def add_collections(self, registry, collections, strict=False, target_queue='primary'):
+        """
+        Takes a list of collection name and queues all uuids for them.
+        Also requires a registry, which is passed in automatically when using
+        the /queue_indexing route.
+
+        If strict, the uuids will be queued with info instructing associated
+        uuids NOT to be queued.
+
+        Returns a list of queued uuids and a list of any uuids that failed to
+        be queued.
+        """
+        curr_time = datetime.datetime.utcnow().isoformat()
         uuids = list(get_uuids_for_types(registry, collections))
-        if not strict:
-            associated_uuids = find_uuids_for_indexing(registry, set(uuids), log)
-            uuids_to_index = self.order_uuids_to_queue(uuids, list(associated_uuids))
-        else:
-            uuids_to_index = uuids
-        failed = self.send_messages(uuids_to_index)
-        return uuids_to_index, failed
+        items = [{'uuid': uuid, 'sid': None, 'strict': strict, 'timestamp': curr_time} for uuid in uuids]
+        failed = self.send_messages(uuids, target_queue=target_queue)
+        return uuids, failed
 
     def get_queue_url(self, queue_name):
         """
@@ -208,10 +240,13 @@ class QueueManager(object):
         Returns a queue url that is guaranteed to link to the right queue.
         """
         # dlq MUST be initialized first if used
-        queue_names = [self.dlq_name, self.queue_name] if dlq else [self.queue_name]
+        if dlq:
+            queue_names = [self.dlq_name, self.queue_name, self.second_queue_name, self.defer_queue_name]
+        else:
+            queue_names = [self.queue_name, self.second_queue_name, self.defer_queue_name]
         queue_urls = {}
         for queue_name in queue_names:
-            queue_attrs = self.dlq_attrs if queue_name == self.dlq_name else self.queue_attrs
+            queue_attrs = self.queue_attrs[queue_name]
             queue_url = self.get_queue_url(queue_name)
             should_set_attrs = False
             if queue_url:  # see if current settings are up to date
@@ -233,6 +268,12 @@ class QueueManager(object):
                             QueueName=queue_name,
                             Attributes=queue_attrs
                         )
+                    except self.client.exceptions.QueueAlreadyExists:
+                        # try to get queue url again
+                        queue_url = self.get_queue_url(queue_name)
+                        if queue_url:
+                            should_set_attrs = True
+                            break
                     except self.client.exceptions.QueueDeletedRecently:
                         log.warning('\n___MUST WAIT TO CREATE QUEUE FOR %ss___\n' % str(backoff))
                         time.sleep(backoff)
@@ -248,8 +289,10 @@ class QueueManager(object):
                     'deadLetterTargetArn': dlq_arn,
                     'maxReceiveCount': 4  # num of fails before sending to dlq
                 }
-                # set redrive policy for main queue
-                self.queue_attrs['RedrivePolicy'] = json.dumps(redrive_policy)
+                # set redrive policy for main queue and secondary queues
+                # do not set on the deferred queue, which has no dlq
+                self.queue_attrs[self.queue_name]['RedrivePolicy'] = json.dumps(redrive_policy)
+                self.queue_attrs[self.second_queue_name]['RedrivePolicy'] = json.dumps(redrive_policy)
             # set attributes on an existing queue. not hit if queue was just created
             if should_set_attrs:
                 self.client.set_queue_attributes(
@@ -265,7 +308,7 @@ class QueueManager(object):
         Clear out the queue and dlq completely. You can no longer retrieve
         these messages. Takes up to 60 seconds.
         """
-        for queue_url in [self.queue_url, self.dlq_url]:
+        for queue_url in [self.queue_url, self.second_queue_url, self.defer_queue_url, self.dlq_url]:
             try:
                 self.client.purge_queue(
                     QueueUrl=queue_url
@@ -281,7 +324,7 @@ class QueueManager(object):
         response = self.client.delete_queue(
             QueueUrl=queue_url
         )
-        self.queue_url = None
+        setattr(self, queue_url, None)
         return response
 
     def chunk_messages(self, messages, chunksize):
@@ -291,55 +334,85 @@ class QueueManager(object):
         for i in range(0, len(messages), chunksize):
             yield messages[i:i + chunksize]
 
-    def send_messages(self, messages):
+    def choose_queue_url(self, name):
         """
-        Send any number of 'messages' in a list.
-        Can batch up to 10 messages, controlled by self.send_batch_size.
-        This is easily controlled by self.send_uuid_threshold.
+        Simple utility function given a string name parameter. Used to select
+        between primary, secondary, and deferred queues
+        """
+        if name.lower() == 'secondary':
+            return self.second_queue_url
+        elif name.lower() == 'deferred':
+            return self.defer_queue_url
+        else:
+            return self.queue_url
 
-        messages argument should be a list of uuid strings.
+    def send_messages(self, items, target_queue='primary'):
+        """
+        Send any number of 'items' as messages to sqs.
+        items is a list of dictionaries with the following format:
+        {
+            'uuid': string uuid,
+            'sid': int sid from postgres or None for secondary items,
+            'strict': boolean that controls if assciated uuids are found,
+            'timestamp': datetime string, should be utc,
+            'detail': string containing extra information, not always used
+        }
+        Can batch up to 10 messages, controlled by self.send_batch_size.
+
+        strict is a boolean that determines whether or not associated uuids
+        will be found for these uuids.
         Returns information on messages that failed to queue
         """
+        queue_url = self.choose_queue_url(target_queue)
         failed = []
-        # we can handle 10 * self.send_uuid_threshold number of messages per go
-        for total_batch in self.chunk_messages(messages, self.send_uuid_threshold * self.send_batch_size):
+        for msg_batch in self.chunk_messages(items, self.send_batch_size):
             entries = []
-            for msg_batch in self.chunk_messages(total_batch, self.send_uuid_threshold):
-                entries.append({
-                    'Id': str(int(time.time() * 1000000)),
-                    'MessageBody': ','.join(msg_batch)
-                })
+            for msg in msg_batch:
+                # quick workaround to communicate with old style messages
+                if isinstance(msg, dict):
+                    entries.append({
+                        'Id': str(int(time.time() * 1000000)),
+                        'MessageBody': json.dumps(msg)
+                    })
+                else:
+                    entries.append({
+                        'Id': str(int(time.time() * 1000000)),
+                        'MessageBody': msg
+                    })
                 time.sleep(0.001)  # in edge cases, Ids were repeated?
             response = self.client.send_message_batch(
-                QueueUrl=self.queue_url,
+                QueueUrl=queue_url,
                 Entries=entries
             )
             failed.extend(response.get('Failed', []))
         return failed
 
-    def receive_messages(self):
+    def receive_messages(self, target_queue='primary'):
         """
         Recieves up to self.receive_batch_size number of messages from the queue.
         Fewer (even 0) messages may be returned on any given run.
+
         Returns a list of messages with message metdata
         """
+        queue_url = self.choose_queue_url(target_queue)
         response = self.client.receive_message(
-            QueueUrl=self.queue_url,
-            MaxNumberOfMessages=self.receive_batch_size,
-            VisibilityTimeout=int(self.queue_attrs['VisibilityTimeout'])
+            QueueUrl=queue_url,
+            MaxNumberOfMessages=self.receive_batch_size
         )
         # messages in response include ReceiptHandle and Body, most importantly
         return response.get('Messages', [])
 
-    def delete_messages(self, messages):
+    def delete_messages(self, messages, target_queue='primary'):
         """
         Called after a message has been successfully received and processed.
         Removes message from the queue.
         Splits messages into a batch size given by self.delete_batch_size.
         Input should be the messages directly from receive messages. At the
         very least, needs a list of messages with 'Id' and 'ReceiptHandle'.
+
         Returns a list with any failed attempts.
         """
+        queue_url = self.choose_queue_url(target_queue)
         failed = []
         for batch in self.chunk_messages(messages, self.delete_batch_size):
             # need to change message format, since deleting takes slightly
@@ -351,13 +424,13 @@ class QueueManager(object):
                 }
                 batch[i] = to_delete
             response = self.client.delete_message_batch(
-                QueueUrl=self.queue_url,
+                QueueUrl=queue_url,
                 Entries=batch
             )
             failed.extend(response.get('Failed', []))
         return failed
 
-    def replace_messages(self, messages):
+    def replace_messages(self, messages, target_queue='primary'):
         """
         Called using received messages to place them back on the queue.
         Using a VisibilityTimeout of 0 means these messages are instantly
@@ -365,8 +438,10 @@ class QueueManager(object):
         Number of messages in a batch is controlled by self.replace_batch_size
         Input should be the messages directly from receive messages. At the
         very least, needs a list of messages with 'Id' and 'ReceiptHandle'.
+
         Returns a list with any failed attempts.
         """
+        queue_url = self.choose_queue_url(target_queue)
         failed = []
         for batch in self.chunk_messages(messages, self.replace_batch_size):
             for i in range(len(batch)):
@@ -377,7 +452,7 @@ class QueueManager(object):
                 }
                 batch[i] = to_replace
             response = self.client.change_message_visibility_batch(
-                QueueUrl=self.queue_url,
+                QueueUrl=queue_url,
                 Entries=batch
             )
             failed.extend(response.get('Failed', []))
@@ -389,25 +464,25 @@ class QueueManager(object):
         number of inflight (i.e. not currently visible) messages.
         Also returns info on items in the dlq.
         """
-        response = self.client.get_queue_attributes(
-            QueueUrl=self.queue_url,
-            AttributeNames=[
-                'ApproximateNumberOfMessages',
-                'ApproximateNumberOfMessagesNotVisible'
-            ]
-        )
-        dlq_response = self.client.get_queue_attributes(
-            QueueUrl=self.dlq_url,
-            AttributeNames=[
-                'ApproximateNumberOfMessages',
-                'ApproximateNumberOfMessagesNotVisible'
-            ]
-        )
+        responses = []
+        for queue_url in [self.queue_url, self.second_queue_url, self.defer_queue_url, self.dlq_url]:
+            response = self.client.get_queue_attributes(
+                QueueUrl=queue_url,
+                AttributeNames=[
+                    'ApproximateNumberOfMessages',
+                    'ApproximateNumberOfMessagesNotVisible'
+                ]
+            )
+            responses.append(response)
         formatted = {
-            'waiting': response.get('Attributes', {}).get('ApproximateNumberOfMessages'),
-            'inflight': response.get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible'),
-            'dlq_waiting': dlq_response.get('Attributes', {}).get('ApproximateNumberOfMessages'),
-            'dlq_inflight': dlq_response.get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible')
+            'primary_waiting': responses[0].get('Attributes', {}).get('ApproximateNumberOfMessages'),
+            'primary_inflight': responses[0].get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible'),
+            'secondary_waiting': responses[1].get('Attributes', {}).get('ApproximateNumberOfMessages'),
+            'secondary_inflight': responses[1].get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible'),
+            'deferred_waiting': responses[2].get('Attributes', {}).get('ApproximateNumberOfMessages'),
+            'deferred_inflight': responses[2].get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible'),
+            'dlq_waiting': responses[3].get('Attributes', {}).get('ApproximateNumberOfMessages'),
+            'dlq_inflight': responses[3].get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible')
         }
         # transform in integers
         for entry in formatted:
@@ -416,16 +491,3 @@ class QueueManager(object):
             except ValueError:
                 formatted[entry] = None
         return formatted
-
-    def order_uuids_to_queue(self, original, to_add):
-        """
-        Given a list of original uuids and list of associated uuids that need
-        to be indexed, extends the first list with the second without
-        introducting duplicates. Returns extended list
-        """
-
-        unique_to_add = [uuid for uuid in to_add if uuid not in original]
-        return original + unique_to_add
-
-    def shutdown(self):
-        pass

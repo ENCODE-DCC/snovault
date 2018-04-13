@@ -107,6 +107,7 @@ def queue_error_callback(cb_args, counter, errors):
         counter[0] = local_counter[0] + counter[0]
     errors.extend(local_errors)
 
+
 ### Running in main process
 
 class MPIndexer(Indexer):

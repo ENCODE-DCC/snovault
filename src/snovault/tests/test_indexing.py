@@ -66,6 +66,7 @@ def teardown(app):
 
 
 def test_indexer_queue(app):
+    import json
     indexer_queue_mirror = app.registry[INDEXER_QUEUE_MIRROR]
     # this is only set up for webprod/webprod2
     assert indexer_queue_mirror is None
@@ -74,13 +75,18 @@ def test_indexer_queue(app):
     # unittesting the QueueManager
     assert indexer_queue.queue_url is not None
     assert indexer_queue.dlq_url is not None
+    assert indexer_queue.second_queue_url is not None
+    assert indexer_queue.defer_queue_url is not None
     test_message = 'abc123'
     to_index, failed = indexer_queue.add_uuids(app.registry, [test_message], strict=True)
     assert to_index == [test_message]
     assert not failed
     received = indexer_queue.receive_messages()
     assert len(received) == 1
-    assert received[0]['Body'] == test_message
+    msg_body = json.loads(received[0]['Body'])
+    assert isinstance(msg_body, dict)
+    assert msg_body['uuid'] == test_message
+    assert msg_body['strict'] is True
     # try to receive again (should be empty)
     received_2 = indexer_queue.receive_messages()
     assert len(received_2) == 0
@@ -95,8 +101,8 @@ def test_indexer_queue(app):
     indexer_queue.delete_messages(received)
     time.sleep(2)
     msg_count = indexer_queue.number_of_messages()
-    assert msg_count['waiting'] == 0
-    assert msg_count['inflight'] == 0
+    assert msg_count['primary_waiting'] == 0
+    assert msg_count['primary_inflight'] == 0
 
 
 def test_indexing_simple(app, testapp, indexer_testapp):

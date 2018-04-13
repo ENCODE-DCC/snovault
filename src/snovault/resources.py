@@ -251,6 +251,10 @@ class Item(Resource):
     def tid(self):
         return self.model.tid
 
+    @property
+    def sid(self):
+        return self.model.sid
+
     def links(self, properties):
         return {
             path: set(simple_path_ids(properties, path))

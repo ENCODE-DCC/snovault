@@ -3,6 +3,7 @@ from elasticsearch.exceptions import (
     ConnectionError,
     TransportError,
 )
+from ..indexing_views import SidException
 from pyramid.view import view_config
 from urllib3.exceptions import ReadTimeoutError
 from .interfaces import (
@@ -10,10 +11,15 @@ from .interfaces import (
     INDEXER,
     INDEXER_QUEUE
 )
+from snovault import (
+    DBSESSION,
+)
+from .indexer_utils import find_uuids_for_indexing
 import datetime
 import logging
 import time
 import copy
+import json
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +39,13 @@ def index(request):
     dry_run = request.json.get('dry_run', False)  # if True, do not actually index
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
+
+    # ensure we get the latest version of what is in the db as much as possible
+    session = request.registry[DBSESSION]()
+    connection = session.connection()
+    connection.execute('SET TRANSACTION ISOLATION LEVEL READ COMMITTED READ ONLY')
+
+
     if not dry_run:
         index_start_time = datetime.datetime.now()
         index_start_str = index_start_time.isoformat()
@@ -103,6 +116,7 @@ def index(request):
 
 class Indexer(object):
     def __init__(self, registry):
+        self.registry = registry
         self.es = registry[ELASTIC_SEARCH]
         self.queue = registry[INDEXER_QUEUE]
 
@@ -120,39 +134,111 @@ class Indexer(object):
             errors = self.update_objects_queue(request, counter)
 
 
+    def get_messages_from_queue(self, skip_deferred=False):
+        """
+        Simple helper method. Attempt to get items from deferred queue first,
+        and if none are found, check primary and then secondary queues. Both use
+        long polling. Returns list of messages received and the string target
+        the the queue came from.
+        If skip_deferred, don't check that queue.
+        """
+        try_order = ['primary', 'secondary'] if skip_deferred else ['deferred', 'primary', 'secondary']
+        messages = None
+        target_queue = None
+        for try_queue in try_order:
+            messages = self.queue.receive_messages(target_queue=try_queue)
+            if messages:
+                target_queue = try_queue
+                break
+        return messages, target_queue
+
+
+    def find_and_queue_secondary_items(self, uuids):
+        """
+        Should be used when strict is False
+        Find all associated uuids of the given set of uuid using ES and queue
+        them in the secondary queue.
+        """
+        associated_uuids = find_uuids_for_indexing(self.registry, uuids, log)
+        # remove already indexed primary uuids used to find them
+        secondary_uuids = list(associated_uuids - uuids)
+        return self.queue.add_uuids(self.registry, secondary_uuids, strict=True, target_queue='secondary')
+
+
     def update_objects_queue(self, request, counter):
         """
         Used with the queue
         """
         errors = []
+        # hold uuids that will be used to find secondary uuids
+        non_strict_uuids = set()
         to_delete = []  # hold messages that will be deleted
-        messages = self.queue.receive_messages()  # long polling used in SQS
+        # only check deferred queue on the first run, since there shouldn't
+        # be much in there at any given point
+        messages, target_queue = self.get_messages_from_queue(skip_deferred=False)
         while len(messages) > 0:
-            for msg in messages:
-                # msg['Body'] is just a string of uuids joined by commas
-                errored = False
-                for msg_uuid in msg['Body'].split(','):
-                    error = self.update_object(request, msg_uuid)
-                    if error is not None:
-                        # on an error, replace the message back in the queue
+            for idx, msg in enumerate(messages):
+                # this code is needed for integration with old style messages
+                try:
+                    msg_body = json.loads(msg['Body'])
+                except ValueError:
+                    msg_body = msg['Body']
+                if isinstance(msg_body, dict):
+                    msg_uuid= msg_body['uuid']
+                    msg_sid = msg_body['sid']
+                    msg_curr_time = msg_body['timestamp']
+                    msg_detail = msg_body.get('detail')
+                    # check to see if we are using the same txn that caused a deferral
+                    if target_queue == 'deferred' and msg_detail == str(request.tm.get()):
+                        self.queue.replace_messages([msg], target_queue=target_queue)
+                        continue
+                    if msg_body['strict'] is False:
+                        non_strict_uuids.add(msg_uuid)
+                else:  # old uuid message format
+                    msg_uuid = str(msg_body)
+                    msg_sid = None
+                    msg_curr_time = None
+                error = self.update_object(request, msg_uuid, sid=msg_sid, curr_time=msg_curr_time)
+                if error:
+                    if error.get('error_message') == 'deferred_retry':
+                        # send this to the deferred queue
+                        # should be set to strict, since associated uuids will
+                        # already have been found if it was intitially not
+                        msg_body['strict'] = False
+                        msg_body['detail'] = error['txn_str']
+                        self.queue.send_messages([msg_body], target_queue='deferred')
+                        # delete the old message
+                        to_delete.append(msg)
+                    else:
+                        # on a regular error, replace the message back in the queue
+                        # could do something with error, like putting on elasticache
+                        self.queue.replace_messages([msg], target_queue=target_queue)
                         errors.append(error)
-                        errored = True
-                        break
-                    elif counter:  # don't increment counter on an error
-                        counter[0] += 1
-                # put the message back in the queue if we hit an error
-                if errored:
-                    self.queue.replace_messages([msg])
                 else:
+                    if counter: counter[0] += 1  # do not increment on error
                     to_delete.append(msg)
                 # delete messages when we have the right number
                 if len(to_delete) == self.queue.delete_batch_size:
-                    self.queue.delete_messages(to_delete)
+                    self.queue.delete_messages(to_delete, target_queue=target_queue)
                     to_delete = []
-            messages = self.queue.receive_messages()
-        # delete any outstanding messages
+            # add to secondary queue, if applicable
+            if non_strict_uuids:
+                queued, failed = self.find_and_queue_secondary_items(non_strict_uuids)
+                if failed:
+                    error_msg = 'Failure(s) queueing secondary uuids: %s' % str(failed)
+                    log.error('INDEXER: ' + error_msg)
+                    errors.append({'error_message': error_msg})
+                non_strict_uuids = set()
+            prev_target_queue = target_queue
+            messages, target_queue = self.get_messages_from_queue(skip_deferred=True)
+            # if we have switched between primary and secondary queues, delete
+            # outstanding messages using previous queue
+            if prev_target_queue != target_queue and to_delete:
+                self.queue.delete_messages(to_delete, target_queue=prev_target_queue)
+                to_delete = []
+        # we're done. delete any outstanding messages
         if to_delete:
-            self.queue.delete_messages(to_delete)
+            self.queue.delete_messages(to_delete, target_queue=target_queue)
         return errors
 
 
@@ -171,29 +257,47 @@ class Indexer(object):
         return errors
 
 
-    def update_object(self, request, uuid):
-        curr_time = datetime.datetime.now().isoformat()
-        timestamp = int(time.time() * 1000000)
+    def update_object(self, request, uuid, sid=None, curr_time=None):
+        """
+        Actually index the uuid using the index-data view.
+        """
+        if not curr_time:
+            curr_time = datetime.datetime.utcnow().isoformat()  # utc
+
+        # check the sid with a less intensive view than @@index-data
+        if sid:
+            index_data_query = '/%s/@@index-data?sid=%s' % (uuid, sid)
+        else:
+            index_data_query = '/%s/@@index-data' % uuid
+
         try:
-            result = request.embed('/%s/@@index-data' % uuid, as_user='INDEXER')
+            result = request.embed(index_data_query, as_user='INDEXER')
+        except SidException as e:
+            log.warning('Invalid sid found for %s with value %s. time: %s' % (uuid, sid, curr_time))
+            # this will cause the item to be sent to the deferred queue
+            return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
+        except KeyError as e:
+            log.warning('KeyError for %s with sid %s. time: %s' % (uuid, sid, curr_time))
+            # this will cause the item to be sent to the deferred queue
+            return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
         except Exception as e:
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
+
         last_exc = None
         for backoff in [0, 1, 2]:
             time.sleep(backoff)
-            # timestamp from the queue or /index call (for sync uuids)
-            # is used as the version number
             try:
                 self.es.index(
                     index=result['item_type'], doc_type=result['item_type'], body=result,
-                    id=str(uuid), version=timestamp, version_type='external_gt',
+                    id=str(uuid), version=result['sid'], version_type='external_gte',
                     request_timeout=30
                 )
             except ConflictError:
-                last_exc = 'Conflict indexing %s at version %s' % (uuid, timestamp)
-                log.warning(last_exc)
-                break
+                log.warning('Conflict indexing %s at version %s. time: %s' % (uuid, sid, curr_time))
+                # this may be somewhat common and is not harmful
+                # do not return an error so the item is removed from the queue
+                return
             except (ConnectionError, ReadTimeoutError, TransportError) as e:
                 log.warning('Retryable error indexing %s: %r', uuid, e)
                 last_exc = repr(e)

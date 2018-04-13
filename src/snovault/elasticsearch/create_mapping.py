@@ -404,6 +404,10 @@ def es_mapping(mapping):
                 'type': 'text',
                 'include_in_all': False,
             },
+            'sid': {
+                'type': 'long',
+                'include_in_all': False,
+            },
             'item_type': {
                 'type': 'text',
             },
@@ -877,6 +881,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         return
 
     # now, queue items for indexing
+    # TODO: when queue space is an issue, put ontology_terms on the secondary
     if uuids_to_index:
         # we need to find associated uuids if all items are not indexed or not strict mode
         if not total_reindex and not strict:
@@ -887,7 +892,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             run_indexing(app, uuids_to_index)
         else:
             log.warning('\n___UUIDS TO INDEX (QUEUED)___: %s\n' % (len(uuids_to_index)))
-            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True)
+            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True, target_queue='primary')
 
 
 

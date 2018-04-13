@@ -12,10 +12,27 @@ from .authentication import calc_principals
 def includeme(config):
     config.scan(__name__)
 
+
+# really simple exception to know when the sid check fails
+class SidException(Exception):
+    pass
+
+
 @view_config(context=Item, name='index-data', permission='index', request_method='GET')
 def item_index_data(context, request):
     uuid = str(context.uuid)
     properties = context.upgrade_properties()
+
+    # if we want to check an sid, it should be set as a query param
+    sid_check = request.params.get('sid', None)
+    if sid_check:
+        try:
+            sid_check = int(sid_check)
+        except ValueError:
+            raise ValueError('sid parameter must be an integer. Provided sid: %s' % sid)
+        if context.sid < sid_check:
+            raise SidException('sid from the query (%s) is greater than that on context (%s). Bailing.' % (sid_check, context.sid))
+
     # ES 2 and up don't allow dots in links. Update these to use ~s
     new_links = {}
     for key, val in context.links(properties).items():
@@ -63,6 +80,7 @@ def item_index_data(context, request):
             for name in context.propsheets.keys() if name != ''
         },
         'tid': context.tid,
+        'sid': context.sid,
         'unique_keys': unique_keys,
         'uuid': uuid,
     }

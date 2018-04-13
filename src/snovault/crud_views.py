@@ -30,6 +30,8 @@ from .validators import (
     validate_item_content_post,
     validate_item_content_put,
 )
+from .invalidation import add_to_indexing_queue
+import transaction
 
 
 def includeme(config):
@@ -164,10 +166,16 @@ def render_item(request, context, render, return_uri_also=False):
              validators=[no_validate_item_content_post],
              request_param=['validate=false'])
 def collection_add(context, request, render=None):
+    txn = transaction.get()
+
     if render is None:
         render = request.params.get('render', True)
 
     item = create_item(context.type_info, request, request.validated)
+    # set up hook for queueing indexing
+    to_queue = {'uuid': str(item.uuid), 'sid': item.sid}
+    txn.addAfterCommitHook(add_to_indexing_queue, args=(request, to_queue, 'add',))
+
     rendered, item_uri = render_item(request, item, render, True)
     request.response.status = 201
     request.response.location = item_uri
@@ -197,11 +205,19 @@ def item_edit(context, request, render=None):
     Note validators will handle the PATH ?delete_fields parameter if you want
     field to be deleted
     """
+
+    txn = transaction.get()
+
     if render is None:
         render = request.params.get('render', True)
 
     # This *sets* the property sheet
     update_item(context, request, request.validated)
+
+    # set up hook for queueing indexing
+    to_queue = {'uuid': str(context.uuid), 'sid': context.sid}
+    txn.addAfterCommitHook(add_to_indexing_queue, args=(request, to_queue, 'edit',))
+
     rendered = render_item(request, context, render)
     request.response.status = 200
     result = {

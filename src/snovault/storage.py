@@ -500,6 +500,14 @@ class Resource(Base):
         tids = (str(self.data[k].propsheet.tid) for k in self.data.keys())
         return ','.join(sorted(set(tids)))
 
+    @property
+    def sid(self):
+        """
+        In some cases there may be more than one sid, but we care about the
+        primary one (with '' key)
+        """
+        return self.data[''].sid
+
     def invalidated(self):
         return False
 
