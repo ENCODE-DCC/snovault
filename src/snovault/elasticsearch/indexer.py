@@ -85,7 +85,7 @@ def index_in_batches(request, indexer, size, queue_client=None):
         while queue_client.queue.qsize() > 0:
             chunk = queue_client.get_chunk_of_uuids(size)
             random.shuffle(chunk)
-            for result in indexer.update_objects(request, chunk):
+            for result in indexer.update_objects(request, chunk, queue_client):
                 queue_client.result_queue.put(result)
     except Exception as ecp:
         LOG.warning("connection error %s", repr(ecp))
@@ -299,19 +299,18 @@ class Indexer(object):
         self.elastic_search = registry[ELASTIC_SEARCH]
         self.esstorage = registry[STORAGE]
         self.index = registry.settings['snovault.elasticsearch.index']
-        self.queue_client = QueueClient(registry)
 
-    def update_objects(self, request, uuids, xmin):
+    def update_objects(self, request, uuids, xmin, queue_client):
         errors = []
         for i, uuid in enumerate(uuids):
-            error = self.update_object(request, uuid, xmin)
+            error = self.update_object(request, uuid, xmin, queue_client)
             if error is not None:
                 errors.append(error)
             if (i + 1) % 50 == 0:
                 LOG.info('Indexing %d', i + 1)
         return errors
 
-    def update_object(self, request, uuid, xmin):
+    def update_object(self, request, uuid, xmin, queue_client):
         request.datastore = 'database'  # required by 2-step indexer
         last_exc = None
         try:
@@ -332,7 +331,7 @@ class Indexer(object):
                         id=str(uuid), version=xmin, version_type='external_gte',
                         request_timeout=30,
                     )
-                    self.queue_client.done_queue.put(str(uuid))
+                    queue_client.done_queue.put(str(uuid))
                 except StatementError:
                     # Can't reconnect until invalid transaction is rolled back
                     raise
