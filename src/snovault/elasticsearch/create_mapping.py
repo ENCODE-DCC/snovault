@@ -354,7 +354,7 @@ def audit_mapping():
 # generate an index record, which contains a mapping and settings
 def build_index_record(mapping, in_type):
     return {
-        'mappings': mapping,
+        'mappings': {in_type: mapping},
         'settings': index_settings(in_type)
     }
 
@@ -597,6 +597,12 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     Will also trigger a re-index for a newly created index if the indexing
     document in meta exists and has an xmin.
     """
+
+    if print_count_only:
+        log.warning('___PRINTING COUNTS___')
+        check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff, True)
+        return
+
     # determine if index already exists for this type
     this_index_record = build_index_record(mapping, in_type)
     this_index_exists = check_if_index_exists(es, in_type, check_first)
@@ -608,7 +614,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
         prev_index_record = get_previous_index_record(this_index_exists, es, in_type)
         if prev_index_record is not None and this_index_record == prev_index_record:
             if in_type != 'meta':
-                check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff, print_count_only)
+                check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff)
             log.warning('MAPPING: using existing index for collection %s' % (in_type))
             return
 
@@ -623,27 +629,19 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
         else:
             log.warning('MAPPING: could not delete index for %s' % (in_type))
 
-    # first, create the mapping. adds settings in the body
-    put_settings = this_index_record['settings']
-    res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, ignore=[400])
+    # first, create the mapping. adds settings and mappings in the body
+    res = es_safe_execute(es.indices.create, index=in_type, body=this_index_record, ignore=[400])
     if res:
         log.warning('MAPPING: new index created for %s' % (in_type))
     else:
         log.warning('MAPPING: new index failed for %s' % (in_type))
-
-    # update with mapping
-    res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, ignore=[400])
-    if res:
-        log.warning('MAPPING: mapping successfully added for %s' % (in_type))
-    else:
-        log.warning('MAPPING: mapping failed for %s' % (in_type))
 
     # we need to queue items in the index for indexing
     # if check_first and we've made it here, nothing has been queued yet
     # for this collection
     coll_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
     uuids_to_index.update(coll_uuids)
-    log.warning('MAPPING: queueing all %s items in the new index %s for reindexing' %
+    log.warning('MAPPING: will queue all %s items in the new index %s for reindexing' %
                 (str(coll_count), in_type))
 
     # put index_record in meta
