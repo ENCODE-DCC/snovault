@@ -78,7 +78,7 @@ def queue_indexing(request):
     return response
 
 
-@view_config(route_name='indexing_status', request_method='GET', permission='view')
+@view_config(route_name='indexing_status', request_method='GET')
 def indexing_status(request):
     """
     Endpoint to check what is currently on the queue. Uses GET requests
