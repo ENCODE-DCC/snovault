@@ -869,14 +869,13 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     log.warning('\n___ES INDICES (POST-MAPPING)___:\n %s\n' % (str(es.cat.indices())))
     log.warning('\n___FINISHED CREATE-MAPPING___\n')
 
+    if skip_indexing or print_count_only:
+        return
+
     # clear the indexer queue on a total reindex
     if total_reindex:
         log.warning('___PURGING THE QUEUE___\n')
         indexer_queue.clear_queue()
-
-    # this is probably only used with tests
-    if skip_indexing:
-        return
 
     # now, queue items for indexing
     # TODO: when queue space is an issue, put ontology_terms on the secondary
