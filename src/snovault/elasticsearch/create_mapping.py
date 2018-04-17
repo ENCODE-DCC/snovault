@@ -855,6 +855,11 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     if not check_if_index_exists(es, 'meta', False) and 'meta' not in collections:
         collections = ['meta'] + collections
 
+    # clear the indexer queue on a total reindex
+    if total_reindex:
+        log.warning('___PURGING THE QUEUE BEFORE MAPPING___\n')
+        indexer_queue.clear_queue()
+
     log.warning('\n___FOUND COLLECTIONS___:\n %s\n' % (str(collections)))
     for collection_name in collections:
         if collection_name == 'meta':
@@ -871,11 +876,6 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
 
     if skip_indexing or print_count_only:
         return
-
-    # clear the indexer queue on a total reindex
-    if total_reindex:
-        log.warning('___PURGING THE QUEUE___\n')
-        indexer_queue.clear_queue()
 
     # now, queue items for indexing
     # TODO: when queue space is an issue, put ontology_terms on the secondary
