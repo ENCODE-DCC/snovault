@@ -844,7 +844,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     # keep a set of all uuids to be reindexed, which occurs after all indices
     # are created
     uuids_to_index = set()
-    total_reindex = (collections == None and not dry_run and not check_first and not index_diff)
+    total_reindex = (collections == None and not dry_run and not check_first and not index_diff and not print_count_only)
     if not collections:
         collections = list(registry[COLLECTIONS].by_item_type.keys())
         # automatically add meta to start when going through all collections
