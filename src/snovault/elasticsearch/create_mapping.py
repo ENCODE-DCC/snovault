@@ -811,13 +811,16 @@ def run_indexing(app, indexing_uuids):
     run_index_data(app, uuids=indexing_uuids)
 
 
-def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=False, index_diff=False, strict=False, sync_index=False, no_meta=False, print_count_only=False):
+def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=False,
+        index_diff=False, strict=False, sync_index=False, no_meta=False, print_count_only=False,
+        purge_queue=False):
     """
     Run create_mapping. Has the following options:
     collections: run create mapping for the given list of item types only.
         If specific collections are set, meta will not be re-created.
     dry_run: if True, do not delete/create indices
     skip_indexing: if True, do not index ANYTHING with this run.
+    purge_queue: to beused with skip_indexing if you want clean up the queue
     check_first: if True, attempt to keep indices that have not changed mapping.
         If the document counts in the index and db do not match, delete index
         and queue all items in the index for reindexing.
@@ -878,6 +881,9 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
 
     # this is probably only used with tests
     if skip_indexing:
+        if purge_queue:
+            log.warning('___SKIP INDEXING AND PURGING THE QUEUE___\n')
+            indexer_queue.clear_queue()
         return
 
     # now, queue items for indexing
