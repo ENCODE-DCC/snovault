@@ -354,7 +354,7 @@ def audit_mapping():
 # generate an index record, which contains a mapping and settings
 def build_index_record(mapping, in_type):
     return {
-        'mappings': mapping,
+        'mappings': {in_type: mapping},
         'settings': index_settings(in_type)
     }
 
@@ -597,6 +597,12 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     Will also trigger a re-index for a newly created index if the indexing
     document in meta exists and has an xmin.
     """
+
+    if print_count_only:
+        log.warning('___PRINTING COUNTS___')
+        check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff, True)
+        return
+
     # determine if index already exists for this type
     this_index_record = build_index_record(mapping, in_type)
     this_index_exists = check_if_index_exists(es, in_type, check_first)
@@ -608,7 +614,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
         prev_index_record = get_previous_index_record(this_index_exists, es, in_type)
         if prev_index_record is not None and this_index_record == prev_index_record:
             if in_type != 'meta':
-                check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff, print_count_only)
+                check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff)
             log.warning('MAPPING: using existing index for collection %s' % (in_type))
             return
 
@@ -623,27 +629,19 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
         else:
             log.warning('MAPPING: could not delete index for %s' % (in_type))
 
-    # first, create the mapping. adds settings in the body
-    put_settings = this_index_record['settings']
-    res = es_safe_execute(es.indices.create, index=in_type, body=put_settings, ignore=[400])
+    # first, create the mapping. adds settings and mappings in the body
+    res = es_safe_execute(es.indices.create, index=in_type, body=this_index_record, ignore=[400])
     if res:
         log.warning('MAPPING: new index created for %s' % (in_type))
     else:
         log.warning('MAPPING: new index failed for %s' % (in_type))
-
-    # update with mapping
-    res = es_safe_execute(es.indices.put_mapping, index=in_type, doc_type=in_type, body=mapping, ignore=[400])
-    if res:
-        log.warning('MAPPING: mapping successfully added for %s' % (in_type))
-    else:
-        log.warning('MAPPING: mapping failed for %s' % (in_type))
 
     # we need to queue items in the index for indexing
     # if check_first and we've made it here, nothing has been queued yet
     # for this collection
     coll_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
     uuids_to_index.update(coll_uuids)
-    log.warning('MAPPING: queueing all %s items in the new index %s for reindexing' %
+    log.warning('MAPPING: will queue all %s items in the new index %s for reindexing' %
                 (str(coll_count), in_type))
 
     # put index_record in meta
@@ -820,7 +818,6 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         If specific collections are set, meta will not be re-created.
     dry_run: if True, do not delete/create indices
     skip_indexing: if True, do not index ANYTHING with this run.
-    purge_queue: to beused with skip_indexing if you want clean up the queue
     check_first: if True, attempt to keep indices that have not changed mapping.
         If the document counts in the index and db do not match, delete index
         and queue all items in the index for reindexing.
@@ -836,6 +833,9 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         re-create the meta index if set.
     print_count_only: if True, print counts for existing indices instead of
         queueing items for reindexing. Must to be used with check_first.
+    purge_queue: if True, purge the contents of all relevant indexing queues.
+        Is automatically done on a full indexing (no index_diff, check_first,
+        or collections).
     """
     ### TODO: Lock the indexer when create_mapping is running
     registry = app.registry
@@ -849,7 +849,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     # keep a set of all uuids to be reindexed, which occurs after all indices
     # are created
     uuids_to_index = set()
-    total_reindex = (collections == None and not dry_run and not check_first and not index_diff)
+    total_reindex = (collections == None and not dry_run and not check_first and not index_diff and not print_count_only)
     if not collections:
         collections = list(registry[COLLECTIONS].by_item_type.keys())
         # automatically add meta to start when going through all collections
@@ -859,6 +859,11 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     # if meta doesn't exist, always add it
     if not check_if_index_exists(es, 'meta', False) and 'meta' not in collections:
         collections = ['meta'] + collections
+
+    # clear the indexer queue on a total reindex
+    if total_reindex or purge_queue:
+        log.warning('___PURGING THE QUEUE BEFORE MAPPING___\n')
+        indexer_queue.clear_queue()
 
     log.warning('\n___FOUND COLLECTIONS___:\n %s\n' % (str(collections)))
     for collection_name in collections:
@@ -874,16 +879,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     log.warning('\n___ES INDICES (POST-MAPPING)___:\n %s\n' % (str(es.cat.indices())))
     log.warning('\n___FINISHED CREATE-MAPPING___\n')
 
-    # clear the indexer queue on a total reindex
-    if total_reindex:
-        log.warning('___PURGING THE QUEUE___\n')
-        indexer_queue.clear_queue()
-
-    # this is probably only used with tests
-    if skip_indexing:
-        if purge_queue:
-            log.warning('___SKIP INDEXING AND PURGING THE QUEUE___\n')
-            indexer_queue.clear_queue()
+    if skip_indexing or print_count_only:
         return
 
     # now, queue items for indexing
@@ -926,6 +922,8 @@ def main():
                         help="add to disregard the meta index")
     parser.add_argument('--print-count-only', action='store_true',
                         help="use with check_first to only print counts")
+    parser.add_argument('--purge-queue', action='store_true',
+                        help="purge the contents of all queues, regardless of run mode")
 
     args = parser.parse_args()
 
@@ -936,7 +934,8 @@ def main():
     logging.getLogger('snovault').setLevel(logging.INFO)
 
     uuids = run(app, args.item_type, args.dry_run, args.check_first, args.skip_indexing,
-               args.index_diff, args.strict, args.sync_index, args.no_meta, args.print_count_only)
+               args.index_diff, args.strict, args.sync_index, args.no_meta,
+               args.print_count_only, args.purge_queue)
     return
 
 
