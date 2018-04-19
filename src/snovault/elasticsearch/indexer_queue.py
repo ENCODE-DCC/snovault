@@ -64,11 +64,11 @@ def queue_indexing(request):
     strict = request.json.get('strict', False)
     if req_uuids:
         # queue these as secondary
-        queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=strict, target_queue='secondary')
+        queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=strict, target_queue='primary')
         response['requested_uuids'] = req_uuids
     else:
         # queue these as secondary
-        queued, failed = queue_indexer.add_collections(request.registry, req_collections, strict=strict, target_queue='secondary')
+        queued, failed = queue_indexer.add_collections(request.registry, req_collections, strict=strict, target_queue='primary')
         response['requested_collections'] = req_collections
     response['notification'] = 'Success'
     response['number_queued'] = len(queued)

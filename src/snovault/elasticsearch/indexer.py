@@ -153,13 +153,15 @@ class Indexer(object):
         return messages, target_queue
 
 
-    def find_and_queue_secondary_items(self, uuids):
+    def find_and_queue_secondary_items(self, uuids, embedded_uuids):
         """
         Should be used when strict is False
         Find all associated uuids of the given set of uuid using ES and queue
         them in the secondary queue.
+        Add embedded_uuids after find secondary uuids
         """
         associated_uuids = find_uuids_for_indexing(self.registry, uuids, log)
+        associated_uuids |= embedded_uuids
         # remove already indexed primary uuids used to find them
         secondary_uuids = list(associated_uuids - uuids)
         return self.queue.add_uuids(self.registry, secondary_uuids, strict=True, target_queue='secondary')
@@ -172,6 +174,7 @@ class Indexer(object):
         errors = []
         # hold uuids that will be used to find secondary uuids
         non_strict_uuids = set()
+        embedded_uuids = set()
         to_delete = []  # hold messages that will be deleted
         # only check deferred queue on the first run, since there shouldn't
         # be much in there at any given point
@@ -198,7 +201,12 @@ class Indexer(object):
                     msg_uuid = str(msg_body)
                     msg_sid = None
                     msg_curr_time = None
-                error = self.update_object(request, msg_uuid, sid=msg_sid, curr_time=msg_curr_time)
+                if target_queue != 'secondary':  # add embedded uuids to secondary
+                    error = self.update_object(request, msg_uuid, sid=msg_sid,
+                        curr_time=msg_curr_time, add_to_secondary=embedded_uuids)
+                else:
+                    error = self.update_object(request, msg_uuid, sid=msg_sid,
+                        curr_time=msg_curr_time, add_to_secondary=None)
                 if error:
                     if error.get('error_message') == 'deferred_retry':
                         # send this to the deferred queue
@@ -223,12 +231,13 @@ class Indexer(object):
                     to_delete = []
             # add to secondary queue, if applicable
             if non_strict_uuids:
-                queued, failed = self.find_and_queue_secondary_items(non_strict_uuids)
+                queued, failed = self.find_and_queue_secondary_items(non_strict_uuids, embedded_uuids=embedded_uuids)
                 if failed:
                     error_msg = 'Failure(s) queueing secondary uuids: %s' % str(failed)
                     log.error('INDEXER: ' + error_msg)
                     errors.append({'error_message': error_msg})
                 non_strict_uuids = set()
+                embedded_uuids = set()
             prev_target_queue = target_queue
             messages, target_queue = self.get_messages_from_queue(skip_deferred=True)
             # if we have switched between primary and secondary queues, delete
@@ -257,9 +266,11 @@ class Indexer(object):
         return errors
 
 
-    def update_object(self, request, uuid, sid=None, curr_time=None):
+    def update_object(self, request, uuid, sid=None, curr_time=None, add_to_secondary=None):
         """
         Actually index the uuid using the index-data view.
+        add_to_secondary is an optional set. If provided, the embedded uuids
+        from the request.embed(/<uuid>/@@index-data) will be added to the set.
         """
         if not curr_time:
             curr_time = datetime.datetime.utcnow().isoformat()  # utc
@@ -306,6 +317,9 @@ class Indexer(object):
                 last_exc = repr(e)
                 break
             else:
+                # add embedded_uuids to secondary queue if no errors...
+                if add_to_secondary and isinstance(add_to_secondary, set):
+                    add_to_secondary |= set(result.get('embedded_uuids', []))
                 return
         return {'error_message': last_exc, 'time': curr_time, 'uuid': str(uuid)}
 
