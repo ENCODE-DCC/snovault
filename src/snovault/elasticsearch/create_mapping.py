@@ -809,7 +809,9 @@ def run_indexing(app, indexing_uuids):
     run_index_data(app, uuids=indexing_uuids)
 
 
-def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=False, index_diff=False, strict=False, sync_index=False, no_meta=False, print_count_only=False):
+def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=False,
+        index_diff=False, strict=False, sync_index=False, no_meta=False, print_count_only=False,
+        purge_queue=False):
     """
     Run create_mapping. Has the following options:
     collections: run create mapping for the given list of item types only.
@@ -831,6 +833,9 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         re-create the meta index if set.
     print_count_only: if True, print counts for existing indices instead of
         queueing items for reindexing. Must to be used with check_first.
+    purge_queue: if True, purge the contents of all relevant indexing queues.
+        Is automatically done on a full indexing (no index_diff, check_first,
+        or collections).
     """
     ### TODO: Lock the indexer when create_mapping is running
     registry = app.registry
@@ -856,7 +861,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         collections = ['meta'] + collections
 
     # clear the indexer queue on a total reindex
-    if total_reindex:
+    if total_reindex or purge_queue:
         log.warning('___PURGING THE QUEUE BEFORE MAPPING___\n')
         indexer_queue.clear_queue()
 
@@ -917,6 +922,8 @@ def main():
                         help="add to disregard the meta index")
     parser.add_argument('--print-count-only', action='store_true',
                         help="use with check_first to only print counts")
+    parser.add_argument('--purge-queue', action='store_true',
+                        help="purge the contents of all queues, regardless of run mode")
 
     args = parser.parse_args()
 
@@ -927,7 +934,8 @@ def main():
     logging.getLogger('snovault').setLevel(logging.INFO)
 
     uuids = run(app, args.item_type, args.dry_run, args.check_first, args.skip_indexing,
-               args.index_diff, args.strict, args.sync_index, args.no_meta, args.print_count_only)
+               args.index_diff, args.strict, args.sync_index, args.no_meta,
+               args.print_count_only, args.purge_queue)
     return
 
 
