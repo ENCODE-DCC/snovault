@@ -589,7 +589,7 @@ def create_mapping_by_type(in_type, registry):
 
 
 def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first, index_diff=False,
-                print_count_only=False, indicies=None, meta_bulk_actions=None):
+                print_count_only=False, meta=None, meta_bulk_actions=None):
     """
     Creates an es index for the given in_type with the given mapping and
     settings defined by item_settings(). If check_first == True, attempting
@@ -600,7 +600,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     Will also trigger a re-index for a newly created index if the indexing
     document in meta exists and has an xmin.
 
-    please pass in indicies and meta_bulk_actions if you are creating multiple indices
+    please pass in meta and meta_bulk_actions if you are creating multiple indices
     then update meta index once with `elasticsearch.helpers.bulk(es, meta_bulk_actions)`
     passing in `meta` can also save on calls to check if index exists...
     """
@@ -614,15 +614,15 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     this_index_record = build_index_record(mapping, in_type)
 
     # determine if index already exists for this type
-    # probably don't need to do this as I can do it upstream... but passing in indicies makes it
+    # probably don't need to do this as I can do it upstream... but passing in meta makes it
     # just a single if check
-    this_index_exists = check_if_index_exists(es, in_type, check_first, indicies)
-    meta_exists = check_if_index_exists(es, 'meta', check_first, indicies) if in_type != 'meta' else True
+    this_index_exists = check_if_index_exists(es, in_type, check_first, meta)
+    meta_exists = check_if_index_exists(es, 'meta', check_first, meta) if in_type != 'meta' else True
 
     # if the index exists, we might not need to delete it
     # otherwise, run if we are using the check-first or index_diff args
     if check_first or index_diff:
-        prev_index_record = get_previous_index_record(this_index_exists, es, in_type)
+        prev_index_record = get_previous_index_record(this_index_exists, es, in_type, meta)
         if prev_index_record is not None and this_index_record == prev_index_record:
             if in_type != 'meta':
                 check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff)
@@ -704,7 +704,7 @@ def check_if_index_exists(es, in_type, check_first, cached_indices=None):
     return this_index_exists
 
 
-def get_previous_index_record(this_index_exists, es, in_type):
+def get_previous_index_record(this_index_exists, es, in_type, meta=None):
     """
     Decide if we need to drop the index + reindex (no index/no meta record)
     OR
@@ -713,19 +713,23 @@ def get_previous_index_record(this_index_exists, es, in_type):
     """
     prev_index_hit = {}
     if this_index_exists:
-        try:
-            # multiple queries to meta... don't want this...
-            prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type, ignore=[404])
-        except TransportError as excp:
-            if excp.info.get('status') == 503:
-                es.indices.refresh(index='meta')
-                time.sleep(3)
-                try:
-                    prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type, ignore=[404])
-                except:
-                    return None
-        prev_index_record = prev_index_hit.get('_source')
-        return prev_index_record
+        if meta:
+            return meta.get(in_type, {}).get('mapping', None)
+
+        else:
+            try:
+                # multiple queries to meta... don't want this...
+                prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type, ignore=[404])
+            except TransportError as excp:
+                if excp.info.get('status') == 503:
+                    es.indices.refresh(index='meta')
+                    time.sleep(3)
+                    try:
+                        prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type, ignore=[404])
+                    except:
+                        return None
+            prev_index_record = prev_index_hit.get('_source')
+            return prev_index_record
     else:
         return None
 
@@ -900,25 +904,25 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     # indices call leaves some training stuff
     if indices_list[-1] == '': indices_list.pop()
     indices = {}
-    indices.update(index.split() for index in indices_list)
+    for index in indices_list:
+        if index:
+            name, count = index.split()
+            indices[name] = {'count': count}
+
     meta_bulk_actions = []
 
+    # store all previous_mappings
     if 'meta' in indices:
-        import pdb; pdb.set_trace()
-        # store all previous_mappings
         # todo filter by list of collections
         meta_idx = es.search(index='meta', body={'query': {'match_all': {}}})
-        for idx in meta_idx:
-            existing_idx = indices.get(idx['id'], None)
-            if existing_idx:
-                existing_idx['mapping'] = idx['_source']
+        for idx in meta_idx['hits']['hits']:
+            # meta index doesn't have _id I guess we don't need meta in here
+            if idx.get('_id') and idx['_id'] in indices:
+                indices[idx['_id']]['mapping'] = idx['_source']
 
     # now indices should be all index that pre-existed with size and mapping
     # two queries
 
-    # todo, query db in seperate thread for all uuids, as we know at this point 
-    # what needs to be reindexed
-    # assuming we filter out collections that are already in indices... or not...
 
     # if meta doesn't exist, always add it
     if not check_if_index_exists(es, 'meta', False, indices) and 'meta' not in collections:

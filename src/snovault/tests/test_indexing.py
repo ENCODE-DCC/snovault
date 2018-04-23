@@ -12,6 +12,7 @@ from snovault import (
     COLLECTIONS,
     TYPES,
 )
+from snovault.elasticsearch.create_mapping import check_if_index_exists
 
 pytestmark = [pytest.mark.indexing]
 
@@ -311,7 +312,6 @@ def test_index_settings(app, testapp, indexer_testapp):
 
 # some unit tests associated with build_index in create_mapping
 def test_check_if_index_exists(app):
-    from snovault.elasticsearch.create_mapping import check_if_index_exists
     es = app.registry[ELASTIC_SEARCH]
     test_type = 'testing_post_put_patch'
     exists = check_if_index_exists(es, test_type, True)
@@ -319,6 +319,18 @@ def test_check_if_index_exists(app):
     # delete index
     es.indices.delete(index=test_type)
     exists = check_if_index_exists(es, test_type, True)
+    assert not exists
+
+
+def test_check_if_index_exists_can_used_cached_index_list():
+    es = None
+    cached_idx = {'testing_post_put_patch': 22}
+    test_type = 'testing_post_put_patch'
+    exists = check_if_index_exists(es, test_type, True, cached_idx)
+    assert exists
+    # delete index
+    cached_idx = {}
+    exists = check_if_index_exists(es, test_type, True, cached_idx)
     assert not exists
 
 
@@ -412,3 +424,20 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
     time.sleep(5) # Allow time for ES API to send network request to ES server to perform delete.
     check_post_from_es_2 = storage.read.get_by_uuid(test_uuid)
     assert check_post_from_es_2 is None
+
+
+def test_create_mapping_check_first(app, testapp, indexer_testapp):
+    # ensure create mapping has been run
+    from snovault.elasticsearch import create_mapping
+    create_mapping.run(app, check_first=False, skip_indexing=True)
+    es = app.registry[ELASTIC_SEARCH]
+    meta = es.search(index='meta', body={'query': {'match_all': {}}})
+
+
+    # clear one to make sure it gets put back
+    assert es.get(index='meta', doc_type='meta', id='testing_post_put_patch')
+    es.delete(index='meta', doc_type='meta', id='testing_post_put_patch')
+
+    create_mapping.run(app, check_first=True, skip_indexing=True)
+    meta2 = es.search(index='meta', body={'query': {'match_all': {}}})
+    assert(len(meta['hits']['hits']) == len(meta2['hits']['hits']))
