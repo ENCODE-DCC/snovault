@@ -152,11 +152,11 @@ class Indexer(object):
         if source_uuids:
             associated_uuids = find_uuids_for_indexing(self.registry, source_uuids, log)
             associated_uuids |= embedded_uuids
+            # remove already indexed primary uuids used to find them
+            secondary_uuids = list(associated_uuids - source_uuids)
         else:
-            associated_uuids = embedded_uuids
+            secondary_uuids = embedded_uuids
 
-        # remove already indexed primary uuids used to find them
-        secondary_uuids = list(associated_uuids - source_uuids)
         return self.queue.add_uuids(self.registry, secondary_uuids, strict=True, target_queue='secondary')
 
 
@@ -314,10 +314,13 @@ class Indexer(object):
                 # add embedded_uuids to secondary queue if no errors
                 # this makes it so all items embedded in this will get indexed
                 # (on the secondary queue with strict=True)
-                if add_to_secondary is not None and isinstance(add_to_secondary, set):
+                if isinstance(add_to_secondary, set):
                     add_to_secondary |= set(result.get('embedded_uuids', []))
-                    # remove the uuid of the result we just indexed
-                    add_to_secondary -= set(result['uuid'])
+                    # remove the uuid we are indexing (included in result['embedded_uuids'])
+                    try:
+                        add_to_secondary.remove(uuid)
+                    except KeyError:  # catch a possible edge case?
+                        pass
                 return
         return {'error_message': last_exc, 'time': curr_time, 'uuid': str(uuid)}
 
