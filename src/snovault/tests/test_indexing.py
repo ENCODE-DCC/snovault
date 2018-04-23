@@ -7,7 +7,11 @@ Does not include data dependent tests
 
 import pytest
 import time
-from snovault.elasticsearch.interfaces import ELASTIC_SEARCH, INDEXER_QUEUE, INDEXER_QUEUE_MIRROR
+from snovault.elasticsearch.interfaces import (
+    ELASTIC_SEARCH,
+    INDEXER_QUEUE,
+    INDEXER_QUEUE_MIRROR
+)
 from snovault import (
     COLLECTIONS,
     TYPES,
@@ -218,6 +222,40 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     assert res.json['indexing_count'] == 2
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 2
+
+
+def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
+    """
+    When an item is indexed, queue up all its embedded uuids for indexing
+    as well.
+    """
+    es = app.registry[ELASTIC_SEARCH]
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    target  = {'name': 'one', 'uuid': '775795d3-4410-4114-836b-8eeecf1d0c2f'}
+
+    source = {
+        'name': 'A',
+        'target': '775795d3-4410-4114-836b-8eeecf1d0c2f',
+        'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd',
+        'status': 'current',
+    }
+    target_res = testapp.post_json('/testing-link-targets/', target, status=201)
+    # wait for the first item to index
+    doc_count = es.count(index=test_type, doc_type='testing_link_target').get('count')
+    while doc_count < 1:
+        time.sleep(2)
+        doc_count = es.count(index=test_type, doc_type='testing_link_target').get('count')
+    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
+    assert indexing_doc['_source']['indexing_count'] == 1
+    source_res = testapp.post_json('/testing-link-sources/', source, status=201)
+    # wait for them to index
+    doc_count = es.count(index=test_type, doc_type='testing_link_source').get('count')
+    while doc_count < 1:
+        time.sleep(2)
+        doc_count = es.count(index=test_type, doc_type='testing_link_source').get('count')
+    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
+    # this should have indexed the target and source
+    assert indexing_doc['_source']['indexing_count'] == 2
 
 
 def test_queue_indexing_endpoint(app, testapp, indexer_testapp):
