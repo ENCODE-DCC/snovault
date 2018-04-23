@@ -153,17 +153,21 @@ class Indexer(object):
         return messages, target_queue
 
 
-    def find_and_queue_secondary_items(self, uuids, embedded_uuids):
+    def find_and_queue_secondary_items(self, source_uuids, embedded_uuids):
         """
         Should be used when strict is False
         Find all associated uuids of the given set of uuid using ES and queue
         them in the secondary queue.
-        Add embedded_uuids after find secondary uuids
+        Add embedded_uuids after find secondary uuids (they are "strict")
         """
-        associated_uuids = find_uuids_for_indexing(self.registry, uuids, log)
-        associated_uuids |= embedded_uuids
+        if source_uuids:
+            associated_uuids = find_uuids_for_indexing(self.registry, source_uuids, log)
+            associated_uuids |= embedded_uuids
+        else:
+            associated_uuids = embedded_uuids
+
         # remove already indexed primary uuids used to find them
-        secondary_uuids = list(associated_uuids - uuids)
+        secondary_uuids = list(associated_uuids - source_uuids)
         return self.queue.add_uuids(self.registry, secondary_uuids, strict=True, target_queue='secondary')
 
 
@@ -230,8 +234,9 @@ class Indexer(object):
                     self.queue.delete_messages(to_delete, target_queue=target_queue)
                     to_delete = []
             # add to secondary queue, if applicable
-            if non_strict_uuids:
-                queued, failed = self.find_and_queue_secondary_items(non_strict_uuids, embedded_uuids=embedded_uuids)
+            # reset embedded/non-strict uuids after adding
+            if non_strict_uuids or embedded_uuids:
+                queued, failed = self.find_and_queue_secondary_items(non_strict_uuids, embedded_uuids)
                 if failed:
                     error_msg = 'Failure(s) queueing secondary uuids: %s' % str(failed)
                     log.error('INDEXER: ' + error_msg)
@@ -317,9 +322,13 @@ class Indexer(object):
                 last_exc = repr(e)
                 break
             else:
-                # add embedded_uuids to secondary queue if no errors...
-                if add_to_secondary and isinstance(add_to_secondary, set):
+                # add embedded_uuids to secondary queue if no errors
+                # this makes it so all items embedded in this will get indexed
+                # (on the secondary queue with strict=True)
+                if add_to_secondary is not None and isinstance(add_to_secondary, set):
                     add_to_secondary |= set(result.get('embedded_uuids', []))
+                    # remove the uuid of the result we just indexed
+                    add_to_secondary -= set(result['uuid'])
                 return
         return {'error_message': last_exc, 'time': curr_time, 'uuid': str(uuid)}
 
