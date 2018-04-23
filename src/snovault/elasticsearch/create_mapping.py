@@ -48,8 +48,8 @@ log = logging.getLogger(__name__)
 META_MAPPING = {
     '_all': {
         'enabled': False,
-        'analyzer': 'snovault_index_analyzer',
-        'search_analyzer': 'snovault_search_analyzer'
+        #'analyzer': 'snovault_index_analyzer',
+        #'search_analyzer': 'snovault_search_analyzer'
     },
     'dynamic_templates': [
         {
@@ -661,7 +661,8 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
 
     # put index_record in meta
     if meta_exists:
-        if not meta_bulk_actions:
+        if meta_bulk_actions is None:
+            assert False
             meta_bulk_actions = []
             # much better to load in bulk if your doing more than one
             start = timer()
@@ -672,15 +673,15 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
                 log.warning("MAPPING: index record created for %s" % (in_type))
             else:
                 log.warning("MAPPING: index record failed for %s" % (in_type))
-    else:
-        # prefered fast method...
-        bulk_action = {'_op_type': 'index',
-                       '_index': 'meta',
-                       '_type': 'meta',
-                       '_id': in_type,
-                       '_source': this_index_record
-                      }
-        meta_bulk_actions.append(bulk_action)
+        else:
+            # prefered fast method...
+            bulk_action = {'_op_type': 'index',
+                           '_index': 'meta',
+                           '_type': 'meta',
+                           '_id': in_type,
+                           '_source': this_index_record
+                          }
+            meta_bulk_actions.append(bulk_action)
     return meta_bulk_actions
 
 
@@ -875,6 +876,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     """
     ### TODO: Lock the indexer when create_mapping is running
     from timeit import default_timer as timer
+    import pdb; pdb.set_trace()
     overall_start = timer()
     registry = app.registry
     es = registry[ELASTIC_SEARCH]
@@ -904,7 +906,6 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     meta_bulk_actions = []
 
     if 'meta' in indices:
-        import pdb; pdb.set_trace()
         # store all previous_mappings
         # todo filter by list of collections
         meta_idx = es.search(index='meta', body={'query': {'match_all': {}}})
@@ -965,7 +966,20 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     # insert meta_bulk_actions
     start = timer()
     if meta_bulk_actions:
-        bulk(es, meta_bulk_actions)
+        no_refresh = {
+                "refresh_interval" : "-1",
+                "number_of_replicas": 0,
+            }
+        #es.indices.put_settings(index='meta', body=no_refresh)
+
+        bulk(es, meta_bulk_actions,request_timeout=300,chunk_size=20)
+
+        refresh = {
+                "refresh_interval" : "1s",
+                "number_of_replicas" : 1
+            }
+        #es.indices.put_settings(index='meta', body=refresh)
+
     end = timer()
     log.warning("bulk update for meta took %s" % str(end-start))
 
@@ -977,6 +991,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     log.warning('\n___GREATEST MAPPING TIME: %s\n' % str(greatest_mapping_time))
     log.warning('\n___GREATEST INDEX CREATION TIME: %s\n' % str(greatest_index_creation_time))
     log.warning('\n___TIME FOR ALL COLLECTIONS: %s\n' % str(overall_end - overall_start))
+    import pdb; pdb.set_trace()
     if skip_indexing or print_count_only:
         return
 
