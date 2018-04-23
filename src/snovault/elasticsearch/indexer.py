@@ -100,17 +100,6 @@ def index(request):
                     if 'error_message' in item:
                         log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
                         item['error_message'] = "Error occured during indexing, check the logs"
-            es.indices.refresh(index='meta')
-            # use this opportunity to sync flush the index (no harm if it fails)
-            try:
-                es.indices.flush_synced(index='meta')
-            except ConflictError:
-                pass
-    # refresh all indices
-    try:
-        es.indices.refresh(index='_all')
-    except Exception as e:
-        log.warning('Error refreshing indices after indexing: %s' % str(e))
     return indexing_record
 
 
