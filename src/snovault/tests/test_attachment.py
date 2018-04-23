@@ -204,3 +204,32 @@ def test_download_create_w_wrong_md5sum(testapp):
         'md5sum': 'deadbeef',
     }}
     testapp.post_json(url, item, status=422)
+
+
+def test_download_attachment_view_proxy_redirect(testapp, testing_download, dummy_request):
+    from snovault.interfaces import BLOBS
+    item_with_attachment = testapp.get(testing_download)
+    # Make it look like an external blob.
+    dummy_request.registry[BLOBS].get_blob_url = lambda x: 'https://s3bucketlink'
+    dummy_request.registry['aws_ipset'] = ['13.32.0.0/15']
+    res = testapp.get(
+        item_with_attachment.json['@id'] + item_with_attachment.json['attachment']['href'],
+        # Make it look like it is coming from AWS IP.
+        extra_environ=dict(HTTP_X_FORWARDED_FOR='13.32.0.0/15')
+    )
+    # Proxy redirect triggered.
+    assert 'X-Accel-Redirect' in res.headers
+
+
+def test_download_attachment_view_temporary_redirect(testapp, testing_download, dummy_request):
+    from snovault.interfaces import BLOBS
+    item_with_attachment = testapp.get(testing_download)
+    # Make it look like an external blob.
+    dummy_request.registry[BLOBS].get_blob_url = lambda x: 'https://s3bucketlink'
+    dummy_request.registry['aws_ipset'] = ['13.32.0.0/15']
+    res = testapp.get(
+        item_with_attachment.json['@id'] + item_with_attachment.json['attachment']['href']
+    )
+    # Pyramid HTTPTemporaryRedirect triggered.
+    assert '307 Temporary Redirect' in str(res.body)
+    assert 'X-Accel-Redirect' not in res.headers
