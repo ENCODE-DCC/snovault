@@ -8,19 +8,18 @@ def includeme(config):
     config.add_renderer(None, json_renderer)
 
 
-def datetime_handler(x):
-    if isinstance(x, datetime.datetime):
-        return x.isoformat()
-    raise TypeError ("Type %s not serializable" % type(x))
-
-
 class JSON(pyramid.renderers.JSON):
     '''Provide easier access to the configured serializer
     '''
     def dumps(self, value):
         request = get_current_request()
+
+        def datetime_adapter(obj, request):
+            return obj.isoformat()
+
+        self.add_adapter(datetime.datetime, datetime_adapter)
         default = self._make_default(request)
-        return json.dumps(value, default=datetime_handler, **self.kw)
+        return json.dumps(value, default=default, **self.kw)
 
 
 class BinaryFromJSON:
