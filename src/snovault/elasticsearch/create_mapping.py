@@ -865,7 +865,6 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     until the end when all mappings are bulk loaded into meta
     """
     ### TODO: Lock the indexer when create_mapping is running
-    import pdb; pdb.set_trace()
     from timeit import default_timer as timer
     overall_start = timer()
     registry = app.registry
