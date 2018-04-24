@@ -13,7 +13,6 @@ azure-nspkg==1.0.0
 azure-servicebus==0.20.1
 azure-servicemanagement-legacy==0.20.2
 azure-storage==0.20.3
-boto==2.39.0
 debtcollector==1.3.0
 envfile==1.0
 funcsigs==0.4

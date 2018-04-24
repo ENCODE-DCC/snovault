@@ -31,7 +31,7 @@ from .interfaces import (
     DBSESSION,
     STORAGE,
 )
-import boto
+import boto3
 import transaction
 import uuid
 
@@ -311,9 +311,9 @@ class RDBBlobStorage(object):
 
 class S3BlobStorage(object):
     def __init__(self, bucket, read_profile_name=None, store_profile_name=None):
-        self.store_conn = boto.connect_s3(profile_name=store_profile_name)
-        self.read_conn = boto.connect_s3(profile_name=read_profile_name)
-        self.bucket = self.store_conn.get_bucket(bucket, validate=False)
+        self.store_conn = boto3.session.Session(profile_name=store_profile_name).resource('s3')
+        self.read_conn = boto3.session.Session(profile_name=read_profile_name).resource('s3')
+        self.bucket = self.store_conn.Bucket(bucket)
 
     def store_blob(self, data, download_meta, blob_id=None):
         if blob_id is None:
@@ -339,13 +339,15 @@ class S3BlobStorage(object):
 
     def get_blob_url(self, download_meta):
         bucket_name, key = self._get_bucket_key(download_meta)
-        location = self.read_conn.generate_url(
-            36*60*60, method='GET', bucket=bucket_name, key=key)
+        location = self.read_conn.meta.client.generate_presigned_url(
+            ClientMethod='get_object',
+            ExpiresIn=36*60*60,
+            Params={'Bucket': bucket_name, 'Key': key})
         return location
 
     def get_blob(self, download_meta):
         bucket_name, key = self._get_bucket_key(download_meta)
-        bucket = self.read_conn.get_bucket(bucket_name, validate=False)
+        bucket = self.read_conn.Bucket(bucket_name)
         key_obj = bucket.get_key(key, validate=False)
         return key_obj.get_contents_as_string()
 
