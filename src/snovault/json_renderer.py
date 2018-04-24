@@ -11,6 +11,8 @@ def includeme(config):
 def datetime_handler(x):
     if isinstance(x, datetime.datetime):
         return x.isoformat()
+    if isinstance(x, uuid.UUID):
+        return x.hex
     raise TypeError ("Type %s not serializable" % type(x))
 
 
