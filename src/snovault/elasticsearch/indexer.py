@@ -294,7 +294,7 @@ class Indexer(object):
                     request_timeout=30
                 )
             except ConflictError:
-                log.warning('Conflict indexing %s at version %s. time: %s' % (uuid, sid, curr_time))
+                log.warning('Conflict indexing %s at version %s. time: %s' % (uuid, result['sid'], curr_time))
                 # this may be somewhat common and is not harmful
                 # do not return an error so the item is removed from the queue
                 return

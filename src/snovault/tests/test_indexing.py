@@ -75,6 +75,7 @@ def test_indexer_queue(app):
     assert indexer_queue_mirror is None
 
     indexer_queue = app.registry[INDEXER_QUEUE]
+    indexer_queue.clear_queue()
     # unittesting the QueueManager
     assert indexer_queue.queue_url is not None
     assert indexer_queue.dlq_url is not None
@@ -474,12 +475,13 @@ def test_create_mapping_index_diff(app, testapp, indexer_testapp):
 
     # remove one item
     es.delete(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid)
-    time.sleep(4)
+    time.sleep(8)
     second_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert second_count == 1
 
+    # patch the item to increment version
+    res = testapp.patch_json(TEST_COLL + test_uuid, {'required': 'meh'})
     # index with index_diff to ensure the item is reindexed
-    create_mapping.run(app, index_diff=True, sync_index=True)
-    time.sleep(4)
+    create_mapping.run(app, index_diff=True, sync_index=True, purge_queue=True)
     third_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert third_count == initial_count
