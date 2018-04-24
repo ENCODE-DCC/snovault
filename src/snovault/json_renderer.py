@@ -11,7 +11,7 @@ def includeme(config):
 def datetime_handler(x):
     if isinstance(x, datetime.datetime):
         return x.isoformat()
-    raise TypeError("Unknown type")
+    raise TypeError ("Type %s not serializable" % type(obj))
 
 
 class JSON(pyramid.renderers.JSON):
