@@ -274,7 +274,9 @@ def test_S3BlobStorage(mocker):
     url = storage.get_blob_url(download_meta)
     assert url == 'http://testurl'
     storage.read_conn.meta.client.generate_presigned_url.assert_called_once_with(
-        129600, method='GET', bucket='test', key=download_meta['key']
+        ClientMethod='get_object',
+        ExpiresIn=129600,
+        Params={'Bucket': 'test', 'Key': download_meta['key']}
     )
 
 
@@ -289,5 +291,7 @@ def test_S3BlobStorage_get_blob_url_for_non_s3_file(mocker):
     url = storage.get_blob_url(download_meta)
     assert url == 'http://testurl'
     storage.read_conn.meta.client.generate_presigned_url.assert_called_once_with(
-        129600, method='GET', bucket='test', key=download_meta['blob_id']
+        ClientMethod='get_object',
+        ExpiresIn=129600,
+        Params={'Bucket': 'test', 'Key': download_meta['blob_id']}
     )
