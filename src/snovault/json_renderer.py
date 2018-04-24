@@ -62,4 +62,4 @@ def datetime_adapter(obj, request):
 json_renderer.add_adapter(uuid.UUID, uuid_adapter)
 json_renderer.add_adapter(set, listy_adapter)
 json_renderer.add_adapter(frozenset, listy_adapter)
-json_renderer.dumpsadd_adapter(datetime.datetime, datetime_adapter)
+json_renderer.add_adapter(datetime.datetime, datetime_adapter)
