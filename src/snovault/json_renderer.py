@@ -8,13 +8,19 @@ def includeme(config):
     config.add_renderer(None, json_renderer)
 
 
+def datetime_handler(x):
+    if isinstance(x, datetime.datetime):
+        return x.isoformat()
+    raise TypeError("Unknown type")
+
+
 class JSON(pyramid.renderers.JSON):
     '''Provide easier access to the configured serializer
     '''
     def dumps(self, value):
         request = get_current_request()
         default = self._make_default(request)
-        return json.dumps(value, default=default, **self.kw)
+        return json.dumps(value, default=datetime_handler, **self.kw)
 
 
 class BinaryFromJSON:
