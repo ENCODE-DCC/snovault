@@ -53,7 +53,8 @@ def teardown(app):
     from zope.sqlalchemy import mark_changed
     from snovault import DBSESSION
     from snovault.elasticsearch import create_mapping
-    create_mapping.run(app, collections=[TEST_TYPE], skip_indexing=True, purge_queue=True)
+    # just run for the TEST_TYPE by default
+    create_mapping.run(app, collections=[TEST_TYPE], skip_indexing=True)
     session = app.registry[DBSESSION]
     connection = session.connection().connect()
     meta = MetaData(bind=session.connection(), reflect=True)
@@ -266,9 +267,16 @@ def test_es_indices(app, elasticsearch):
     Do this by checking es directly before and after running mapping.
     Delete an index directly, run again to see if it recovers.
     """
-    from snovault.elasticsearch.create_mapping import type_mapping, create_mapping_by_type, build_index_record
+    from snovault.elasticsearch.create_mapping import (
+        create_mapping,
+        type_mapping,
+        create_mapping_by_type,
+        build_index_record
+    )
     es = app.registry[ELASTIC_SEARCH]
     item_types = app.registry[TYPES].by_item_type
+    # run create mapping for all types, but no need to index
+    create_mapping(skip_indexing=True)
     # check that mappings and settings are in index
     for item_type in item_types:
         item_mapping = type_mapping(app.registry[TYPES], item_type)
@@ -441,6 +449,7 @@ def test_create_mapping_check_first(app, testapp, indexer_testapp):
     # remove the index manually and do not index
     # should cause create_mapping w/ check_first to recreate
     es.delete(index='meta', doc_type='meta', id=TEST_TYPE)
+    es.delete(index=TEST_TYPE)
     create_mapping.run(app, check_first=True, skip_indexing=True)
     third_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert third_count == 0
@@ -453,14 +462,14 @@ def test_create_mapping_index_diff(app, testapp, indexer_testapp):
     es = app.registry[ELASTIC_SEARCH]
     # post a couple items, index, then remove one
     res = testapp.post_json(TEST_COLL, {'required': ''})
-    to_delete = res['uuid']
-    res = testapp.post_json(TEST_COLL, {'required': ''})
+    test_uuid = res.json['uuid']
+    testapp.post_json(TEST_COLL, {'required': ''})  # second item
     create_mapping.run(app, sync_index=True, purge_queue=True)
     initial_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert initial_count == 2
 
     # remove one item
-    es.delete(index=TEST_TYPE, doc_type=TEST_TYPE, id=to_delete)
+    es.delete(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid)
     time.sleep(4)
     second_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert second_count == 1
