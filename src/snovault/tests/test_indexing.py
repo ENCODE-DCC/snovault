@@ -449,7 +449,7 @@ def test_create_mapping_check_first(app, testapp, indexer_testapp):
     # remove the index manually and do not index
     # should cause create_mapping w/ check_first to recreate
     es.delete(index='meta', doc_type='meta', id=TEST_TYPE)
-    es.delete(index=TEST_TYPE)
+    es.indices.delete(index=TEST_TYPE)
     create_mapping.run(app, check_first=True, skip_indexing=True)
     third_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert third_count == 0
@@ -462,7 +462,7 @@ def test_create_mapping_index_diff(app, testapp, indexer_testapp):
     es = app.registry[ELASTIC_SEARCH]
     # post a couple items, index, then remove one
     res = testapp.post_json(TEST_COLL, {'required': ''})
-    test_uuid = res.json['uuid']
+    test_uuid = res.json['@graph'][0]['uuid']
     testapp.post_json(TEST_COLL, {'required': ''})  # second item
     create_mapping.run(app, sync_index=True, purge_queue=True)
     initial_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
