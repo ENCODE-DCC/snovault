@@ -647,7 +647,6 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     # put index_record in meta
     if meta_exists:
         if meta_bulk_actions is None:
-            assert False
             meta_bulk_actions = []
             # much better to load in bulk if your doing more than one
             start = timer()
@@ -862,8 +861,11 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     purge_queue: if True, purge the contents of all relevant indexing queues.
         Is automatically done on a full indexing (no index_diff, check_first,
         or collections).
+    bulk_meta: caches meta at the start of create_mapping and never queries or updates it again,
+    until the end when all mappings are bulk loaded into meta
     """
     ### TODO: Lock the indexer when create_mapping is running
+    import pdb; pdb.set_trace()
     from timeit import default_timer as timer
     overall_start = timer()
     registry = app.registry
@@ -885,7 +887,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             collections = ['meta'] + collections
 
     # for bulk_meta, cache meta upfront, and only update it (with all mappings) at very end
-    indicies = meta_bulk_actions = None
+    indices = meta_bulk_actions = None
     if bulk_meta:
         indices = cache_meta(es)
         meta_bulk_actions = []
