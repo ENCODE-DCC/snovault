@@ -227,11 +227,7 @@ def schema_mapping(field, schema, top_level=False):
         }
 
 
-def index_settings(in_type):
-    if in_type == 'meta':
-        field_limit = 1000000
-    else:
-        field_limit = 5000
+def index_settings():
     return {
         'index': {
             'number_of_shards': 3,
@@ -239,7 +235,7 @@ def index_settings(in_type):
             'max_result_window': 100000,
             'mapping': {
                 'total_fields': {
-                    'limit': field_limit
+                    'limit': 5000
                 },
                 'depth': {
                     'limit': 30
@@ -342,7 +338,7 @@ def audit_mapping():
 def build_index_record(mapping, in_type):
     return {
         'mappings': {in_type: mapping},
-        'settings': index_settings(in_type)
+        'settings': index_settings()
     }
 
 
@@ -658,7 +654,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
             else:
                 log.warning("MAPPING: index record failed for %s" % (in_type))
         else:
-            # create bulk actions to be submitted after all mappings are created 
+            # create bulk actions to be submitted after all mappings are created
             bulk_action = {'_op_type': 'index',
                            '_index': 'meta',
                            '_type': 'meta',
@@ -932,10 +928,9 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             if index_time > greatest_index_creation_time['time']:
                 greatest_index_creation_time['collection'] = collection_name
                 greatest_index_creation_time['time'] = index_time
-
             timings[collection_name] = {'mapping': mapping_time, 'index': index_time}
 
-    # should be called only for bulk_meta setting 
+    # should be called only for bulk_meta setting
     if meta_bulk_actions:
         start = timer()
         bulk(es, meta_bulk_actions)
@@ -968,6 +963,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True, target_queue='primary')
     return timings
 
+
 def cache_meta(es):
     ''' get what we know from ES about the state of our indexes'''
 
@@ -982,7 +978,7 @@ def cache_meta(es):
             name, count = index.split()
             indices[name] = {'count': count}
 
-    # store all existing mappings 
+    # store all existing mappings
     if 'meta' in indices:
         meta_idx = es.search(index='meta', body={'query': {'match_all': {}}})
         for idx in meta_idx['hits']['hits']:

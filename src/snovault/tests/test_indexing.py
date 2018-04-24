@@ -130,7 +130,7 @@ def test_indexing_simple(app, testapp, indexer_testapp):
     assert uuid in uuids
     # test the meta index
     es = app.registry[ELASTIC_SEARCH]
-    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
+    indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
     indexing_source = indexing_doc['_source']
     assert 'indexing_finished' in indexing_source
     assert 'indexing_content' in indexing_source
@@ -162,14 +162,14 @@ def test_indexing_queue_records(app, testapp, indexer_testapp):
     assert doc_count == 0
     # indexing record should not yet exist (expect error)
     with pytest.raises(NotFoundError):
-        es.get(index='meta', doc_type='meta', id='latest_indexing')
+        es.get(index='indexing', doc_type='indexing', id='latest_indexing')
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 1
     assert res.json['indexing_content']['type'] == 'queue'
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
     # make sure latest_indexing doc matches
-    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
+    indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
     indexing_doc_source = indexing_doc.get('_source', {})
     assert indexing_doc_source.get('indexing_count') == 1
     # test timing in indexing doc
@@ -181,7 +181,7 @@ def test_indexing_queue_records(app, testapp, indexer_testapp):
     time_done = datetime.strptime(indexing_end, '%Y-%m-%dT%H:%M:%S.%f')
     assert time_start < time_done
     # get indexing record by start_time
-    indexing_record = es.get(index='meta', doc_type='meta', id=indexing_start)
+    indexing_record = es.get(index='indexing', doc_type='indexing', id=indexing_start)
     assert indexing_record.get('_source', {}).get('indexing_status') == 'finished'
     assert indexing_record.get('_source') == indexing_doc_source
 
@@ -200,7 +200,7 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     time.sleep(6)
     doc_count = es.count(index=test_type, doc_type=test_type).get('count')
     assert doc_count == 1
-    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
+    indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
     assert indexing_doc['_source']['indexing_content']['type'] == 'sync'
     assert indexing_doc['_source']['indexing_count'] == 1
     # post second item to database but do not index (don't load into es)
@@ -296,7 +296,7 @@ def test_es_indices(app, elasticsearch):
 def test_index_settings(app, testapp, indexer_testapp):
     from snovault.elasticsearch.create_mapping import index_settings
     test_type = 'testing_post_put_patch'
-    es_settings = index_settings(test_type)
+    es_settings = index_settings()
     max_result_window = es_settings['index']['max_result_window']
     # preform some initial indexing to build meta
     res = testapp.post_json('/testing-post-put-patch/', {'required': ''})

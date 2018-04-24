@@ -35,7 +35,7 @@ def includeme(config):
 def index(request):
     # Setting request.datastore here only works because routed views are not traversed.
     request.datastore = 'database'
-    record = request.json.get('record', False)  # if True, make a record in meta
+    record = request.json.get('record', False)  # if True, make a record in es
     dry_run = request.json.get('dry_run', False)  # if True, do not actually index
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
@@ -88,22 +88,22 @@ def index(request):
 
         if record:
             try:
-                es.index(index='meta', doc_type='meta', body=indexing_record, id=index_start_str)
-                es.index(index='meta', doc_type='meta', body=indexing_record, id='latest_indexing')
+                es.index(index='indexing', doc_type='indexing', body=indexing_record, id=index_start_str)
+                es.index(index='indexing', doc_type='indexing', body=indexing_record, id='latest_indexing')
             except:
                 indexing_record['indexing_status'] = 'errored'
                 error_messages = copy.deepcopy(indexing_record['errors'])
                 del indexing_record['errors']
-                es.index(index='meta', doc_type='meta', body=indexing_record, id=index_start_str)
-                es.index(index='meta', doc_type='meta', body=indexing_record, id='latest_indexing')
+                es.index(index='indexing', doc_type='indexing', body=indexing_record, id=index_start_str)
+                es.index(index='indexing', doc_type='indexing', body=indexing_record, id='latest_indexing')
                 for item in error_messages:
                     if 'error_message' in item:
                         log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
                         item['error_message'] = "Error occured during indexing, check the logs"
-            es.indices.refresh(index='meta')
+            es.indices.refresh(index='indexing')
             # use this opportunity to sync flush the index (no harm if it fails)
             try:
-                es.indices.flush_synced(index='meta')
+                es.indices.flush_synced(index='indexing')
             except ConflictError:
                 pass
     # refresh all indices
