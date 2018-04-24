@@ -195,10 +195,12 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     from datetime import datetime
     es = app.registry[ELASTIC_SEARCH]
     indexer_queue = app.registry[INDEXER_QUEUE]
+    # clear queue before starting this one
+    indexer_queue.clear_queue()
     # queued on post - total of one item queued
     res = testapp.post_json(TEST_COLL, {'required': ''})
     # synchronously index
-    create_mapping.run(app, collections=[TEST_TYPE], sync_index=True, purge_queue=True)
+    create_mapping.run(app, collections=[TEST_TYPE], sync_index=True)
     time.sleep(6)
     doc_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert doc_count == 1
@@ -278,7 +280,7 @@ def test_es_indices(app, elasticsearch):
     es = app.registry[ELASTIC_SEARCH]
     item_types = app.registry[TYPES].by_item_type
     # run create mapping for all types, but no need to index
-    run(skip_indexing=True)
+    run(app, skip_indexing=True)
     # check that mappings and settings are in index
     for item_type in item_types:
         item_mapping = type_mapping(app.registry[TYPES], item_type)
