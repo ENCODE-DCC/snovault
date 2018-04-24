@@ -13,11 +13,6 @@ class JSON(pyramid.renderers.JSON):
     '''
     def dumps(self, value):
         request = get_current_request()
-
-        def datetime_adapter(obj, request):
-            return obj.isoformat()
-
-        self.add_adapter(datetime.datetime, datetime_adapter)
         default = self._make_default(request)
         return json.dumps(value, default=default, **self.kw)
 
@@ -60,6 +55,11 @@ def listy_adapter(obj, request):
     return list(obj)
 
 
+def datetime_adapter(obj, request):
+    return obj.isoformat()
+
+
 json_renderer.add_adapter(uuid.UUID, uuid_adapter)
 json_renderer.add_adapter(set, listy_adapter)
 json_renderer.add_adapter(frozenset, listy_adapter)
+json_renderer.dumpsadd_adapter(datetime.datetime, datetime_adapter)
