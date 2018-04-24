@@ -251,7 +251,7 @@ def test_keys(session):
 
 def test_S3BlobStorage(mocker):
     from snovault.storage import S3BlobStorage
-    mocker.patch('boto.connect_s3')
+    mocker.patch('boto3.session.Session.resource')
     bucket = 'test'
     fake_key = mocker.Mock()
     storage = S3BlobStorage(bucket)
@@ -282,7 +282,7 @@ def test_S3BlobStorage(mocker):
 
 def test_S3BlobStorage_get_blob_url_for_non_s3_file(mocker):
     from snovault.storage import S3BlobStorage
-    mocker.patch('boto.connect_s3')
+    mocker.patch('boto3.session.Session.resource')
     bucket = 'test'
     storage = S3BlobStorage(bucket)
     storage.bucket.name = bucket
