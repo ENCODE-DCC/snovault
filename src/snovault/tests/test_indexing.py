@@ -196,7 +196,7 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     # queued on post - total of one item queued
     res = testapp.post_json(TEST_COLL, {'required': ''})
     # synchronously index
-    create_mapping.run(app, collections=[TEST_TYPE], sync_index=True)
+    create_mapping.run(app, collections=[TEST_TYPE], sync_index=True, purge_queue=True)
     time.sleep(6)
     doc_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert doc_count == 1

@@ -597,8 +597,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     # determine if index already exists for this type
     # probably don't need to do this as I can do it upstream... but passing in meta makes it
     # just a single if check
-    this_index_exists = check_if_index_exists(es, in_type, check_first, cached_meta)
-    meta_exists = check_if_index_exists(es, 'meta', check_first, cached_meta) if in_type != 'meta' else True
+    this_index_exists = check_if_index_exists(es, in_type, cached_meta)
 
     # if the index exists, we might not need to delete it
     # otherwise, run if we are using the check-first or index_diff args
@@ -641,31 +640,30 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
                 (str(coll_count), in_type))
 
     # put index_record in meta
-    if meta_exists:
-        if meta_bulk_actions is None:
-            meta_bulk_actions = []
-            # 1-2s faster to load in bulk if your doing more than one
-            start = timer()
-            res = es_safe_execute(es.index, index='meta', doc_type='meta', body=this_index_record, id=in_type)
-            end = timer()
-            log.warning("update meta took %s" % str(end-start))
-            if res:
-                log.warning("MAPPING: index record created for %s" % (in_type))
-            else:
-                log.warning("MAPPING: index record failed for %s" % (in_type))
+    if meta_bulk_actions is None:
+        meta_bulk_actions = []
+        # 1-2s faster to load in bulk if your doing more than one
+        start = timer()
+        res = es_safe_execute(es.index, index='meta', doc_type='meta', body=this_index_record, id=in_type)
+        end = timer()
+        log.warning("update meta took %s" % str(end-start))
+        if res:
+            log.warning("MAPPING: index record created for %s" % (in_type))
         else:
-            # create bulk actions to be submitted after all mappings are created
-            bulk_action = {'_op_type': 'index',
-                           '_index': 'meta',
-                           '_type': 'meta',
-                           '_id': in_type,
-                           '_source': this_index_record
-                          }
-            meta_bulk_actions.append(bulk_action)
+            log.warning("MAPPING: index record failed for %s" % (in_type))
+    else:
+        # create bulk actions to be submitted after all mappings are created
+        bulk_action = {'_op_type': 'index',
+                       '_index': 'meta',
+                       '_type': 'meta',
+                       '_id': in_type,
+                       '_source': this_index_record
+                      }
+        meta_bulk_actions.append(bulk_action)
     return meta_bulk_actions
 
 
-def check_if_index_exists(es, in_type, check_first, cached_indices=None):
+def check_if_index_exists(es, in_type, cached_indices=None):
     # first attempt to get the index from the cached meta indices
     if isinstance(cached_indices, dict) and cached_indices:
         return in_type in cached_indices
@@ -675,15 +673,6 @@ def check_if_index_exists(es, in_type, check_first, cached_indices=None):
             return this_index_exists
     except ConnectionTimeout:
         this_index_exists = False
-    # retry if this is meta and check_first because this is important
-    if check_first and in_type == 'meta':
-        for wait in [1,2,3,5]:
-            if not this_index_exists:
-                time.sleep(wait)
-                try:
-                    this_index_exists = es.indices.exists(index=in_type)
-                except ConnectionTimeout:
-                    this_index_exists = False
     return this_index_exists
 
 
@@ -748,7 +737,7 @@ def get_db_es_counts_and_db_uuids(app, es, in_type, index_diff=False):
     the list of collection uuids from the database, and the list of uuids
     found in the DB but not in the ES store.
     """
-    if check_if_index_exists(es, in_type, False):
+    if check_if_index_exists(es, in_type):
         if index_diff:
             search = Search(using=es, index=in_type, doc_type=in_type)
             search_source = search.source([])
@@ -859,8 +848,8 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     purge_queue: if True, purge the contents of all relevant indexing queues.
         Is automatically done on a full indexing (no index_diff, check_first,
         or collections).
-    bulk_meta: caches meta at the start of create_mapping and never queries or updates it again,
-    until the end when all mappings are bulk loaded into meta
+    bulk_meta: caches meta at the start of create_mapping and never queries or
+        updates it again, until the end when all mappings are bulk loaded into meta
     """
     ### TODO: Lock the indexer when create_mapping is running
     from timeit import default_timer as timer
@@ -884,13 +873,13 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             collections = ['meta'] + collections
 
     # for bulk_meta, cache meta upfront, and only update it (with all mappings) at very end
-    indices = meta_bulk_actions = None
+    cached_indices = meta_bulk_actions = None
     if bulk_meta:
-        indices = cache_meta(es)
+        cached_indices = cache_meta(es)
         meta_bulk_actions = []
 
     # if meta doesn't exist, always add it
-    if not check_if_index_exists(es, 'meta', False, indices) and 'meta' not in collections:
+    if not check_if_index_exists(es, 'meta', cached_indices) and 'meta' not in collections:
         collections = ['meta'] + collections
 
     # clear the indexer queue on a total reindex
@@ -910,10 +899,14 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             # meta mapping just contains settings
             build_index(app, es, collection_name, META_MAPPING, uuids_to_index,
                         dry_run, check_first, index_diff, print_count_only,
-                        indices, meta_bulk_actions)
+                        cached_indices, meta_bulk_actions)
+            # bail if we fail to make meta
+            if not check_if_index_exists(es, 'meta'):
+                log.warning('\n___META NOT CREATED; CREATE MAPPING ABORTED___\n')
+                return timings
             # only update this for bulk_meta setting
-            if indices:
-                indices['meta'] = 1
+            if cached_indices:
+                cached_indices['meta'] = 1
         else:
             start = timer()
             mapping = create_mapping_by_type(collection_name, registry)
@@ -922,7 +915,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             start = timer()
             build_index(app, es, collection_name, mapping, uuids_to_index,
                         dry_run, check_first, index_diff, print_count_only,
-                        indices, meta_bulk_actions)
+                        cached_indices, meta_bulk_actions)
             end = timer()
             index_time = end - start
             log.warning('___FINISHED %s___\n' % (collection_name))
