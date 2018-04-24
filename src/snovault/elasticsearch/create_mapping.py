@@ -895,8 +895,11 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
 
     # clear the indexer queue on a total reindex
     if total_reindex or purge_queue:
-        log.warning('___PURGING THE QUEUE BEFORE MAPPING___\n')
+        log.warning('___PURGING THE QUEUE AND CLEARING INDEXING RECORDS BEFORE MAPPING___\n')
         indexer_queue.clear_queue()
+        # we also want to remove the 'indexing' index, which stores old records
+        # it's not guaranteed to be there, though
+        es_safe_execute(es.indices.delete, index='indexing', ignore=[400,404])
 
     greatest_mapping_time = {'collection': '', 'time': 0}
     greatest_index_creation_time = {'collection': '', 'time': 0}

@@ -52,7 +52,7 @@ def teardown(app):
     from zope.sqlalchemy import mark_changed
     from snovault import DBSESSION
     from snovault.elasticsearch import create_mapping
-    create_mapping.run(app, skip_indexing=True)
+    create_mapping.run(app, skip_indexing=True, purge_queue=True)
     session = app.registry[DBSESSION]
     connection = session.connection().connect()
     meta = MetaData(bind=session.connection(), reflect=True)
