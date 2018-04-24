@@ -342,7 +342,7 @@ class S3BlobStorage(object):
         location = self.read_conn.meta.client.generate_presigned_url(
             ClientMethod='get_object',
             ExpiresIn=36*60*60,
-            Params={Bucket=bucket_name, Key=key})
+            Params={Bucket: bucket_name, Key: key})
         return location
 
     def get_blob(self, download_meta):
