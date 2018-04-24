@@ -329,7 +329,7 @@ def test_check_if_index_exists_can_used_cached_index_list():
     exists = check_if_index_exists(es, test_type, True, cached_idx)
     assert exists
     # delete index
-    cached_idx = {}
+    cached_idx = {'not_here':1}
     exists = check_if_index_exists(es, test_type, True, cached_idx)
     assert not exists
 
