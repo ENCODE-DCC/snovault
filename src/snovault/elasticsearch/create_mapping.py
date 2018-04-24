@@ -48,27 +48,12 @@ log = logging.getLogger(__name__)
 META_MAPPING = {
     '_all': {
         'enabled': False,
-        #'analyzer': 'snovault_index_analyzer',
-        #'search_analyzer': 'snovault_search_analyzer'
     },
-    'dynamic_templates': [
-        {
-            'store_generic': {
-                'match': '*',
-                'mapping': {
-                    'index': False,
-                    'store': True,
-                },
-            },
-        },
-    ],
+    'enabled': False,
 }
 
 PATH_FIELDS = ['submitted_file_name']
 NON_SUBSTRING_FIELDS = ['uuid', '@id', 'submitted_by', 'md5sum', 'references', 'submitted_file_name']
-
-
-
 
 
 def sorted_pairs_hook(pairs):
@@ -686,7 +671,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
 
 
 def check_if_index_exists(es, in_type, check_first, cached_indices=None):
-    if isinstance(cached_indices, dict):
+    if isinstance(cached_indices, dict) and cached_indices:
         return in_type in cached_indices
     try:
         this_index_exists = es.indices.exists(index=in_type)
@@ -852,7 +837,7 @@ def run_indexing(app, indexing_uuids):
 
 def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=False,
         index_diff=False, strict=False, sync_index=False, no_meta=False, print_count_only=False,
-        purge_queue=False):
+        purge_queue=False, bulk_meta=True):
     """
     Run create_mapping. Has the following options:
     collections: run create mapping for the given list of item types only.
@@ -880,7 +865,6 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     """
     ### TODO: Lock the indexer when create_mapping is running
     from timeit import default_timer as timer
-    import pdb; pdb.set_trace()
     overall_start = timer()
     registry = app.registry
     es = registry[ELASTIC_SEARCH]
@@ -889,8 +873,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     log.warning('\n___ES___:\n %s\n' % (str(es.cat.client)))
     log.warning('\n___ES NODES___:\n %s\n' % (str(es.cat.nodes())))
     log.warning('\n___ES HEALTH___:\n %s\n' % (str(es.cat.health())))
-    existing_indices = es.cat.indices(h='index,docs.count')
-    log.warning('\n___ES INDICES (PRE-MAPPING)___:\n %s\n' % str(existing_indices))
+    log.warning('\n___ES INDICES (PRE-MAPPING)___:\n %s\n' % str(es.cat.indices()))
     # keep a set of all uuids to be reindexed, which occurs after all indices
     # are created
     uuids_to_index = set()
@@ -901,31 +884,11 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         if not no_meta:
             collections = ['meta'] + collections
 
-    # determine which collections exist
-    indices_list = existing_indices.split('\n')
-    # indices call leaves some training stuff
-    if indices_list[-1] == '': indices_list.pop()
-    indices = {}
-    for index in indices_list:
-        if index:
-            name, count = index.split()
-            indices[name] = {'count': count}
-
-    meta_bulk_actions = []
-
-    # store all previous_mappings
-    if 'meta' in indices:
-        # store all previous_mappings
-        # todo filter by list of collections
-        meta_idx = es.search(index='meta', body={'query': {'match_all': {}}})
-        for idx in meta_idx['hits']['hits']:
-            # meta index doesn't have _id I guess we don't need meta in here
-            if idx.get('_id') and idx['_id'] in indices:
-                indices[idx['_id']]['mapping'] = idx['_source']
-
-    # now indices should be all index that pre-existed with size and mapping
-    # two queries
-
+    # for bulk_meta, cache meta upfront, and only update it (with all mappings) at very end
+    indicies = meta_bulk_actions = None
+    if bulk_meta:
+        indices = cache_meta(es)
+        meta_bulk_actions = []
 
     # if meta doesn't exist, always add it
     if not check_if_index_exists(es, 'meta', False, indices) and 'meta' not in collections:
@@ -946,7 +909,9 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             build_index(app, es, collection_name, META_MAPPING, uuids_to_index,
                         dry_run, check_first, index_diff, print_count_only, indices,
                         meta_bulk_actions)
-            indices['meta'] = 1
+            # only update this for bulk_meta setting
+            if indices:
+                indices['meta'] = 1
         else:
             start = timer()
             mapping = create_mapping_by_type(collection_name, registry)
@@ -969,25 +934,12 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
 
             timings[collection_name] = {'mapping': mapping_time, 'index': index_time}
 
-    # insert meta_bulk_actions
-    start = timer()
+    # should be called only for bulk_meta setting 
     if meta_bulk_actions:
-        no_refresh = {
-                "refresh_interval" : "-1",
-                "number_of_replicas": 0,
-            }
-        #es.indices.put_settings(index='meta', body=no_refresh)
-
-        bulk(es, meta_bulk_actions,request_timeout=300,chunk_size=20)
-
-        refresh = {
-                "refresh_interval" : "1s",
-                "number_of_replicas" : 1
-            }
-        #es.indices.put_settings(index='meta', body=refresh)
-
-    end = timer()
-    log.warning("bulk update for meta took %s" % str(end-start))
+        start = timer()
+        bulk(es, meta_bulk_actions)
+        end = timer()
+        log.warning("bulk update for meta took %s" % str(end-start))
 
     overall_end = timer()
     log.warning('\n___ES INDICES (POST-MAPPING)___:\n %s\n' % (str(es.cat.indices())))
@@ -997,9 +949,8 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     log.warning('\n___GREATEST MAPPING TIME: %s\n' % str(greatest_mapping_time))
     log.warning('\n___GREATEST INDEX CREATION TIME: %s\n' % str(greatest_index_creation_time))
     log.warning('\n___TIME FOR ALL COLLECTIONS: %s\n' % str(overall_end - overall_start))
-    import pdb; pdb.set_trace()
     if skip_indexing or print_count_only:
-        return
+        return timings
 
     # now, queue items for indexing
     # TODO: when queue space is an issue, put ontology_terms on the secondary
@@ -1014,7 +965,31 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         else:
             log.warning('\n___UUIDS TO INDEX (QUEUED)___: %s\n' % (len(uuids_to_index)))
             indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True, target_queue='primary')
+    return timings
 
+def cache_meta(es):
+    ''' get what we know from ES about the state of our indexes'''
+
+    existing_indices = es.cat.indices(h='index,docs.count')
+    # determine which collections exist
+    indices_list = existing_indices.split('\n')
+    # indices call leaves some trailing stuff
+    if indices_list[-1] == '': indices_list.pop()
+    indices = {}
+    for index in indices_list:
+        if index:
+            name, count = index.split()
+            indices[name] = {'count': count}
+
+    # store all existing mappings 
+    if 'meta' in indices:
+        meta_idx = es.search(index='meta', body={'query': {'match_all': {}}})
+        for idx in meta_idx['hits']['hits']:
+            if idx.get('_id') and idx['_id'] in indices:
+                indices[idx['_id']]['mapping'] = idx['_source']
+
+    # now indices should be all index that xisted with size and mapping (mapping includes settings)
+    return indices
 
 
 def main():
