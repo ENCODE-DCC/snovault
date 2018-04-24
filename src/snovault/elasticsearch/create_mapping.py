@@ -648,7 +648,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     if meta_exists:
         if meta_bulk_actions is None:
             meta_bulk_actions = []
-            # much better to load in bulk if your doing more than one
+            # 1-2s faster to load in bulk if your doing more than one
             start = timer()
             res = es_safe_execute(es.index, index='meta', doc_type='meta', body=this_index_record, id=in_type)
             end = timer()
@@ -658,7 +658,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
             else:
                 log.warning("MAPPING: index record failed for %s" % (in_type))
         else:
-            # prefered fast method...
+            # create bulk actions to be submitted after all mappings are created 
             bulk_action = {'_op_type': 'index',
                            '_index': 'meta',
                            '_type': 'meta',
