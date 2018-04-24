@@ -429,15 +429,50 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
 def test_create_mapping_check_first(app, testapp, indexer_testapp):
     # ensure create mapping has been run
     from snovault.elasticsearch import create_mapping
-    create_mapping.run(app, check_first=False, skip_indexing=True)
     es = app.registry[ELASTIC_SEARCH]
-    meta = es.search(index='meta', body={'query': {'match_all': {}}})
-
-
-    # clear one to make sure it gets put back
+    # post an item and then index it (synchronously because its easy)
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    create_mapping.run(app, sync_index=True)
+    initial_count = es.count(index='testing_post_put_patch', doc_type='testing_post_put_patch').get('count')
+    # make sure the meta entry is created
     assert es.get(index='meta', doc_type='meta', id='testing_post_put_patch')
-    es.delete(index='meta', doc_type='meta', id='testing_post_put_patch')
 
+    # run with check_first but skip indexing. counts should still match because
+    # the index wasn't removed
     create_mapping.run(app, check_first=True, skip_indexing=True)
-    meta2 = es.search(index='meta', body={'query': {'match_all': {}}})
-    assert(len(meta['hits']['hits']) == len(meta2['hits']['hits']))
+    second_count = es.count(index='testing_post_put_patch', doc_type='testing_post_put_patch').get('count')
+    assert second_count == initial_count
+    # make sure the meta entry is still there
+    assert es.get(index='meta', doc_type='meta', id='testing_post_put_patch')
+
+    # remove the index manually and do not index
+    # should cause create_mapping w/ check_first to recreate
+    es.delete(index='meta', doc_type='meta', id='testing_post_put_patch')
+    create_mapping.run(app, check_first=True, skip_indexing=True)
+    third_count = es.count(index='testing_post_put_patch', doc_type='testing_post_put_patch').get('count')
+    assert third_count == 0
+    # but the meta entry should be there
+    assert es.get(index='meta', doc_type='meta', id='testing_post_put_patch')
+
+
+def test_create_mapping_index_diff(app, testapp, indexer_testapp):
+    from snovault.elasticsearch import create_mapping
+    es = app.registry[ELASTIC_SEARCH]
+    # post a couple items, index, then remove one
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    to_delete = res['uuid']
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    create_mapping.run(app, sync_index=True)
+    initial_count = es.count(index='testing_post_put_patch', doc_type='testing_post_put_patch').get('count')
+    assert initial_count == 2
+
+    # remove one item
+    es.delete(index='testing_post_put_patch', doc_type='testing_post_put_patch', id=to_delete)
+    time.sleep(4)
+    second_count = es.count(index='testing_post_put_patch', doc_type='testing_post_put_patch').get('count')
+    assert second_count == 1
+
+    # index with index_diff to ensure the item is reindexed
+    create_mapping.run(app, index_diff=True, sync_index=True)
+    third_count = es.count(index='testing_post_put_patch', doc_type='testing_post_put_patch').get('count')
+    assert third_count == initial_count
