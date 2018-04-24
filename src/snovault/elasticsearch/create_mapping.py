@@ -570,7 +570,7 @@ def create_mapping_by_type(in_type, registry):
 
 
 def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first, index_diff=False,
-                print_count_only=False, meta=None, meta_bulk_actions=None):
+                print_count_only=False, cached_meta=None, meta_bulk_actions=None):
     """
     Creates an es index for the given in_type with the given mapping and
     settings defined by item_settings(). If check_first == True, attempting
@@ -581,9 +581,9 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     Will also trigger a re-index for a newly created index if the indexing
     document in meta exists and has an xmin.
 
-    please pass in meta and meta_bulk_actions if you are creating multiple indices
+    please pass in cached_meta and meta_bulk_actions if you are creating multiple indices
     then update meta index once with `elasticsearch.helpers.bulk(es, meta_bulk_actions)`
-    passing in `meta` can also save on calls to check if index exists...
+    passing in `cached_meta` can also save on calls to check if index exists...
     """
 
     if print_count_only:
@@ -597,13 +597,13 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     # determine if index already exists for this type
     # probably don't need to do this as I can do it upstream... but passing in meta makes it
     # just a single if check
-    this_index_exists = check_if_index_exists(es, in_type, check_first, meta)
-    meta_exists = check_if_index_exists(es, 'meta', check_first, meta) if in_type != 'meta' else True
+    this_index_exists = check_if_index_exists(es, in_type, check_first, cached_meta)
+    meta_exists = check_if_index_exists(es, 'meta', check_first, cached_meta) if in_type != 'meta' else True
 
     # if the index exists, we might not need to delete it
     # otherwise, run if we are using the check-first or index_diff args
     if check_first or index_diff:
-        prev_index_record = get_previous_index_record(this_index_exists, es, in_type, meta)
+        prev_index_record = get_previous_index_record(this_index_exists, es, in_type, cached_meta)
         if prev_index_record is not None and this_index_record == prev_index_record:
             if in_type != 'meta':
                 check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff)
@@ -666,6 +666,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
 
 
 def check_if_index_exists(es, in_type, check_first, cached_indices=None):
+    # first attempt to get the index from the cached meta indices
     if isinstance(cached_indices, dict) and cached_indices:
         return in_type in cached_indices
     try:
@@ -674,6 +675,7 @@ def check_if_index_exists(es, in_type, check_first, cached_indices=None):
             return this_index_exists
     except ConnectionTimeout:
         this_index_exists = False
+    # retry if this is meta and check_first because this is important
     if check_first and in_type == 'meta':
         for wait in [1,2,3,5]:
             if not this_index_exists:
@@ -685,7 +687,7 @@ def check_if_index_exists(es, in_type, check_first, cached_indices=None):
     return this_index_exists
 
 
-def get_previous_index_record(this_index_exists, es, in_type, meta=None):
+def get_previous_index_record(this_index_exists, es, in_type, cached_meta=None):
     """
     Decide if we need to drop the index + reindex (no index/no meta record)
     OR
@@ -694,8 +696,8 @@ def get_previous_index_record(this_index_exists, es, in_type, meta=None):
     """
     prev_index_hit = {}
     if this_index_exists:
-        if meta:
-            return meta.get(in_type, {}).get('mapping', None)
+        if cached_meta:
+            return cached_meta.get(in_type, {}).get('mapping', None)
 
         else:
             try:
@@ -904,8 +906,8 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         if collection_name == 'meta':
             # meta mapping just contains settings
             build_index(app, es, collection_name, META_MAPPING, uuids_to_index,
-                        dry_run, check_first, index_diff, print_count_only, indices,
-                        meta_bulk_actions)
+                        dry_run, check_first, index_diff, print_count_only,
+                        indices, meta_bulk_actions)
             # only update this for bulk_meta setting
             if indices:
                 indices['meta'] = 1
@@ -916,8 +918,8 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             mapping_time = end - start
             start = timer()
             build_index(app, es, collection_name, mapping, uuids_to_index,
-                        dry_run, check_first, index_diff, print_count_only, indices,
-                        meta_bulk_actions)
+                        dry_run, check_first, index_diff, print_count_only,
+                        indices, meta_bulk_actions)
             end = timer()
             index_time = end - start
             log.warning('___FINISHED %s___\n' % (collection_name))
