@@ -154,6 +154,8 @@ def test_indexing_queue_records(app, testapp, indexer_testapp):
     from datetime import datetime
     es = app.registry[ELASTIC_SEARCH]
     indexer_queue = app.registry[INDEXER_QUEUE]
+    # first clear out the indexing records
+    es.indices.delete(index='indexing')
     # no documents added yet
     doc_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert doc_count == 0
@@ -268,7 +270,7 @@ def test_es_indices(app, elasticsearch):
     Delete an index directly, run again to see if it recovers.
     """
     from snovault.elasticsearch.create_mapping import (
-        create_mapping,
+        run,
         type_mapping,
         create_mapping_by_type,
         build_index_record
@@ -276,7 +278,7 @@ def test_es_indices(app, elasticsearch):
     es = app.registry[ELASTIC_SEARCH]
     item_types = app.registry[TYPES].by_item_type
     # run create mapping for all types, but no need to index
-    create_mapping(skip_indexing=True)
+    run(skip_indexing=True)
     # check that mappings and settings are in index
     for item_type in item_types:
         item_mapping = type_mapping(app.registry[TYPES], item_type)
@@ -319,22 +321,22 @@ def test_index_settings(app, testapp, indexer_testapp):
 # some unit tests associated with build_index in create_mapping
 def test_check_if_index_exists(app):
     es = app.registry[ELASTIC_SEARCH]
-    exists = check_if_index_exists(es, TEST_TYPE, True)
+    exists = check_if_index_exists(es, TEST_TYPE)
     assert exists
     # delete index
     es.indices.delete(index=TEST_TYPE)
-    exists = check_if_index_exists(es, TEST_TYPE, True)
+    exists = check_if_index_exists(es, TEST_TYPE)
     assert not exists
 
 
 def test_check_if_index_exists_can_used_cached_index_list():
     es = None
     cached_idx = {TEST_TYPE: 22}
-    exists = check_if_index_exists(es, TEST_TYPE, True, cached_idx)
+    exists = check_if_index_exists(es, TEST_TYPE, cached_idx)
     assert exists
     # delete index
     cached_idx = {'not_here':1}
-    exists = check_if_index_exists(es, TEST_TYPE, True, cached_idx)
+    exists = check_if_index_exists(es, TEST_TYPE, cached_idx)
     assert not exists
 
 
@@ -476,5 +478,6 @@ def test_create_mapping_index_diff(app, testapp, indexer_testapp):
 
     # index with index_diff to ensure the item is reindexed
     create_mapping.run(app, index_diff=True, sync_index=True)
+    time.sleep(4)
     third_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert third_count == initial_count
