@@ -387,6 +387,7 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
     )
     from snovault.commands.es_index_data import run as run_index_data
     indexer_queue = app.registry[INDEXER_QUEUE]
+    es = app.registry[ELASTIC_SEARCH]
     ## Adding new test resource to DB
     storage = app.registry[STORAGE]
     test_body = {'required': '', 'simple1' : 'foo', 'simple2' : 'bar' }
@@ -396,20 +397,17 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
 
     assert str(check.uuid) == test_uuid
 
-    ## Make sure we update ES index
-    test_uuids = set()
-    check_and_reindex_existing(app, app.registry[ELASTIC_SEARCH], TEST_TYPE, test_uuids)
-
-    assert test_uuid in test_uuids # Assert that this newly added Item is not yet indexed.
     # Then index it:
-    indexer_queue.add_uuids(app.registry, list(test_uuids), strict=True)
     res = indexer_testapp.post_json('/index', {'record': True})
     time.sleep(5) # INDEXER performs a network request to ES server to index things. Whether we like it or not, this means it's async and we must wait.
 
     ## Now ensure that we do have it in ES:
-    test_uuids_2 = set()
-    check_and_reindex_existing(app, app.registry[ELASTIC_SEARCH], TEST_TYPE, test_uuids_2)
-    assert bool(test_uuids_2) == False # Ensure we don't have any more indices to reindex after indexing our newly added UUID/Item
+    try:
+        es_item = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid)
+    except:
+        assert False
+    item_uuid = es_item.get('_source', {}).get('uuid')
+    assert item_uuid == test_uuid
 
     check_post_from_es = storage.read.get_by_uuid(test_uuid)
     check_post_from_rdb = storage.write.get_by_uuid(test_uuid)
