@@ -100,6 +100,7 @@ def index(request):
                     if 'error_message' in item:
                         log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
                         item['error_message'] = "Error occured during indexing, check the logs"
+    es.indices.refresh(index='_all')
     return indexing_record
 
 
