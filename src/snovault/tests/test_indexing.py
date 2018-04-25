@@ -407,14 +407,12 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
     item_uuid = es_item.get('_source', {}).get('uuid')
     assert item_uuid == test_uuid
 
-    check_post_from_es = storage.read.get_by_uuid(test_uuid)
+    import pdb; pdb.set_trace()
     check_post_from_rdb = storage.write.get_by_uuid(test_uuid)
-
-    assert check_post_from_es is not None
     assert check_post_from_rdb is not None
 
-    assert check_post_from_es.properties['simple1'] == test_body['simple1']
-    assert check_post_from_es.properties['simple2'] == test_body['simple2']
+    assert es_item['_source']['embedded']['simple1'] == test_body['simple1']
+    assert es_item['_source']['embedded']['simple2'] == test_body['simple2']
 
     # The actual delete
     storage.delete_by_uuid(test_uuid) # We can optionally pass in TEST_TYPE as well for better performance.
@@ -424,8 +422,8 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
     assert check_post_from_rdb_2 is None
 
     time.sleep(5) # Allow time for ES API to send network request to ES server to perform delete.
-    check_post_from_es_2 = storage.read.get_by_uuid(test_uuid)
-    assert check_post_from_es_2 is None
+    check_post_from_es_2 = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid, ignore=[404])
+    assert check_post_from_es_2['found'] == False
 
 
 def test_create_mapping_check_first(app, testapp, indexer_testapp):
