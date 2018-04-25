@@ -300,7 +300,7 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
     while doc_count < 1:
         time.sleep(2)
         doc_count = es.count(index='testing_link_target', doc_type='testing_link_target').get('count')
-    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
+    indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
     assert indexing_doc['_source']['indexing_count'] == 1
     source_res = testapp.post_json('/testing-link-sources/', source, status=201)
     res = indexer_testapp.post_json('/index', {'record': True})
@@ -309,7 +309,7 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
     while doc_count < 1:
         time.sleep(2)
         doc_count = es.count(index='testing_link_source', doc_type='testing_link_source').get('count')
-    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
+    indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
     # this should have indexed the target and source
     assert indexing_doc['_source']['indexing_count'] == 2
 
