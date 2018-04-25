@@ -240,22 +240,59 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
         'status': 'current',
     }
     target_res = testapp.post_json('/testing-link-targets/', target, status=201)
+    res = indexer_testapp.post_json('/index', {'record': True})
     # wait for the first item to index
-    doc_count = es.count(index=test_type, doc_type='testing_link_target').get('count')
+    doc_count = es.count(index='testing_link_target', doc_type='testing_link_target').get('count')
     while doc_count < 1:
         time.sleep(2)
-        doc_count = es.count(index=test_type, doc_type='testing_link_target').get('count')
+        doc_count = es.count(index='testing_link_target', doc_type='testing_link_target').get('count')
     indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
     assert indexing_doc['_source']['indexing_count'] == 1
     source_res = testapp.post_json('/testing-link-sources/', source, status=201)
+    res = indexer_testapp.post_json('/index', {'record': True})
     # wait for them to index
-    doc_count = es.count(index=test_type, doc_type='testing_link_source').get('count')
+    doc_count = es.count(index='testing_link_source', doc_type='testing_link_source').get('count')
     while doc_count < 1:
         time.sleep(2)
-        doc_count = es.count(index=test_type, doc_type='testing_link_source').get('count')
+        doc_count = es.count(index='testing_link_source', doc_type='testing_link_source').get('count')
     indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
     # this should have indexed the target and source
     assert indexing_doc['_source']['indexing_count'] == 2
+
+
+def test_indexing_invalid_sid(app, testapp, indexer_testapp):
+    """
+    For now, this test uses the deferred queue strategy
+    """
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    es = app.registry[ELASTIC_SEARCH]
+    # post an item, index, then confirm verion (sid) is 1
+    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    test_uuids = res.json['@graph'][0]['uuid']
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexing_count'] == 1
+    es_item = es.get(index='testing_post_put_patch', doc_type='testing_post_put_patch', id=test_uuid)
+    assert es_item['_version'] == 1
+
+    # now increment the version and check it
+    res = testapp.patch_json('/testing-post-put-patch/' + test_uuid, {'required': 'meh'})
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexing_count'] == 1
+    es_item = es.get(index='testing_post_put_patch', doc_type='testing_post_put_patch', id=test_uuid)
+    assert es_item['_version'] == 2
+
+    # now try to manually bump the version to 3 for the queued item
+    # expect it to be sent to the deferred queue
+    to_queue = {
+        'uuid': test_uuid,
+        'sid': 3,
+        'strict': True
+    }
+    indexer_queue.send_messages([to_queue], target_queue='primary')
+    res = indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(3)
+    msg_count = indexer_queue.number_of_messages()
+    assert msg_count['deferred_waiting'] == 1
 
 
 def test_queue_indexing_endpoint(app, testapp, indexer_testapp):
