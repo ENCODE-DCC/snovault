@@ -280,10 +280,11 @@ def test_es_indices(app, elasticsearch):
     )
     es = app.registry[ELASTIC_SEARCH]
     item_types = app.registry[TYPES].by_item_type
+    test_collections = [TEST_TYPE]
     # run create mapping for all types, but no need to index
-    run(app, skip_indexing=True)
+    run(app, collections=test_collections, skip_indexing=True)
     # check that mappings and settings are in index
-    for item_type in item_types:
+    for item_type in test_collections:
         item_mapping = type_mapping(app.registry[TYPES], item_type)
         try:
             item_index = es.indices.get(index=item_type)
@@ -381,10 +382,6 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
         CurrentPropertySheet,
         TransactionRecord,
     )
-    from snovault.elasticsearch.create_mapping import (
-       run as run_create_mapping,
-       check_and_reindex_existing
-    )
     from snovault.commands.es_index_data import run as run_index_data
     indexer_queue = app.registry[INDEXER_QUEUE]
     es = app.registry[ELASTIC_SEARCH]
@@ -436,7 +433,7 @@ def test_create_mapping_check_first(app, testapp, indexer_testapp):
     es = app.registry[ELASTIC_SEARCH]
     # post an item and then index it (synchronously because its easy)
     res = testapp.post_json(TEST_COLL, {'required': ''})
-    create_mapping.run(app, sync_index=True, purge_queue=True)
+    create_mapping.run(app, collections=[TEST_TYPE], sync_index=True, purge_queue=True)
     initial_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     # make sure the meta entry is created
     assert es.get(index='meta', doc_type='meta', id=TEST_TYPE)
@@ -453,7 +450,7 @@ def test_create_mapping_check_first(app, testapp, indexer_testapp):
     # should cause create_mapping w/ check_first to recreate
     es.delete(index='meta', doc_type='meta', id=TEST_TYPE)
     es.indices.delete(index=TEST_TYPE)
-    create_mapping.run(app, check_first=True, skip_indexing=True)
+    create_mapping.run(app, collections=[TEST_TYPE], check_first=True, skip_indexing=True)
     third_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert third_count == 0
     # but the meta entry should be there
@@ -467,7 +464,7 @@ def test_create_mapping_index_diff(app, testapp, indexer_testapp):
     res = testapp.post_json(TEST_COLL, {'required': ''})
     test_uuid = res.json['@graph'][0]['uuid']
     testapp.post_json(TEST_COLL, {'required': ''})  # second item
-    create_mapping.run(app, sync_index=True, purge_queue=True)
+    create_mapping.run(app, collections=[TEST_TYPE], sync_index=True, purge_queue=True)
     initial_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert initial_count == 2
 
@@ -480,6 +477,6 @@ def test_create_mapping_index_diff(app, testapp, indexer_testapp):
     # patch the item to increment version
     res = testapp.patch_json(TEST_COLL + test_uuid, {'required': 'meh'})
     # index with index_diff to ensure the item is reindexed
-    create_mapping.run(app, index_diff=True, sync_index=True, purge_queue=True)
+    create_mapping.run(app, collections=[TEST_TYPE], index_diff=True, sync_index=True, purge_queue=True)
     third_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert third_count == initial_count
