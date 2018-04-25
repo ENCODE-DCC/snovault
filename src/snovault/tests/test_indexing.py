@@ -325,6 +325,7 @@ def test_indexing_invalid_sid(app, testapp, indexer_testapp):
     test_uuid = res.json['@graph'][0]['uuid']
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 1
+    time.sleep(4)
     es_item = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid)
     inital_version = es_item['_version']
 
@@ -332,6 +333,7 @@ def test_indexing_invalid_sid(app, testapp, indexer_testapp):
     res = testapp.patch_json(TEST_COLL + test_uuid, {'required': 'meh'})
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 1
+    time.sleep(4)
     es_item = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid)
     assert es_item['_version'] == inital_version + 1
 
@@ -345,6 +347,7 @@ def test_indexing_invalid_sid(app, testapp, indexer_testapp):
     }
     indexer_queue.send_messages([to_queue], target_queue='primary')
     res = indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(4)
     assert res.json['indexing_count'] == 0
     time.sleep(2)
     received_deferred = indexer_queue.receive_messages(target_queue='deferred')
