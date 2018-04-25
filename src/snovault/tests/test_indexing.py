@@ -71,8 +71,6 @@ def teardown(app):
     import transaction
     from sqlalchemy import MetaData
     from zope.sqlalchemy import mark_changed
-    # sleeeeep
-    time.sleep(10)
     # just run for the TEST_TYPE by default
     create_mapping.run(app, collections=[TEST_TYPE], skip_indexing=True)
     session = app.registry[DBSESSION]
@@ -336,17 +334,18 @@ def test_indexing_invalid_sid(app, testapp, indexer_testapp):
     inital_version = es_item['_version']
 
     # now increment the version and check it
-    res = testapp.patch_json(TEST_COLL + test_uuid, {'required': 'meh'})
+    res = testapp.post_json(TEST_COLL, {'required': ''})
+    test_uuid2 = res.json['@graph'][0]['uuid']
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 1
     time.sleep(4)
-    es_item = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid)
+    es_item = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid2)
     assert es_item['_version'] == inital_version + 1
 
     # now try to manually bump an invalid version for the queued item
     # expect it to be sent to the deferred queue
     to_queue = {
-        'uuid': test_uuid,
+        'uuid': test_uuid2,
         'sid': inital_version + 2,
         'strict': True,
         'timestamp': datetime.utcnow().isoformat()
