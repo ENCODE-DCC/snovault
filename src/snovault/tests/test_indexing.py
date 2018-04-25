@@ -407,7 +407,6 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
     item_uuid = es_item.get('_source', {}).get('uuid')
     assert item_uuid == test_uuid
 
-    import pdb; pdb.set_trace()
     check_post_from_rdb = storage.write.get_by_uuid(test_uuid)
     assert check_post_from_rdb is not None
 
