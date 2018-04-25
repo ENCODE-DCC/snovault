@@ -550,7 +550,13 @@ def test_create_mapping_check_first(app, testapp, indexer_testapp):
     # the index wasn't removed
     create_mapping.run(app, check_first=True, skip_indexing=True)
     second_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
+    counter = 0
+    while (second_count != initial_count and counter < 10):
+        time.sleep(1)
+        second_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
+        counter +=1
     assert second_count == initial_count
+
     # make sure the meta entry is still there
     assert es.get(index='meta', doc_type='meta', id=TEST_TYPE)
 
