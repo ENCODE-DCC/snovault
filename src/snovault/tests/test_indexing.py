@@ -7,16 +7,26 @@ Does not include data dependent tests
 
 import pytest
 import time
-from snovault.elasticsearch.interfaces import ELASTIC_SEARCH, INDEXER_QUEUE, INDEXER_QUEUE_MIRROR
+import json
+from snovault.elasticsearch.interfaces import (
+    ELASTIC_SEARCH,
+    INDEXER_QUEUE,
+    INDEXER_QUEUE_MIRROR,
+)
 from snovault import (
     COLLECTIONS,
     TYPES,
 )
+from snovault import DBSESSION, STORAGE
 from snovault.elasticsearch.create_mapping import check_if_index_exists
+from snovault.commands.es_index_data import run as run_index_data
+from snovault.elasticsearch import create_mapping, indexer_utils
+
 
 pytestmark = [pytest.mark.indexing]
 TEST_COLL = '/testing-post-put-patch/'
 TEST_TYPE = 'testing_post_put_patch'  # use one collection for testing
+
 
 @pytest.fixture(scope='session')
 def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server):
@@ -40,7 +50,6 @@ def app(app_settings):
 
     yield app
 
-    from snovault import DBSESSION
     DBSession = app.registry[DBSESSION]
     # Dispose connections so postgres can tear down.
     DBSession.bind.pool.dispose()
@@ -51,8 +60,6 @@ def teardown(app):
     import transaction
     from sqlalchemy import MetaData
     from zope.sqlalchemy import mark_changed
-    from snovault import DBSESSION
-    from snovault.elasticsearch import create_mapping
     # just run for the TEST_TYPE by default
     create_mapping.run(app, collections=[TEST_TYPE], skip_indexing=True)
     session = app.registry[DBSESSION]
@@ -69,7 +76,6 @@ def teardown(app):
 
 
 def test_indexer_queue(app):
-    import json
     indexer_queue_mirror = app.registry[INDEXER_QUEUE_MIRROR]
     # this is only set up for webprod/webprod2
     assert indexer_queue_mirror is None
@@ -95,22 +101,18 @@ def test_indexer_queue(app):
     received_2 = indexer_queue.receive_messages()
     assert len(received_2) == 0
     # replace into queue
-    indexer_queue.replace_messages(received)
+    indexer_queue.replace_messages(received, vis_timeout=0)
     # replace sets vis timeout to 5 seconds... so wait a bit first
-    import time
-    time.sleep(5.1)
     received = indexer_queue.receive_messages()
     assert len(received) == 1
     # finally, delete
     indexer_queue.delete_messages(received)
-    time.sleep(2)
     msg_count = indexer_queue.number_of_messages()
     assert msg_count['primary_waiting'] == 0
     assert msg_count['primary_inflight'] == 0
 
 
 def test_indexing_simple(app, testapp, indexer_testapp):
-    from snovault.elasticsearch import indexer_utils
     # First post a single item so that subsequent indexing is incremental
     testapp.post_json(TEST_COLL, {'required': ''})
     res = indexer_testapp.post_json('/index', {'record': True})
@@ -374,16 +376,6 @@ def test_check_and_reindex_existing(app, testapp):
 
 
 def test_es_delete_simple(app, testapp, indexer_testapp, session):
-    from snovault.interfaces import STORAGE
-    from snovault.storage import (
-        Resource,
-        Key,
-        PropertySheet,
-        CurrentPropertySheet,
-        TransactionRecord,
-    )
-    from snovault.commands.es_index_data import run as run_index_data
-    from snovault.elasticsearch import create_mapping
     indexer_queue = app.registry[INDEXER_QUEUE]
     es = app.registry[ELASTIC_SEARCH]
     ## Adding new test resource to DB
@@ -397,7 +389,7 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
 
     # Then index it:
     create_mapping.run(app, collections=[TEST_TYPE], sync_index=True, purge_queue=True)
-    time.sleep(4) 
+    time.sleep(4)
 
     ## Now ensure that we do have it in ES:
     try:
