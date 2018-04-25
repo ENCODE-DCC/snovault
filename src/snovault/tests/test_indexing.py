@@ -104,10 +104,47 @@ def test_indexer_queue(app):
     assert len(received) == 1
     # finally, delete
     indexer_queue.delete_messages(received)
-    time.sleep(2)
+    time.sleep(5)
     msg_count = indexer_queue.number_of_messages()
     assert msg_count['primary_waiting'] == 0
     assert msg_count['primary_inflight'] == 0
+
+
+def test_queue_indexing_endpoint(app, testapp):
+    # let's put some test messages to the secondary queue and a collection
+    # to the deferred queue. Posting will add uuid to the primary queue
+    # delete all messages afterwards
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    time.sleep(2)
+    secondary_body = {
+        'uuids': ['12345', '23456'],
+        'strict': True,
+        'target_queue': 'secondary'
+    }
+    testapp.post_json('/queue_indexing', secondary_body)
+    time.sleep(2)
+    deferred_body = {
+        'uuids': ['abcdef'],
+        'strict': True,
+        'target_queue': 'deferred'
+    }
+    testapp.post_json('/queue_indexing', deferred_body)
+    time.sleep(5)
+    msg_count = indexer_queue.number_of_messages()
+    assert msg_count['primary_waiting'] == 1
+    assert msg_count['secondary_waiting'] == 2
+    assert msg_count['deferred_waiting'] == 1
+    # delete the messages
+    for target in ['primary', 'secondary', 'deferred']:
+        received = indexer_queue.receive_messages(target_queue=target)
+        assert len(received) > 0
+        indexer_queue.delete_messages(received, target_queue=target)
+    time.sleep(8)
+    msg_count = indexer_queue.number_of_messages()
+    assert msg_count['primary_waiting'] == 0
+    assert msg_count['secondary_waiting'] == 0
+    assert msg_count['deferred_waiting'] == 0
 
 
 def test_indexing_simple(app, testapp, indexer_testapp):
@@ -292,7 +329,7 @@ def test_indexing_invalid_sid(app, testapp, indexer_testapp):
     }
     indexer_queue.send_messages([to_queue], target_queue='primary')
     res = indexer_testapp.post_json('/index', {'record': True})
-    time.sleep(3)
+    time.sleep(5)
     msg_count = indexer_queue.number_of_messages()
     assert msg_count['deferred_waiting'] == 1
 
