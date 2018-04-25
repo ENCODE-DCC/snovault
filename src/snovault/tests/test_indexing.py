@@ -329,9 +329,11 @@ def test_indexing_invalid_sid(app, testapp, indexer_testapp):
     }
     indexer_queue.send_messages([to_queue], target_queue='primary')
     res = indexer_testapp.post_json('/index', {'record': True})
-    time.sleep(5)
-    msg_count = indexer_queue.number_of_messages()
-    assert msg_count['deferred_waiting'] == 1
+    assert res.json['indexing_count'] == 0
+    time.sleep(2)
+    received_deferred = indexer_queue.receive_messages(target_queue='deferred')
+    assert len(received_deferred) == 1
+    indexer_queue.delete_messages(received_deferred, target_queue='deferred')
 
 
 def test_queue_indexing_endpoint(app, testapp, indexer_testapp):
