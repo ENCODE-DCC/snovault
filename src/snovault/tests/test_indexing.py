@@ -8,6 +8,7 @@ Does not include data dependent tests
 import pytest
 import time
 import json
+from datetime import datetime
 from snovault.elasticsearch.interfaces import (
     ELASTIC_SEARCH,
     INDEXER_QUEUE,
@@ -18,9 +19,16 @@ from snovault import (
     TYPES,
 )
 from snovault import DBSESSION, STORAGE
-from snovault.elasticsearch.create_mapping import check_if_index_exists
 from snovault.commands.es_index_data import run as run_index_data
 from snovault.elasticsearch import create_mapping, indexer_utils
+from elasticsearch.exceptions import NotFoundError
+from snovault.elasticsearch.create_mapping import (
+    run,
+    type_mapping,
+    create_mapping_by_type,
+    build_index_record,
+    check_if_index_exists
+)
 
 
 pytestmark = [pytest.mark.indexing]
@@ -152,9 +160,6 @@ def test_indexing_queue_records(app, testapp, indexer_testapp):
     Do a full test using different forms of create mapping and both sync
     and queued indexing.
     """
-    from snovault.elasticsearch import create_mapping, indexer_utils
-    from elasticsearch.exceptions import NotFoundError
-    from datetime import datetime
     es = app.registry[ELASTIC_SEARCH]
     indexer_queue = app.registry[INDEXER_QUEUE]
     # first clear out the indexing records
@@ -193,9 +198,6 @@ def test_indexing_queue_records(app, testapp, indexer_testapp):
 
 
 def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
-    from snovault.elasticsearch import create_mapping, indexer_utils
-    from elasticsearch.exceptions import NotFoundError
-    from datetime import datetime
     es = app.registry[ELASTIC_SEARCH]
     indexer_queue = app.registry[INDEXER_QUEUE]
     # clear queue before starting this one
@@ -204,8 +206,14 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     res = testapp.post_json(TEST_COLL, {'required': ''})
     # synchronously index
     create_mapping.run(app, collections=[TEST_TYPE], sync_index=True)
-    time.sleep(6)
-    doc_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
+    #time.sleep(6)
+    doc_count = tries = 0
+    while(tries < 6):
+        doc_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
+        if doc_count != 0:
+            break
+        time.sleep(1)
+        tries += 1
     assert doc_count == 1
     indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
     assert indexing_doc['_source']['indexing_content']['type'] == 'sync'
@@ -213,14 +221,13 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     # post second item to database but do not index (don't load into es)
     # queued on post - total of two items queued
     res = testapp.post_json(TEST_COLL, {'required': ''})
-    time.sleep(2)
+    #time.sleep(2)
     doc_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     # doc_count has not yet updated
     assert doc_count == 1
     # clear the queue by indexing and then run create mapping to queue the all items
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 2
-    time.sleep(2)
     create_mapping.run(app, collections=[TEST_TYPE])
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 2
@@ -274,12 +281,6 @@ def test_es_indices(app, elasticsearch):
     Do this by checking es directly before and after running mapping.
     Delete an index directly, run again to see if it recovers.
     """
-    from snovault.elasticsearch.create_mapping import (
-        run,
-        type_mapping,
-        create_mapping_by_type,
-        build_index_record
-    )
     es = app.registry[ELASTIC_SEARCH]
     item_types = app.registry[TYPES].by_item_type
     test_collections = [TEST_TYPE]
