@@ -70,6 +70,8 @@ def index(request):
         # actually index
         # try to ensure ES is reasonably up to date
         es.indices.refresh(index='_all')
+        # prepare_for_indexing
+
         indexing_record['errors'] = indexer.update_objects(request, indexing_counter)
         index_finish_time = datetime.datetime.now()
         indexing_record['indexing_finished'] = index_finish_time.isoformat()
@@ -128,11 +130,13 @@ class Indexer(object):
         # (which is synchronous) OR uuids from the queue
         sync_uuids = request.json.get('uuids', None)
         # actually index
+        self.es.indices.put_settings(index='_all', body={'index' : {'refresh_interval': '-1'}})
         if sync_uuids:
             errors = self.update_objects_sync(request, sync_uuids, counter)
         else:
             errors = self.update_objects_queue(request, counter)
 
+        self.es.indices.put_settings(index='_all', body={'index' : {'refresh_interval': None}})
 
     def get_messages_from_queue(self, skip_deferred=False):
         """
