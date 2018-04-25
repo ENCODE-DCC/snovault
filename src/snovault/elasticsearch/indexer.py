@@ -135,6 +135,12 @@ class Indexer(object):
         messages = None
         target_queue = None
         for try_queue in try_order:
+            # SPECIAL CASE: if we are looking at secondary but have items in
+            # deferred, exit so that we can get a new transaction
+            if skip_deferred and try_queue == 'secondary':
+                deferred_waiting = indexer_queue.number_of_messages().get('deferred_waiting')
+                if deferred_waiting and deferred_waiting > 0:
+                    break
             messages = self.queue.receive_messages(target_queue=try_queue)
             if messages:
                 target_queue = try_queue

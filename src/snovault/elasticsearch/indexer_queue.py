@@ -38,7 +38,8 @@ def queue_indexing(request):
     """
     Endpoint to queue items for indexing. Takes a POST request with index
     priviliges which should contain either a list of uuids under "uuids" key
-    or a list of collections under "collections" key of its body.
+    or a list of collections under "collections" key of its body. Can also
+    optionally take "strict" boolean and "target_queue" string.
     """
     req_uuids = request.json.get('uuids', None)
     req_collections = request.json.get('collections', None)
@@ -62,19 +63,22 @@ def queue_indexing(request):
     queue_indexer = request.registry[INDEXER_QUEUE]
     # strict mode means uuids should be indexed without finding associates
     strict = request.json.get('strict', False)
+    # target queue can also be specified: 'primary', 'secondary', 'deferred'
+    target = request.json.get('target_queue', 'primary')
     if req_uuids:
         # queue these as secondary
-        queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=strict, target_queue='primary')
+        queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=strict, target_queue=target)
         response['requested_uuids'] = req_uuids
     else:
         # queue these as secondary
-        queued, failed = queue_indexer.add_collections(request.registry, req_collections, strict=strict, target_queue='primary')
+        queued, failed = queue_indexer.add_collections(request.registry, req_collections, strict=strict, target_queue=target)
         response['requested_collections'] = req_collections
     response['notification'] = 'Success'
     response['number_queued'] = len(queued)
     response['detail'] = 'Successfuly queued items!'
     response['errors'] = failed
     response['strict'] = strict
+    response['target_queue'] = target
     return response
 
 

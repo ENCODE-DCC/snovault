@@ -7,6 +7,7 @@ Does not include data dependent tests
 
 import pytest
 import time
+import datetime
 from snovault.elasticsearch.interfaces import (
     ELASTIC_SEARCH,
     INDEXER_QUEUE,
@@ -266,27 +267,28 @@ def test_indexing_invalid_sid(app, testapp, indexer_testapp):
     """
     indexer_queue = app.registry[INDEXER_QUEUE]
     es = app.registry[ELASTIC_SEARCH]
-    # post an item, index, then confirm verion (sid) is 1
+    # post an item, index, then find verion (sid)
     res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
-    test_uuids = res.json['@graph'][0]['uuid']
+    test_uuid = res.json['@graph'][0]['uuid']
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 1
     es_item = es.get(index='testing_post_put_patch', doc_type='testing_post_put_patch', id=test_uuid)
-    assert es_item['_version'] == 1
+    inital_version = es_item['_version']
 
     # now increment the version and check it
     res = testapp.patch_json('/testing-post-put-patch/' + test_uuid, {'required': 'meh'})
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 1
     es_item = es.get(index='testing_post_put_patch', doc_type='testing_post_put_patch', id=test_uuid)
-    assert es_item['_version'] == 2
+    assert es_item['_version'] == inital_version + 1
 
-    # now try to manually bump the version to 3 for the queued item
+    # now try to manually bump an invalid version for the queued item
     # expect it to be sent to the deferred queue
     to_queue = {
         'uuid': test_uuid,
-        'sid': 3,
-        'strict': True
+        'sid': inital_version + 2,
+        'strict': True,
+        'timestamp': datetime.datetime.utcnow().isoformat()
     }
     indexer_queue.send_messages([to_queue], target_queue='primary')
     res = indexer_testapp.post_json('/index', {'record': True})
