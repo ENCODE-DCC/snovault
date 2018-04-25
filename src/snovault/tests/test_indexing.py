@@ -118,9 +118,47 @@ def test_indexer_queue(app):
     assert len(received) == 1
     # finally, delete
     indexer_queue.delete_messages(received)
+    time.sleep(5)
     msg_count = indexer_queue.number_of_messages()
     assert msg_count['primary_waiting'] == 0
     assert msg_count['primary_inflight'] == 0
+
+
+def test_queue_indexing_endpoint(app, testapp):
+    # let's put some test messages to the secondary queue and a collection
+    # to the deferred queue. Posting will add uuid to the primary queue
+    # delete all messages afterwards
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    testapp.post_json(TEST_COLL, {'required': ''})
+    time.sleep(2)
+    secondary_body = {
+        'uuids': ['12345', '23456'],
+        'strict': True,
+        'target_queue': 'secondary'
+    }
+    testapp.post_json('/queue_indexing', secondary_body)
+    time.sleep(2)
+    deferred_body = {
+        'uuids': ['abcdef'],
+        'strict': True,
+        'target_queue': 'deferred'
+    }
+    testapp.post_json('/queue_indexing', deferred_body)
+    time.sleep(5)
+    msg_count = indexer_queue.number_of_messages()
+    assert msg_count['primary_waiting'] == 1
+    assert msg_count['secondary_waiting'] == 2
+    assert msg_count['deferred_waiting'] == 1
+    # delete the messages
+    for target in ['primary', 'secondary', 'deferred']:
+        received = indexer_queue.receive_messages(target_queue=target)
+        assert len(received) > 0
+        indexer_queue.delete_messages(received, target_queue=target)
+    time.sleep(8)
+    msg_count = indexer_queue.number_of_messages()
+    assert msg_count['primary_waiting'] == 0
+    assert msg_count['secondary_waiting'] == 0
+    assert msg_count['deferred_waiting'] == 0
 
 
 def test_indexing_simple(app, testapp, indexer_testapp):
@@ -238,6 +276,80 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     assert res.json['indexing_count'] == 2
     doc_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert doc_count == 2
+
+
+def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
+    """
+    When an item is indexed, queue up all its embedded uuids for indexing
+    as well.
+    """
+    es = app.registry[ELASTIC_SEARCH]
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    target  = {'name': 'one', 'uuid': '775795d3-4410-4114-836b-8eeecf1d0c2f'}
+
+    source = {
+        'name': 'A',
+        'target': '775795d3-4410-4114-836b-8eeecf1d0c2f',
+        'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd',
+        'status': 'current',
+    }
+    target_res = testapp.post_json('/testing-link-targets/', target, status=201)
+    res = indexer_testapp.post_json('/index', {'record': True})
+    # wait for the first item to index
+    doc_count = es.count(index='testing_link_target', doc_type='testing_link_target').get('count')
+    while doc_count < 1:
+        time.sleep(2)
+        doc_count = es.count(index='testing_link_target', doc_type='testing_link_target').get('count')
+    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
+    assert indexing_doc['_source']['indexing_count'] == 1
+    source_res = testapp.post_json('/testing-link-sources/', source, status=201)
+    res = indexer_testapp.post_json('/index', {'record': True})
+    # wait for them to index
+    doc_count = es.count(index='testing_link_source', doc_type='testing_link_source').get('count')
+    while doc_count < 1:
+        time.sleep(2)
+        doc_count = es.count(index='testing_link_source', doc_type='testing_link_source').get('count')
+    indexing_doc = es.get(index='meta', doc_type='meta', id='latest_indexing')
+    # this should have indexed the target and source
+    assert indexing_doc['_source']['indexing_count'] == 2
+
+
+def test_indexing_invalid_sid(app, testapp, indexer_testapp):
+    """
+    For now, this test uses the deferred queue strategy
+    """
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    es = app.registry[ELASTIC_SEARCH]
+    # post an item, index, then find verion (sid)
+    res = testapp.post_json(TEST_COLL, {'required': ''})
+    test_uuid = res.json['@graph'][0]['uuid']
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexing_count'] == 1
+    es_item = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid)
+    inital_version = es_item['_version']
+
+    # now increment the version and check it
+    res = testapp.patch_json(TEST_COLL + test_uuid, {'required': 'meh'})
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexing_count'] == 1
+    es_item = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid)
+    assert es_item['_version'] == inital_version + 1
+
+    # now try to manually bump an invalid version for the queued item
+    # expect it to be sent to the deferred queue
+    to_queue = {
+        'uuid': test_uuid,
+        'sid': inital_version + 2,
+        'strict': True,
+        'timestamp': datetime.utcnow().isoformat()
+    }
+    indexer_queue.send_messages([to_queue], target_queue='primary')
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexing_count'] == 0
+    time.sleep(2)
+    received_deferred = indexer_queue.receive_messages(target_queue='deferred')
+    assert len(received_deferred) == 1
+    indexer_queue.delete_messages(received_deferred, target_queue='deferred')
 
 
 def test_queue_indexing_endpoint(app, testapp, indexer_testapp):
