@@ -251,7 +251,7 @@ def test_keys(session):
 
 def test_S3BlobStorage(mocker):
     from snovault.storage import S3BlobStorage
-    mocker.patch('boto.connect_s3')
+    mocker.patch('boto3.session.Session.resource')
     bucket = 'test'
     fake_key = mocker.Mock()
     storage = S3BlobStorage(bucket)
@@ -270,24 +270,28 @@ def test_S3BlobStorage(mocker):
     assert data == 'data'
     storage.bucket.get_key.assert_called_once_with(download_meta['key'], validate=False)
 
-    storage.read_conn.generate_url.return_value = 'http://testurl'
+    storage.read_conn.meta.client.generate_presigned_url.return_value = 'http://testurl'
     url = storage.get_blob_url(download_meta)
     assert url == 'http://testurl'
-    storage.read_conn.generate_url.assert_called_once_with(
-        129600, method='GET', bucket='test', key=download_meta['key']
+    storage.read_conn.meta.client.generate_presigned_url.assert_called_once_with(
+        ClientMethod='get_object',
+        ExpiresIn=129600,
+        Params={'Bucket': 'test', 'Key': download_meta['key']}
     )
 
 
 def test_S3BlobStorage_get_blob_url_for_non_s3_file(mocker):
     from snovault.storage import S3BlobStorage
-    mocker.patch('boto.connect_s3')
+    mocker.patch('boto3.session.Session.resource')
     bucket = 'test'
     storage = S3BlobStorage(bucket)
     storage.bucket.name = bucket
     download_meta = {'blob_id': 'blob_id'}
-    storage.read_conn.generate_url.return_value = 'http://testurl'
+    storage.read_conn.meta.client.generate_presigned_url.return_value = 'http://testurl'
     url = storage.get_blob_url(download_meta)
     assert url == 'http://testurl'
-    storage.read_conn.generate_url.assert_called_once_with(
-        129600, method='GET', bucket='test', key=download_meta['blob_id']
+    storage.read_conn.meta.client.generate_presigned_url.assert_called_once_with(
+        ClientMethod='get_object',
+        ExpiresIn=129600,
+        Params={'Bucket': 'test', 'Key': download_meta['blob_id']}
     )

@@ -2,7 +2,7 @@ from pyramid.threadlocal import get_current_request
 import json
 import pyramid.renderers
 import uuid
-
+import datetime
 
 def includeme(config):
     config.add_renderer(None, json_renderer)
@@ -55,6 +55,11 @@ def listy_adapter(obj, request):
     return list(obj)
 
 
+def datetime_adapter(obj, request):
+    return obj.isoformat()
+
+
 json_renderer.add_adapter(uuid.UUID, uuid_adapter)
 json_renderer.add_adapter(set, listy_adapter)
 json_renderer.add_adapter(frozenset, listy_adapter)
+json_renderer.add_adapter(datetime.datetime, datetime_adapter)
