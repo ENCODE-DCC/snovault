@@ -72,4 +72,4 @@ before_script:
 - sudo service elasticsearch stop
 script:
 - if test -n "$UNIT"; then bin/test -v -v --timeout=400 -m "not bdd" --cov
-  src/snovault; fi
+  src/snovault --duration 10; fi
