@@ -295,20 +295,24 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
     }
     target_res = testapp.post_json('/testing-link-targets/', target, status=201)
     res = indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(2)
     # wait for the first item to index
     doc_count = es.count(index='testing_link_target', doc_type='testing_link_target').get('count')
     while doc_count < 1:
-        time.sleep(2)
+        time.sleep(4)
         doc_count = es.count(index='testing_link_target', doc_type='testing_link_target').get('count')
+    time.sleep(4)
     indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
     assert indexing_doc['_source']['indexing_count'] == 1
     source_res = testapp.post_json('/testing-link-sources/', source, status=201)
     res = indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(2)
     # wait for them to index
     doc_count = es.count(index='testing_link_source', doc_type='testing_link_source').get('count')
     while doc_count < 1:
-        time.sleep(2)
+        time.sleep(4)
         doc_count = es.count(index='testing_link_source', doc_type='testing_link_source').get('count')
+    time.sleep(4)
     indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
     # this should have indexed the target and source
     assert indexing_doc['_source']['indexing_count'] == 2
@@ -349,7 +353,6 @@ def test_indexing_invalid_sid(app, testapp, indexer_testapp):
     res = indexer_testapp.post_json('/index', {'record': True})
     time.sleep(4)
     assert res.json['indexing_count'] == 0
-    time.sleep(2)
     received_deferred = indexer_queue.receive_messages(target_queue='deferred')
     assert len(received_deferred) == 1
     indexer_queue.delete_messages(received_deferred, target_queue='deferred')
