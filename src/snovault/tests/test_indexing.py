@@ -35,6 +35,9 @@ pytestmark = [pytest.mark.indexing]
 TEST_COLL = '/testing-post-put-patch/'
 TEST_TYPE = 'testing_post_put_patch'  # use one collection for testing
 
+# we just need single shard for these tests
+create_mapping.NUM_SHARDS = 1
+
 
 @pytest.fixture(scope='session')
 def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server):
@@ -153,6 +156,8 @@ def test_indexing_simple(app, testapp, indexer_testapp):
     testing_ppp_source = testing_ppp_meta['_source']
     assert 'mappings' in testing_ppp_source
     assert 'settings' in testing_ppp_source
+    # ensure we only have 1 shard for tests
+    assert testing_ppp_source['settings']['index']['number_of_shards'] == 1
 
 
 def test_indexing_queue_records(app, testapp, indexer_testapp):

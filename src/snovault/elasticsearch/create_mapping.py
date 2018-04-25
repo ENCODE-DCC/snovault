@@ -54,6 +54,8 @@ META_MAPPING = {
 
 PATH_FIELDS = ['submitted_file_name']
 NON_SUBSTRING_FIELDS = ['uuid', '@id', 'submitted_by', 'md5sum', 'references', 'submitted_file_name']
+NUM_SHARDS = 3
+NUM_REPLICAS = 1
 
 
 def sorted_pairs_hook(pairs):
@@ -230,8 +232,8 @@ def schema_mapping(field, schema, top_level=False):
 def index_settings():
     return {
         'index': {
-            'number_of_shards': 3,
-            'number_of_replicas': 1,
+            'number_of_shards': NUM_SHARDS,
+            'number_of_replicas': NUM_REPLICAS,
             'max_result_window': 100000,
             'mapping': {
                 'total_fields': {
