@@ -892,6 +892,12 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         # it's not guaranteed to be there, though
         es_safe_execute(es.indices.delete, index='indexing', ignore=[400,404])
 
+    # if indexing doesn't exist, initialize it with some basic settings
+    # but no mapping. this is where indexing_records go
+    if not check_if_index_exists(es, 'indexing'):
+        idx_settings = {'settings': index_settings()}
+        es_safe_execute(es.indices.create, index='indexing', body=idx_settings)
+
     greatest_mapping_time = {'collection': '', 'time': 0}
     greatest_index_creation_time = {'collection': '', 'time': 0}
     timings = {}
