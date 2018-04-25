@@ -383,6 +383,7 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
         TransactionRecord,
     )
     from snovault.commands.es_index_data import run as run_index_data
+    from snovault.elasticsearch import create_mapping
     indexer_queue = app.registry[INDEXER_QUEUE]
     es = app.registry[ELASTIC_SEARCH]
     ## Adding new test resource to DB
@@ -395,8 +396,8 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
     assert str(check.uuid) == test_uuid
 
     # Then index it:
-    res = indexer_testapp.post_json('/index', {'record': True})
-    time.sleep(5) # INDEXER performs a network request to ES server to index things. Whether we like it or not, this means it's async and we must wait.
+    create_mapping.run(app, collections=[TEST_TYPE], sync_index=True, purge_queue=True)
+    time.sleep(4) 
 
     ## Now ensure that we do have it in ES:
     try:
