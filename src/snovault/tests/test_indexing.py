@@ -50,7 +50,7 @@ def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server)
     settings['collection_datastore'] = 'elasticsearch'
     settings['item_datastore'] = 'elasticsearch'
     settings['indexer'] = True
-    settings['indexer.processes'] = 1
+    settings['indexer.processes'] = 2
     return settings
 
 
@@ -71,8 +71,6 @@ def teardown(app):
     import transaction
     from sqlalchemy import MetaData
     from zope.sqlalchemy import mark_changed
-    # sleeeeep
-    time.sleep(10)
     # just run for the TEST_TYPE by default
     create_mapping.run(app, collections=[TEST_TYPE], skip_indexing=True)
     session = app.registry[DBSESSION]
