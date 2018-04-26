@@ -62,18 +62,23 @@ def elasticsearch_host_port():
 
 @pytest.mark.fixture_cost(10)
 @pytest.yield_fixture(scope='session')
-def elasticsearch_server(request, elasticsearch_host_port):
-    from .elasticsearch_fixture import server_process
-    host, port = elasticsearch_host_port
-    tmpdir = request.config._tmpdirhandler.mktemp('elasticsearch', numbered=True)
-    tmpdir = str(tmpdir)
-    process = server_process(str(tmpdir), host=host, port=port)
+def elasticsearch_server(request, elasticsearch_host_port, remote_es):
 
-    yield 'http://%s:%d' % (host, port)
+    if not remote_es:
+        # spawn a new one
+        from .elasticsearch_fixture import server_process
+        host, port = elasticsearch_host_port
+        tmpdir = request.config._tmpdirhandler.mktemp('elasticsearch', numbered=True)
+        tmpdir = str(tmpdir)
+        process = server_process(str(tmpdir), host=host, port=port)
 
-    if process.poll() is None:
-        process.terminate()
-        process.wait()
+        yield 'http://%s:%d' % (host, port)
+
+        if process.poll() is None:
+            process.terminate()
+            process.wait()
+    else:
+        yield remote_es
 
 
 # http://docs.sqlalchemy.org/en/rel_0_8/orm/session.html#joining-a-session-into-an-external-transaction

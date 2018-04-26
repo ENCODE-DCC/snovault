@@ -37,18 +37,13 @@ def includeme(config):
         auth = BotoAWSRequestsAuth(aws_host=host[0],
                                    aws_region='us-east-1',
                                    aws_service='es')
-        es_options['connection_class'] = 'RequestsHttpConnection'
+        es_options['connection_class'] = RequestsHttpConnection
         es_options['http_auth'] = auth
 
 
     config.registry[ELASTIC_SEARCH] = Elasticsearch(
         addresses, **es_options)
-    '''  serializer=PyramidJSONSerializer(json_renderer),
-        connection_class=TimedUrllib3HttpConnection,
-        retry_on_timeout=True,
-        maxsize=50
-    )
-    '''
+
     config.include('.cached_views')
     config.include('.esstorage')
     config.include('.indexer_queue')

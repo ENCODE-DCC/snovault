@@ -19,8 +19,6 @@ env:
   global:
   - JAVA_HOME=/usr/lib/jvm/java-8-oracle
   - BOTO_CONFIG=/bogus
-  - ES_VERSION=5.4.1
-  - ES_DOWNLOAD_URL=https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-${ES_VERSION}.deb
   - PATH="/usr/share/elasticsearch/bin:/usr/lib/postgresql/9.4/bin:$PATH"
   - secure: |-
       TcTEKSEjlu05k3azfO3LMc9NMiZMBqj1pOqg4FOxcprU3Bw7+k5aC/6wMUHI
@@ -62,14 +60,10 @@ before_install:
 - node --version
 - npm config set python /usr/bin/python2.7
 install:
-- curl -O  ${ES_DOWNLOAD_URL}
-- sudo dpkg -i --force-confnew elasticsearch-${ES_VERSION}.deb
 - python bootstrap.py --buildout-version 2.9.5 --setuptools-version 37.0.0
 - bin/buildout -c || (echo "Retrying buildout" && bin/buildout )
 - pip install coveralls
 - pip install codacy-coverage
-before_script:
-- sudo service elasticsearch stop
 script:
 - if test -n "$UNIT"; then bin/test -v -v --timeout=400 -m "not bdd" --cov
-  src/snovault; fi
+  src/snovault --aws-auth --es search-fourfront-builds-uhevxdzfcv7mkm5pj5svcri3aq.us-east-1.es.amazonaws.com:80 ; fi
