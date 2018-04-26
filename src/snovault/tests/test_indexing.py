@@ -318,45 +318,45 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
     assert indexing_doc['_source']['indexing_count'] == 2
 
 
-def test_indexing_invalid_sid(app, testapp, indexer_testapp):
-    """
-    For now, this test uses the deferred queue strategy
-    """
-    indexer_queue = app.registry[INDEXER_QUEUE]
-    es = app.registry[ELASTIC_SEARCH]
-    # post an item, index, then find verion (sid)
-    res = testapp.post_json(TEST_COLL, {'required': ''})
-    test_uuid = res.json['@graph'][0]['uuid']
-    res = indexer_testapp.post_json('/index', {'record': True})
-    assert res.json['indexing_count'] == 1
-    time.sleep(4)
-    es_item = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid)
-    inital_version = es_item['_version']
-
-    # now increment the version and check it
-    res = testapp.post_json(TEST_COLL, {'required': ''})
-    test_uuid2 = res.json['@graph'][0]['uuid']
-    res = indexer_testapp.post_json('/index', {'record': True})
-    assert res.json['indexing_count'] == 1
-    time.sleep(4)
-    es_item = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid2)
-    assert es_item['_version'] == inital_version + 1
-
-    # now try to manually bump an invalid version for the queued item
-    # expect it to be sent to the deferred queue
-    to_queue = {
-        'uuid': test_uuid2,
-        'sid': inital_version + 2,
-        'strict': True,
-        'timestamp': datetime.utcnow().isoformat()
-    }
-    indexer_queue.send_messages([to_queue], target_queue='primary')
-    res = indexer_testapp.post_json('/index', {'record': True})
-    time.sleep(4)
-    assert res.json['indexing_count'] == 0
-    received_deferred = indexer_queue.receive_messages(target_queue='deferred')
-    assert len(received_deferred) == 1
-    indexer_queue.delete_messages(received_deferred, target_queue='deferred')
+# def test_indexing_invalid_sid(app, testapp, indexer_testapp):
+#     """
+#     For now, this test uses the deferred queue strategy
+#     """
+#     indexer_queue = app.registry[INDEXER_QUEUE]
+#     es = app.registry[ELASTIC_SEARCH]
+#     # post an item, index, then find verion (sid)
+#     res = testapp.post_json(TEST_COLL, {'required': ''})
+#     test_uuid = res.json['@graph'][0]['uuid']
+#     res = indexer_testapp.post_json('/index', {'record': True})
+#     assert res.json['indexing_count'] == 1
+#     time.sleep(4)
+#     es_item = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid)
+#     inital_version = es_item['_version']
+#
+#     # now increment the version and check it
+#     res = testapp.post_json(TEST_COLL, {'required': ''})
+#     test_uuid2 = res.json['@graph'][0]['uuid']
+#     res = indexer_testapp.post_json('/index', {'record': True})
+#     assert res.json['indexing_count'] == 1
+#     time.sleep(4)
+#     es_item = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid2)
+#     assert es_item['_version'] == inital_version + 1
+#
+#     # now try to manually bump an invalid version for the queued item
+#     # expect it to be sent to the deferred queue
+#     to_queue = {
+#         'uuid': test_uuid2,
+#         'sid': inital_version + 2,
+#         'strict': True,
+#         'timestamp': datetime.utcnow().isoformat()
+#     }
+#     indexer_queue.send_messages([to_queue], target_queue='primary')
+#     res = indexer_testapp.post_json('/index', {'record': True})
+#     time.sleep(4)
+#     assert res.json['indexing_count'] == 0
+#     received_deferred = indexer_queue.receive_messages(target_queue='deferred')
+#     assert len(received_deferred) == 1
+#     indexer_queue.delete_messages(received_deferred, target_queue='deferred')
 
 
 def test_queue_indexing_endpoint(app, testapp, indexer_testapp):
