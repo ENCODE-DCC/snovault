@@ -65,5 +65,5 @@ install:
 - pip install coveralls
 - pip install codacy-coverage
 script:
-- if test -n "$UNIT"; then bin/test -v -v --timeout=400 -m "not bdd" --cov
-  src/snovault --aws-auth --es search-fourfront-builds-uhevxdzfcv7mkm5pj5svcri3aq.us-east-1.es.amazonaws.com:80 ; fi
+- if test -n "$UNIT"; then bin/test -v -v --timeout=400 --aws-auth -m "not bdd" --cov
+  src/snovault --es-search-fourfront-builds-uhevxdzfcv7mkm5pj5svcri3aq.us-east-1.es.amazonaws.com:80 ; fi
