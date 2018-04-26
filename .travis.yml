@@ -66,4 +66,4 @@ install:
 - pip install codacy-coverage
 script:
 - if test -n "$UNIT"; then bin/test -k test_indexing -v -v --timeout=400 --aws-auth -m "not bdd" --cov
-  src/snovault --es-search=fourfront-builds-uhevxdzfcv7mkm5pj5svcri3aq.us-east-1.es.amazonaws.com:80 ; fi
+  src/snovault --es-search fourfront-builds-uhevxdzfcv7mkm5pj5svcri3aq.us-east-1.es.amazonaws.com:80 ; fi
