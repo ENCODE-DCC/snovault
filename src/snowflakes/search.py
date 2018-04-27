@@ -39,9 +39,9 @@ def includeme(config):
     config.scan(__name__)
 
 
-sanitize_search_string_re = re.compile(r'[\\\+\-\&\|\!\(\)\{\}\[\]\^\~\:\/\\\*\?]')
+SANITIZE_SEARCH_STRING_RE = re.compile(r'[\\\+\-\&\|\!\(\)\{\}\[\]\^\~\:\/\\\*\?]')
 
-audit_facets = [
+AUDIT_FACETS = [
     ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
     ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
     ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
@@ -132,15 +132,16 @@ def search(context, request, return_generator=False):
         # Probably this is why filtering Items with subclasses doesn't work right
         # i.e., search/?type=Dataset   Type is not a regular filter/facet.
         for item_type in doc_types:
-            ti = types[item_type]
-            qs = urlencode([
+            it_type = types[item_type]
+            query_string = urlencode([
                 (k.encode('utf-8'), v.encode('utf-8'))
-                for k, v in request.params.items() if not (k == 'type' and types['Item' if v == '*' else v] is ti)
+                for k, v in request.params.items() if not (k == 'type' and types['Item' if v == '*'
+                                                                                 else v] is it_type)
             ])
             result['filters'].append({
                 'field': 'type',
-                'term': ti.name,
-                'remove': '{}?{}'.format(request.path, qs)
+                'term': it_type.name,
+                'remove': '{}?{}'.format(request.path, query_string)
             })
 
         # Add special views like Report and Matrix if search is a single type
@@ -177,7 +178,6 @@ def search(context, request, return_generator=False):
         # del query['query']['bool']['must']['multi_match']['fields']
         query['query']['query_string']['fields'].extend(['_all', '*.uuid', '*.md5sum', '*.submitted_file_name'])
 
-
     # Set sort order
     set_sort_order(request, search_term, types, doc_types, query, result)
 
@@ -192,7 +192,7 @@ def search(context, request, return_generator=False):
         facets.extend(types[doc_types[0]].schema['facets'].items())
 
     # Display all audits if logged in, or all but INTERNAL_ACTION if logged out
-    for audit_facet in audit_facets:
+    for audit_facet in AUDIT_FACETS:
         if search_audit and 'group.submitter' in principals or 'INTERNAL_ACTION' not in audit_facet[0]:
             facets.append(audit_facet)
 
