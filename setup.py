@@ -43,6 +43,7 @@ requires = [
     'zope.sqlalchemy',
     'bcrypt',
     'cryptacular',
+    'aws-requests-auth'
 ]
 
 if sys.version_info.major == 2:

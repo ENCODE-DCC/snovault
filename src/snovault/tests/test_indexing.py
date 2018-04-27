@@ -31,6 +31,8 @@ from snovault.elasticsearch.create_mapping import (
 )
 
 
+from pyramid.paster import get_appsettings
+
 pytestmark = [pytest.mark.indexing]
 TEST_COLL = '/testing-post-put-patch/'
 TEST_TYPE = 'testing_post_put_patch'  # use one collection for testing
@@ -40,17 +42,21 @@ create_mapping.NUM_SHARDS = 1
 
 
 @pytest.fixture(scope='session')
-def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server):
+def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server, aws_auth):
     from .testappfixtures import _app_settings
     settings = _app_settings.copy()
     settings['create_tables'] = True
-    settings['persona.audiences'] = 'http://%s:%s' % wsgi_server_host_port
     settings['elasticsearch.server'] = elasticsearch_server
     settings['sqlalchemy.url'] = postgresql_server
     settings['collection_datastore'] = 'elasticsearch'
     settings['item_datastore'] = 'elasticsearch'
     settings['indexer'] = True
     settings['indexer.processes'] = 2
+
+    # use aws auth to access elasticsearch 
+    if aws_auth:
+        settings['elasticsearch.aws_auth'] = aws_auth
+
     return settings
 
 

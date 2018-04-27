@@ -1,6 +1,6 @@
 from snovault.json_renderer import json_renderer
 from snovault.util import get_root_request
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, RequestsHttpConnection
 from elasticsearch.connection import Urllib3HttpConnection
 from elasticsearch.serializer import SerializationError
 from pyramid.settings import (
@@ -13,6 +13,8 @@ from .interfaces import (
 )
 import json
 import sys
+from aws_requests_auth.boto_utils import BotoAWSRequestsAuth
+
 PY2 = sys.version_info.major == 2
 
 
@@ -22,13 +24,25 @@ def includeme(config):
     config.add_request_method(datastore, 'datastore', reify=True)
 
     addresses = aslist(settings['elasticsearch.server'])
+    use_aws_auth = settings.get('elasticsearch.aws_auth')
+
+    es_options = {'serializer': PyramidJSONSerializer(json_renderer),
+                  'connection_class': TimedUrllib3HttpConnection,
+                  'retry_on_timeout': True,
+                  'maxsize': 50  # parallellism...
+                 }
+    if use_aws_auth:
+        # drop port if it's there
+        host = addresses[0].split(':')
+        auth = BotoAWSRequestsAuth(aws_host=host[0],
+                                   aws_region='us-east-1',
+                                   aws_service='es')
+        es_options['connection_class'] = RequestsHttpConnection
+        es_options['http_auth'] = auth
+
+
     config.registry[ELASTIC_SEARCH] = Elasticsearch(
-        addresses,
-        serializer=PyramidJSONSerializer(json_renderer),
-        connection_class=TimedUrllib3HttpConnection,
-        retry_on_timeout=True,
-        maxsize=50
-    )
+        addresses, **es_options)
 
     config.include('.cached_views')
     config.include('.esstorage')

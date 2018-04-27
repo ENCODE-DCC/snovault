@@ -319,9 +319,10 @@ class Indexer(object):
                 break
             else:
                 # add embedded_uuids to secondary queue if no errors
+                # but ONLY on a post or patch (we have an sid)
                 # this makes it so all items embedded in this will get indexed
                 # (on the secondary queue with strict=True)
-                if isinstance(add_to_secondary, set):
+                if sid and isinstance(add_to_secondary, set):
                     add_to_secondary |= set(result.get('embedded_uuids', []))
                     # remove the uuid we are indexing (included in result['embedded_uuids'])
                     try:
