@@ -226,6 +226,7 @@ def test_indexing_queue_records(app, testapp, indexer_testapp):
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 1
     assert res.json['indexing_content']['type'] == 'queue'
+    time.sleep(4)
     doc_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert doc_count == 1
     # make sure latest_indexing doc matches
@@ -280,6 +281,7 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     create_mapping.run(app, collections=[TEST_TYPE])
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 2
+    time.sleep(4)
     doc_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert doc_count == 2
 
@@ -382,6 +384,7 @@ def test_queue_indexing_endpoint(app, testapp, indexer_testapp):
     assert res.json['number_queued'] == 2
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 2
+    time.sleep(4)
     doc_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert doc_count == 2
 
@@ -561,11 +564,11 @@ def test_create_mapping_check_first(app, testapp, indexer_testapp):
 
     # run with check_first but skip indexing. counts should still match because
     # the index wasn't removed
-    create_mapping.run(app, check_first=True, skip_indexing=True)
+    create_mapping.run(app, check_first=True, collections=[TEST_TYPE], skip_indexing=True)
     second_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     counter = 0
     while (second_count != initial_count and counter < 10):
-        time.sleep(1)
+        time.sleep(2)
         second_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
         counter +=1
     assert second_count == initial_count
