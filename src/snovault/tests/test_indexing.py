@@ -565,6 +565,8 @@ def test_create_mapping_check_first(app, testapp, indexer_testapp):
     # run with check_first but skip indexing. counts should still match because
     # the index wasn't removed
     create_mapping.run(app, check_first=True, collections=[TEST_TYPE], skip_indexing=True)
+    time.sleep(4)
+    assert es.get(index='meta', doc_type='meta', id=TEST_TYPE)
     second_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     counter = 0
     while (second_count != initial_count and counter < 10):
