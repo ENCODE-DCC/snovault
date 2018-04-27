@@ -434,7 +434,7 @@ class QueueManager(object):
             failed.extend(response.get('Failed', []))
         return failed
 
-    def replace_messages(self, messages, target_queue='primary'):
+    def replace_messages(self, messages, target_queue='primary', vis_timeout=5):
         """
         Called using received messages to place them back on the queue.
         Using a VisibilityTimeout of 0 means these messages are instantly
@@ -452,7 +452,7 @@ class QueueManager(object):
                 to_replace = {
                     'Id': batch[i]['MessageId'],
                     'ReceiptHandle': batch[i]['ReceiptHandle'],
-                    'VisibilityTimeout': 5
+                    'VisibilityTimeout': vis_timeout
                 }
                 batch[i] = to_replace
             response = self.client.change_message_visibility_batch(

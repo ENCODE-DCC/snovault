@@ -68,8 +68,11 @@ def workbook(app):
     inserts = resource_filename('snowflakes', 'tests/data/inserts/')
     docsdir = [resource_filename('snowflakes', 'tests/data/documents/')]
     load_all(testapp, inserts, docsdir)
-
+    from timeit import default_timer as timer
+    start = timer()
     testapp.post_json('/index', {})
+    stop = timer()
+    print("indexing time is %s" % (stop-start))
     yield
     # XXX cleanup
 
