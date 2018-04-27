@@ -689,7 +689,6 @@ def get_previous_index_record(this_index_exists, es, in_type):
     if this_index_exists:
         try:
             # multiple queries to meta... don't want this...
-            import pdb; pdb.set_trace()
             prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type, ignore=[404])
         except TransportError as excp:
             if excp.info.get('status') == 503:
