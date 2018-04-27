@@ -53,7 +53,7 @@ def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server,
     settings['indexer'] = True
     settings['indexer.processes'] = 2
 
-    # use aws auth to access elasticsearch 
+    # use aws auth to access elasticsearch
     if aws_auth:
         settings['elasticsearch.aws_auth'] = aws_auth
 
@@ -551,9 +551,10 @@ def test_create_mapping_check_first(app, testapp, indexer_testapp):
     # ensure create mapping has been run
     from snovault.elasticsearch import create_mapping
     es = app.registry[ELASTIC_SEARCH]
-    # post an item and then index it (synchronously because its easy)
-    res = testapp.post_json(TEST_COLL, {'required': ''})
-    create_mapping.run(app, collections=[TEST_TYPE], sync_index=True, purge_queue=True)
+    # post an item and then index it
+    testapp.post_json(TEST_COLL, {'required': ''})
+    indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(4)
     initial_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     # make sure the meta entry is created
     assert es.get(index='meta', doc_type='meta', id=TEST_TYPE)
@@ -590,7 +591,9 @@ def test_create_mapping_index_diff(app, testapp, indexer_testapp):
     res = testapp.post_json(TEST_COLL, {'required': ''})
     test_uuid = res.json['@graph'][0]['uuid']
     testapp.post_json(TEST_COLL, {'required': ''})  # second item
-    create_mapping.run(app, collections=[TEST_TYPE], sync_index=True, purge_queue=True)
+    create_mapping.run(app, collections=[TEST_TYPE], purge_queue=True)
+    indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(4)
     initial_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert initial_count == 2
 
@@ -603,6 +606,8 @@ def test_create_mapping_index_diff(app, testapp, indexer_testapp):
     # patch the item to increment version
     res = testapp.patch_json(TEST_COLL + test_uuid, {'required': 'meh'})
     # index with index_diff to ensure the item is reindexed
-    create_mapping.run(app, collections=[TEST_TYPE], index_diff=True, sync_index=True, purge_queue=True)
+    create_mapping.run(app, collections=[TEST_TYPE], index_diff=True)
+    res = indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(4)
     third_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert third_count == initial_count
