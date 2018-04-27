@@ -63,7 +63,6 @@ def elasticsearch_host_port():
 @pytest.mark.fixture_cost(10)
 @pytest.yield_fixture(scope='session')
 def elasticsearch_server(request, elasticsearch_host_port, remote_es):
-
     if not remote_es:
         # spawn a new one
         from .elasticsearch_fixture import server_process
