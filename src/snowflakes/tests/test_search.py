@@ -1,5 +1,6 @@
 # Use workbook fixture from BDD tests (including elasticsearch)
 from .features.conftest import app_settings, app, workbook
+import pytest
 
 
 def test_search_view(workbook, testapp):
@@ -63,6 +64,7 @@ def recursively_find_uuids(json, uuids):
     return uuids
 
 
+@pytest.mark.es
 def test_embedded_uuids_real(workbook, testapp, app):
     """
     Find all uuids from a search result and ensure they match the

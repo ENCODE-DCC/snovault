@@ -92,6 +92,7 @@ def teardown(app):
     transaction.commit()
 
 
+@pytest.mark.es
 def test_indexer_queue(app):
     indexer_queue_mirror = app.registry[INDEXER_QUEUE_MIRROR]
     # this is only set up for webprod/webprod2
@@ -553,6 +554,7 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
 def test_create_mapping_check_first(app, testapp, indexer_testapp):
     # ensure create mapping has been run
     from snovault.elasticsearch import create_mapping
+    create_mapping.run(app, collections=[TEST_TYPE], skip_indexing=True)
     es = app.registry[ELASTIC_SEARCH]
     # post an item and then index it
     testapp.post_json(TEST_COLL, {'required': ''})
