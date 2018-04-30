@@ -1,5 +1,4 @@
-1.0.7:
-01. SNO-34-attachment-download (#97)
+1.0.7: The only update was reverted.  Empty Release.
 
 1.0.6:
 01. SNO-33 specify index for get_by_unique_key from collection (#94)
