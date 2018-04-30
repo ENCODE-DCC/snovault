@@ -950,8 +950,8 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     if skip_indexing or print_count_only:
         return timings
 
-    # now, queue items for indexing
-    # TODO: when queue space is an issue, put ontology_terms on the secondary
+    # now, queue items for indexing in the secondary queue
+    # TODO: maybe put items on primary/secondary by type
     if uuids_to_index:
         # we need to find associated uuids if all items are not indexed or not strict mode
         if not total_reindex and not strict:
@@ -962,7 +962,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             run_indexing(app, uuids_to_index)
         else:
             log.warning('\n___UUIDS TO INDEX (QUEUED)___: %s\n' % (len(uuids_to_index)))
-            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True, target_queue='primary')
+            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True, target_queue='secondary')
     return timings
 
 
