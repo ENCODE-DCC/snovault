@@ -5,16 +5,13 @@ from webtest import TestApp
 EPILOG = __doc__
 
 
-def run(app, collections=None, last_xmin=None, uuids=None):
+def run(app, uuids=None):
     environ = {
         'HTTP_ACCEPT': 'application/json',
         'REMOTE_USER': 'INDEXER',
     }
     testapp = TestApp(app, environ)
     post_body = {
-        'last_xmin': last_xmin,
-        'types': collections,
-        'recovery': True,
         'record': True
     }
     if uuids:
@@ -30,7 +27,7 @@ def main():
         description="Index data in Elastic Search", epilog=EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument('--item-type', action='append', help="Item type")
+    parser.add_argument('--uuid', action='append', help="uuid to index")
     parser.add_argument('--app-name', help="Pyramid app name in configfile")
     parser.add_argument('config_uri', help="path to configfile")
     args = parser.parse_args()
@@ -44,7 +41,7 @@ def main():
 
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.DEBUG)
-    return run(app, args.item_type)
+    return run(app, args.uuid)
 
 
 if __name__ == '__main__':
