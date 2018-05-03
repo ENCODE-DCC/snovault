@@ -494,7 +494,11 @@ def test_get_previous_index_record(app):
 
 
 def test_confirm_mapping(app):
-    from snovault.elasticsearch.create_mapping import create_mapping_by_type, confirm_mapping
+    from snovault.elasticsearch.create_mapping import (
+        create_mapping_by_type,
+        build_index_record,
+        confirm_mapping
+    )
     es = app.registry[ELASTIC_SEARCH]
     # make a dynamic mapping
     es_safe_execute(es.indices.delete, index=TEST_TYPE)
@@ -504,7 +508,8 @@ def test_confirm_mapping(app):
     assert res.json['indexing_count'] == 1
     time.sleep(2)
     mapping = create_mapping_by_type(TEST_TYPE, app.registry)
-    tries_taken = confirm_mapping(es, TEST_TYPE, mapping)
+    index_record = build_index_record(mapping, TEST_TYPE)
+    tries_taken = confirm_mapping(es, TEST_TYPE, index_record)
     # 3 tries means it failed to correct, 0 means it was unneeded
     assert tries_taken > 0 and tries_taken < 3
 
