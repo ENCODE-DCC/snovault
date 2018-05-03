@@ -501,7 +501,7 @@ def test_confirm_mapping(app):
     )
     es = app.registry[ELASTIC_SEARCH]
     # make a dynamic mapping
-    es_safe_execute(es.indices.delete, index=TEST_TYPE)
+    es.indices.delete(index=TEST_TYPE)
     time.sleep(2)
     testapp.post_json(TEST_COLL, {'required': ''})
     res = indexer_testapp.post_json('/index', {'record': True})
