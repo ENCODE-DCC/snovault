@@ -493,7 +493,7 @@ def test_get_previous_index_record(app):
     assert record is None
 
 
-def test_confirm_mapping(app):
+def test_confirm_mapping(app, testapp, indexer_testapp):
     from snovault.elasticsearch.create_mapping import (
         create_mapping_by_type,
         build_index_record,
