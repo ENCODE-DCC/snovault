@@ -629,10 +629,12 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     else:
         log.warning('MAPPING: new index failed for %s' % (in_type))
 
+    # check to debug create-mapping issues and ensure correct mappings
+    confirm_mapping(es, in_type, this_index_record)
+
     # we need to queue items in the index for indexing
     # if check_first and we've made it here, nothing has been queued yet
     # for this collection
-
     start = timer()
     coll_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
     end = timer()
@@ -795,6 +797,36 @@ def get_collection_uuids_and_count(app, in_type):
     if datastore:
         app.datastore = datastore
     return db_count, final_uuids
+
+
+def confirm_mapping(es, in_type, this_index_record):
+    """
+    The mapping put to ES can be incorrect, most likely due to residual
+    items getting indexed at the time of index creation. This loop serves
+    to find those problems and correct them, as well as provide more info
+    for debugging the underlying issue.
+    Returns number of iterations this took (0 means initial mapping was right)
+    """
+    mapping_check = False
+    tries = 0
+    while not mapping_check and tries < 3:
+        found_mapping = es.indices.get_mapping(index=in_type).get(in_type, {}).get('mappings')
+        found_map_json = json.dumps(found_mapping, sort_keys=True)
+        this_map_json = json.dumps(this_index_record['mappings'], sort_keys=True)
+        # es converts {'properties': {}} --> {'type': 'object'}
+        this_map_json = this_map_json.replace('{"properties": {}}', '{"type": "object"}')
+        if found_map_json == this_map_json:
+            mapping_check = True
+        else:
+            count = es.count(index=in_type, doc_type=in_type).get('count', 'ERR')
+            log.warning('___BAD MAPPING FOUND FOR %s. RETRYING___\nDocument count in that index is %s.' % (in_type, count))
+            es_safe_execute(es.indices.delete, index=in_type)
+            es_safe_execute(es.indices.create, index=in_type, body=this_index_record)
+            tries += 1
+            time.sleep(2)
+    if not mapping_check:
+        log.warning('___MAPPING CORRECTION FAILED FOR %s___' % in_type)
+    return tries
 
 
 def es_safe_execute(function, **kwargs):
