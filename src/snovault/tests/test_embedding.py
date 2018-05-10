@@ -28,29 +28,29 @@ def autouse_external_tx(external_tx):
 
 @pytest.fixture
 def content(testapp):
-    url = '/testing-link-targets/'
+    url = '/testing-link-targets-sno/'
     for item in targets:
         testapp.post_json(url, item, status=201)
 
-    url = '/testing-link-sources/'
+    url = '/testing-link-sources-sno/'
     for item in sources:
         testapp.post_json(url, item, status=201)
 
 
 def test_embedded_uuids_object(content, dummy_request, threadlocals):
-    dummy_request.embed('/testing-link-sources/', sources[0]['uuid'], '@@object')
+    dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@object')
     assert dummy_request._embedded_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd'}
     assert dummy_request._linked_uuids == {'775795d3-4410-4114-836b-8eeecf1d0c2f', '16157204-8c8f-4672-a1a4-14f4b8021fcd'}
 
 
 def test_embedded_uuids_embedded(content, dummy_request, threadlocals):
-    dummy_request.embed('/testing-link-sources/', sources[0]['uuid'], '@@embedded')
+    dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@embedded')
     assert dummy_request._embedded_uuids == {'775795d3-4410-4114-836b-8eeecf1d0c2f', '16157204-8c8f-4672-a1a4-14f4b8021fcd'}
     assert dummy_request._linked_uuids == {'775795d3-4410-4114-836b-8eeecf1d0c2f', '16157204-8c8f-4672-a1a4-14f4b8021fcd'}
 
 
 def test_embedded_uuids_expand_target(content, dummy_request, threadlocals):
-    dummy_request.embed('/testing-link-sources/', sources[0]['uuid'], '@@expand?expand=target')
+    dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@expand?expand=target')
     # assert dummy_request._embedded_uuids == {sources[0]['uuid'], targets[0]['uuid']}
     # the @@expand?expand=target arg causes the body to be built as expected,
     # but not we only return _embedded_uuids and _linked_uuids when
@@ -61,18 +61,18 @@ def test_embedded_uuids_expand_target(content, dummy_request, threadlocals):
 
 
 def test_updated_source(content, testapp):
-    url = '/testing-link-sources/' + sources[0]['uuid']
+    url = '/testing-link-sources-sno/' + sources[0]['uuid']
     res = testapp.patch_json(url, {})
     assert set(res.headers['X-Updated'].split(',')) == {sources[0]['uuid']}
 
 
 def test_updated_source_changed(content, testapp):
-    url = '/testing-link-sources/' + sources[0]['uuid']
+    url = '/testing-link-sources-sno/' + sources[0]['uuid']
     res = testapp.patch_json(url, {'target': targets[1]['uuid']})
     assert set(res.headers['X-Updated'].split(',')) == {sources[0]['uuid'], targets[1]['uuid']}
 
 
 def test_updated_target(content, testapp):
-    url = '/testing-link-targets/' + targets[0]['uuid']
+    url = '/testing-link-targets-sno/' + targets[0]['uuid']
     res = testapp.patch_json(url, {})
     assert set(res.headers['X-Updated'].split(',')) == {targets[0]['uuid']}

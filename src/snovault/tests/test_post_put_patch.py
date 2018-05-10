@@ -49,7 +49,7 @@ COLLECTION_URL = '/testing-post-put-patch-sno/'
 
 @pytest.fixture
 def link_targets(testapp):
-    url = '/testing-link-targets/'
+    url = '/testing-link-targets-sno/'
     for item in targets:
         testapp.post_json(url, item, status=201)
 
@@ -62,9 +62,9 @@ def content(testapp, external_tx):
 
 @pytest.fixture
 def content_with_child(testapp):
-    parent_res = testapp.post_json('/testing-link-targets/', {}, status=201)
+    parent_res = testapp.post_json('/testing-link-targets-sno/', {}, status=201)
     parent_id = parent_res.json['@graph'][0]['@id']
-    child_res = testapp.post_json('/testing-link-sources/', {'target': parent_id})
+    child_res = testapp.post_json('/testing-link-sources-sno/', {'target': parent_id})
     child_id = child_res.json['@graph'][0]['@id']
     return {'@id': parent_id, 'child': child_id}
 
@@ -288,7 +288,7 @@ def test_post_object_with_child(testapp):
             'status': 'released',
         }]
     }
-    res = testapp.post_json('/testing-link-targets', edit, status=201)
+    res = testapp.post_json('/testing-link-targets-sno/', edit, status=201)
     parent_id = res.json['@graph'][0]['uuid']
     source = res.json['@graph'][0]['reverse'][0]
     res = testapp.get(source)
@@ -296,7 +296,7 @@ def test_post_object_with_child(testapp):
 
 
 def test_retry(testapp):
-    res = testapp.post_json('/testing-post-put-patch-sno/', {'required': ''})
+    res = testapp.post_json(COLLECTION_URL, {'required': ''})
     url = res.location
     res = testapp.get(url + '/@@testing-retry?datstore=database')
     assert res.json['attempt'] == 2
