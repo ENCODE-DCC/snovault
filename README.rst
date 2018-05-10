@@ -43,7 +43,8 @@ If you need to update dependencies::
 
 Step 3: Run buildout::
 
-    $ python3 bootstrap.py --buildout-version 2.4.1 --setuptools-version 18.5
+    $ pip3 install -U zc.buildout setuptools
+    $ buildout bootstrap
     $ bin/buildout
 
     NOTE:  
