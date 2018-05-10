@@ -203,10 +203,10 @@ class Indexer(object):
                     msg_curr_time = None
                 if target_queue != 'secondary':  # add embedded uuids to secondary
                     error = self.update_object(request, msg_uuid, sid=msg_sid,
-                        curr_time=msg_curr_time, add_to_secondary=embedded_uuids)
+                        curr_time=msg_curr_time, add_to_secondary=embedded_uuids, target_queue=target_queue)
                 else:
                     error = self.update_object(request, msg_uuid, sid=msg_sid,
-                        curr_time=msg_curr_time, add_to_secondary=None)
+                        curr_time=msg_curr_time, add_to_secondary=None, target_queue=target_queue)
                 if error:
                     if error.get('error_message') == 'deferred_retry':
                         # send this to the deferred queue
@@ -267,7 +267,7 @@ class Indexer(object):
         return errors
 
 
-    def update_object(self, request, uuid, sid=None, curr_time=None, add_to_secondary=None):
+    def update_object(self, request, uuid, sid=None, curr_time=None, add_to_secondary=None, target_queue=None):
         """
         Actually index the uuid using the index-data view.
         add_to_secondary is an optional set. If provided, the embedded uuids
@@ -289,9 +289,8 @@ class Indexer(object):
             # this will cause the item to be sent to the deferred queue
             return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
         except KeyError as e:
-            # only consider a KeyError deferrable if there is an sid with
-            # this item OR we are in primary/deferred (have add_to_secondary)
-            if sid or add_to_secondary is not None:
+            # only consider a KeyError deferrable if using primary queue
+            if target_queue == 'primary':
                 log.warning('KeyError for %s with sid %s. time: %s' % (uuid, sid, curr_time))
                 # this will cause the item to be sent to the deferred queue
                 return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
