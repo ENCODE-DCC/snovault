@@ -194,7 +194,7 @@ class Indexer(object):
                     # check to see if we are using the same txn that caused a deferral
                     if target_queue == 'deferred' and msg_detail == str(request.tm.get()):
                         # re-create a new message so we don't affect retry count (dlq)
-                        self.queue.send_messages([msg], target_queue=target_queue)
+                        self.queue.send_messages([msg_body], target_queue=target_queue)
                         to_delete.append(msg)
                         continue
                     if msg_body['strict'] is False:
@@ -203,7 +203,8 @@ class Indexer(object):
                     msg_uuid = str(msg_body)
                     msg_sid = None
                     msg_curr_time = None
-                if target_queue != 'secondary':  # add embedded uuids to secondary
+                # add embedded uuids to secondary, but only if not using secondary
+                if target_queue != 'secondary':
                     error = self.update_object(request, msg_uuid, sid=msg_sid,
                         curr_time=msg_curr_time, add_to_secondary=embedded_uuids, target_queue=target_queue)
                 else:
@@ -274,6 +275,8 @@ class Indexer(object):
         Actually index the uuid using the index-data view.
         add_to_secondary is an optional set. If provided, the embedded uuids
         from the request.embed(/<uuid>/@@index-data) will be added to the set.
+        target_queue is an optional string queue name:
+            'primary', 'secondary', or 'deferred'
         """
         if not curr_time:
             curr_time = datetime.datetime.utcnow().isoformat()  # utc
