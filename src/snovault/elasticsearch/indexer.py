@@ -289,7 +289,9 @@ class Indexer(object):
             # this will cause the item to be sent to the deferred queue
             return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
         except KeyError as e:
-            if sid:
+            # only consider a KeyError deferrable if there is an sid with
+            # this item OR we are in primary/deferred (have add_to_secondary)
+            if sid or add_to_secondary is not None:
                 log.warning('KeyError for %s with sid %s. time: %s' % (uuid, sid, curr_time))
                 # this will cause the item to be sent to the deferred queue
                 return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
