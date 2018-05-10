@@ -193,7 +193,9 @@ class Indexer(object):
                     msg_detail = msg_body.get('detail')
                     # check to see if we are using the same txn that caused a deferral
                     if target_queue == 'deferred' and msg_detail == str(request.tm.get()):
-                        self.queue.replace_messages([msg], target_queue=target_queue)
+                        # re-create a new message so we don't affect retry count (dlq)
+                        self.queue.send_messages([msg], target_queue=target_queue)
+                        to_delete.append(msg)
                         continue
                     if msg_body['strict'] is False:
                         non_strict_uuids.add(msg_uuid)
@@ -289,8 +291,8 @@ class Indexer(object):
             # this will cause the item to be sent to the deferred queue
             return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
         except KeyError as e:
-            # only consider a KeyError deferrable if using primary queue
-            if target_queue == 'primary':
+            # only consider a KeyError deferrable if not already in deferred queue
+            if target_queue != 'deferred':
                 log.warning('KeyError for %s with sid %s. time: %s' % (uuid, sid, curr_time))
                 # this will cause the item to be sent to the deferred queue
                 return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
