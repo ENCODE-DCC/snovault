@@ -137,14 +137,16 @@ class TestingLinkTarget(Item):
         return paths_filtered_by_status(request, reverse)
 
 
+# Renamed from TestingPostPutPatch to TestingPostPutPatchSno so that indices
+# would not coincide with Fourfront tests, which also use that index name
 @collection(
-    'testing-post-put-patch',
+    'testing-post-put-patch-sno',
     acl=[
         (Allow, 'group.submitter', ['add', 'edit', 'view']),
     ],
 )
-class TestingPostPutPatch(Item):
-    item_type = 'testing_post_put_patch'
+class TestingPostPutPatchSno(Item):
+    item_type = 'testing_post_put_patch_sno'
     embedded_list = ['protected_link.*']
     schema = {
         'required': ['required'],
@@ -256,7 +258,7 @@ def testing_render_error(request):
     }
 
 
-@view_config(context=TestingPostPutPatch, name='testing-retry')
+@view_config(context=TestingPostPutPatchSno, name='testing-retry')
 def testing_retry(context, request):
     from sqlalchemy import inspect
     from transaction.interfaces import TransientError

@@ -44,7 +44,7 @@ item_with_link = [
 ]
 
 
-COLLECTION_URL = '/testing-post-put-patch/'
+COLLECTION_URL = '/testing-post-put-patch-sno/'
 
 
 @pytest.fixture
@@ -185,7 +185,7 @@ def test_patch_delete_fields_required(content, testapp):
 
 
 def test_patch_new_schema_version(content, root, testapp, monkeypatch):
-    collection = root['testing_post_put_patch']
+    collection = root['testing_post_put_patch_sno']
     properties = collection.type_info.schema['properties']
 
     url = content['@id']
@@ -296,7 +296,7 @@ def test_post_object_with_child(testapp):
 
 
 def test_retry(testapp):
-    res = testapp.post_json('/testing-post-put-patch/', {'required': ''})
+    res = testapp.post_json('/testing-post-put-patch-sno/', {'required': ''})
     url = res.location
     res = testapp.get(url + '/@@testing-retry?datstore=database')
     assert res.json['attempt'] == 2

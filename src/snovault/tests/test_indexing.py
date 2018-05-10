@@ -34,8 +34,8 @@ from snovault.elasticsearch.create_mapping import (
 from pyramid.paster import get_appsettings
 
 pytestmark = [pytest.mark.indexing]
-TEST_COLL = '/testing-post-put-patch/'
-TEST_TYPE = 'testing_post_put_patch'  # use one collection for testing
+TEST_COLL = '/testing-post-put-patch-sno/'
+TEST_TYPE = 'testing_post_put_patch_sno'  # use one collection for testing
 
 # we just need single shard for these tests
 create_mapping.NUM_SHARDS = 1
@@ -179,12 +179,12 @@ def test_indexing_simple(app, testapp, indexer_testapp):
     uuid = res.json['@graph'][0]['uuid']
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 1
-    res = testapp.get('/search/?type=TestingPostPutPatch')
+    res = testapp.get('/search/?type=TestingPostPutPatchSno')
     uuids = [indv_res['uuid'] for indv_res in res.json['@graph']]
     count = 0
     while uuid not in uuids and count < 20:
         time.sleep(1)
-        res = testapp.get('/search/?type=TestingPostPutPatch')
+        res = testapp.get('/search/?type=TestingPostPutPatchSno')
         uuids = [indv_res['uuid'] for indv_res in res.json['@graph']]
         count += 1
     assert res.json['total'] >= 2
