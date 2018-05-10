@@ -73,9 +73,9 @@ class TestingDownload(ItemWithAttachment):
     }
 
 
-@collection('testing-link-sources')
-class TestingLinkSource(Item):
-    item_type = 'testing_link_source'
+@collection('testing-link-sources-sno')
+class TestingLinkSourceSno(Item):
+    item_type = 'testing_link_source_sno'
     schema = {
         'type': 'object',
         'properties': {
@@ -87,7 +87,7 @@ class TestingLinkSource(Item):
             },
             'target': {
                 'type': 'string',
-                'linkTo': 'TestingLinkTarget',
+                'linkTo': 'TestingLinkTargetSno',
             },
             'status': {
                 'type': 'string',
@@ -98,9 +98,9 @@ class TestingLinkSource(Item):
     }
 
 
-@collection('testing-link-targets', unique_key='testing_link_target:name')
-class TestingLinkTarget(Item):
-    item_type = 'testing_link_target'
+@collection('testing-link-targets-sno', unique_key='testing_link_target_sno:name')
+class TestingLinkTargetSno(Item):
+    item_type = 'testing_link_target_sno'
     name_key = 'name'
     schema = {
         'type': 'object',
@@ -119,7 +119,7 @@ class TestingLinkTarget(Item):
         'additionalProperties': False,
     }
     rev = {
-        'reverse': ('TestingLinkSource', 'target'),
+        'reverse': ('TestingLinkSourceSno', 'target'),
     }
     embedded_list = [
         'reverse.*',
@@ -130,21 +130,23 @@ class TestingLinkTarget(Item):
         "type": "array",
         "items": {
             "type": ['string', 'object'],
-            "linkFrom": "TestingLinkSource.target",
+            "linkFrom": "TestingLinkSourceSno.target",
         },
     })
     def reverse(self, request, reverse):
         return paths_filtered_by_status(request, reverse)
 
 
+# Renamed from TestingPostPutPatch to TestingPostPutPatchSno so that indices
+# would not coincide with Fourfront tests, which also use that index name
 @collection(
-    'testing-post-put-patch',
+    'testing-post-put-patch-sno',
     acl=[
         (Allow, 'group.submitter', ['add', 'edit', 'view']),
     ],
 )
-class TestingPostPutPatch(Item):
-    item_type = 'testing_post_put_patch'
+class TestingPostPutPatchSno(Item):
+    item_type = 'testing_post_put_patch_sno'
     embedded_list = ['protected_link.*']
     schema = {
         'required': ['required'],
@@ -189,7 +191,7 @@ class TestingPostPutPatch(Item):
                 # This should be allowed on PUT so long as the linked uuid is
                 # the same
                 'type': 'string',
-                'linkTo': 'TestingLinkTarget',
+                'linkTo': 'TestingLinkTargetSno',
                 'permission': 'import_items',
             },
         }
@@ -256,7 +258,7 @@ def testing_render_error(request):
     }
 
 
-@view_config(context=TestingPostPutPatch, name='testing-retry')
+@view_config(context=TestingPostPutPatchSno, name='testing-retry')
 def testing_retry(context, request):
     from sqlalchemy import inspect
     from transaction.interfaces import TransientError

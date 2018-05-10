@@ -34,8 +34,8 @@ from snovault.elasticsearch.create_mapping import (
 from pyramid.paster import get_appsettings
 
 pytestmark = [pytest.mark.indexing]
-TEST_COLL = '/testing-post-put-patch/'
-TEST_TYPE = 'testing_post_put_patch'  # use one collection for testing
+TEST_COLL = '/testing-post-put-patch-sno/'
+TEST_TYPE = 'testing_post_put_patch_sno'  # use one collection for testing
 
 # we just need single shard for these tests
 create_mapping.NUM_SHARDS = 1
@@ -179,12 +179,12 @@ def test_indexing_simple(app, testapp, indexer_testapp):
     uuid = res.json['@graph'][0]['uuid']
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 1
-    res = testapp.get('/search/?type=TestingPostPutPatch')
+    res = testapp.get('/search/?type=TestingPostPutPatchSno')
     uuids = [indv_res['uuid'] for indv_res in res.json['@graph']]
     count = 0
     while uuid not in uuids and count < 20:
         time.sleep(1)
-        res = testapp.get('/search/?type=TestingPostPutPatch')
+        res = testapp.get('/search/?type=TestingPostPutPatchSno')
         uuids = [indv_res['uuid'] for indv_res in res.json['@graph']]
         count += 1
     assert res.json['total'] >= 2
@@ -302,25 +302,25 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
         'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd',
         'status': 'current',
     }
-    target_res = testapp.post_json('/testing-link-targets/', target, status=201)
+    target_res = testapp.post_json('/testing-link-targets-sno/', target, status=201)
     res = indexer_testapp.post_json('/index', {'record': True})
     time.sleep(2)
     # wait for the first item to index
-    doc_count = es.count(index='testing_link_target', doc_type='testing_link_target').get('count')
+    doc_count = es.count(index='testing_link_target_sno', doc_type='testing_link_target_sno').get('count')
     while doc_count < 1:
         time.sleep(4)
-        doc_count = es.count(index='testing_link_target', doc_type='testing_link_target').get('count')
+        doc_count = es.count(index='testing_link_target_sno', doc_type='testing_link_target_sno').get('count')
     time.sleep(4)
     indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
     assert indexing_doc['_source']['indexing_count'] == 1
-    source_res = testapp.post_json('/testing-link-sources/', source, status=201)
+    source_res = testapp.post_json('/testing-link-sources-sno/', source, status=201)
     res = indexer_testapp.post_json('/index', {'record': True})
     time.sleep(2)
     # wait for them to index
-    doc_count = es.count(index='testing_link_source', doc_type='testing_link_source').get('count')
+    doc_count = es.count(index='testing_link_source_sno', doc_type='testing_link_source_sno').get('count')
     while doc_count < 1:
         time.sleep(4)
-        doc_count = es.count(index='testing_link_source', doc_type='testing_link_source').get('count')
+        doc_count = es.count(index='testing_link_source_sno', doc_type='testing_link_source_sno').get('count')
     time.sleep(4)
     indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
     # this should have indexed the target and source

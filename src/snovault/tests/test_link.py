@@ -29,11 +29,11 @@ def autouse_external_tx(external_tx):
 
 @pytest.fixture
 def content(testapp):
-    url = '/testing-link-targets/'
+    url = '/testing-link-targets-sno/'
     for item in targets:
         testapp.post_json(url, item, status=201)
 
-    url = '/testing-link-sources/'
+    url = '/testing-link-sources-sno/'
     for item in sources:
         testapp.post_json(url, item, status=201)
 
@@ -54,7 +54,7 @@ def test_links_add(content, session):
 def test_links_update(content, testapp, session):
     from snovault.storage import Link
 
-    url = '/testing-link-sources/' + sources[1]['uuid']
+    url = '/testing-link-sources-sno/' + sources[1]['uuid']
     new_item = {'name': 'B updated', 'target': targets[0]['name']}
     testapp.put_json(url, new_item, status=200)
 
@@ -71,17 +71,17 @@ def test_links_update(content, testapp, session):
 
 def test_links_reverse(content, testapp, session):
     target = targets[0]
-    res = testapp.get('/testing-link-targets/%s/?frame=object' % target['name'])
-    assert res.json['reverse'] == ['/testing-link-sources/%s/' % sources[0]['uuid']]
+    res = testapp.get('/testing-link-targets-sno/%s/?frame=object' % target['name'])
+    assert res.json['reverse'] == ['/testing-link-sources-sno/%s/' % sources[0]['uuid']]
 
     # DELETED sources are hidden from the list.
     target = targets[1]
-    res = testapp.get('/testing-link-targets/%s/' % target['name'])
+    res = testapp.get('/testing-link-targets-sno/%s/' % target['name'])
     assert res.json['reverse'] == []
 
 
 def test_links_quoted_ids(content, testapp, session):
-    res = testapp.get('/testing-link-targets/quote:name/?frame=object')
+    res = testapp.get('/testing-link-targets-sno/quote:name/?frame=object')
     target = res.json
     source = {'name': 'C', 'target': target['@id']}
-    testapp.post_json('/testing-link-sources/', source, status=201)
+    testapp.post_json('/testing-link-sources-sno/', source, status=201)

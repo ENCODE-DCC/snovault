@@ -293,10 +293,10 @@ class QueueManager(object):
                     'deadLetterTargetArn': dlq_arn,
                     'maxReceiveCount': 4  # num of fails before sending to dlq
                 }
-                # set redrive policy for main queue and secondary queues
-                # do not set on the deferred queue, which has no dlq
-                self.queue_attrs[self.queue_name]['RedrivePolicy'] = json.dumps(redrive_policy)
-                self.queue_attrs[self.second_queue_name]['RedrivePolicy'] = json.dumps(redrive_policy)
+                # set redrive policy for three main queues
+                for redrive_queue in [self.queue_name, self.second_queue_name, self.defer_queue_name]:
+                    self.queue_attrs[redrive_queue]['RedrivePolicy'] = json.dumps(redrive_policy)
+
             # set attributes on an existing queue. not hit if queue was just created
             if should_set_attrs:
                 self.client.set_queue_attributes(
