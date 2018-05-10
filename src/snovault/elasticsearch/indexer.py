@@ -289,9 +289,13 @@ class Indexer(object):
             # this will cause the item to be sent to the deferred queue
             return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
         except KeyError as e:
-            log.warning('KeyError for %s with sid %s. time: %s' % (uuid, sid, curr_time))
-            # this will cause the item to be sent to the deferred queue
-            return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
+            if sid:
+                log.warning('KeyError for %s with sid %s. time: %s' % (uuid, sid, curr_time))
+                # this will cause the item to be sent to the deferred queue
+                return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
+            else:
+                log.error('KeyError rendering /%s/@@index-data', uuid, exc_info=True)
+                return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
         except Exception as e:
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
