@@ -142,6 +142,7 @@ packages:
 - pv
 - python2.7-dev
 - python3.4-dev
+- python3-pip
 - python-software-properties
 - python-virtualenv
 - ruby-dev
