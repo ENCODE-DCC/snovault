@@ -31,26 +31,32 @@ from snovault.elasticsearch.create_mapping import (
 )
 
 
+from pyramid.paster import get_appsettings
+
 pytestmark = [pytest.mark.indexing]
-TEST_COLL = '/testing-post-put-patch/'
-TEST_TYPE = 'testing_post_put_patch'  # use one collection for testing
+TEST_COLL = '/testing-post-put-patch-sno/'
+TEST_TYPE = 'testing_post_put_patch_sno'  # use one collection for testing
 
 # we just need single shard for these tests
 create_mapping.NUM_SHARDS = 1
 
 
 @pytest.fixture(scope='session')
-def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server):
+def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server, aws_auth):
     from .testappfixtures import _app_settings
     settings = _app_settings.copy()
     settings['create_tables'] = True
-    settings['persona.audiences'] = 'http://%s:%s' % wsgi_server_host_port
     settings['elasticsearch.server'] = elasticsearch_server
     settings['sqlalchemy.url'] = postgresql_server
     settings['collection_datastore'] = 'elasticsearch'
     settings['item_datastore'] = 'elasticsearch'
     settings['indexer'] = True
     settings['indexer.processes'] = 2
+
+    # use aws auth to access elasticsearch
+    if aws_auth:
+        settings['elasticsearch.aws_auth'] = aws_auth
+
     return settings
 
 
@@ -86,6 +92,7 @@ def teardown(app):
     transaction.commit()
 
 
+@pytest.mark.es
 def test_indexer_queue(app):
     indexer_queue_mirror = app.registry[INDEXER_QUEUE_MIRROR]
     # this is only set up for webprod/webprod2
@@ -118,9 +125,47 @@ def test_indexer_queue(app):
     assert len(received) == 1
     # finally, delete
     indexer_queue.delete_messages(received)
+    time.sleep(5)
     msg_count = indexer_queue.number_of_messages()
     assert msg_count['primary_waiting'] == 0
     assert msg_count['primary_inflight'] == 0
+
+
+def test_queue_indexing_endpoint(app, testapp):
+    # let's put some test messages to the secondary queue and a collection
+    # to the deferred queue. Posting will add uuid to the primary queue
+    # delete all messages afterwards
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    testapp.post_json(TEST_COLL, {'required': ''})
+    time.sleep(2)
+    secondary_body = {
+        'uuids': ['12345', '23456'],
+        'strict': True,
+        'target_queue': 'secondary'
+    }
+    testapp.post_json('/queue_indexing', secondary_body)
+    time.sleep(2)
+    deferred_body = {
+        'uuids': ['abcdef'],
+        'strict': True,
+        'target_queue': 'deferred'
+    }
+    testapp.post_json('/queue_indexing', deferred_body)
+    time.sleep(5)
+    msg_count = indexer_queue.number_of_messages()
+    assert msg_count['primary_waiting'] == 1
+    assert msg_count['secondary_waiting'] == 2
+    assert msg_count['deferred_waiting'] == 1
+    # delete the messages
+    for target in ['primary', 'secondary', 'deferred']:
+        received = indexer_queue.receive_messages(target_queue=target)
+        assert len(received) > 0
+        indexer_queue.delete_messages(received, target_queue=target)
+    time.sleep(8)
+    msg_count = indexer_queue.number_of_messages()
+    assert msg_count['primary_waiting'] == 0
+    assert msg_count['secondary_waiting'] == 0
+    assert msg_count['deferred_waiting'] == 0
 
 
 def test_indexing_simple(app, testapp, indexer_testapp):
@@ -134,12 +179,12 @@ def test_indexing_simple(app, testapp, indexer_testapp):
     uuid = res.json['@graph'][0]['uuid']
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 1
-    res = testapp.get('/search/?type=TestingPostPutPatch')
+    res = testapp.get('/search/?type=TestingPostPutPatchSno')
     uuids = [indv_res['uuid'] for indv_res in res.json['@graph']]
     count = 0
     while uuid not in uuids and count < 20:
         time.sleep(1)
-        res = testapp.get('/search/?type=TestingPostPutPatch')
+        res = testapp.get('/search/?type=TestingPostPutPatchSno')
         uuids = [indv_res['uuid'] for indv_res in res.json['@graph']]
         count += 1
     assert res.json['total'] >= 2
@@ -182,6 +227,7 @@ def test_indexing_queue_records(app, testapp, indexer_testapp):
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 1
     assert res.json['indexing_content']['type'] == 'queue'
+    time.sleep(4)
     doc_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert doc_count == 1
     # make sure latest_indexing doc matches
@@ -236,8 +282,89 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     create_mapping.run(app, collections=[TEST_TYPE])
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 2
+    time.sleep(4)
     doc_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert doc_count == 2
+
+
+def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
+    """
+    When an item is indexed, queue up all its embedded uuids for indexing
+    as well.
+    """
+    es = app.registry[ELASTIC_SEARCH]
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    target  = {'name': 'one', 'uuid': '775795d3-4410-4114-836b-8eeecf1d0c2f'}
+
+    source = {
+        'name': 'A',
+        'target': '775795d3-4410-4114-836b-8eeecf1d0c2f',
+        'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd',
+        'status': 'current',
+    }
+    target_res = testapp.post_json('/testing-link-targets-sno/', target, status=201)
+    res = indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(2)
+    # wait for the first item to index
+    doc_count = es.count(index='testing_link_target_sno', doc_type='testing_link_target_sno').get('count')
+    while doc_count < 1:
+        time.sleep(4)
+        doc_count = es.count(index='testing_link_target_sno', doc_type='testing_link_target_sno').get('count')
+    time.sleep(4)
+    indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
+    assert indexing_doc['_source']['indexing_count'] == 1
+    source_res = testapp.post_json('/testing-link-sources-sno/', source, status=201)
+    res = indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(2)
+    # wait for them to index
+    doc_count = es.count(index='testing_link_source_sno', doc_type='testing_link_source_sno').get('count')
+    while doc_count < 1:
+        time.sleep(4)
+        doc_count = es.count(index='testing_link_source_sno', doc_type='testing_link_source_sno').get('count')
+    time.sleep(4)
+    indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
+    # this should have indexed the target and source
+    assert indexing_doc['_source']['indexing_count'] == 2
+
+
+def test_indexing_invalid_sid(app, testapp, indexer_testapp):
+    """
+    For now, this test uses the deferred queue strategy
+    """
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    es = app.registry[ELASTIC_SEARCH]
+    # post an item, index, then find verion (sid)
+    res = testapp.post_json(TEST_COLL, {'required': ''})
+    test_uuid = res.json['@graph'][0]['uuid']
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexing_count'] == 1
+    time.sleep(4)
+    es_item = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid)
+    inital_version = es_item['_version']
+
+    # now increment the version and check it
+    res = testapp.patch_json(TEST_COLL + test_uuid, {'required': 'meh'})
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexing_count'] == 1
+    time.sleep(4)
+    es_item = es.get(index=TEST_TYPE, doc_type=TEST_TYPE, id=test_uuid)
+    assert es_item['_version'] == inital_version + 1
+
+    # now try to manually bump an invalid version for the queued item
+    # expect it to be sent to the deferred queue
+    to_queue = {
+        'uuid': test_uuid,
+        'sid': inital_version + 2,
+        'strict': True,
+        'timestamp': datetime.utcnow().isoformat()
+    }
+    indexer_queue.send_messages([to_queue], target_queue='primary')
+    res = indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(4)
+    assert res.json['indexing_count'] == 0
+    received_deferred = indexer_queue.receive_messages(target_queue='deferred')
+    assert len(received_deferred) == 1
+    indexer_queue.delete_messages(received_deferred, target_queue='deferred')
 
 
 def test_queue_indexing_endpoint(app, testapp, indexer_testapp):
@@ -258,6 +385,7 @@ def test_queue_indexing_endpoint(app, testapp, indexer_testapp):
     assert res.json['number_queued'] == 2
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 2
+    time.sleep(4)
     doc_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert doc_count == 2
 
@@ -365,6 +493,27 @@ def test_get_previous_index_record(app):
     assert record is None
 
 
+def test_confirm_mapping(app, testapp, indexer_testapp):
+    from snovault.elasticsearch.create_mapping import (
+        create_mapping_by_type,
+        build_index_record,
+        confirm_mapping
+    )
+    es = app.registry[ELASTIC_SEARCH]
+    # make a dynamic mapping
+    es.indices.delete(index=TEST_TYPE)
+    time.sleep(2)
+    testapp.post_json(TEST_COLL, {'required': ''})
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexing_count'] == 1
+    time.sleep(2)
+    mapping = create_mapping_by_type(TEST_TYPE, app.registry)
+    index_record = build_index_record(mapping, TEST_TYPE)
+    tries_taken = confirm_mapping(es, TEST_TYPE, index_record)
+    # 3 tries means it failed to correct, 0 means it was unneeded
+    assert tries_taken > 0 and tries_taken < 3
+
+
 def test_check_and_reindex_existing(app, testapp):
     from snovault.elasticsearch.create_mapping import check_and_reindex_existing
     es = app.registry[ELASTIC_SEARCH]
@@ -427,18 +576,27 @@ def test_create_mapping_check_first(app, testapp, indexer_testapp):
     # ensure create mapping has been run
     from snovault.elasticsearch import create_mapping
     es = app.registry[ELASTIC_SEARCH]
-    # post an item and then index it (synchronously because its easy)
-    res = testapp.post_json(TEST_COLL, {'required': ''})
-    create_mapping.run(app, collections=[TEST_TYPE], sync_index=True, purge_queue=True)
+    # post an item and then index it
+    testapp.post_json(TEST_COLL, {'required': ''})
+    indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(4)
     initial_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     # make sure the meta entry is created
     assert es.get(index='meta', doc_type='meta', id=TEST_TYPE)
 
     # run with check_first but skip indexing. counts should still match because
     # the index wasn't removed
-    create_mapping.run(app, check_first=True, skip_indexing=True)
+    create_mapping.run(app, check_first=True, collections=[TEST_TYPE], skip_indexing=True)
+    time.sleep(4)
+    assert es.get(index='meta', doc_type='meta', id=TEST_TYPE)
     second_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
+    counter = 0
+    while (second_count != initial_count and counter < 10):
+        time.sleep(2)
+        second_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
+        counter +=1
     assert second_count == initial_count
+
     # make sure the meta entry is still there
     assert es.get(index='meta', doc_type='meta', id=TEST_TYPE)
 
@@ -460,7 +618,9 @@ def test_create_mapping_index_diff(app, testapp, indexer_testapp):
     res = testapp.post_json(TEST_COLL, {'required': ''})
     test_uuid = res.json['@graph'][0]['uuid']
     testapp.post_json(TEST_COLL, {'required': ''})  # second item
-    create_mapping.run(app, collections=[TEST_TYPE], sync_index=True, purge_queue=True)
+    create_mapping.run(app, collections=[TEST_TYPE], purge_queue=True)
+    indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(4)
     initial_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert initial_count == 2
 
@@ -473,6 +633,8 @@ def test_create_mapping_index_diff(app, testapp, indexer_testapp):
     # patch the item to increment version
     res = testapp.patch_json(TEST_COLL + test_uuid, {'required': 'meh'})
     # index with index_diff to ensure the item is reindexed
-    create_mapping.run(app, collections=[TEST_TYPE], index_diff=True, sync_index=True, purge_queue=True)
+    create_mapping.run(app, collections=[TEST_TYPE], index_diff=True)
+    res = indexer_testapp.post_json('/index', {'record': True})
+    time.sleep(4)
     third_count = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     assert third_count == initial_count

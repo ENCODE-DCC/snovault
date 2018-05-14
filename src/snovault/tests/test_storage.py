@@ -249,49 +249,31 @@ def test_keys(session):
         session.flush()
 
 
-def test_S3BlobStorage(mocker):
+def test_S3BlobStorage():
     from snovault.storage import S3BlobStorage
-    mocker.patch('boto3.session.Session.resource')
-    bucket = 'test'
-    fake_key = mocker.Mock()
-    storage = S3BlobStorage(bucket)
-    storage.bucket.name = bucket
-    storage.bucket.new_key.return_value = fake_key
+    blob_bucket = 'encoded-4dn-blobs'
+    storage = S3BlobStorage(blob_bucket)
+    assert storage.bucket == blob_bucket
 
     download_meta = {'download': 'test.txt'}
     storage.store_blob('data', download_meta)
-    assert download_meta['bucket'] == 'test'
+    assert download_meta['bucket'] == blob_bucket
     assert 'key' in download_meta
-    fake_key.set_contents_from_string.assert_called_once_with('data')
 
-    storage.bucket.get_key.return_value = fake_key
-    fake_key.get_contents_as_string.return_value = 'data'
     data = storage.get_blob(download_meta)
     assert data == 'data'
-    storage.bucket.get_key.assert_called_once_with(download_meta['key'], validate=False)
 
-    storage.read_conn.meta.client.generate_presigned_url.return_value = 'http://testurl'
     url = storage.get_blob_url(download_meta)
-    assert url == 'http://testurl'
-    storage.read_conn.meta.client.generate_presigned_url.assert_called_once_with(
-        ClientMethod='get_object',
-        ExpiresIn=129600,
-        Params={'Bucket': 'test', 'Key': download_meta['key']}
-    )
+    assert url
+    assert blob_bucket in url
+    assert 'Signature' in url
 
 
-def test_S3BlobStorage_get_blob_url_for_non_s3_file(mocker):
+def test_S3BlobStorage_get_blob_url_for_non_s3_file():
     from snovault.storage import S3BlobStorage
-    mocker.patch('boto3.session.Session.resource')
-    bucket = 'test'
-    storage = S3BlobStorage(bucket)
-    storage.bucket.name = bucket
+    blob_bucket = 'encoded-4dn-blobs'
+    storage = S3BlobStorage(blob_bucket)
+    assert storage.bucket == blob_bucket
     download_meta = {'blob_id': 'blob_id'}
-    storage.read_conn.meta.client.generate_presigned_url.return_value = 'http://testurl'
     url = storage.get_blob_url(download_meta)
-    assert url == 'http://testurl'
-    storage.read_conn.meta.client.generate_presigned_url.assert_called_once_with(
-        ClientMethod='get_object',
-        ExpiresIn=129600,
-        Params={'Bucket': 'test', 'Key': download_meta['blob_id']}
-    )
+    assert url

@@ -6,7 +6,7 @@ For the development.ini you must supply the paster app name:
 
 """
 from pkg_resources import resource_filename
-from pyramid.paster import get_app
+from pyramid.paster import get_app, get_appsettings
 
 import atexit
 import logging
@@ -67,6 +67,9 @@ def main():
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snowvault').setLevel(logging.DEBUG)
 
+    # get the config and see if we want to connect to non-local servers
+    config = get_appsettings(args.config_uri, args.app_name)
+
     from snovault.tests import elasticsearch_fixture, postgresql_fixture
     from snovault.elasticsearch import create_mapping
     datadir = os.path.abspath(args.datadir)
@@ -83,9 +86,11 @@ def main():
     ### may have to `rm /tmp/snovault/pgdata/postmaster.pid`
 
     postgres = postgresql_fixture.server_process(pgdata, echo=True)
-    elasticsearch = elasticsearch_fixture.server_process(esdata, echo=True)
     nginx = nginx_server_process(echo=True)
-    processes = [postgres, elasticsearch, nginx]
+    processes = [postgres, nginx]
+    if not config.get('elasticsearch.aws_auth'):
+        elasticsearch = elasticsearch_fixture.server_process(esdata, echo=True)
+        processes = [postgres, elasticsearch, nginx]
 
     @atexit.register
     def cleanup_process():
@@ -100,8 +105,9 @@ def main():
                 pass
             process.wait()
 
+
+    app = get_app(args.config_uri, args.app_name)
     if args.init:
-        app = get_app(args.config_uri, args.app_name)
         create_mapping.run(app, check_first=False)
 
     if args.load:

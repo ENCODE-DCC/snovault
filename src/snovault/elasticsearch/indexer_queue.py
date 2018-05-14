@@ -38,7 +38,8 @@ def queue_indexing(request):
     """
     Endpoint to queue items for indexing. Takes a POST request with index
     priviliges which should contain either a list of uuids under "uuids" key
-    or a list of collections under "collections" key of its body.
+    or a list of collections under "collections" key of its body. Can also
+    optionally take "strict" boolean and "target_queue" string.
     """
     req_uuids = request.json.get('uuids', None)
     req_collections = request.json.get('collections', None)
@@ -62,19 +63,22 @@ def queue_indexing(request):
     queue_indexer = request.registry[INDEXER_QUEUE]
     # strict mode means uuids should be indexed without finding associates
     strict = request.json.get('strict', False)
+    # target queue can also be specified: 'primary', 'secondary', 'deferred'
+    target = request.json.get('target_queue', 'primary')
     if req_uuids:
         # queue these as secondary
-        queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=strict, target_queue='secondary')
+        queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=strict, target_queue=target)
         response['requested_uuids'] = req_uuids
     else:
         # queue these as secondary
-        queued, failed = queue_indexer.add_collections(request.registry, req_collections, strict=strict, target_queue='secondary')
+        queued, failed = queue_indexer.add_collections(request.registry, req_collections, strict=strict, target_queue=target)
         response['requested_collections'] = req_collections
     response['notification'] = 'Success'
     response['number_queued'] = len(queued)
     response['detail'] = 'Successfuly queued items!'
     response['errors'] = failed
     response['strict'] = strict
+    response['target_queue'] = target
     return response
 
 
@@ -289,10 +293,10 @@ class QueueManager(object):
                     'deadLetterTargetArn': dlq_arn,
                     'maxReceiveCount': 4  # num of fails before sending to dlq
                 }
-                # set redrive policy for main queue and secondary queues
-                # do not set on the deferred queue, which has no dlq
-                self.queue_attrs[self.queue_name]['RedrivePolicy'] = json.dumps(redrive_policy)
-                self.queue_attrs[self.second_queue_name]['RedrivePolicy'] = json.dumps(redrive_policy)
+                # set redrive policy for three main queues
+                for redrive_queue in [self.queue_name, self.second_queue_name, self.defer_queue_name]:
+                    self.queue_attrs[redrive_queue]['RedrivePolicy'] = json.dumps(redrive_policy)
+
             # set attributes on an existing queue. not hit if queue was just created
             if should_set_attrs:
                 self.client.set_queue_attributes(

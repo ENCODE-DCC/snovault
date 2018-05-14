@@ -604,7 +604,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     # if the index exists, we might not need to delete it
     # otherwise, run if we are using the check-first or index_diff args
     if check_first or index_diff:
-        prev_index_record = get_previous_index_record(this_index_exists, es, in_type, cached_meta)
+        prev_index_record = get_previous_index_record(this_index_exists, es, in_type)
         if prev_index_record is not None and this_index_record == prev_index_record:
             if in_type != 'meta':
                 check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff)
@@ -629,10 +629,12 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     else:
         log.warning('MAPPING: new index failed for %s' % (in_type))
 
+    # check to debug create-mapping issues and ensure correct mappings
+    confirm_mapping(es, in_type, this_index_record)
+
     # we need to queue items in the index for indexing
     # if check_first and we've made it here, nothing has been queued yet
     # for this collection
-
     start = timer()
     coll_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
     end = timer()
@@ -678,7 +680,7 @@ def check_if_index_exists(es, in_type, cached_indices=None):
     return this_index_exists
 
 
-def get_previous_index_record(this_index_exists, es, in_type, cached_meta=None):
+def get_previous_index_record(this_index_exists, es, in_type):
     """
     Decide if we need to drop the index + reindex (no index/no meta record)
     OR
@@ -687,23 +689,19 @@ def get_previous_index_record(this_index_exists, es, in_type, cached_meta=None):
     """
     prev_index_hit = {}
     if this_index_exists:
-        if cached_meta:
-            return cached_meta.get(in_type, {}).get('mapping', None)
-
-        else:
-            try:
-                # multiple queries to meta... don't want this...
-                prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type, ignore=[404])
-            except TransportError as excp:
-                if excp.info.get('status') == 503:
-                    es.indices.refresh(index='meta')
-                    time.sleep(3)
-                    try:
-                        prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type, ignore=[404])
-                    except:
-                        return None
-            prev_index_record = prev_index_hit.get('_source')
-            return prev_index_record
+        try:
+            # multiple queries to meta... don't want this...
+            prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type, ignore=[404])
+        except TransportError as excp:
+            if excp.info.get('status') == 503:
+                es.indices.refresh(index='meta')
+                time.sleep(3)
+                try:
+                    prev_index_hit = es.get(index='meta', doc_type='meta', id=in_type, ignore=[404])
+                except:
+                    return None
+        prev_index_record = prev_index_hit.get('_source')
+        return prev_index_record
     else:
         return None
 
@@ -799,6 +797,36 @@ def get_collection_uuids_and_count(app, in_type):
     if datastore:
         app.datastore = datastore
     return db_count, final_uuids
+
+
+def confirm_mapping(es, in_type, this_index_record):
+    """
+    The mapping put to ES can be incorrect, most likely due to residual
+    items getting indexed at the time of index creation. This loop serves
+    to find those problems and correct them, as well as provide more info
+    for debugging the underlying issue.
+    Returns number of iterations this took (0 means initial mapping was right)
+    """
+    mapping_check = False
+    tries = 0
+    while not mapping_check and tries < 3:
+        found_mapping = es.indices.get_mapping(index=in_type).get(in_type, {}).get('mappings')
+        found_map_json = json.dumps(found_mapping, sort_keys=True)
+        this_map_json = json.dumps(this_index_record['mappings'], sort_keys=True)
+        # es converts {'properties': {}} --> {'type': 'object'}
+        this_map_json = this_map_json.replace('{"properties": {}}', '{"type": "object"}')
+        if found_map_json == this_map_json:
+            mapping_check = True
+        else:
+            count = es.count(index=in_type, doc_type=in_type).get('count', 'ERR')
+            log.warning('___BAD MAPPING FOUND FOR %s. RETRYING___\nDocument count in that index is %s.' % (in_type, count))
+            es_safe_execute(es.indices.delete, index=in_type)
+            es_safe_execute(es.indices.create, index=in_type, body=this_index_record)
+            tries += 1
+            time.sleep(2)
+    if not mapping_check:
+        log.warning('___MAPPING CORRECTION FAILED FOR %s___' % in_type)
+    return tries
 
 
 def es_safe_execute(function, **kwargs):
@@ -954,8 +982,8 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     if skip_indexing or print_count_only:
         return timings
 
-    # now, queue items for indexing
-    # TODO: when queue space is an issue, put ontology_terms on the secondary
+    # now, queue items for indexing in the secondary queue
+    # TODO: maybe put items on primary/secondary by type
     if uuids_to_index:
         # we need to find associated uuids if all items are not indexed or not strict mode
         if not total_reindex and not strict:
@@ -966,7 +994,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             run_indexing(app, uuids_to_index)
         else:
             log.warning('\n___UUIDS TO INDEX (QUEUED)___: %s\n' % (len(uuids_to_index)))
-            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True, target_queue='primary')
+            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True, target_queue='secondary')
     return timings
 
 
@@ -985,12 +1013,13 @@ def cache_meta(es):
             indices[name] = {'count': count}
 
     # store all existing mappings
-    if 'meta' in indices:
+    # we no longer create any mapping for meta.. so it's not searchable
+    '''if 'meta' in indices:
         meta_idx = es.search(index='meta', body={'query': {'match_all': {}}})
         for idx in meta_idx['hits']['hits']:
             if idx.get('_id') and idx['_id'] in indices:
                 indices[idx['_id']]['mapping'] = idx['_source']
-
+    '''
     # now indices should be all index that xisted with size and mapping (mapping includes settings)
     return indices
 

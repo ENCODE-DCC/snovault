@@ -1,7 +1,12 @@
 # Use workbook fixture from BDD tests (including elasticsearch)
+# these take far to long to run on travis... I'll turn them off there
 from .features.conftest import app_settings, app, workbook
+import pytest
+import os
+dont_run_on_travis = pytest.mark.skipif(os.environ.get('TRAVIS', False),
+                                        reason='to slow to run on travis')
 
-
+@dont_run_on_travis
 def test_search_view(workbook, testapp):
     res = testapp.get('/search/?type=Item').json
     assert res['@type'] == ['Search']
@@ -16,6 +21,7 @@ def test_search_view(workbook, testapp):
     assert '@graph' in res
 
 
+@dont_run_on_travis
 def test_selective_embedding(workbook, testapp):
     res = testapp.get('/search/?type=Snowflake&limit=all').json
     # Use a specific snowflake, found by accession from test data
@@ -50,6 +56,7 @@ def test_selective_embedding(workbook, testapp):
     assert test_json[0]['lab']['city'] == 'Stanford/USA/'
 
 
+@dont_run_on_travis
 def recursively_find_uuids(json, uuids):
     for key, val in json.items():
         if key == 'uuid':
@@ -63,6 +70,8 @@ def recursively_find_uuids(json, uuids):
     return uuids
 
 
+@dont_run_on_travis
+@pytest.mark.es
 def test_embedded_uuids_real(workbook, testapp, app):
     """
     Find all uuids from a search result and ensure they match the

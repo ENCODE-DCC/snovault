@@ -47,8 +47,6 @@ def includeme(config):
     if registry.settings.get('blob_bucket'):
         registry[BLOBS] = S3BlobStorage(
             registry.settings['blob_bucket'],
-            read_profile_name=registry.settings.get('blob_read_profile_name'),
-            store_profile_name=registry.settings.get('blob_store_profile_name'),
         )
     else:
         registry[BLOBS] = RDBBlobStorage(registry[DBSESSION])
@@ -310,23 +308,27 @@ class RDBBlobStorage(object):
 
 
 class S3BlobStorage(object):
-    def __init__(self, bucket, read_profile_name=None, store_profile_name=None):
-        self.store_conn = boto3.session.Session(profile_name=store_profile_name).resource('s3')
-        self.read_conn = boto3.session.Session(profile_name=read_profile_name).resource('s3')
-        self.bucket = self.store_conn.Bucket(bucket)
+    def __init__(self, bucket):
+        self.bucket = bucket
+        session = boto3.session.Session(region_name='us-east-1')
+        self.s3 = session.client('s3')
 
     def store_blob(self, data, download_meta, blob_id=None):
+        '''
+        create a new s3 key = blob_id
+        upload the contents and return the meta in download_meta
+        '''
         if blob_id is None:
             blob_id = str(uuid.uuid4())
-            key = None
-        else:
-            key = self.bucket.get_key(blob_id)
-        if key is None:
-            key = self.bucket.new_key(blob_id)
-            if 'type' in download_meta:
-                key.content_type = download_meta['type']
-            key.set_contents_from_string(data)
-        download_meta['bucket'] = self.bucket.name
+
+        content_type = download_meta.get('type','binary/octet-stream')
+
+        self.s3.put_object(Bucket=self.bucket,
+                           Key=blob_id,
+                           Body=data,
+                           ContentType=content_type
+                           )
+        download_meta['bucket'] = self.bucket
         download_meta['key'] = blob_id
         download_meta['blob_id'] = str(blob_id)
 
@@ -335,11 +337,12 @@ class S3BlobStorage(object):
         if 'bucket' in download_meta:
             return download_meta['bucket'], download_meta['key']
         else:
-            return self.bucket.name, download_meta['blob_id']
+            return self.bucket, download_meta['blob_id']
 
     def get_blob_url(self, download_meta):
         bucket_name, key = self._get_bucket_key(download_meta)
-        location = self.read_conn.meta.client.generate_presigned_url(
+
+        location = self.s3.generate_presigned_url(
             ClientMethod='get_object',
             ExpiresIn=36*60*60,
             Params={'Bucket': bucket_name, 'Key': key})
@@ -347,9 +350,10 @@ class S3BlobStorage(object):
 
     def get_blob(self, download_meta):
         bucket_name, key = self._get_bucket_key(download_meta)
-        bucket = self.read_conn.Bucket(bucket_name)
-        key_obj = bucket.get_key(key, validate=False)
-        return key_obj.get_contents_as_string()
+
+        response = self.s3.get_object(Bucket=bucket_name,
+                                 Key=key)
+        return response['Body'].read().decode()
 
 
 class Key(Base):

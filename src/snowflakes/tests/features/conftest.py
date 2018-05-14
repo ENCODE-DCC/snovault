@@ -18,7 +18,7 @@ def external_tx():
 
 
 @pytest.fixture(scope='session')
-def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server):
+def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server, aws_auth):
     from snovault.tests.testappfixtures import _app_settings
     settings = _app_settings.copy()
     settings['create_tables'] = True
@@ -30,6 +30,11 @@ def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server)
     settings['indexer'] = True
     settings['should_index'] = True
     settings['indexer.processes'] = 2
+
+    # use aws auth to access elasticsearch 
+    if aws_auth:
+        settings['elasticsearch.aws_auth'] = aws_auth
+
     return settings
 
 

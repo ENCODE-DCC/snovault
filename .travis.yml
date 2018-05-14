@@ -4,7 +4,7 @@ cache:
   pip: true
   directories:
   - eggs
-  - .npm
+  - ".npm"
   - node_modules
 addons:
   apt:
@@ -14,13 +14,10 @@ addons:
     - build-essential
     - make
     - graphviz
-  postgresql: "9.4"
+  postgresql: '9.4'
 env:
   global:
   - JAVA_HOME=/usr/lib/jvm/java-8-oracle
-  - BOTO_CONFIG=/bogus
-  - ES_VERSION=5.4.1
-  - ES_DOWNLOAD_URL=https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-${ES_VERSION}.deb
   - PATH="/usr/share/elasticsearch/bin:/usr/lib/postgresql/9.4/bin:$PATH"
   - secure: |-
       TcTEKSEjlu05k3azfO3LMc9NMiZMBqj1pOqg4FOxcprU3Bw7+k5aC/6wMUHI
@@ -48,6 +45,8 @@ env:
       dupbuu33llfRtSQ2anjqNY4MFKrEbtb6n4s2+SP4dVNV36VAe0f+Ujp0vDAk3
       4heHupboqoOYsJaL9bmumjnGBvvFB5tngcvKV0HE54DvzOk+QmmdO1B2OXOT3
       EYc4biKIhqDc=
+  - secure: gSD7QL9OtPYmyFMvJKUHNeJu38uKCO686g6U7LfnlcOL675wuBGOSfgYnD4mfJxK0EjuVppVuUclzAFS7SwLyH1K6MjFzL777FkU6uZEVvXpTdiLHi+yeiRTJUXDi3YVTKiL5JZIHiDhNhrhI8mEDrCBMZwCl08NVQE+YjavcIdBYHd5RGyxF3/iRapl77Yh3ugIvagSabZ7IClLvklL1eyM1chh5Sxk6kZYmsginjfPF5sQf6DsgpfYtLklLXioJ9Z9+Zr4alGrSV700mndp2gwnrtSvBhnWzTGNMgHw9VQCBl9gSkZyRW83/YoJJDR9ozZMeKoFbXobkZ/jIQYY700dII1z2YSaJhahOfbXgYbj8qmi9sB7daF4NjJVllpmi8769rFpB99frJE3vyT8SJeRK1vLWB0Yq5rXmnE99gpUp7zCgMHQhfXr1IZTPf7SHO3IFvG4cVfqDdXc+uxRfYneTAoEU9yufxkvIdLqBzg5+cwBFVEjvS25T63LXnu3CUj3Hbcp3B1hrk4hVp9nfRexTtmPeC0j1+SreWGz1BDmtXFD1fZBJCqwvfcS4HVT8F7HS/bUvyu0+Wm4YtUiQcFBORpswzq2PsRI3BSBc7GSeO46qYv2qRphVXgmqEhTIYEh/1q8lxUxbr19Q90Pco6AGgZwsERBWKXMYhe1/w=
+  - secure: Dzs4p1PuHdNXyBJu8FEWp839RhxvetKQrKonNeon3CvcN0xbxtICKr6ekj7+Y8hejxnUFGRwnypGmjbeee9evCC0bcvRQCjy/9aX7Kfuykn4IhvDAAYcWr533wqxC78A4TMyFJEJxYiZ4eJy+M/DnH+lr4zaoAwpsO1mxq92uPfjmj+gYZEAO5mvOUyCKQu5tKYYi9UTJ9Rxz0lJKRbaSQtEGRHs6+kU0qFc6QJGsYXXIbc/BOmfhKkrcJ+6jfvG7eli7cQSK1ve8h1VX0n/Eonk9heH4umCyTT2RTfhcARrc2ZwWYKXTka0jxmAck9gELcGEYOSV5dL/Qy9zykLeH7dL0UbNMnnrNY+89/b2WJfav9KtoG3e0dgiQZp5oMgC1MtkDxQif+V7In9baZA4rafgW+Bw/O3Uzz+VAPpl4xDVjk/29GLQ5iWnj9eJT9a7jIQIOMD6WKxAKH2O3XD6ZyUWvjKYEqT9BIxfchWnd+z2tIPDQBBI3Az+jDh6Quyrmb7AQVveTc+CtmzP98lhnIqAfIz8hwHyRgCo+i27wUGyKHMnKCJeHVSEPbANqXxeg1l8rgG5ht8H0AznkPpzTjajZRmZowDQRg9b9plM5AQsIxhPtAHBHAHcpXx8reN9NHrPuKLoMV3KRTUoq6UqTUrPz/qKCCSbaSbR7UNK7E=
 matrix:
   include:
   - python: '3.4'
@@ -62,14 +61,11 @@ before_install:
 - node --version
 - npm config set python /usr/bin/python2.7
 install:
-- curl -O  ${ES_DOWNLOAD_URL}
-- sudo dpkg -i --force-confnew elasticsearch-${ES_VERSION}.deb
 - python bootstrap.py --buildout-version 2.9.5 --setuptools-version 37.0.0
 - bin/buildout -c || (echo "Retrying buildout" && bin/buildout )
 - pip install coveralls
 - pip install codacy-coverage
-before_script:
-- sudo service elasticsearch stop
 script:
-- if test -n "$UNIT"; then bin/test -v -v --timeout=400 -m "not bdd" --cov
-  src/snovault --duration 10; fi
+- if test -n "$UNIT"; then bin/test -v -v --timeout=400 --aws-auth
+  -m "not bdd" --cov src/snovault --es search-fourfront-builds-uhevxdzfcv7mkm5pj5svcri3aq.us-east-1.es.amazonaws.com:80;
+  fi
