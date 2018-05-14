@@ -21,12 +21,6 @@ def includeme(config):
     registry[STORAGE] = PickStorage(ElasticSearchStorage(es, es_index), wrapped_storage)
 
 
-def force_database_for_request():
-    request = get_current_request()
-    if request:
-        request.datastore = 'database'
-
-
 class CachedModel(object):
     def __init__(self, hit):
         self.hit = hit
@@ -92,7 +86,6 @@ class PickStorage(object):
         model = storage.get_by_uuid(uuid)
         if storage is self.read:
             if model is None or model.invalidated():
-                force_database_for_request()
                 return self.write.get_by_uuid(uuid)
         return model
 
@@ -101,7 +94,6 @@ class PickStorage(object):
         model = storage.get_by_unique_key(unique_key, name, index=index)
         if storage is self.read:
             if model is None or model.invalidated():
-                force_database_for_request()
                 return self.write.get_by_unique_key(unique_key, name, index=index)
         return model
 
