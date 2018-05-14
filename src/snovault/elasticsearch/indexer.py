@@ -50,7 +50,7 @@ def get_related_uuids(request, es, updated, renamed):
     updated_count = len(updated)
     renamed_count = len(renamed)
     if (updated_count + renamed_count) > MAX_CLAUSES_FOR_ES:
-        return (all_uuids(request.registry), True)
+        return (set(all_uuids(request.registry)), True)
     elif (updated_count + renamed_count) == 0:
         return (set(), False)
 
@@ -104,7 +104,7 @@ def get_related_uuids(request, es, updated, renamed):
     })
 
     if res['hits']['total'] > SEARCH_MAX:
-        return (all_uuids(request.registry), True)
+        return (set(all_uuids(request.registry)), True)
 
     related_set = {hit['_id'] for hit in res['hits']['hits']}
 
