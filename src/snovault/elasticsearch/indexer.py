@@ -193,7 +193,9 @@ class Indexer(object):
                     msg_detail = msg_body.get('detail')
                     # check to see if we are using the same txn that caused a deferral
                     if target_queue == 'deferred' and msg_detail == str(request.tm.get()):
-                        self.queue.replace_messages([msg], target_queue=target_queue)
+                        # re-create a new message so we don't affect retry count (dlq)
+                        self.queue.send_messages([msg_body], target_queue=target_queue)
+                        to_delete.append(msg)
                         continue
                     if msg_body['strict'] is False:
                         non_strict_uuids.add(msg_uuid)
@@ -201,12 +203,13 @@ class Indexer(object):
                     msg_uuid = str(msg_body)
                     msg_sid = None
                     msg_curr_time = None
-                if target_queue != 'secondary':  # add embedded uuids to secondary
+                # add embedded uuids to secondary, but only if not using secondary
+                if target_queue != 'secondary':
                     error = self.update_object(request, msg_uuid, sid=msg_sid,
-                        curr_time=msg_curr_time, add_to_secondary=embedded_uuids)
+                        curr_time=msg_curr_time, add_to_secondary=embedded_uuids, target_queue=target_queue)
                 else:
                     error = self.update_object(request, msg_uuid, sid=msg_sid,
-                        curr_time=msg_curr_time, add_to_secondary=None)
+                        curr_time=msg_curr_time, add_to_secondary=None, target_queue=target_queue)
                 if error:
                     if error.get('error_message') == 'deferred_retry':
                         # send this to the deferred queue
@@ -267,11 +270,13 @@ class Indexer(object):
         return errors
 
 
-    def update_object(self, request, uuid, sid=None, curr_time=None, add_to_secondary=None):
+    def update_object(self, request, uuid, sid=None, curr_time=None, add_to_secondary=None, target_queue=None):
         """
         Actually index the uuid using the index-data view.
         add_to_secondary is an optional set. If provided, the embedded uuids
         from the request.embed(/<uuid>/@@index-data) will be added to the set.
+        target_queue is an optional string queue name:
+            'primary', 'secondary', or 'deferred'
         """
         if not curr_time:
             curr_time = datetime.datetime.utcnow().isoformat()  # utc
@@ -289,9 +294,14 @@ class Indexer(object):
             # this will cause the item to be sent to the deferred queue
             return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
         except KeyError as e:
-            log.warning('KeyError for %s with sid %s. time: %s' % (uuid, sid, curr_time))
-            # this will cause the item to be sent to the deferred queue
-            return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
+            # only consider a KeyError deferrable if not already in deferred queue
+            if target_queue != 'deferred':
+                log.warning('KeyError for %s with sid %s. time: %s' % (uuid, sid, curr_time))
+                # this will cause the item to be sent to the deferred queue
+                return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
+            else:
+                log.error('KeyError rendering /%s/@@index-data', uuid, exc_info=True)
+                return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
         except Exception as e:
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
