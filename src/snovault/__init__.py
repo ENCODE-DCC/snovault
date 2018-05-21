@@ -82,7 +82,7 @@ def set_logging(in_prod = False):
         timestamper,
     ]
     format_processor = structlog.dev.ConsoleRenderer()
-    if not in_prod:
+    if in_prod:
         format_processor = structlog.processors.JSONRenderer(indent=True)
 
     formatter = structlog.stdlib.ProcessorFormatter(
