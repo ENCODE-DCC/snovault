@@ -130,7 +130,7 @@ def main(global_config, **local_config):
     settings = global_config
     settings.update(local_config)
 
-    import pdb; pdb.set_trace()
+    # TODO: move to dcicutils
     set_logging(settings.get('production'))
 
     # TODO - these need to be set for dummy app
