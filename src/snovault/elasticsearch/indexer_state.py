@@ -148,9 +148,12 @@ class IndexerState(object):
         if errors is not None:
             state['errors'] = errors
 
-    def request_reindex(self,requested):
+    def request_reindex(self,requested, force=False):
         '''Requests full reindexing on next cycle'''
         if requested == 'all':
+            state = self.get()
+            if state['status'] == 'indexing' and not force:
+                return "Request not allowed while currently indexing.  Try force=true"
             if self.title == 'primary':  # If primary indexer delete the original master obj
                 self.delete_objs(["indexing"])  # http://localhost:9201/snovault/meta/indexing
             else:
@@ -562,7 +565,7 @@ def indexer_state_show(request):
     # requesting reindex
     reindex = request.params.get("reindex")
     if reindex is not None:
-        msg = state.request_reindex(reindex)
+        msg = state.request_reindex(reindex, force=request.params.get("force",False))
         if msg is not None:
             return msg
 
