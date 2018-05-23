@@ -45,12 +45,12 @@ def includeme(config):
     registry[INDEXER] = Indexer(registry)
 
 def get_related_uuids(request, es, updated, renamed):
-    '''Returns (set of uuids, True if all_uuids)'''
+    '''Returns (set of uuids, False) or (list of all uuids, True) if full reindex triggered'''
 
     updated_count = len(updated)
     renamed_count = len(renamed)
     if (updated_count + renamed_count) > MAX_CLAUSES_FOR_ES:
-        return (set(all_uuids(request.registry)), True)
+        return (list(all_uuids(request.registry)), True)  # guaranteed unique
     elif (updated_count + renamed_count) == 0:
         return (set(), False)
 
@@ -104,7 +104,7 @@ def get_related_uuids(request, es, updated, renamed):
     })
 
     if res['hits']['total'] > SEARCH_MAX:
-        return (set(all_uuids(request.registry)), True)
+        return (list(all_uuids(request.registry)), True)  # guaranteed unique
 
     related_set = {hit['_id'] for hit in res['hits']['hits']}
 
