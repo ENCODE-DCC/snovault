@@ -11,11 +11,11 @@ from .interfaces import (
 )
 from .elasticsearch.interfaces import INDEXER_QUEUE, INDEXER_QUEUE_MIRROR
 from .util import simple_path_ids
-import logging
+import structlog
 import datetime
 import transaction
 
-log = logging.getLogger(__name__)
+log = structlog.getLogger(__name__)
 
 
 def includeme(config):
