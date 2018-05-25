@@ -42,30 +42,37 @@ from .app import (
     )
 import logging
 import structlog
+from structlog.threadlocal import wrap_dict
 
 
 # Logging setup using structlog
 # configure structlog to use its formats for stdlib logging and / or structlog logging
-def set_logging(in_prod = False, level="DEBUG"):
+def set_logging(in_prod = False, level=logging.DEBUG):
     timestamper = structlog.processors.TimeStamper(fmt="iso")
 
+    processors=[
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        timestamper,
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.UnicodeDecoder(),
+    ]
+
     if in_prod:
-        level = "INFO"
+        level = logging.INFO
+        processors.append(structlog.processors.JSONRenderer())
+    else:
+        processors.append(structlog.dev.ConsoleRenderer())
+
+    # need this guy to go last
+    processors.append(structlog.stdlib.ProcessorFormatter.wrap_for_formatter)
 
     structlog.configure(
-        processors=[
-            structlog.stdlib.filter_by_level,
-            structlog.stdlib.add_logger_name,
-            structlog.stdlib.add_log_level,
-            structlog.stdlib.PositionalArgumentsFormatter(),
-            timestamper,
-            structlog.processors.StackInfoRenderer(),
-            structlog.processors.format_exc_info,
-            structlog.processors.UnicodeDecoder(),
-            structlog.processors.JSONRenderer(),
-            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
-        ],
-        context_class=dict,
+        processors=processors,
+        context_class=wrap_dict(dict),
         logger_factory=structlog.stdlib.LoggerFactory(),
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,

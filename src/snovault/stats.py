@@ -70,7 +70,9 @@ def stats_tween_factory(handler, registry):
         if 'log_action' in request.params:
             log_keys['log_action'] = request.params['log_action']
 
-        log_keys['url'] = request.url
+        log_keys['url_path'] = request.path
+        log_keys['url_qs'] = request.query_string
+        log_keys['host'] = request.host.split(":")[0]
 
         log.bind(**log_keys)
         stats.update(log_keys)

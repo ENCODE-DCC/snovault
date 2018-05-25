@@ -33,6 +33,9 @@ from .validators import (
 from .invalidation import add_to_indexing_queue
 import transaction
 
+from structlog import get_logger
+log = get_logger(__name__)
+
 
 def includeme(config):
     config.scan(__name__)
@@ -174,6 +177,8 @@ def collection_add(context, request, render=None):
     item = create_item(context.type_info, request, request.validated)
     # set up hook for queueing indexing
     to_queue = {'uuid': str(item.uuid), 'sid': item.sid}
+    log.info(event='add_to_indexing_queue', **to_queue)
+
     txn.addAfterCommitHook(add_to_indexing_queue, args=(request, to_queue, 'add',))
 
     rendered, item_uri = render_item(request, item, render, True)
