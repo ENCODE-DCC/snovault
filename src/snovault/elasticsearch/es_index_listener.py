@@ -12,6 +12,7 @@ import datetime
 import elasticsearch.exceptions
 import json
 import logging
+import structlog
 import os
 import psycopg2
 import signal
@@ -21,7 +22,7 @@ import threading
 import time
 from urllib.parse import parse_qsl
 
-log = logging.getLogger(__name__)
+log = structlog.getLogger(__name__)
 
 EPILOG = __doc__
 DEFAULT_INTERVAL = 3  # 3 second default
@@ -227,11 +228,20 @@ def main():
     parser.add_argument('config_uri', help="path to configfile")
     args = parser.parse_args()
 
-    logging.basicConfig()
+    # logging.basicConfig()
     testapp = internal_app(args.config_uri, args.app_name, args.username)
 
+
     # Loading app will have configured from config file. Reconfigure here:
+    level = logging.INFO
     if args.verbose or args.dry_run:
+        level = logging.DEBUG
+
+    set_logging(app.registry.settings.get('production'), level=level)
+    global log
+    log = structlog.get_logger(__name__)
+
+    # Loading app will have configured from config file. Reconfigure here:
         logging.getLogger('snovault').setLevel(logging.DEBUG)
 
     return run(testapp, args.poll_interval, args.dry_run, args.path)

@@ -1059,7 +1059,7 @@ def main():
 
 
     # Loading app will have configured from config file. Reconfigure here:
-    set_logging(app.registry.settings.get('production'), level="INFO")
+    set_logging(app.registry.settings.get('production'), level=logging.INFO)
     global log
     log = structlog.get_logger(__name__)
 

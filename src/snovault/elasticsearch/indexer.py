@@ -16,13 +16,13 @@ from snovault import (
 )
 from .indexer_utils import find_uuids_for_indexing
 import datetime
-import logging
+import structlog
 import time
 import copy
 import json
 from timeit import default_timer as timer
 
-log = logging.getLogger(__name__)
+log = structlog.getLogger(__name__)
 
 
 def includeme(config):
@@ -101,7 +101,7 @@ def index(request):
                 es.index(index='indexing', doc_type='indexing', body=indexing_record, id='latest_indexing')
                 for item in error_messages:
                     if 'error_message' in item:
-                        log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
+                        log.error('Indexing error', **item)
                         item['error_message'] = "Error occured during indexing, check the logs"
     es.indices.refresh(index='_all')
     return indexing_record
@@ -245,7 +245,7 @@ class Indexer(object):
                 queued, failed = self.find_and_queue_secondary_items(non_strict_uuids, embedded_uuids)
                 if failed:
                     error_msg = 'Failure(s) queueing secondary uuids: %s' % str(failed)
-                    log.error('INDEXER: ' + error_msg)
+                    log.error('INDEXER: ', "error": error_msg)
                     errors.append({'error_message': error_msg})
                 non_strict_uuids = set()
                 embedded_uuids = set()
@@ -285,10 +285,14 @@ class Indexer(object):
         target_queue is an optional string queue name:
             'primary', 'secondary', or 'deferred'
         """
+
         #timing stuff
         start = timer()
         if not curr_time:
             curr_time = datetime.datetime.utcnow().isoformat()  # utc
+
+        # to add to each log message
+        log.bind(embed_uuid=uuid, sid=sid, uo_start_time=curr_time)
 
         # check the sid with a less intensive view than @@index-data
         if sid:
@@ -300,24 +304,22 @@ class Indexer(object):
             result = request.embed(index_data_query, as_user='INDEXER')
         except SidException as e:
             duration = timer() - start
-            log.warning('Invalid sid found for %s with value %s. time: %s, duration: %s' %
-                        (uuid, sid, curr_time, duration))
+            log.warning('Invalid sid found', duration=duration)
             # this will cause the item to be sent to the deferred queue
             return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
         except KeyError as e:
             # only consider a KeyError deferrable if not already in deferred queue
             duration = timer() - start
             if target_queue != 'deferred':
-                log.warning('KeyError for %s with sid %s. time: %s, duration: %s' %
-                           (uuid, sid, curr_time, duration))
+                log.warning('KeyError', duration=duration)
                 # this will cause the item to be sent to the deferred queue
                 return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
             else:
-                log.error('KeyError rendering /%s/@@index-data , duration: %s' % (uuid, duration), exc_info=True)
+                log.error('KeyError rendering @@index-data', duration=duration, exc_info=True)
                 return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
         except Exception as e:
             duration = timer() - start
-            log.error('Error rendering /%s/@@index-data , duration: %s ' % (uuid, duration), exc_info=True)
+            log.error('Error rendering @@index-data', duration=duration, exc_info=True)
             return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
 
         last_exc = None
@@ -331,18 +333,17 @@ class Indexer(object):
                 )
             except ConflictError:
                 duration = timer() - start
-                log.warning('Conflict indexing %s at version %s. time: %s, duration: %s' %
-                            (uuid, result['sid'], curr_time, duration))
+                log.warning('Conflict indexing', sid=result['sid'], duration=duration)
                 # this may be somewhat common and is not harmful
                 # do not return an error so the item is removed from the queue
                 return
             except (ConnectionError, ReadTimeoutError, TransportError) as e:
                 duration = timer() - start
-                log.warning('Retryable error indexing %s: %r, duration: %s' % (uuid, e, duration))
+                log.warning('Retryable error indexing', error=str(e), duration=duration)
                 last_exc = repr(e)
             except Exception as e:
                 duration = timer() - start
-                log.error('Error indexing %s, duration: %s', (uuid, duration), exc_info=True)
+                log.error('Error indexing', duration=duration, exc_info=True)
                 last_exc = repr(e)
                 break
             else:
@@ -358,8 +359,7 @@ class Indexer(object):
                     except KeyError:  # catch a possible edge case?
                         pass
                 duration = timer() - start
-                log.debug('Conflict indexing %s at version %s. time: %s, duration: %s' %
-                            (uuid, result['sid'], curr_time, duration))
+                log.debug('Conflict indexing',  sid=result['sid'], duration=duration)
                 return
         return {'error_message': last_exc, 'time': curr_time, 'uuid': str(uuid)}
 
