@@ -46,10 +46,9 @@ import structlog
 
 # Logging setup using structlog
 # configure structlog to use its formats for stdlib logging and / or structlog logging
-def set_logging(in_prod = False):
+def set_logging(in_prod = False, level="DEBUG"):
     timestamper = structlog.processors.TimeStamper(fmt="iso")
 
-    level = "DEBUG"
     if in_prod:
         level = "INFO"
 
@@ -62,9 +61,9 @@ def set_logging(in_prod = False):
             timestamper,
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
-            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
             structlog.processors.UnicodeDecoder(),
-            structlog.processors.JSONRenderer()
+            structlog.processors.JSONRenderer(),
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
