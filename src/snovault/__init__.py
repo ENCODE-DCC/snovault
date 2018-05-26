@@ -47,7 +47,7 @@ from structlog.threadlocal import wrap_dict
 
 # Logging setup using structlog
 # configure structlog to use its formats for stdlib logging and / or structlog logging
-def set_logging(in_prod = False, level=logging.DEBUG):
+def set_logging(in_prod = False, level=logging.INFO):
     timestamper = structlog.processors.TimeStamper(fmt="iso")
 
     processors=[
