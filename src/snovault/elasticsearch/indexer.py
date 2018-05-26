@@ -245,7 +245,7 @@ class Indexer(object):
                 queued, failed = self.find_and_queue_secondary_items(non_strict_uuids, embedded_uuids)
                 if failed:
                     error_msg = 'Failure(s) queueing secondary uuids: %s' % str(failed)
-                    log.error('INDEXER: ', "error": error_msg)
+                    log.error('INDEXER: ', error=error_msg)
                     errors.append({'error_message': error_msg})
                 non_strict_uuids = set()
                 embedded_uuids = set()

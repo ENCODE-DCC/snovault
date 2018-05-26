@@ -44,7 +44,7 @@ from timeit import default_timer as timer
 EPILOG = __doc__
 
 
-log = None #structlog.getLogger(__name__)
+log = structlog.getLogger(__name__)
 
 # An index to store non-content metadata
 META_MAPPING = {
