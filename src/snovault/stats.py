@@ -5,10 +5,14 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from urllib.parse import urlencode
 from .util import get_root_request
+from uuid import uuid4
 
 
 def includeme(config):
     config.add_tween('snovault.stats.stats_tween_factory', under=pyramid.tweens.INGRESS)
+
+from structlog import get_logger
+log = get_logger(__name__)
 
 
 def requests_timing_hook(prefix='requests'):
@@ -58,6 +62,21 @@ def stats_tween_factory(handler, registry):
 
     def stats_tween(request):
         stats = request._stats = {}
+
+        # set telemetry_id as logger context if passed in
+        log_keys = {}
+        if 'telemetry_id' in request.params:
+            log_keys['telemetry_id'] = request.params['telemetry_id']
+        if 'log_action' in request.params:
+            log_keys['log_action'] = request.params['log_action']
+
+        log_keys['url_path'] = request.path
+        log_keys['url_qs'] = request.query_string
+        log_keys['host'] = request.host.split(":")[0]
+
+        log.bind(**log_keys)
+        stats.update(log_keys)
+
         rss_begin = stats['rss_begin'] = process.memory_info().rss
         begin = stats['wsgi_begin'] = int(time.time() * 1e6)
         response = handler(request)
@@ -75,6 +94,10 @@ def stats_tween_factory(handler, registry):
         xs = response.headers['X-Stats'] = str(urlencode(sorted(stats.items())))
         if getattr(request, '_stats_html_attribute', False):
             response.set_cookie('X-Stats', xs)
+
+        # log all this stuff
+        log.bind(**stats).info("request timmings")
+
         return response
 
     return stats_tween

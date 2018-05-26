@@ -1,8 +1,9 @@
+from .interfaces import ELASTIC_SEARCH
+from elasticsearch.exceptions import ConnectionTimeout
+import time
+
 def find_uuids_for_indexing(registry, updated, log=None):
-    from .interfaces import ELASTIC_SEARCH
     from .create_mapping import index_settings
-    from elasticsearch.exceptions import ConnectionTimeout
-    import time
     es = registry[ELASTIC_SEARCH]
     SEARCH_MAX = 99999  # OutOfMemoryError if too high
     """
@@ -12,6 +13,7 @@ def find_uuids_for_indexing(registry, updated, log=None):
     If something goes wrong with the search or it's too large, return a set
     of all uuids.
     """
+
     invalidated = set()
     if len(updated) > SEARCH_MAX:  # use all uuids
         invalidated = set(get_uuids_for_types(registry))

@@ -43,7 +43,10 @@ requires = [
     'zope.sqlalchemy',
     'bcrypt',
     'cryptacular',
-    'aws-requests-auth'
+    'aws-requests-auth',
+    # for logging
+    'colorama',
+    'structlog'
 ]
 
 if sys.version_info.major == 2:

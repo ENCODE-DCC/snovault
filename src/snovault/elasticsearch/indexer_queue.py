@@ -4,7 +4,7 @@
 import boto3
 import json
 import math
-import logging
+import structlog
 import socket
 import time
 import datetime
@@ -13,7 +13,7 @@ from pyramid.decorator import reify
 from .interfaces import INDEXER_QUEUE, INDEXER_QUEUE_MIRROR
 from .indexer_utils import get_uuids_for_types
 
-log = logging.getLogger(__name__)
+log = structlog.getLogger(__name__)
 
 def includeme(config):
     config.add_route('queue_indexing', '/queue_indexing')
@@ -25,7 +25,8 @@ def includeme(config):
         mirror_env = 'fourfront-webprod2' if env_name == 'fourfront-webprod' else 'fourfront-webprod'
         mirror_queue = QueueManager(config.registry, mirror_env=mirror_env)
         if not mirror_queue.queue_url:
-            log.error('INDEXING: Mirror queues %s are not available!' % mirror_queue.queue_name)
+            log.error('INDEXING: Mirror queues %s are not available!' % mirror_queue.queue_name,
+                      queue=mirror_queue.queue_name)
             raise Exception('INDEXING: Mirror queues %s are not available!' % mirror_queue.queue_name)
         config.registry[INDEXER_QUEUE_MIRROR] = mirror_queue
     else:
@@ -318,7 +319,8 @@ class QueueManager(object):
                     QueueUrl=queue_url
                 )
             except self.client.exceptions.PurgeQueueInProgress:
-                log.warning('\n___QUEUE IS ALREADY BEING PURGED: %s___\n' % queue_url)
+                log.warning('\n___QUEUE IS ALREADY BEING PURGED: %s___\n' % queue_url,
+                            queue_url=queue_url)
 
     def delete_queue(self, queue_url):
         """

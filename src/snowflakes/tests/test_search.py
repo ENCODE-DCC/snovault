@@ -3,7 +3,7 @@
 from .features.conftest import app_settings, app, workbook
 import pytest
 import os
-dont_run_on_travis = pytest.mark.skipif(os.environ.get('TRAVIS', False),
+dont_run_on_travis = pytest.mark.skipif(os.environ.get('TRAVIS', False) != False,
                                         reason='to slow to run on travis')
 
 @dont_run_on_travis

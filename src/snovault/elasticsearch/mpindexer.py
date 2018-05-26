@@ -9,7 +9,8 @@ from pyramid.threadlocal import (
     manager,
 )
 import atexit
-import logging
+import structlog
+from snovault import set_logging
 import transaction
 from .indexer import (
     INDEXER,
@@ -20,7 +21,7 @@ from .interfaces import (
     INDEXER_QUEUE
 )
 
-log = logging.getLogger(__name__)
+log = structlog.getLogger(__name__)
 
 def includeme(config):
     if config.registry.settings.get('indexer_worker'):
@@ -47,6 +48,11 @@ def initializer(app_factory, settings):
     global app
     atexit.register(clear_manager)
     app = app_factory(settings, indexer_worker=True, create_tables=False)
+
+    set_logging(app.registry.settings.get('production'), level=logging.INFO)
+    global log
+    log = structlog.get_logger(__name__)
+
     signal.signal(signal.SIGALRM, clear_manager)
 
 

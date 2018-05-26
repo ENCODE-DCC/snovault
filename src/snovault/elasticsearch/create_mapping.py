@@ -28,7 +28,7 @@ from snovault.fourfront_utils import add_default_embeds, get_jsonld_types_from_c
 from .interfaces import ELASTIC_SEARCH, INDEXER_QUEUE
 import collections
 import json
-import logging
+import structlog
 import time
 import datetime
 import sys
@@ -37,12 +37,14 @@ from .indexer_utils import find_uuids_for_indexing
 import transaction
 import os
 import argparse
+from snovault import set_logging
 from timeit import default_timer as timer
 
 
 EPILOG = __doc__
 
-log = logging.getLogger(__name__)
+
+log = structlog.getLogger(__name__)
 
 # An index to store non-content metadata
 META_MAPPING = {
@@ -881,7 +883,6 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     bulk_meta: caches meta at the start of create_mapping and never queries or
         updates it again, until the end when all mappings are bulk loaded into meta
     """
-    ### TODO: Lock the indexer when create_mapping is running
     from timeit import default_timer as timer
     overall_start = timer()
     registry = app.registry
@@ -1053,11 +1054,14 @@ def main():
 
     args = parser.parse_args()
 
-    logging.basicConfig()
+    #logging.basicConfig()
     app = get_app(args.config_uri, args.app_name)
 
+
     # Loading app will have configured from config file. Reconfigure here:
-    logging.getLogger('snovault').setLevel(logging.INFO)
+    set_logging(app.registry.settings.get('production'), level=logging.INFO)
+    global log
+    log = structlog.get_logger(__name__)
 
     uuids = run(app, args.item_type, args.dry_run, args.check_first, args.skip_indexing,
                args.index_diff, args.strict, args.sync_index, args.no_meta,
