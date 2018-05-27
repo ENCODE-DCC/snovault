@@ -311,7 +311,7 @@ class Indexer(object):
             # only consider a KeyError deferrable if not already in deferred queue
             duration = timer() - start
             if target_queue != 'deferred':
-                log.warning('KeyError', duration=duration)
+                log.info('KeyError', duration=duration)
                 # this will cause the item to be sent to the deferred queue
                 return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
             else:

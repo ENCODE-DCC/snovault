@@ -12,7 +12,7 @@ def includeme(config):
     config.add_tween('snovault.stats.stats_tween_factory', under=pyramid.tweens.INGRESS)
 
 from structlog import get_logger
-log = get_logger(__name__)
+log = get_logger()
 
 
 def requests_timing_hook(prefix='requests'):

@@ -50,6 +50,8 @@ from structlog.threadlocal import wrap_dict
 def set_logging(in_prod = False, level=logging.INFO):
     timestamper = structlog.processors.TimeStamper(fmt="iso")
 
+    logging.basicConfig(format='%(message)s')
+
     processors=[
         structlog.stdlib.filter_by_level,
         structlog.stdlib.add_logger_name,
@@ -89,17 +91,17 @@ def set_logging(in_prod = False, level=logging.INFO):
     ]
     format_processor = structlog.dev.ConsoleRenderer()
     if in_prod:
-        format_processor = structlog.processors.JSONRenderer(indent=True)
+        format_processor = structlog.processors.JSONRenderer()
 
     formatter = structlog.stdlib.ProcessorFormatter(
         processor=format_processor,
         foreign_pre_chain=pre_chain,
     )
 
-    #handler = logging.StreamHandler()
-    #handler.setFormatter(formatter)
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
     root_logger = logging.getLogger()
-    #root_logger.addHandler(handler)
+    root_logger.addHandler(handler)
     root_logger.setLevel(level)
 
 
