@@ -1,3 +1,10 @@
+1.0.9:
+01. SNO-38 Return lists from get_related_uuids (#108, #105)
+
+1.0.8: Released with 1.0.9
+01. SNO-36-update-buildout (#104)
+02. SNO-34-nginx-dev-proxy-headers (#103)
+
 1.0.7: The only update was reverted.  Empty Release.
 
 1.0.6:
