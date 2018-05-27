@@ -96,10 +96,10 @@ def set_logging(in_prod = False, level=logging.INFO):
         foreign_pre_chain=pre_chain,
     )
 
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
+    #handler = logging.StreamHandler()
+    #handler.setFormatter(formatter)
     root_logger = logging.getLogger()
-    root_logger.addHandler(handler)
+    #root_logger.addHandler(handler)
     root_logger.setLevel(level)
 
 

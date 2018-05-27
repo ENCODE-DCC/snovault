@@ -3,6 +3,8 @@ from snovault.crud_views import log as crud_view_log
 from unittest import mock
 import pytest
 from snovault.tests.test_post_put_patch import COLLECTION_URL, item_with_uuid
+import structlog
+import json
 
 
 @pytest.fixture
@@ -64,3 +66,40 @@ def test_telemetry_id_carries_through_logging(testapp, external_tx):
         assert logger._context.get('telemetry_id') == 'test'
         assert logger._context.get('log_action') == 'action_test'
 
+def test_log_to_file_and_ship(testapp, external_tx, capfd):
+        '''
+        in prod we just want to log json to stdout and let the environment
+        do something with stdout... on beanstalk apache will pipe it to error_log
+        for example...
+        our local dev environment however uses structlog.ConsoleLogger and
+        those can be accessed in pytest through the `capfd` fixture, although
+        they would have color codes...
+        exteral_tx just for roll back..
+        '''
+        return
+        #from snovault import set_logging
+        #set_logging(in_prod=True)
+
+        # somethign that generates logs
+        res = testapp.post_json(COLLECTION_URL + "?telemetry_id=test&log_action=action_test", item_with_uuid[0], status=201)
+        print(res)
+
+        # At this point we should have some simple logging write it to file and ship it..
+        logs = capfd.readouterr()
+
+        import pdb; pdb.set_trace()
+        assert logs 
+
+        import tempfile
+        log_file = tempfile.NamedTemporaryFile()
+        json.dump(logs[1], log_file)
+        tempfile.flush()
+
+        # now ship it
+
+        set_logging(in_prod=False)
+
+
+        # reset logging
+        old_config = structlog.get_config()
+        structlog.configure(**old_config)
