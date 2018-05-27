@@ -10,6 +10,7 @@ from pyramid.threadlocal import (
 )
 import atexit
 import structlog
+import logging
 from snovault import set_logging
 import transaction
 from .indexer import (
