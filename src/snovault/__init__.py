@@ -99,14 +99,11 @@ def set_logging(in_prod = False, level=logging.INFO):
     )
 
     handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
+    #handler.setFormatter(formatter)
     root_logger = logging.getLogger()
-    root_logger.addHandler(handler)
+    #root_logger.addHandler(handler)
 
-    # for not us do level + 1, cause they can be noisy
-    # logging levels are just enumerations DEBUG=10,INFO=20 etc...
-    root_logger.setLevel(level+1)
-    #root_logger.setLevel(level)
+    root_logger.setLevel(level)
 
 
 def includeme(config):
