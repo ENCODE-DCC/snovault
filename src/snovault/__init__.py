@@ -50,7 +50,7 @@ from structlog.threadlocal import wrap_dict
 def set_logging(in_prod = False, level=logging.INFO):
     timestamper = structlog.processors.TimeStamper(fmt="iso")
 
-     logging.basicConfig(format='%(levelname)s:%(name)s:%(message)s')
+    logging.basicConfig(format='%(levelname)s:%(name)s:%(message)s')
 
     processors=[
         structlog.stdlib.filter_by_level,
