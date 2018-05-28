@@ -50,7 +50,7 @@ from structlog.threadlocal import wrap_dict
 def set_logging(in_prod = False, level=logging.INFO):
     timestamper = structlog.processors.TimeStamper(fmt="iso")
 
-    logging.basicConfig(format='%(message)s')
+     logging.basicConfig(format='%(levelname)s:%(name)s:%(message)s')
 
     processors=[
         structlog.stdlib.filter_by_level,
@@ -102,7 +102,11 @@ def set_logging(in_prod = False, level=logging.INFO):
     handler.setFormatter(formatter)
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
-    root_logger.setLevel(level)
+
+    # for not us do level + 1, cause they can be noisy
+    # logging levels are just enumerations DEBUG=10,INFO=20 etc...
+    root_logger.setLevel(level+1)
+    #root_logger.setLevel(level)
 
 
 def includeme(config):
