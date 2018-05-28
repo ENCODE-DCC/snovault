@@ -47,10 +47,10 @@ from structlog.threadlocal import wrap_dict
 
 # Logging setup using structlog
 # configure structlog to use its formats for stdlib logging and / or structlog logging
-def set_logging(in_prod = False, level=logging.INFO):
+def set_logging(in_prod = False, level=logging.INFO, log_name=None, log_dir=None):
     timestamper = structlog.processors.TimeStamper(fmt="iso")
 
-    logging.basicConfig(format='%(levelname)s:%(name)s:%(message)s')
+    logging.basicConfig(format='')
 
     processors=[
         structlog.stdlib.filter_by_level,
@@ -64,6 +64,7 @@ def set_logging(in_prod = False, level=logging.INFO):
     ]
 
     if in_prod:
+        # should be on beanstalk
         level = logging.INFO
         processors.append(structlog.processors.JSONRenderer())
     else:
@@ -98,12 +99,23 @@ def set_logging(in_prod = False, level=logging.INFO):
         foreign_pre_chain=pre_chain,
     )
 
-    handler = logging.StreamHandler()
+    if log_name is None:
+        log_name = __name__
+    if log_dir and log_name:
+        import os
+        log_file = os.path.join(log_dir, log_name + ".log")
+        logger = logging.getLogger(log_name)
+        hdlr = logging.FileHandler(log_file)
+        formatter = logging.Formatter('')
+        hdlr.setFormatter(formatter)
+        logger.addHandler(hdlr)
+        logger.setLevel(level)
+    #handler = logging.StreamHandler()
     #handler.setFormatter(formatter)
-    root_logger = logging.getLogger()
+    #root_logger = logging.getLogger()
     #root_logger.addHandler(handler)
 
-    root_logger.setLevel(level)
+    #root_logger.setLevel(level)
 
 
 def includeme(config):
@@ -140,7 +152,7 @@ def main(global_config, **local_config):
     settings.update(local_config)
 
     # TODO: move to dcicutils
-    set_logging(settings.get('production'))
+    set_logging(settings.get('production'),log_dir=settings.get('structlog.dir'))
 
     # TODO - these need to be set for dummy app
     # settings['snovault.jsonld.namespaces'] = json_asset('snovault:schemas/namespaces.json')

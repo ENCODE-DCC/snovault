@@ -242,7 +242,7 @@ def main():
     log = structlog.get_logger(__name__)
 
     # Loading app will have configured from config file. Reconfigure here:
-        logging.getLogger('snovault').setLevel(logging.DEBUG)
+    logging.getLogger('snovault').setLevel(logging.DEBUG)
 
     return run(testapp, args.poll_interval, args.dry_run, args.path)
 
