@@ -67,10 +67,7 @@ def run(testapp, interval=DEFAULT_INTERVAL, dry_run=False, path='/index', update
         else:
             timestamp = datetime.datetime.now().isoformat()
             result = res.json
-            result['stats'] = {
-                k: int(v) for k, v in parse_qsl(
-                    res.headers.get('X-Stats', ''))
-            }
+            result['stats'] = res.headers.get('X-Stats', {})
             result['timestamp'] = timestamp
             update_status(last_result=result)
             if result.get('indexing_status') == 'finished':
