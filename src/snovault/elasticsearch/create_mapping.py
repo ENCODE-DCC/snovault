@@ -38,6 +38,7 @@ import transaction
 import os
 import argparse
 from snovault import set_logging
+import logging
 from timeit import default_timer as timer
 
 
