@@ -69,6 +69,8 @@ def stats_tween_factory(handler, registry):
             log_keys['telemetry_id'] = request.params['telemetry_id']
         if 'log_action' in request.params:
             log_keys['log_action'] = request.params['log_action']
+        if request.registry.settings.get('env_name'):
+            log_keys['ff_env'] = request.registry.settings.get('env_name')
 
         log_keys['url_path'] = request.path
         log_keys['url_qs'] = request.query_string
