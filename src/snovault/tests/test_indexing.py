@@ -310,9 +310,10 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
     while doc_count < 1:
         time.sleep(4)
         doc_count = es.count(index='testing_link_target_sno', doc_type='testing_link_target_sno').get('count')
-    time.sleep(4)
-    indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
-    assert indexing_doc['_source']['indexing_count'] == 1
+    assert doc_count == 1
+    # time.sleep(4)
+    # indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
+    # assert indexing_doc['_source']['indexing_count'] == 1
     source_res = testapp.post_json('/testing-link-sources-sno/', source, status=201)
     res = indexer_testapp.post_json('/index', {'record': True})
     time.sleep(2)
@@ -321,10 +322,11 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
     while doc_count < 1:
         time.sleep(4)
         doc_count = es.count(index='testing_link_source_sno', doc_type='testing_link_source_sno').get('count')
-    time.sleep(4)
-    indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
-    # this should have indexed the target and source
-    assert indexing_doc['_source']['indexing_count'] == 2
+    assert doc_count == 2
+    # time.sleep(4)
+    # indexing_doc = es.get(index='indexing', doc_type='indexing', id='latest_indexing')
+    # # this should have indexed the target and source
+    # assert indexing_doc['_source']['indexing_count'] == 2
 
 
 def test_indexing_invalid_sid(app, testapp, indexer_testapp):
