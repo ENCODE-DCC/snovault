@@ -294,8 +294,13 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
     """
     es = app.registry[ELASTIC_SEARCH]
     indexer_queue = app.registry[INDEXER_QUEUE]
+    # first, run create mapping with the indices we will use
+    create_mapping.run(
+        app,
+        collections=['testing_link_target_sno', 'testing_link_source_sno'],
+        skip_indexing=True
+    )
     target  = {'name': 'one', 'uuid': '775795d3-4410-4114-836b-8eeecf1d0c2f'}
-
     source = {
         'name': 'A',
         'target': '775795d3-4410-4114-836b-8eeecf1d0c2f',
@@ -315,6 +320,7 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
     assert doc_count == 1
     # indexing the source will also reindex the target
     source_res = testapp.post_json('/testing-link-sources-sno/', source, status=201)
+    time.sleep(2)
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 2
     time.sleep(2)
