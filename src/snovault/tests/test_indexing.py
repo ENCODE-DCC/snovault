@@ -8,6 +8,7 @@ Does not include data dependent tests
 import pytest
 import time
 import json
+import uuid
 from datetime import datetime
 from snovault.elasticsearch.interfaces import (
     ELASTIC_SEARCH,
@@ -289,6 +290,7 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
     """
     When an item is indexed, queue up all its embedded uuids for indexing
     as well.
+    Test indexer_utils.find_uuids_for_indexing here as well
     """
     es = app.registry[ELASTIC_SEARCH]
     indexer_queue = app.registry[INDEXER_QUEUE]
@@ -323,6 +325,14 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
         time.sleep(4)
         doc_count = es.count(index='testing_link_source_sno', doc_type='testing_link_source_sno').get('count')
     assert doc_count == 1
+
+    # test find_uuids_for_indexing
+    to_index = indexer_utils.find_uuids_for_indexing(app.registry, {target['uuid']})
+    assert to_index == {target['uuid'], source['uuid']}
+    # now use a made-up uuid; only result should be itself
+    fake_uuid = str(uuid.uuid4())
+    to_index = indexer_utils.find_uuids_for_indexing(app.registry, {fake_uuid})
+    assert to_index == {fake_uuid}
 
 
 def test_indexing_invalid_sid(app, testapp, indexer_testapp):
