@@ -76,9 +76,8 @@ def test_log_to_file_and_ship(testapp, external_tx, capfd):
         they would have color codes...
         exteral_tx just for roll back..
         '''
-        return
-        #from snovault import set_logging
-        #set_logging(in_prod=True)
+        from snovault import set_logging
+        set_logging(in_prod=True)
 
         # somethign that generates logs
         res = testapp.post_json(COLLECTION_URL + "?telemetry_id=test&log_action=action_test", item_with_uuid[0], status=201)
@@ -86,20 +85,16 @@ def test_log_to_file_and_ship(testapp, external_tx, capfd):
 
         # At this point we should have some simple logging write it to file and ship it..
         logs = capfd.readouterr()
-
-        import pdb; pdb.set_trace()
-        assert logs 
-
-        import tempfile
-        log_file = tempfile.NamedTemporaryFile()
-        json.dump(logs[1], log_file)
-        tempfile.flush()
-
-        # now ship it
-
-        set_logging(in_prod=False)
-
-
-        # reset logging
-        old_config = structlog.get_config()
-        structlog.configure(**old_config)
+        assert logs[1]
+        entries = logs[1].split('\n')
+        # check format of entries
+        for entry in entries:
+            if not entry:
+                continue
+            # test logger adds like INFO:snovault.crud_views: to front of log file
+            log_entry = "{" + entry.split("{")[1]
+            entry_dict = json.loads(log_entry)
+            assert entry_dict
+            assert '@timestamp' in entry_dict
+            assert 'logger' in entry_dict
+            assert 'level' in entry_dict

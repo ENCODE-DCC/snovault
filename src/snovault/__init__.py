@@ -46,6 +46,13 @@ from structlog.threadlocal import wrap_dict
 
 
 # Logging setup using structlog
+def convert_ts_to_at_ts(logger, log_method, event_dict):
+    if 'timestamp' in event_dict:
+        event_dict['@timestamp'] = event_dict['timestamp']
+        del event_dict['timestamp']
+        return event_dict
+
+
 # configure structlog to use its formats for stdlib logging and / or structlog logging
 def set_logging(in_prod = False, level=logging.INFO, log_name=None, log_dir=None):
     timestamper = structlog.processors.TimeStamper(fmt="iso")
@@ -58,6 +65,7 @@ def set_logging(in_prod = False, level=logging.INFO, log_name=None, log_dir=None
         structlog.stdlib.add_log_level,
         structlog.stdlib.PositionalArgumentsFormatter(),
         timestamper,
+        convert_ts_to_at_ts,
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
