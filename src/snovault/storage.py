@@ -49,7 +49,9 @@ def includeme(config):
     _DBSESSION = registry[DBSESSION]
     if registry.settings.get('blob_bucket'):
         registry[BLOBS] = S3BlobStorage(
-            registry.settings['blob_bucket']
+            registry.settings['blob_bucket'],
+            read_profile_name=registry.settings.get('blob_read_profile_name'),
+            store_profile_name=registry.settings.get('blob_store_profile_name')
         )
     else:
         registry[BLOBS] = RDBBlobStorage(registry[DBSESSION])
@@ -297,11 +299,11 @@ class RDBBlobStorage(object):
 
 
 class S3BlobStorage(object):
-    def __init__(self, bucket):
-        self.resource = boto3.resource('s3')
+    def __init__(self, bucket, read_profile_name=None, store_profile_name=None):
+        self.store_conn = boto3.Session(profile_name=store_profile_name).client('s3')
         # Have to use client API for presigned_url.
-        self.client = boto3.client('s3')
-        self.bucket = self.resource.Bucket(bucket)
+        self.read_conn = boto3.Session(profile_name=read_profile_name).client('s3')
+        self.bucket = boto3.Session(profile_name=read_profile_name).resource('s3').Bucket(bucket)
 
     def store_blob(self, data, download_meta, blob_id=None):
         if blob_id is None:
@@ -310,7 +312,10 @@ class S3BlobStorage(object):
         else:
             # Have to check existence manually with boto3.
             try:
-                key = self.resource.Object(self.bucket.name, blob_id).get()
+                key = self.store_conn.get_object(
+                    Bucket=self.bucket.name,
+                    Key=blob_id
+                )
             except botocore.exceptions.ClientError as e:
                 # Possible that UUID exists but is not in bucket during migration.
                 if e.response['Error']['Code'] == 'NoSuchKey':
@@ -318,7 +323,8 @@ class S3BlobStorage(object):
                 else:
                     raise
         if key is None:
-            self.resource.Bucket(self.bucket.name).put_object(
+            self.store_conn.put_object(
+                Bucket=self.bucket.name,
                 Key=blob_id,
                 Body=data,
                 ContentType=download_meta.get('type', 'application/octet-stream')
@@ -335,7 +341,7 @@ class S3BlobStorage(object):
 
     def get_blob_url(self, download_meta):
         bucket_name, key = self._get_bucket_key(download_meta)
-        location = self.client.generate_presigned_url(
+        location = self.read_conn.generate_presigned_url(
             ClientMethod='get_object',
             Params={
                 'Bucket': bucket_name,
@@ -347,7 +353,10 @@ class S3BlobStorage(object):
 
     def get_blob(self, download_meta):
         bucket_name, key = self._get_bucket_key(download_meta)
-        return self.resource.Object(bucket_name, key).get()['Body'].read()
+        return self.read_conn.get_object(
+            Bucket=bucket_name,
+            Key=key
+        )['Body'].read()
 
 
 class JSON(types.TypeDecorator):
