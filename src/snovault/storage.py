@@ -49,9 +49,7 @@ def includeme(config):
     _DBSESSION = registry[DBSESSION]
     if registry.settings.get('blob_bucket'):
         registry[BLOBS] = S3BlobStorage(
-            registry.settings['blob_bucket'],
-            read_profile_name=registry.settings.get('blob_read_profile_name'),
-            store_profile_name=registry.settings.get('blob_store_profile_name'),
+            registry.settings['blob_bucket']
         )
     else:
         registry[BLOBS] = RDBBlobStorage(registry[DBSESSION])
