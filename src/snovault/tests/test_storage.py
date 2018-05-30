@@ -223,45 +223,50 @@ def test_keys(session):
         session.flush()
 
 
-def test_S3BlobStorage(mocker):
+def test_S3BlobStorage_boto3(mocker):
     from snovault.storage import S3BlobStorage
-    mocker.patch('boto.connect_s3')
+    mocker.patch('boto3.resource')
     bucket = 'test'
-    fake_key = mocker.Mock()
+    mock_key = mocker.Mock()
     storage = S3BlobStorage(bucket)
     storage.bucket.name = bucket
-    storage.bucket.new_key.return_value = fake_key
-
-    download_meta = {'download': 'test.txt'}
+    storage.resource.return_value = mock_key
+    download_meta = {'blob_id': '123'}
     storage.store_blob('data', download_meta)
     assert download_meta['bucket'] == 'test'
     assert 'key' in download_meta
-    fake_key.set_contents_from_string.assert_called_once_with('data')
-
-    storage.bucket.get_key.return_value = fake_key
-    fake_key.get_contents_as_string.return_value = 'data'
+    storage.resource.Bucket().put_object.assert_called_once()
+    storage.resource.Object().get()['Body'].read.return_value = 'data'
     data = storage.get_blob(download_meta)
     assert data == 'data'
-    storage.bucket.get_key.assert_called_once_with(download_meta['key'], validate=False)
-
-    storage.read_conn.generate_url.return_value = 'http://testurl'
-    url = storage.get_blob_url(download_meta)
-    assert url == 'http://testurl'
-    storage.read_conn.generate_url.assert_called_once_with(
-        129600, method='GET', bucket='test', key=download_meta['key']
-    )
+    storage.resource.Object().get().read().assert_called_once()
 
 
-def test_S3BlobStorage_get_blob_url_for_non_s3_file(mocker):
+def test_S3BlobStorage_boto3_with_header(mocker):
     from snovault.storage import S3BlobStorage
-    mocker.patch('boto.connect_s3')
+    mocker.patch('boto3.resource')
+    bucket = 'test'
+    mock_key = mocker.Mock()
+    storage = S3BlobStorage(bucket)
+    storage.bucket.name = bucket
+    storage.resource.return_value = mock_key
+    download_meta = {'blob_id': '123', 'type': 'text/plain'}
+    storage.store_blob('data', download_meta)
+    assert 'type' in download_meta
+    assert download_meta['type'] == 'text/plain'
+
+  
+def test_S3BlobStorage_boto3_get_blob_url_for_s3_file(mocker):
+    from snovault.storage import S3BlobStorage
+    mocker.patch('boto3.resource')
+    mocker.patch('boto3.client')
     bucket = 'test'
     storage = S3BlobStorage(bucket)
     storage.bucket.name = bucket
-    download_meta = {'blob_id': 'blob_id'}
-    storage.read_conn.generate_url.return_value = 'http://testurl'
+    download_meta = {'blob_id': '123'}
+    storage.client.generate_presigned_url.return_value = 'http://testurl'
     url = storage.get_blob_url(download_meta)
     assert url == 'http://testurl'
-    storage.read_conn.generate_url.assert_called_once_with(
-        129600, method='GET', bucket='test', key=download_meta['blob_id']
+    storage.client.generate_presigned_url.assert_called_once_with(
+        Params={'Key': '123', 'Bucket': 'test'}, ExpiresIn=129600, ClientMethod='get_object'
     )
