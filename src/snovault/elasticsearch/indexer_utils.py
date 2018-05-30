@@ -1,61 +1,65 @@
 from .interfaces import ELASTIC_SEARCH
 from elasticsearch.exceptions import ConnectionTimeout
+from elasticsearch.helpers import scan
 import time
 
 def find_uuids_for_indexing(registry, updated, log=None):
-    from .create_mapping import index_settings
-    es = registry[ELASTIC_SEARCH]
-    SEARCH_MAX = 99999  # OutOfMemoryError if too high
     """
     Run a search to find uuids of objects with that contain the given updated
     uuids either in their embedded_uuids.
     Returns a set containing original uuids and the found uuids.
-    If something goes wrong with the search or it's too large, return a set
-    of all uuids.
+    Uses elasticsearch.helpers.scan to iterate through ES results
     """
-
-    invalidated = set()
-    if len(updated) > SEARCH_MAX:  # use all uuids
-        invalidated = set(get_uuids_for_types(registry))
-        return invalidated | updated
-    for backoff in [0, 1, 2, 4, 6]:  # arbitrary times
-        time.sleep(backoff)
-        try:
-            res = es.search(index='_all', size=SEARCH_MAX, body={
-                'query': {
+    from .create_mapping import index_settings
+    es = registry[ELASTIC_SEARCH]
+    # SEARCH_MAX = 99999  # OutOfMemoryError if too high
+    import pdb; pdb.set_trace()
+    scan_query = {
+        'query': {
+            'bool': {
+                'filter': {
                     'bool': {
-                        'filter': {
-                            'bool': {
-                                'should': [
-                                    {
-                                        'terms': {
-                                            'embedded_uuids': list(updated),
-                                            '_cache': False,
-                                        },
-                                    },
-                                ],
+                        'should': [
+                            {
+                                'terms': {
+                                    'embedded_uuids': list(updated),
+                                    '_cache': False,
+                                },
                             },
-                        },
+                        ],
                     },
                 },
-                '_source': False,
-            })
-        except Exception as e:
-            if log:
-                log.warning('Retrying due to error with find_uuids_for_indexing: %s' % str(e))
-            es.indices.refresh(index='_all')
-        else:
-            if log:
-                log.debug("Found %s associated items for indexing" %
-                        (str(res['hits']['total'])))
-            if res['hits']['total'] > SEARCH_MAX:  # use all uuids
-                invalidated = set(get_uuids_for_types(registry))
-            else:
-                invalidated = {hit['_id'] for hit in res['hits']['hits']}
-            return invalidated | updated
-    # this is only hit if the retry loop is exited. invalidate all
-    invalidated = set(get_uuids_for_types(registry))
-    return invalidated | updated
+            },
+        },
+        '_source': False,
+    }
+    results = scan(es, index='_all', query=scan_query)
+    return {res['_id'] for res in results}
+
+    # invalidated = set()
+    # if len(updated) > SEARCH_MAX:  # use all uuids
+    #     invalidated = set(get_uuids_for_types(registry))
+    #     return invalidated | updated
+    # for backoff in [0, 1, 2, 4, 6]:  # arbitrary times
+    #     time.sleep(backoff)
+    #     try:
+    #         # res = es.search(index='_all', size=SEARCH_MAX, body=)
+    #     except Exception as e:
+    #         if log:
+    #             log.warning('Retrying due to error with find_uuids_for_indexing: %s' % str(e))
+    #         es.indices.refresh(index='_all')
+    #     else:
+    #         if log:
+    #             log.debug("Found %s associated items for indexing" %
+    #                     (str(res['hits']['total'])))
+    #         if res['hits']['total'] > SEARCH_MAX:  # use all uuids
+    #             invalidated = set(get_uuids_for_types(registry))
+    #         else:
+    #             invalidated = {hit['_id'] for hit in res['hits']['hits']}
+    #         return invalidated | updated
+    # # this is only hit if the retry loop is exited. invalidate all
+    # invalidated = set(get_uuids_for_types(registry))
+    # return invalidated | updated
 
 
 def get_uuids_for_types(registry, types=None):
