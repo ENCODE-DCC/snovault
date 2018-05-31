@@ -346,14 +346,22 @@ def validate_request(schema, request, data=None, current=None):
         data = request.json
 
     validated, errors = validate(schema, data, current)
-    for error in errors:
-        messages = list([x.message for x in error.context])
-        schema_paths = [list(x.absolute_schema_path) for x in error.context]
-        context = {}
-        for i in range(len(schema_paths)):
-          context["->".join([str(x) for x in schema_paths[i]])] = messages[i]
-        request.errors.add('body', list(error.path), error.message,json.dumps(context,indent=2))
 
+    for error in errors:
+        # Check for any contextual errors within the schema's dependency graph.
+        context = []
+        for context_error in error.context:
+            context.append({
+              'name': list(context_error.absolute_schema_path),
+              'description': context_error.message,
+            })
+        if context:
+            request.errors.add(
+                'body', list(error.path), error.message,
+                context=context)
+        else:
+            request.errors.add(
+              'body', list(error.path), error.message)
     if not errors:
         request.validated.update(validated)
 
