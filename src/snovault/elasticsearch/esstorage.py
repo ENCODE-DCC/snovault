@@ -5,6 +5,7 @@ from zope.interface import alsoProvides
 from .interfaces import (
     ELASTIC_SEARCH,
     ICachedItem,
+    RESOURCES_INDEX,
 )
 
 
@@ -15,9 +16,15 @@ def includeme(config):
     from snovault import STORAGE
     registry = config.registry
     es = registry[ELASTIC_SEARCH]
-    es_index = '_all'
+    es_index = RESOURCES_INDEX
     wrapped_storage = registry[STORAGE]
     registry[STORAGE] = PickStorage(ElasticSearchStorage(es, es_index), wrapped_storage)
+
+
+def force_database_for_request():
+    request = get_current_request()
+    if request:
+        request.datastore = 'database'
 
 
 class CachedModel(object):
@@ -85,15 +92,17 @@ class PickStorage(object):
         model = storage.get_by_uuid(uuid)
         if storage is self.read:
             if model is None or model.invalidated():
+                force_database_for_request()
                 return self.write.get_by_uuid(uuid)
         return model
 
-    def get_by_unique_key(self, unique_key, name):
+    def get_by_unique_key(self, unique_key, name, index=None):
         storage = self.storage()
-        model = storage.get_by_unique_key(unique_key, name)
+        model = storage.get_by_unique_key(unique_key, name, index=index)
         if storage is self.read:
             if model is None or model.invalidated():
-                return self.write.get_by_unique_key(unique_key, name)
+                force_database_for_request()
+                return self.write.get_by_unique_key(unique_key, name, index=index)
         return model
 
     def get_rev_links(self, model, rel, *item_types):
@@ -119,8 +128,10 @@ class ElasticSearchStorage(object):
         self.es = es
         self.index = index
 
-    def _one(self, query):
-        data = self.es.search(index=self.index, body=query)
+    def _one(self, query, index=None):
+        if index is None:
+            index = self.index
+        data = self.es.search(index=index, body=query)
         hits = data['hits']['hits']
         if len(hits) != 1:
             return None
@@ -142,7 +153,7 @@ class ElasticSearchStorage(object):
         hit = result['hits']['hits'][0]
         return CachedModel(hit)
 
-    def get_by_unique_key(self, unique_key, name):
+    def get_by_unique_key(self, unique_key, name, index=None):
         term = 'unique_keys.' + unique_key
         query = {
             'query': {
@@ -150,7 +161,7 @@ class ElasticSearchStorage(object):
             },
             'version': True,
         }
-        return self._one(query)
+        return self._one(query, index)
 
     def get_rev_links(self, model, rel, *item_types):
         filter_ = {'term': {'links.' + rel: str(model.uuid)}}

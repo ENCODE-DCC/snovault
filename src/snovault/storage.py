@@ -93,7 +93,7 @@ class RDBStorage(object):
             return default
         return model
 
-    def get_by_unique_key(self, unique_key, name, default=None):
+    def get_by_unique_key(self, unique_key, name, default=None, index=None):
         session = self.DBSession()
         try:
             key = baked_query_unique_key(session).params(name=unique_key, value=name).one()
@@ -422,7 +422,8 @@ class PropertySheet(Base):
                  ForeignKey('resources.rid',
                             deferrable=True,
                             initially='DEFERRED'),
-                 nullable=False)
+                 nullable=False,
+                 index=True)
     name = Column(types.String, nullable=False)
     properties = Column(JSON)
     tid = Column(UUID,

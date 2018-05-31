@@ -168,7 +168,12 @@ class AbstractCollection(Resource, Mapping):
                 return default
             return resource
         if self.unique_key is not None:
-            resource = self.connection.get_by_unique_key(self.unique_key, name)
+            # Give the storage a hint of which index to search.
+            # If this is a collection of an abstract type,
+            # the item_type will be None and we'll search all snovault indices.
+            index = getattr(self.type_info, 'item_type', None)
+            resource = self.connection.get_by_unique_key(
+                self.unique_key, name, index=index)
             if resource is not None:
                 if not self._allow_contained(resource):
                     return default

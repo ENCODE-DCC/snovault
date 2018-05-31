@@ -1,3 +1,29 @@
+1.0.9:
+01. SNO-38 Return lists from get_related_uuids (#108, #105)
+
+1.0.8: Released with 1.0.9
+01. SNO-36-update-buildout (#104)
+02. SNO-34-nginx-dev-proxy-headers (#103)
+
+1.0.7: The only update was reverted.  Empty Release.
+
+1.0.6:
+01. SNO-33 specify index for get_by_unique_key from collection (#94)
+02. SNO-28 limit ES storage to indices created for snovault resources (#93)
+
+1.0.5:
+01. SNO-30 Split Indexer State from indexer file and update
+02. SNO-10 Remove audit indexing via 2-pass
+03. SNO-9 Add api end points to new indexer meta objects
+04. SNO-25 Make uniqueItems to check the serialized values (#85)
+05. SNO-26 Add schemas map view to profiles (#86)
+06. SNO-29 Limit audits on form update (#87)
+07. SNO-19 Update DOI preferred resolver url (#80)
+
+1.0.4:
+-SNO-15 Add index to storage propertysheet
+-SNO-14 Update delete script
+
 1.0.3:
 -SNO-8 Add JSONSchemas type to profiles page (#73)
 

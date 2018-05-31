@@ -11,6 +11,8 @@ from .util import mutated_schema
 def includeme(config):
     config.add_route('schemas', '/profiles/')
     config.add_route('schema', '/profiles/{type_name}.json')
+    config.add_route('schemap', '/profiles/{type_name}')
+    config.add_route('schemas_map', '/profiles-map/')
     config.scan(__name__)
 
 
@@ -39,6 +41,8 @@ def _annotated_schema(type_info, request):
 
 @view_config(route_name='schema', request_method='GET',
              decorator=etag_app_version_effective_principals)
+@view_config(route_name='schemap', request_method='GET',
+             decorator=etag_app_version_effective_principals)
 def schema(context, request):
     type_name = request.matchdict['type_name']
     types = request.registry[TYPES]
@@ -65,3 +69,15 @@ def schemas(context, request):
         subtypes[name] = type_info.subtypes
 
     return schemas
+
+
+@view_config(route_name='schemas_map', request_method='GET',
+             decorator=etag_app_version_effective_principals)
+def schemas_map(context, request):
+    types = request.registry[TYPES]
+    profiles_map = {}
+    for type_info in types.by_item_type.values():
+        if 'id' in type_info.schema:
+            profiles_map[type_info.name] = type_info.schema['id']
+    profiles_map['@type'] = ['JSONSchemas']
+    return profiles_map
