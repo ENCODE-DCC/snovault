@@ -14,6 +14,7 @@ from elasticsearch.exceptions import (
     ConnectionError,
     NotFoundError,
     TransportError,
+    RequestError,
     ConnectionTimeout
 )
 from elasticsearch_dsl import Index, Search
@@ -611,7 +612,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
         if prev_index_record is not None and this_index_record == prev_index_record:
             if in_type != 'meta':
                 check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff)
-            log.warning('MAPPING: using existing index for collection %s' % (in_type))
+            log.warning('MAPPING: using existing index for collection %s' % (in_type), collection=in_type)
             return
 
     if dry_run or index_diff:
@@ -621,16 +622,16 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     if this_index_exists:
         res = es_safe_execute(es.indices.delete, index=in_type, ignore=[400,404])
         if res:
-            log.warning('MAPPING: index successfully deleted for %s' % (in_type))
+            log.warning('MAPPING: index successfully deleted for %s' % in_type, collection=in_type)
         else:
-            log.warning('MAPPING: could not delete index for %s' % (in_type))
+            log.warning('MAPPING: could not delete index for %s' % in_type, collection=in_type)
 
     # first, create the mapping. adds settings and mappings in the body
     res = es_safe_execute(es.indices.create, index=in_type, body=this_index_record, ignore=[400])
     if res:
-        log.warning('MAPPING: new index created for %s' % (in_type))
+        log.warning('MAPPING: new index created for %s' % (in_type), collection=in_type)
     else:
-        log.warning('MAPPING: new index failed for %s' % (in_type))
+        log.warning('MAPPING: new index failed for %s' % (in_type), collection=in_type)
 
     # check to debug create-mapping issues and ensure correct mappings
     confirm_mapping(es, in_type, this_index_record)
@@ -641,10 +642,10 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     start = timer()
     coll_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
     end = timer()
-    log.warning('get_coll_uuids %s' % str(end-start))
+    log.warning('Time to get collection uuids: %s' % str(end-start), collection=in_type)
     uuids_to_index.update(coll_uuids)
     log.warning('MAPPING: will queue all %s items in the new index %s for reindexing' %
-                (str(coll_count), in_type))
+                (str(coll_count), in_type), collection=in_type)
 
     # put index_record in meta
     if meta_bulk_actions is None:
@@ -653,11 +654,11 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
         start = timer()
         res = es_safe_execute(es.index, index='meta', doc_type='meta', body=this_index_record, id=in_type)
         end = timer()
-        log.warning("update meta took %s" % str(end-start))
+        log.warning("Time to update metadata document: %s" % str(end-start), collection=in_type)
         if res:
-            log.warning("MAPPING: index record created for %s" % (in_type))
+            log.warning("MAPPING: index record created for %s" % (in_type), collection=in_type)
         else:
-            log.warning("MAPPING: index record failed for %s" % (in_type))
+            log.warning("MAPPING: index record failed for %s" % (in_type), collection=in_type)
     else:
         # create bulk actions to be submitted after all mappings are created
         bulk_action = {'_op_type': 'index',
@@ -719,18 +720,21 @@ def check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff=Fals
     db_count, es_count, db_uuids, diff_uuids = get_db_es_counts_and_db_uuids(app, es, in_type, index_diff)
     if print_counts:  # just display things, don't actually queue the uuids
         log.warning("DB count is %s and ES count is %s for index: %s" %
-                 (str(db_count), str(es_count), in_type))
+                    (str(db_count), str(es_count), in_type), collection=in_type)
         if index_diff and diff_uuids:
-            log.warning("The following UUIDs are found in the DB but not the ES index: %s" % (in_type))
+            log.warning("The following UUIDs are found in the DB but not the ES index: %s"
+                        % (in_type), collection=in_type)
             for uuid in diff_uuids:
                 log.warning(uuid)
         return
     if es_count is None or es_count != db_count:
         if index_diff:
-            log.warning('MAPPING: queueing %s items found in DB but not ES in the index %s for reindexing' % (str(len(diff_uuids)), in_type))
+            log.warning('MAPPING: queueing %s items found in DB but not ES in the index %s for reindexing'
+                        % (str(len(diff_uuids)), in_type), collection=in_type)
             uuids_to_index.update(diff_uuids)
         else:
-            log.warning('MAPPING: queueing %s items found in the existing index %s for reindexing' % (str(len(diff_uuids)), in_type))
+            log.warning('MAPPING: queueing %s items found in the existing index %s for reindexing'
+                        % (str(len(diff_uuids)), in_type), collection=in_type)
             uuids_to_index.update(db_uuids)
 
 
@@ -812,7 +816,7 @@ def confirm_mapping(es, in_type, this_index_record):
     """
     mapping_check = False
     tries = 0
-    while not mapping_check and tries < 3:
+    while not mapping_check and tries < 5:
         found_mapping = es.indices.get_mapping(index=in_type).get(in_type, {}).get('mappings')
         found_map_json = json.dumps(found_mapping, sort_keys=True)
         this_map_json = json.dumps(this_index_record['mappings'], sort_keys=True)
@@ -822,13 +826,19 @@ def confirm_mapping(es, in_type, this_index_record):
             mapping_check = True
         else:
             count = es.count(index=in_type, doc_type=in_type).get('count', 'ERR')
-            log.warning('___BAD MAPPING FOUND FOR %s. RETRYING___\nDocument count in that index is %s.' % (in_type, count))
+            log.warning('___BAD MAPPING FOUND FOR %s. RETRYING___\nDocument count in that index is %s.' % (in_type, count), collection=in_type)
             es_safe_execute(es.indices.delete, index=in_type)
-            es_safe_execute(es.indices.create, index=in_type, body=this_index_record)
-            tries += 1
+            # do not increment tries if an error arises from creating the index
+            try:
+                es_safe_execute(es.indices.create, index=in_type, body=this_index_record)
+            except (TransportError, RequestError) as e:
+                log.warning('___COULD NOT CREATE INDEX FOR %s AS IT ALREADY EXISTS.\nError: %s\nRETRYING___'
+                            % (in_type, str(e)), collection=in_type)
+            else:
+                tries += 1
             time.sleep(2)
     if not mapping_check:
-        log.warning('___MAPPING CORRECTION FAILED FOR %s___' % in_type)
+        log.warning('___MAPPING CORRECTION FAILED FOR %s___' % in_type, collection=in_type)
     return tries
 
 
