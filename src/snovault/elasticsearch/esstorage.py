@@ -106,7 +106,10 @@ class PickStorage(object):
         return model
 
     def get_rev_links(self, model, rel, *item_types):
-        return self.storage().get_rev_links(model, rel, *item_types)
+        storage = self.storage()
+        if isinstance(model, CachedModel) and storage is self.write:
+            model = storage.get_by_uuid(str(model.uuid))
+        return storage.get_rev_links(model, rel, *item_types)
 
     def __iter__(self, *item_types):
         return self.storage().__iter__(*item_types)
