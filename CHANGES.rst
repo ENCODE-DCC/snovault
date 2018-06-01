@@ -1,3 +1,7 @@
+1.0.10
+01. SNO-35 fix bug in get_rev_links(#111)
+02. SNO-40 Upgrade blob storage to boto3 (#110)
+
 1.0.9:
 01. SNO-38 Return lists from get_related_uuids (#108, #105)
 
