@@ -44,6 +44,10 @@ def validate_item_content_put(context, request):
     if 'uuid' in data and UUID(data['uuid']) != context.uuid:
         msg = 'uuid may not be changed'
         raise ValidationFailure('body', ['uuid'], msg)
+    accession = context.properties.get('accession')
+    if accession and accession != data.get('accession'):
+        msg = 'must specify original accession'
+        raise ValidationFailure('body', ['accession'], msg)
     current = context.upgrade_properties().copy()
     current['uuid'] = str(context.uuid)
     validate_request(schema, request, data, current)

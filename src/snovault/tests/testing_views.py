@@ -163,6 +163,13 @@ class TestingPostPutPatch(Item):
                 "permission": "import_items",
                 "requestMethod": "POST",
             },
+            "accession": {
+                "title": "Accession",
+                "description": "",
+                "type": "string",
+                "format": "accession",
+                "permission": "import_items"
+            },
             'required': {
                 'type': 'string',
             },
