@@ -69,7 +69,6 @@ item_with_accession = [
 
 
 COLLECTION_URL = '/testing-post-put-patch/'
-ACCESSION_COLLECTION_URL = '/testing-post-put-patch-accession/'
 
 
 @pytest.fixture
