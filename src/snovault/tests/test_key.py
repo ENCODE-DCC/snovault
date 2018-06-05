@@ -59,7 +59,6 @@ def test_keys_update(testapp):
     item = items[0]
     res = testapp.post_json(url, item, status=201)
     location = res.location
-    print(location)
     new_item = {'name': 'new_one', 'alias': 'NEW1'}
     testapp.put_json(location, new_item, status=200)
     testapp.post_json(url, item, status=201)
