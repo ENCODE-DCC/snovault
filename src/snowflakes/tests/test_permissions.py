@@ -165,3 +165,109 @@ def test_disabled_user_wrangler(wrangler_testapp, disabled_user):
 def test_labs_view_wrangler(wrangler_testapp, other_lab):
     labs = wrangler_testapp.get('/labs/', status=200)
     assert(len(labs.json['@graph']) == 1)
+
+
+def test_snowflake_accession_patch_admin(testapp, snowflake):
+    new_accession = 'SNOFL123ABC'
+    testapp.patch_json(snowflake['@id'], {'accession': new_accession}, status=200)
+
+
+def test_snowflake_accession_patch_wrangler(wrangler_testapp, snowflake):
+    new_accession = 'SNOFL123ABC'
+    wrangler_testapp.patch_json(snowflake['@id'], {'accession': new_accession}, status=200)
+
+
+def test_snowflake_accession_patch_submitter(submitter_testapp, snowflake):
+    new_accession = 'SNOFL123ABC'
+    # permission 'import_items' required
+    submitter_testapp.patch_json(snowflake['@id'], {'accession': new_accession}, status=422)
+
+
+def test_snowflake_accession_put_admin(testapp, snowflake):
+    snowflake_id = snowflake['@id']
+    old_accession = snowflake['accession']
+    # Can't resubmit @type/@id.
+    snowflake.pop('@id', None)
+    snowflake.pop('@type', None)
+    testapp.put_json(snowflake_id, snowflake, status=200)
+    # Change allowable field.
+    snowflake['status'] = 'released'
+    testapp.put_json(snowflake_id, snowflake, status=200)
+    # Change nonallowable field.
+    assert 'accession' in snowflake
+    snowflake['accession'] = 'SNOFL123ABC'
+    res = testapp.put_json(snowflake_id, snowflake, status=422)
+    assert res.json['errors'][0]['description'] == 'must specify original accession'
+    # Submit with blank accession.
+    snowflake.pop('accession', None)
+    assert 'accession' not in snowflake
+    res = testapp.put_json(snowflake_id, snowflake, status=422)
+    assert res.json['errors'][0]['description'] == 'must specify original accession'
+    # Change uuid.
+    snowflake['accession'] = old_accession
+    from uuid import uuid4
+    snowflake['uuid'] = str(uuid4())
+    res = testapp.put_json(snowflake_id, snowflake, status=422)
+    assert res.json['errors'][0]['description'] == 'uuid may not be changed'
+
+
+def test_snowflake_accession_put_submitter(submitter_testapp, snowflake):
+    snowflake_id = snowflake['@id']
+    old_accession = snowflake['accession']
+    # Can't resubmit @type/@id.
+    snowflake.pop('@id', None)
+    snowflake.pop('@type', None)
+    submitter_testapp.put_json(snowflake_id, snowflake, status=200)
+    # Change allowable field.
+    snowflake['status'] = 'released'
+    submitter_testapp.put_json(snowflake_id, snowflake, status=200)
+    # Submitters can't edit released objects.
+    snowflake['status'] = 'in progress'
+    submitter_testapp.put_json(snowflake_id, snowflake, status=403)
+    # Change nonallowable field.
+    assert 'accession' in snowflake
+    snowflake['accession'] = 'SNOFL123ABC'
+    res = submitter_testapp.put_json(snowflake_id, snowflake, status=422)
+    assert res.json['errors'][0]['description'] == 'must specify original accession'
+    # Submit with blank accession.
+    snowflake.pop('accession', None)
+    assert 'accession' not in snowflake
+    res = submitter_testapp.put_json(snowflake_id, snowflake, status=422)
+    assert res.json['errors'][0]['description'] == 'must specify original accession'
+    # Change uuid.
+    snowflake['accession'] = old_accession
+    from uuid import uuid4
+    snowflake['uuid'] = str(uuid4())
+    res = submitter_testapp.put_json(snowflake_id, snowflake, status=422)
+    assert res.json['errors'][0]['description'] == 'uuid may not be changed'
+
+
+def test_snowflake_accession_put_wrangler(wrangler_testapp, snowflake):
+    snowflake_id = snowflake['@id']
+    old_accession = snowflake['accession']
+    # Can't resubmit @type/@id.
+    snowflake.pop('@id', None)
+    snowflake.pop('@type', None)
+    wrangler_testapp.put_json(snowflake_id, snowflake, status=200)
+    # Change allowable field.
+    snowflake['status'] = 'released'
+    wrangler_testapp.put_json(snowflake_id, snowflake, status=200)
+    # Wranglers can edit released objects.
+    snowflake['status'] = 'in progress'
+    wrangler_testapp.put_json(snowflake_id, snowflake, status=200)
+    # Change nonallowable field.
+    assert 'accession' in snowflake
+    snowflake['accession'] = 'SNOFL123ABC'
+    res = wrangler_testapp.put_json(snowflake_id, snowflake, status=422)
+    assert res.json['errors'][0]['description'] == 'must specify original accession'
+    # Submit with blank accession.
+    snowflake.pop('accession', None)
+    assert 'accession' not in snowflake
+    res = wrangler_testapp.put_json(snowflake_id, snowflake, status=422)
+    assert res.json['errors'][0]['description'] == 'must specify original accession'
+    # Change uuid.
+    snowflake['accession'] = old_accession
+    from uuid import uuid4
+    snowflake['uuid'] = str(uuid4())
+    res = wrangler_testapp.put_json(snowflake_id, snowflake, status=422)
+    assert res.json['errors'][0]['description'] == 'uuid may not be changed'
