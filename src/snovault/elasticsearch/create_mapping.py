@@ -624,14 +624,14 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
         if res:
             log.warning('MAPPING: index successfully deleted for %s' % in_type, collection=in_type)
         else:
-            log.warning('MAPPING: could not delete index for %s' % in_type, collection=in_type)
+            log.error('MAPPING: could not delete index for %s' % in_type, collection=in_type)
 
     # first, create the mapping. adds settings and mappings in the body
     res = es_safe_execute(es.indices.create, index=in_type, body=this_index_record, ignore=[400])
     if res:
         log.warning('MAPPING: new index created for %s' % (in_type), collection=in_type)
     else:
-        log.warning('MAPPING: new index failed for %s' % (in_type), collection=in_type)
+        log.error('MAPPING: new index failed for %s' % (in_type), collection=in_type)
 
     # check to debug create-mapping issues and ensure correct mappings
     confirm_mapping(es, in_type, this_index_record)
@@ -642,10 +642,11 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
     start = timer()
     coll_count, coll_uuids = get_collection_uuids_and_count(app, in_type)
     end = timer()
-    log.warning('Time to get collection uuids: %s' % str(end-start), collection=in_type)
+    log.warning('Time to get collection uuids: %s' % str(end-start), cat='fetch time',
+                duration=str(end-start), collection=in_type)
     uuids_to_index.update(coll_uuids)
     log.warning('MAPPING: will queue all %s items in the new index %s for reindexing' %
-                (str(coll_count), in_type), collection=in_type)
+                (str(coll_count), in_type), cat='items to queue', count=str(coll_count), collection=in_type)
 
     # put index_record in meta
     if meta_bulk_actions is None:
@@ -654,11 +655,12 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
         start = timer()
         res = es_safe_execute(es.index, index='meta', doc_type='meta', body=this_index_record, id=in_type)
         end = timer()
-        log.warning("Time to update metadata document: %s" % str(end-start), collection=in_type)
+        log.warning("Time to update metadata document: %s" % str(end-start), duration=str(end-start),
+                    collection=in_type, cat='update meta')
         if res:
             log.warning("MAPPING: index record created for %s" % (in_type), collection=in_type)
         else:
-            log.warning("MAPPING: index record failed for %s" % (in_type), collection=in_type)
+            log.error("MAPPING: index record failed for %s" % (in_type), collection=in_type)
     else:
         # create bulk actions to be submitted after all mappings are created
         bulk_action = {'_op_type': 'index',
@@ -718,9 +720,10 @@ def check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff=Fals
     If index_diff, store uuids for reindexing that are in DB but not ES
     """
     db_count, es_count, db_uuids, diff_uuids = get_db_es_counts_and_db_uuids(app, es, in_type, index_diff)
+    log.warning("DB count is %s and ES count is %s for index: %s" %
+                (str(db_count), str(es_count), in_type), collection=in_type,
+                 db_count=str(db_count), cat='collection_counts', es_count=str(es_count))
     if print_counts:  # just display things, don't actually queue the uuids
-        log.warning("DB count is %s and ES count is %s for index: %s" %
-                    (str(db_count), str(es_count), in_type), collection=in_type)
         if index_diff and diff_uuids:
             log.warning("The following UUIDs are found in the DB but not the ES index: %s"
                         % (in_type), collection=in_type)
@@ -730,11 +733,11 @@ def check_and_reindex_existing(app, es, in_type, uuids_to_index, index_diff=Fals
     if es_count is None or es_count != db_count:
         if index_diff:
             log.warning('MAPPING: queueing %s items found in DB but not ES in the index %s for reindexing'
-                        % (str(len(diff_uuids)), in_type), collection=in_type)
+                        % (str(len(diff_uuids)), in_type), items_queued=str(len(diff_uuids)), collection=in_type)
             uuids_to_index.update(diff_uuids)
         else:
             log.warning('MAPPING: queueing %s items found in the existing index %s for reindexing'
-                        % (str(len(diff_uuids)), in_type), collection=in_type)
+                        % (str(len(diff_uuids)), in_type), items_queued=str(len(diff_uuids)), collection=in_type)
             uuids_to_index.update(db_uuids)
 
 
@@ -826,19 +829,20 @@ def confirm_mapping(es, in_type, this_index_record):
             mapping_check = True
         else:
             count = es.count(index=in_type, doc_type=in_type).get('count', 'ERR')
-            log.warning('___BAD MAPPING FOUND FOR %s. RETRYING___\nDocument count in that index is %s.' % (in_type, count), collection=in_type)
+            log.warning('___BAD MAPPING FOUND FOR %s. RETRYING___\nDocument count in that index is %s.'
+                        % (in_type, count), collection=in_type, count=count, cat='bad mapping')
             es_safe_execute(es.indices.delete, index=in_type)
             # do not increment tries if an error arises from creating the index
             try:
                 es_safe_execute(es.indices.create, index=in_type, body=this_index_record)
             except (TransportError, RequestError) as e:
                 log.warning('___COULD NOT CREATE INDEX FOR %s AS IT ALREADY EXISTS.\nError: %s\nRETRYING___'
-                            % (in_type, str(e)), collection=in_type)
+                            % (in_type, str(e)), collection=in_type, cat='index already exists')
             else:
                 tries += 1
             time.sleep(2)
     if not mapping_check:
-        log.warning('___MAPPING CORRECTION FAILED FOR %s___' % in_type, collection=in_type)
+        log.warning('___MAPPING CORRECTION FAILED FOR %s___' % in_type, cat='correction', collection=in_type)
     return tries
 
 
@@ -899,11 +903,13 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     registry = app.registry
     es = registry[ELASTIC_SEARCH]
     indexer_queue = registry[INDEXER_QUEUE]
-    log.warning('\n___CREATE-MAPPING___:\ncollections: %s\ncheck_first %s\n index_diff %s\n' % (collections, check_first, index_diff))
-    log.warning('\n___ES___:\n %s\n' % (str(es.cat.client)))
-    log.warning('\n___ES NODES___:\n %s\n' % (str(es.cat.nodes())))
-    log.warning('\n___ES HEALTH___:\n %s\n' % (str(es.cat.health())))
-    log.warning('\n___ES INDICES (PRE-MAPPING)___:\n %s\n' % str(es.cat.indices()))
+    cat = 'start create mapping'
+    log.warning('\n___CREATE-MAPPING___:\ncollections: %s\ncheck_first %s\n index_diff %s\n' %
+                (collections, check_first, index_diff), cat=cat)
+    log.warning('\n___ES___:\n %s\n' % (str(es.cat.client)), cat=cat)
+    log.warning('\n___ES NODES___:\n %s\n' % (str(es.cat.nodes())), cat=cat)
+    log.warning('\n___ES HEALTH___:\n %s\n' % (str(es.cat.health())), cat=cat)
+    log.warning('\n___ES INDICES (PRE-MAPPING)___:\n %s\n' % str(es.cat.indices()), cat=cat)
     # keep a set of all uuids to be reindexed, which occurs after all indices
     # are created
     uuids_to_index = set()
@@ -926,7 +932,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
 
     # clear the indexer queue on a total reindex
     if total_reindex or purge_queue:
-        log.warning('___PURGING THE QUEUE AND CLEARING INDEXING RECORDS BEFORE MAPPING___\n')
+        log.warning('___PURGING THE QUEUE AND CLEARING INDEXING RECORDS BEFORE MAPPING___\n', cat=cat)
         indexer_queue.clear_queue()
         # we also want to remove the 'indexing' index, which stores old records
         # it's not guaranteed to be there, though
@@ -938,10 +944,10 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         idx_settings = {'settings': index_settings()}
         es_safe_execute(es.indices.create, index='indexing', body=idx_settings)
 
-    greatest_mapping_time = {'collection': '', 'time': 0}
-    greatest_index_creation_time = {'collection': '', 'time': 0}
+    greatest_mapping_time = {'collection': '', 'duration': 0}
+    greatest_index_creation_time = {'collection': '', 'duration': 0}
     timings = {}
-    log.warning('\n___FOUND COLLECTIONS___:\n %s\n' % (str(collections)))
+    log.warning('\n___FOUND COLLECTIONS___:\n %s\n' % (str(collections)), cat=cat)
     for collection_name in collections:
         if collection_name == 'meta':
             # meta mapping just contains settings
@@ -950,7 +956,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
                         cached_indices, meta_bulk_actions)
             # bail if we fail to make meta
             if not check_if_index_exists(es, 'meta'):
-                log.warning('\n___META NOT CREATED; CREATE MAPPING ABORTED___\n')
+                log.warning('\n___META NOT CREATED; CREATE MAPPING ABORTED___\n', cat=cat)
                 return timings
             # only update this for bulk_meta setting
             if cached_indices:
@@ -967,13 +973,15 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
             end = timer()
             index_time = end - start
             log.warning('___FINISHED %s___\n' % (collection_name))
-            log.warning('___Mapping Time: %s  Index time %s ___\n' % (mapping_time, index_time))
-            if mapping_time > greatest_mapping_time['time']:
+            log.warning('___Mapping Time: %s  Index time %s ___\n' % (mapping_time, index_time),
+                        cat='index mapping time', collection=collection_name, map_time=mapping_time,
+                        index_time=index_time)
+            if mapping_time > greatest_mapping_time['duration']:
                 greatest_mapping_time['collection'] = collection_name
-                greatest_mapping_time['time'] = mapping_time
-            if index_time > greatest_index_creation_time['time']:
+                greatest_mapping_time['duration'] = mapping_time
+            if index_time > greatest_index_creation_time['duration']:
                 greatest_index_creation_time['collection'] = collection_name
-                greatest_index_creation_time['time'] = index_time
+                greatest_index_creation_time['duration'] = index_time
             timings[collection_name] = {'mapping': mapping_time, 'index': index_time}
 
     # should be called only for bulk_meta setting
@@ -981,31 +989,39 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         start = timer()
         bulk(es, meta_bulk_actions)
         end = timer()
-        log.warning("bulk update for meta took %s" % str(end-start))
+        log.warning("bulk update for meta took %s" % str(end-start), cat='bulk_meta time',
+                    duration=str(end-start))
 
     overall_end = timer()
-    log.warning('\n___ES INDICES (POST-MAPPING)___:\n %s\n' % (str(es.cat.indices())))
-    log.warning('\n___FINISHED CREATE-MAPPING___\n')
+    cat = 'finished mapping'
+    log.warning('\n___ES INDICES (POST-MAPPING)___:\n %s\n' % (str(es.cat.indices())), cat=cat)
+    log.warning('\n___FINISHED CREATE-MAPPING___\n', cat=cat)
 
 
-    log.warning('\n___GREATEST MAPPING TIME: %s\n' % str(greatest_mapping_time))
-    log.warning('\n___GREATEST INDEX CREATION TIME: %s\n' % str(greatest_index_creation_time))
-    log.warning('\n___TIME FOR ALL COLLECTIONS: %s\n' % str(overall_end - overall_start))
+    log.warning('\n___GREATEST MAPPING TIME: %s\n' % str(greatest_mapping_time),
+                cat='max mapping time', **greatest_mapping_time)
+    log.warning('\n___GREATEST INDEX CREATION TIME: %s\n' % str(greatest_index_creation_time),
+                cat='max index create time', **greatest_index_create_time)
+    log.warning('\n___TIME FOR ALL COLLECTIONS: %s\n' % str(overall_end - overall_start),
+                cat='overall mapping time', time=str(overall_end - overall_start))
     if skip_indexing or print_count_only:
         return timings
 
     # now, queue items for indexing in the secondary queue
     # TODO: maybe put items on primary/secondary by type
     if uuids_to_index:
+        count=len(uuids_to_index)
         # we need to find associated uuids if all items are not indexed or not strict mode
         if not total_reindex and not strict:
             uuids_to_index = find_uuids_for_indexing(registry, uuids_to_index, log)
         # only index (synchronously) if --sync-index option is used
         if sync_index:
-            log.warning('\n___UUIDS TO INDEX (SYNC)___: %s\n' % (len(uuids_to_index)))
+            log.warning('\n___UUIDS TO INDEX (SYNC)___: %s\n' % count,
+                        cat='uuids to index', count=count)
             run_indexing(app, uuids_to_index)
         else:
-            log.warning('\n___UUIDS TO INDEX (QUEUED)___: %s\n' % (len(uuids_to_index)))
+            log.warning('\n___UUIDS TO INDEX (QUEUED)___: %s\n' % count,
+                        cat='uuids to index', count=count)
             indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True, target_queue='secondary')
     return timings
 

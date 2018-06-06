@@ -3,7 +3,7 @@ import pytest
 
 def pytest_configure():
     import logging
-    logging.basicConfig()
+    logging.basicConfig(format='')
     logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
     class Shorten(logging.Filter):
