@@ -1001,7 +1001,7 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     log.warning('\n___GREATEST MAPPING TIME: %s\n' % str(greatest_mapping_time),
                 cat='max mapping time', **greatest_mapping_time)
     log.warning('\n___GREATEST INDEX CREATION TIME: %s\n' % str(greatest_index_creation_time),
-                cat='max index create time', **greatest_index_create_time)
+                cat='max index create time', **greatest_index_creation_time)
     log.warning('\n___TIME FOR ALL COLLECTIONS: %s\n' % str(overall_end - overall_start),
                 cat='overall mapping time', time=str(overall_end - overall_start))
     if skip_indexing or print_count_only:
