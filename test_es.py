@@ -19,7 +19,6 @@ if __name__ == '__main__':
 
     es = Elasticsearch(addresses, **es_options)
 
-    import pdb; pdb.set_trace()
     print(es)
 
 
