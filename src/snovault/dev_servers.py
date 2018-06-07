@@ -63,7 +63,7 @@ def main():
                         help="store local or copy to s3, will generate and store access key for admin user", default=None)
     args = parser.parse_args()
 
-    logging.basicConfig()
+    logging.basicConfig(format='')
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snowvault').setLevel(logging.DEBUG)
 
