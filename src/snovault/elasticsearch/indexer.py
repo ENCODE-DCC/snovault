@@ -302,6 +302,8 @@ class Indexer(object):
 
         try:
             result = request.embed(index_data_query, as_user='INDEXER')
+            duration = timer() - start
+            log.info("time to embed", duration=duration, cat="embed time")
         except SidException as e:
             duration = timer() - start
             log.warning('Invalid sid found', duration=duration)
