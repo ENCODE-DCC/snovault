@@ -46,7 +46,8 @@ requires = [
     'aws-requests-auth',
     # for logging
     'colorama',
-    'structlog'
+    'structlog',
+    'dcicutils>=0.2.9'
 ]
 
 if sys.version_info.major == 2:

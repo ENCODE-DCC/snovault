@@ -43,6 +43,7 @@ from .app import (
 import logging
 import structlog
 from structlog.threadlocal import wrap_dict
+from dcicutils.log_utils import set_logging
 
 
 # Logging setup using structlog
@@ -54,7 +55,7 @@ def convert_ts_to_at_ts(logger, log_method, event_dict):
 
 
 # configure structlog to use its formats for stdlib logging and / or structlog logging
-def set_logging(in_prod = False, level=logging.INFO, log_name=None, log_dir=None):
+def set_logging1(in_prod = False, level=logging.INFO, log_name=None, log_dir=None):
     timestamper = structlog.processors.TimeStamper(fmt="iso")
 
     logging.basicConfig(format='')
