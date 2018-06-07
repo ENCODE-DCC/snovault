@@ -361,6 +361,9 @@ class Indexer(object):
                 duration = timer() - start
                 log.debug('Conflict indexing',  sid=result['sid'], duration=duration)
                 return
+
+        duration = timer() - start
+        log.info('update object', duration=duration, cat="update object")
         return {'error_message': last_exc, 'time': curr_time, 'uuid': str(uuid)}
 
 

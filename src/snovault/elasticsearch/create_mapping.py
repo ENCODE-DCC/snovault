@@ -1087,11 +1087,11 @@ def main():
 
     # Loading app will have configured from config file. Reconfigure here:
     set_logging(app.registry.settings.get('production'), level=logging.INFO)
-    global log
-    log = structlog.get_logger(__name__)
+    #global log
+    #log = structlog.get_logger(__name__)
 
     uuids = run(app, args.item_type, args.dry_run, args.check_first, args.skip_indexing,
-               args.index_diff, args.strict, args.sync_index, args.no_meta,
+                args.index_diff, args.strict, args.sync_index, args.no_meta,
                args.print_count_only, args.purge_queue)
     return
 
