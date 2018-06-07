@@ -646,7 +646,7 @@ def build_index(app, es, in_type, mapping, uuids_to_index, dry_run, check_first,
                 duration=str(end-start), collection=in_type)
     uuids_to_index.update(coll_uuids)
     log.warning('MAPPING: will queue all %s items in the new index %s for reindexing' %
-                (str(coll_count), in_type), cat='items to queue', count=str(coll_count), collection=in_type)
+                (str(coll_count), in_type), cat='items to queue', count=coll_count, collection=in_type)
 
     # put index_record in meta
     if meta_bulk_actions is None:
@@ -828,7 +828,7 @@ def confirm_mapping(es, in_type, this_index_record):
         if found_map_json == this_map_json:
             mapping_check = True
         else:
-            count = es.count(index=in_type, doc_type=in_type).get('count', 'ERR')
+            count = es.count(index=in_type, doc_type=in_type).get('count', 0)
             log.warning('___BAD MAPPING FOUND FOR %s. RETRYING___\nDocument count in that index is %s.'
                         % (in_type, count), collection=in_type, count=count, cat='bad mapping')
             es_safe_execute(es.indices.delete, index=in_type)
