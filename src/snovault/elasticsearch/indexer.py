@@ -230,7 +230,8 @@ class Indexer(object):
                     else:
                         # on a regular error, replace the message back in the queue
                         # could do something with error, like putting on elasticache
-                        self.queue.replace_messages([msg], target_queue=target_queue)
+                        # set VisibilityTimeout high so that other items can process
+                        self.queue.replace_messages([msg], target_queue=target_queue, vis_timeout=180)
                         errors.append(error)
                 else:
                     if counter: counter[0] += 1  # do not increment on error
