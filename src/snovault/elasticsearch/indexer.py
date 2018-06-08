@@ -320,7 +320,7 @@ class Indexer(object):
                 # this will cause the item to be sent to the deferred queue
                 return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
             else:
-                log.error('KeyError rendering @@index-data', duration=duration, exc_info=True), cat=cat)
+                log.error('KeyError rendering @@index-data', duration=duration, exc_info=True, cat=cat)
                 return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
         except Exception as e:
             duration = timer() - start

@@ -904,6 +904,11 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     es = registry[ELASTIC_SEARCH]
     indexer_queue = registry[INDEXER_QUEUE]
     cat = 'start create mapping'
+
+    # we shouldn't have telemetry id here but just double check and set if not set
+    global log
+    if not log._context.get('telemetry_id'):
+        log = log.bind(telemetry_id='cr_run_' + datetime.datetime.now().isoformat())
     log.warning('\n___CREATE-MAPPING___:\ncollections: %s\ncheck_first %s\n index_diff %s\n' %
                 (collections, check_first, index_diff), cat=cat)
     log.warning('\n___ES___:\n %s\n' % (str(es.cat.client)), cat=cat)
