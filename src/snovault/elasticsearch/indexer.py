@@ -306,6 +306,7 @@ class Indexer(object):
         try:
             result = request.embed(index_data_query, as_user='INDEXER')
             duration = timer() - start
+            log.bind(collection=result.get('item_type'))
             log.info("time to embed", duration=duration, cat="embed time")
         except SidException as e:
             duration = timer() - start
@@ -364,7 +365,7 @@ class Indexer(object):
                     except KeyError:  # catch a possible edge case?
                         pass
                 duration = timer() - start
-                log.info('update object', duration=duration, cat=cat)
+                log.info('update object success', duration=duration, cat=cat)
                 return
 
         return {'error_message': last_exc, 'time': curr_time, 'uuid': str(uuid)}
