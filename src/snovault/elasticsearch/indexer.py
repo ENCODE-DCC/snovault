@@ -230,7 +230,8 @@ class Indexer(object):
                     else:
                         # on a regular error, replace the message back in the queue
                         # could do something with error, like putting on elasticache
-                        self.queue.replace_messages([msg], target_queue=target_queue)
+                        # set VisibilityTimeout high so that other items can process
+                        self.queue.replace_messages([msg], target_queue=target_queue, vis_timeout=180)
                         errors.append(error)
                 else:
                     if counter: counter[0] += 1  # do not increment on error
@@ -286,6 +287,9 @@ class Indexer(object):
             'primary', 'secondary', or 'deferred'
         """
 
+        # logging constant
+        cat = 'update object'
+
         #timing stuff
         start = timer()
         if not curr_time:
@@ -302,24 +306,27 @@ class Indexer(object):
 
         try:
             result = request.embed(index_data_query, as_user='INDEXER')
+            duration = timer() - start
+            log.bind(collection=result.get('item_type'))
+            log.info("time to embed", duration=duration, cat="embed time")
         except SidException as e:
             duration = timer() - start
-            log.warning('Invalid sid found', duration=duration)
+            log.warning('Invalid sid found', duration=duration, cat=cat)
             # this will cause the item to be sent to the deferred queue
             return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
         except KeyError as e:
             # only consider a KeyError deferrable if not already in deferred queue
             duration = timer() - start
             if target_queue != 'deferred':
-                log.info('KeyError', duration=duration)
+                log.info('KeyError', duration=duration, cat=cat)
                 # this will cause the item to be sent to the deferred queue
                 return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
             else:
-                log.error('KeyError rendering @@index-data', duration=duration, exc_info=True)
+                log.error('KeyError rendering @@index-data', duration=duration, exc_info=True, cat=cat)
                 return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
         except Exception as e:
             duration = timer() - start
-            log.error('Error rendering @@index-data', duration=duration, exc_info=True)
+            log.error('Error rendering @@index-data', duration=duration, exc_info=True, cat=cat)
             return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
 
         last_exc = None
@@ -333,17 +340,17 @@ class Indexer(object):
                 )
             except ConflictError:
                 duration = timer() - start
-                log.warning('Conflict indexing', sid=result['sid'], duration=duration)
+                log.warning('Conflict indexing', sid=result['sid'], duration=duration, cat=cat)
                 # this may be somewhat common and is not harmful
                 # do not return an error so the item is removed from the queue
                 return
             except (ConnectionError, ReadTimeoutError, TransportError) as e:
                 duration = timer() - start
-                log.warning('Retryable error indexing', error=str(e), duration=duration)
+                log.warning('Retryable error indexing', error=str(e), duration=duration, cat=cat)
                 last_exc = repr(e)
             except Exception as e:
                 duration = timer() - start
-                log.error('Error indexing', duration=duration, exc_info=True)
+                log.error('Error indexing', duration=duration, exc_info=True, cat=cat)
                 last_exc = repr(e)
                 break
             else:
@@ -359,8 +366,9 @@ class Indexer(object):
                     except KeyError:  # catch a possible edge case?
                         pass
                 duration = timer() - start
-                log.debug('Conflict indexing',  sid=result['sid'], duration=duration)
+                log.info('update object success', duration=duration, cat=cat)
                 return
+
         return {'error_message': last_exc, 'time': curr_time, 'uuid': str(uuid)}
 
 

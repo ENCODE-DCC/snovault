@@ -141,25 +141,26 @@ class QueueManager(object):
         self.defer_queue_name = self.env_name + '-deferred-indexer-queue'
         self.dlq_name = self.queue_name + '-dlq'
         # dictionary storing attributes for each queue, keyed by name
+        # set VisibilityTimeout high because messages are batched and some items are slow
         self.queue_attrs = {
             self.queue_name: {
                 'DelaySeconds': '1',  # messages initially inivisble for 1 sec
-                'VisibilityTimeout': '120',  # increase if messages going to dlq
+                'VisibilityTimeout': '600',
                 'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
                 'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
             },
             self.second_queue_name: {
-                'VisibilityTimeout': '120',  # increase if messages going to dlq
+                'VisibilityTimeout': '600',
                 'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
                 'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
             },
             self.defer_queue_name: {
-                'VisibilityTimeout': '120',
+                'VisibilityTimeout': '600',
                 'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
                 'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
             },
             self.dlq_name: {
-                'VisibilityTimeout': '120',  # increase if messages going to dlq
+                'VisibilityTimeout': '600',  # increase if messages going to dlq
                 'MessageRetentionPeriod': '1209600',  # 14 days, in seconds
                 'ReceiveMessageWaitTimeSeconds': '2',  # 2 seconds of long polling
             }
