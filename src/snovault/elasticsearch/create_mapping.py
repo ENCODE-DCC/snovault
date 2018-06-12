@@ -1011,11 +1011,11 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     # TODO: maybe put items on primary/secondary by type
     if uuids_to_index:
         count=len(uuids_to_index)
-        # lets not knock over ES trying to get all theses uuids
+        # lets not knock over ES trying to get all these uuids
         # we need to find associated uuids if all items are not indexed or not strict mode
         if not total_reindex and not strict:
             if count > 30000:  # arbitrary large number, that hopefully is within ES limits
-                uuids_to_index = get_uuids_for_types(registry)
+                uuids_to_index = set(get_uuids_for_types(registry))  # all uuids
             else:
                 uuids_to_index = find_uuids_for_indexing(registry, uuids_to_index, log)
         # only index (synchronously) if --sync-index option is used
