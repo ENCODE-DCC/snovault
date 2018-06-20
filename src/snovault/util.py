@@ -36,12 +36,12 @@ def simple_path_ids(obj, path):
             yield result
 
 
-def secure_embed(request, item_path, addition='@@object'):
+def secure_embed(request, item_path, addition='@@object', user=None):
     res = {'error': 'no view permissions'}
     try:
         # if empty item_path reqeust.embed returns just addition as a string
         if item_path:
-            res = request.embed(str(item_path), addition, as_user=True)
+            res = request.embed(str(item_path), addition, as_user=user)
         else:
             res = ''
         return res
@@ -64,12 +64,12 @@ def expand_path(request, obj, path):
     if isinstance(value, list):
         for index, member in enumerate(value):
             if not isinstance(member, dict):
-                res = secure_embed(request, member, '@@object')
+                res = secure_embed(request, member, '@@object', user=True)
                 member = value[index] = res
             expand_path(request, member, remaining)
     else:
         if not isinstance(value, dict):
-            res = secure_embed(request, value, '@@object')
+            res = secure_embed(request, value, '@@object', user=True)
             value = obj[name] = res
         expand_path(request, value, remaining)
 
@@ -127,6 +127,8 @@ def expand_val_for_embedded_model(request, obj_val, downstream_model):
         if not obj_val or obj_val == {'error': 'no view permissions'}:
             return obj_val
         obj_embedded = expand_embedded_model(request, obj_val, downstream_model)
+        if hasattr(request, '_embedded_uuids'):
+            request._embedded_uuids.add(obj_embedded['uuid'])
         return obj_embedded
     else:
         # this means the object should be returned as-is

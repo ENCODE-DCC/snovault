@@ -60,6 +60,7 @@ def item_index_data(context, request):
                 for key in unique_keys[key_name])
 
     path = path + '/'
+    request._embedded_uuids.add(uuid)
     embedded = request.embed(path, '@@embedded')
     audit = request.embed(path, '@@audit')['audit']
     obj = request.embed(path, '@@object')

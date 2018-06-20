@@ -297,8 +297,6 @@ class Item(Resource):
         return properties
 
     def __json__(self, request):
-        # Record embedding objects
-        request._embedded_uuids.add(str(self.uuid))
         return self.upgrade_properties()
 
     def __resource_url__(self, request, info):
