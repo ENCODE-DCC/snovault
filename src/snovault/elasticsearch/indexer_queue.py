@@ -50,6 +50,8 @@ def queue_indexing(request):
         'number_queued': 0,
         'detail': 'Nothing was queued. Make sure to past in a list of uuids in in "uuids" key OR list of collections in the "collections" key of request the POST request.'
     }
+    telemetry_id = request.params.get('telemetry_id', None)
+
     if not req_uuids and not req_collections:
         return response
     if req_uuids and req_collections:
@@ -68,11 +70,14 @@ def queue_indexing(request):
     target = request.json.get('target_queue', 'primary')
     if req_uuids:
         # queue these as secondary
-        queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=strict, target_queue=target)
+        queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=strict,
+                                                 target_queue=target, telemetry_id=telemetry_id)
         response['requested_uuids'] = req_uuids
     else:
         # queue these as secondary
-        queued, failed = queue_indexer.add_collections(request.registry, req_collections, strict=strict, target_queue=target)
+        queued, failed = queue_indexer.add_collections(request.registry, req_collections, strict=strict,
+                                                       target_queue=target,
+                                                       telemetry_id=telemetry_id)
         response['requested_collections'] = req_collections
     response['notification'] = 'Success'
     response['number_queued'] = len(queued)
@@ -178,7 +183,7 @@ class QueueManager(object):
             self.defer_queue_url = self.get_queue_url(self.defer_queue_name)
             self.dlq_url = self.get_queue_url(self.dlq_name)
 
-    def add_uuids(self, registry, uuids, strict=False, target_queue='primary'):
+    def add_uuids(self, registry, uuids, strict=False, target_queue='primary', telemetry_id=None):
         """
         Takes a list of string uuids queues them up. Also requires a registry,
         which is passed in automatically when using the /queue_indexing route.
@@ -191,11 +196,17 @@ class QueueManager(object):
         be queued.
         """
         curr_time = datetime.datetime.utcnow().isoformat()
-        items = [{'uuid': uuid, 'sid': None, 'strict': strict, 'timestamp': curr_time} for uuid in uuids]
+        items = []
+        for uuid in uuids:
+            temp = {'uuid': uuid, 'sid': None, 'strict': strict, 'timestamp': curr_time}
+            if telemetry_id:
+                temp['telemetry_id']= telemetry_id
+            items.append(temp)
         failed = self.send_messages(items, target_queue=target_queue)
         return uuids, failed
 
-    def add_collections(self, registry, collections, strict=False, target_queue='primary'):
+    def add_collections(self, registry, collections, strict=False, target_queue='primary',
+                        telemetry_id=None):
         """
         Takes a list of collection name and queues all uuids for them.
         Also requires a registry, which is passed in automatically when using
@@ -209,8 +220,13 @@ class QueueManager(object):
         """
         curr_time = datetime.datetime.utcnow().isoformat()
         uuids = list(get_uuids_for_types(registry, collections))
-        items = [{'uuid': uuid, 'sid': None, 'strict': strict, 'timestamp': curr_time} for uuid in uuids]
-        failed = self.send_messages(uuids, target_queue=target_queue)
+        items = []
+        for uuid in uuids:
+            temp = {'uuid': uuid, 'sid': None, 'strict': strict, 'timestamp': curr_time}
+            if telemetry_id:
+                temp['telemetry_id']= telemetry_id
+            items.append(temp)
+        failed = self.send_messages(items, target_queue=target_queue)
         return uuids, failed
 
     def get_queue_url(self, queue_name):

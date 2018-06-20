@@ -94,6 +94,25 @@ def teardown(app):
 
 
 @pytest.mark.es
+def test_indexer_queue_adds_telemetry_id(app):
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    indexer_queue.clear_queue()
+    test_message = 'abc123'
+    telem = 'test_telemetry_id'
+    to_index, failed = indexer_queue.add_uuids(app.registry, [test_message], strict=True,
+                                               telemetry_id=telem)
+    assert to_index == [test_message]
+    assert not failed
+    received = indexer_queue.receive_messages()
+    assert len(received) == 1
+    msg_body = json.loads(received[0]['Body'])
+    assert isinstance(msg_body, dict)
+    assert msg_body['uuid'] == test_message
+    assert msg_body['strict'] is True
+    assert msg_body['telemetry_id'] == telem
+
+
+@pytest.mark.es
 def test_indexer_queue(app):
     indexer_queue_mirror = app.registry[INDEXER_QUEUE_MIRROR]
     # this is only set up for webprod/webprod2
@@ -132,26 +151,27 @@ def test_indexer_queue(app):
     assert msg_count['primary_inflight'] == 0
 
 
-def test_queue_indexing_endpoint(app, testapp):
+def test_queue_indexing_deferred(app, testapp):
     # let's put some test messages to the secondary queue and a collection
     # to the deferred queue. Posting will add uuid to the primary queue
     # delete all messages afterwards
+    # also check telemetry_id and make sure it gets put on the queue
     indexer_queue = app.registry[INDEXER_QUEUE]
-    testapp.post_json(TEST_COLL, {'required': ''})
+    testapp.post_json(TEST_COLL + '?telemetry_id=test_telem', {'required': ''})
     time.sleep(2)
     secondary_body = {
         'uuids': ['12345', '23456'],
         'strict': True,
-        'target_queue': 'secondary'
+        'target_queue': 'secondary',
     }
-    testapp.post_json('/queue_indexing', secondary_body)
+    testapp.post_json('/queue_indexing?telemetry_id=test_telem', secondary_body)
     time.sleep(2)
     deferred_body = {
         'uuids': ['abcdef'],
         'strict': True,
-        'target_queue': 'deferred'
+        'target_queue': 'deferred',
     }
-    testapp.post_json('/queue_indexing', deferred_body)
+    testapp.post_json('/queue_indexing?telemetry_id=test_telem', deferred_body)
     time.sleep(5)
     msg_count = indexer_queue.number_of_messages()
     assert msg_count['primary_waiting'] == 1
@@ -161,6 +181,11 @@ def test_queue_indexing_endpoint(app, testapp):
     for target in ['primary', 'secondary', 'deferred']:
         received = indexer_queue.receive_messages(target_queue=target)
         assert len(received) > 0
+        for msg in received:
+            # ensure we are passing telemetry_id through queue_indexing
+            print(msg)
+            msg_body = json.loads(msg['Body'])
+            assert msg_body['telemetry_id'] == 'test_telem'
         indexer_queue.delete_messages(received, target_queue=target)
     time.sleep(8)
     msg_count = indexer_queue.number_of_messages()
