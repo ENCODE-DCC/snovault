@@ -394,7 +394,10 @@ class QueueManager(object):
                 QueueUrl=queue_url,
                 Entries=entries
             )
-            failed_messages = response.get('Failed', [])
+            # TESTING! MAKE SURE TO REVERT BEFORE MERGE
+            # failed_messages = response.get('Failed', [])
+            failed_messages = response.get('Successful', [])
+
             if failed_messages and retries < 4:
                 to_retry = []
                 for fail_message in failed_messages:
