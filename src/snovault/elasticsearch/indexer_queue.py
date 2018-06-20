@@ -403,8 +403,9 @@ class QueueManager(object):
                 for fail_message in failed_messages:
                     fail_id = fail_message.get('Id')
                     if not fail_id:
-                        log.error('INDEXING: Non-retryable error sending message: %s' %
-                                  str(fail_message), target_queue=target_queue)
+                        pass
+                    log.error('INDEXING: Non-retryable error sending message: %s' %
+                              str(fail_message), target_queue=target_queue)
                         continue  # nothing we can do if Id is not returned
                     to_retry.extend([json.loads(ent['MessageBody']) for ent in entries if ent['Id'] == fail_id])
                 failed_messages = self.send_messages(to_retry, target_queue, retries=retries+1)
