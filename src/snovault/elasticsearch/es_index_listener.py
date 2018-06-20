@@ -34,10 +34,6 @@ PY2 = sys.version_info[0] == 2
 
 
 def run(testapp, interval=DEFAULT_INTERVAL, dry_run=False, path='/index', update_status=None):
-
-    # TESTING
-    return
-
     log.info('___INDEXER LISTENER STARTING___')
     listening = False
     timestamp = datetime.datetime.now().isoformat()
