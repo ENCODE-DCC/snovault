@@ -382,7 +382,7 @@ class QueueManager(object):
                 if isinstance(msg, dict):
                     entries.append({
                         'Id': str(int(time.time() * 1000000)),
-                        'DFAasdMessageBody': json.dumps(msg)
+                        'MessageBody': json.dumps(msg)
                     })
                 else:
                     entries.append({
