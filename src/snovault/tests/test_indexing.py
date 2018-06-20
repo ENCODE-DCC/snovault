@@ -111,6 +111,9 @@ def test_indexer_queue_adds_telemetry_id(app):
     assert msg_body['strict'] is True
     assert msg_body['telemetry_id'] == telem
 
+    # finally, delete
+    indexer_queue.delete_messages(received)
+
 
 @pytest.mark.es
 def test_indexer_queue(app):

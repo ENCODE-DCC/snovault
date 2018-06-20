@@ -189,30 +189,22 @@ class Indexer(object):
         messages, target_queue = self.get_messages_from_queue(skip_deferred=False)
         while len(messages) > 0:
             for idx, msg in enumerate(messages):
-                # this code is needed for integration with old style messages
-                try:
-                    msg_body = json.loads(msg['Body'])
-                except ValueError:
-                    msg_body = msg['Body']
-                if isinstance(msg_body, dict):
-                    msg_uuid= msg_body['uuid']
-                    msg_sid = msg_body['sid']
-                    msg_curr_time = msg_body['timestamp']
-                    msg_detail = msg_body.get('detail')
-                    msg_telemetry = msg_body.get('telemetry_id')
-                    # check to see if we are using the same txn that caused a deferral
-                    if target_queue == 'deferred' and msg_detail == str(request.tm.get()):
-                        # re-create a new message so we don't affect retry count (dlq)
-                        self.queue.send_messages([msg_body], target_queue=target_queue)
-                        to_delete.append(msg)
-                        continue
-                    if msg_body['strict'] is False:
-                        non_strict_uuids.add(msg_uuid)
-                else:  # old uuid message format
-                    msg_uuid = str(msg_body)
-                    msg_sid = None
-                    msg_curr_time = None
-                    msg_telemetry = None
+                # get all the details
+                msg_body = json.loads(msg['Body'])
+                msg_uuid= msg_body['uuid']
+                msg_sid = msg_body['sid']
+                msg_curr_time = msg_body['timestamp']
+                msg_detail = msg_body.get('detail')
+                msg_telemetry = msg_body.get('telemetry_id')
+
+                # check to see if we are using the same txn that caused a deferral
+                if target_queue == 'deferred' and msg_detail == str(request.tm.get()):
+                    # re-create a new message so we don't affect retry count (dlq)
+                    self.queue.send_messages([msg_body], target_queue=target_queue)
+                    to_delete.append(msg)
+                    continue
+                if msg_body['strict'] is False:
+                    non_strict_uuids.add(msg_uuid)
                 # add embedded uuids to secondary, but only if not using secondary
                 if target_queue != 'secondary':
                     error = self.update_object(request, msg_uuid, sid=msg_sid,
