@@ -370,7 +370,7 @@ class QueueManager(object):
         else:
             return self.queue_url
 
-    def send_messages(self, items, target_queue='primary'):
+    def send_messages(self, items, target_queue='primary', retries=0):
         """
         Send any number of 'items' as messages to sqs.
         items is a list of dictionaries with the following format:
@@ -385,7 +385,10 @@ class QueueManager(object):
 
         strict is a boolean that determines whether or not associated uuids
         will be found for these uuids.
-        Returns information on messages that failed to queue
+
+        Since sending messages is something we want to be fail-proof, retry
+        failed messages automatically up to 4 times.
+        Returns information on messages that failed to queue despite the retries
         """
         queue_url = self.choose_queue_url(target_queue)
         failed = []
@@ -403,12 +406,25 @@ class QueueManager(object):
                         'Id': str(int(time.time() * 1000000)),
                         'MessageBody': msg
                     })
-                time.sleep(0.001)  # in edge cases, Ids were repeated?
+                time.sleep(0.001)  # ensure time-based Ids are not repeated
             response = self.client.send_message_batch(
                 QueueUrl=queue_url,
                 Entries=entries
             )
-            failed.extend(response.get('Failed', []))
+            failed_messages = response.get('Failed', [])
+
+            if failed_messages and retries < 4:
+                to_retry = []
+                for fail_message in failed_messages:
+                    fail_id = fail_message.get('Id')
+                    if not fail_id:
+                        log.error('INDEXING: Non-retryable error sending message: %s' %
+                                  str(fail_message), target_queue=target_queue)
+                        continue  # cannot retry this message without an Id
+                    to_retry.extend([json.loads(ent['MessageBody']) for ent in entries if ent['Id'] == fail_id])
+                if to_retry:
+                    failed_messages = self.send_messages(to_retry, target_queue, retries=retries+1)
+            failed.extend(failed_messages)
         return failed
 
     def receive_messages(self, target_queue='primary'):
