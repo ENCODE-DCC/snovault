@@ -422,9 +422,10 @@ def test_queue_indexing_endpoint(app, testapp, indexer_testapp):
         'collections': [TEST_TYPE],
         'strict': True
     }
-    res = indexer_testapp.post_json('/queue_indexing', post_body)
+    res = indexer_testapp.post_json('/queue_indexing?telemetry_id=test', post_body)
     assert res.json['notification'] == 'Success'
     assert res.json['number_queued'] == 2
+    assert res.json['telemetry_id'] == 'test'
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 2
     time.sleep(4)
