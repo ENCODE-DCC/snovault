@@ -907,8 +907,10 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
 
     # we shouldn't have telemetry id here but just double check and set if not set
     global log
-    if not log._context.get('telemetry_id'):
-        log = log.bind(telemetry_id='cr_run_' + datetime.datetime.now().isoformat())
+    telemetry_id = log._context.get('telemetry_id', None)
+    if not telemetry_id:
+        telemetry_id='cm_run_' + datetime.datetime.now().isoformat()
+        log = log.bind(telemetry_id=telemetry_id)
     log.warning('\n___CREATE-MAPPING___:\ncollections: %s\ncheck_first %s\n index_diff %s\n' %
                 (collections, check_first, index_diff), cat=cat)
     log.warning('\n___ES___:\n %s\n' % (str(es.cat.client)), cat=cat)
@@ -1031,7 +1033,8 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         else:
             log.warning('\n___UUIDS TO INDEX (QUEUED)___: %s\n' % count,
                         cat='uuids to index', count=count)
-            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True, target_queue='secondary')
+            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True,
+                                    target_queue='secondary', telemetry_id=telemetry_id)
     return timings
 
 

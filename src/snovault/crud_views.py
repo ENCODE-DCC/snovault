@@ -177,6 +177,9 @@ def collection_add(context, request, render=None):
     item = create_item(context.type_info, request, request.validated)
     # set up hook for queueing indexing
     to_queue = {'uuid': str(item.uuid), 'sid': item.sid}
+    telemetry_id = request.params.get('telemetry_id', None)
+    if telemetry_id:
+        to_queue['telemetry_id'] = telemetry_id
     log.info(event='add_to_indexing_queue', **to_queue)
 
     txn.addAfterCommitHook(add_to_indexing_queue, args=(request, to_queue, 'add',))
@@ -221,6 +224,9 @@ def item_edit(context, request, render=None):
 
     # set up hook for queueing indexing
     to_queue = {'uuid': str(context.uuid), 'sid': context.sid}
+    telemetry_id = request.params.get('telemetry_id', None)
+    if telemetry_id:
+        to_queue['telemetry_id'] = telemetry_id
     txn.addAfterCommitHook(add_to_indexing_queue, args=(request, to_queue, 'edit',))
 
     rendered = render_item(request, context, render)
