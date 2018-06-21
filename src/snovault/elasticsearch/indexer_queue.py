@@ -405,7 +405,8 @@ class QueueManager(object):
                                   str(fail_message), target_queue=target_queue)
                         continue  # cannot retry this message without an Id
                     to_retry.extend([json.loads(ent['MessageBody']) for ent in entries if ent['Id'] == fail_id])
-                failed_messages = self.send_messages(to_retry, target_queue, retries=retries+1)
+                if to_retry:
+                    failed_messages = self.send_messages(to_retry, target_queue, retries=retries+1)
             failed.extend(failed_messages)
         return failed
 

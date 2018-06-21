@@ -61,8 +61,7 @@ before_install:
 - node --version
 - npm config set python /usr/bin/python2.7
 install:
-# Pin six to >= 1.11.0 to avoid cherrypy/cheroot dependency errors
-# For more info, see: https://github.com/OpenKMIP/SLUGS/issues/3
+# need to manually change the version of six used by Travis for some reason
 - pip uninstall -y six
 - pip install six>=1.11.0
 - python bootstrap.py --buildout-version 2.9.5 --setuptools-version 37.0.0
