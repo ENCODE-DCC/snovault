@@ -85,6 +85,7 @@ def queue_indexing(request):
     response['errors'] = failed
     response['strict'] = strict
     response['target_queue'] = target
+    response['telemetry_id'] = telemetry_id
     return response
 
 
