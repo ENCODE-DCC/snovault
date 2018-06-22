@@ -1,3 +1,6 @@
+1.0.11
+01. SNO-41-put-validator-accession (#112)
+
 1.0.10
 01. SNO-35 fix bug in get_rev_links(#111)
 02. SNO-40 Upgrade blob storage to boto3 (#110)
