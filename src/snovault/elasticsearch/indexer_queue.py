@@ -102,7 +102,8 @@ def indexing_status(request):
         response['detail'] = str(e)
         response['status'] = 'Failure'
     else:
-        response['detail'] = numbers
+        for queue in numbers:
+            response[queue] = numbers[queue]
         response['status'] = 'Success'
     return response
 
