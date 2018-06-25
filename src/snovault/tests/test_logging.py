@@ -57,7 +57,8 @@ def test_telemetry_id_carries_through_logging(testapp, external_tx):
     mocked = mock.patch.object(crud_view_log, 'info')
     with mocked as mock_log:
         res = testapp.post_json(COLLECTION_URL + "?telemetry_id=test&log_action=action_test", item_with_uuid[0], status=201)
-        mock_log.assert_called_with(event="add_to_indexing_queue", uuid=mock.ANY, sid=mock.ANY)
+        mock_log.assert_called_with(event="add_to_indexing_queue", uuid=mock.ANY,
+                                    sid=mock.ANY, telemetry_id=mock.ANY)
         # also make sure we have a logger that has defaultsset from stats.py
         logger = crud_view_log.bind()
         assert logger._context.get('url_path') == COLLECTION_URL

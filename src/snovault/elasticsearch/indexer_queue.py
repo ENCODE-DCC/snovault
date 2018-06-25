@@ -50,6 +50,8 @@ def queue_indexing(request):
         'number_queued': 0,
         'detail': 'Nothing was queued. Make sure to past in a list of uuids in in "uuids" key OR list of collections in the "collections" key of request the POST request.'
     }
+    telemetry_id = request.params.get('telemetry_id', None)
+
     if not req_uuids and not req_collections:
         return response
     if req_uuids and req_collections:
@@ -68,11 +70,14 @@ def queue_indexing(request):
     target = request.json.get('target_queue', 'primary')
     if req_uuids:
         # queue these as secondary
-        queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=strict, target_queue=target)
+        queued, failed = queue_indexer.add_uuids(request.registry, req_uuids, strict=strict,
+                                                 target_queue=target, telemetry_id=telemetry_id)
         response['requested_uuids'] = req_uuids
     else:
         # queue these as secondary
-        queued, failed = queue_indexer.add_collections(request.registry, req_collections, strict=strict, target_queue=target)
+        queued, failed = queue_indexer.add_collections(request.registry, req_collections, strict=strict,
+                                                       target_queue=target,
+                                                       telemetry_id=telemetry_id)
         response['requested_collections'] = req_collections
     response['notification'] = 'Success'
     response['number_queued'] = len(queued)
@@ -80,6 +85,7 @@ def queue_indexing(request):
     response['errors'] = failed
     response['strict'] = strict
     response['target_queue'] = target
+    response['telemetry_id'] = telemetry_id
     return response
 
 
@@ -96,7 +102,8 @@ def indexing_status(request):
         response['detail'] = str(e)
         response['status'] = 'Failure'
     else:
-        response['detail'] = numbers
+        for queue in numbers:
+            response[queue] = numbers[queue]
         response['status'] = 'Success'
     return response
 
@@ -178,7 +185,7 @@ class QueueManager(object):
             self.defer_queue_url = self.get_queue_url(self.defer_queue_name)
             self.dlq_url = self.get_queue_url(self.dlq_name)
 
-    def add_uuids(self, registry, uuids, strict=False, target_queue='primary'):
+    def add_uuids(self, registry, uuids, strict=False, target_queue='primary', telemetry_id=None):
         """
         Takes a list of string uuids queues them up. Also requires a registry,
         which is passed in automatically when using the /queue_indexing route.
@@ -191,11 +198,17 @@ class QueueManager(object):
         be queued.
         """
         curr_time = datetime.datetime.utcnow().isoformat()
-        items = [{'uuid': uuid, 'sid': None, 'strict': strict, 'timestamp': curr_time} for uuid in uuids]
+        items = []
+        for uuid in uuids:
+            temp = {'uuid': uuid, 'sid': None, 'strict': strict, 'timestamp': curr_time}
+            if telemetry_id:
+                temp['telemetry_id']= telemetry_id
+            items.append(temp)
         failed = self.send_messages(items, target_queue=target_queue)
         return uuids, failed
 
-    def add_collections(self, registry, collections, strict=False, target_queue='primary'):
+    def add_collections(self, registry, collections, strict=False, target_queue='primary',
+                        telemetry_id=None):
         """
         Takes a list of collection name and queues all uuids for them.
         Also requires a registry, which is passed in automatically when using
@@ -209,8 +222,13 @@ class QueueManager(object):
         """
         curr_time = datetime.datetime.utcnow().isoformat()
         uuids = list(get_uuids_for_types(registry, collections))
-        items = [{'uuid': uuid, 'sid': None, 'strict': strict, 'timestamp': curr_time} for uuid in uuids]
-        failed = self.send_messages(uuids, target_queue=target_queue)
+        items = []
+        for uuid in uuids:
+            temp = {'uuid': uuid, 'sid': None, 'strict': strict, 'timestamp': curr_time}
+            if telemetry_id:
+                temp['telemetry_id']= telemetry_id
+            items.append(temp)
+        failed = self.send_messages(items, target_queue=target_queue)
         return uuids, failed
 
     def get_queue_url(self, queue_name):
@@ -353,7 +371,7 @@ class QueueManager(object):
         else:
             return self.queue_url
 
-    def send_messages(self, items, target_queue='primary'):
+    def send_messages(self, items, target_queue='primary', retries=0):
         """
         Send any number of 'items' as messages to sqs.
         items is a list of dictionaries with the following format:
@@ -368,7 +386,10 @@ class QueueManager(object):
 
         strict is a boolean that determines whether or not associated uuids
         will be found for these uuids.
-        Returns information on messages that failed to queue
+
+        Since sending messages is something we want to be fail-proof, retry
+        failed messages automatically up to 4 times.
+        Returns information on messages that failed to queue despite the retries
         """
         queue_url = self.choose_queue_url(target_queue)
         failed = []
@@ -386,12 +407,25 @@ class QueueManager(object):
                         'Id': str(int(time.time() * 1000000)),
                         'MessageBody': msg
                     })
-                time.sleep(0.001)  # in edge cases, Ids were repeated?
+                time.sleep(0.001)  # ensure time-based Ids are not repeated
             response = self.client.send_message_batch(
                 QueueUrl=queue_url,
                 Entries=entries
             )
-            failed.extend(response.get('Failed', []))
+            failed_messages = response.get('Failed', [])
+
+            if failed_messages and retries < 4:
+                to_retry = []
+                for fail_message in failed_messages:
+                    fail_id = fail_message.get('Id')
+                    if not fail_id:
+                        log.error('INDEXING: Non-retryable error sending message: %s' %
+                                  str(fail_message), target_queue=target_queue)
+                        continue  # cannot retry this message without an Id
+                    to_retry.extend([json.loads(ent['MessageBody']) for ent in entries if ent['Id'] == fail_id])
+                if to_retry:
+                    failed_messages = self.send_messages(to_retry, target_queue, retries=retries+1)
+            failed.extend(failed_messages)
         return failed
 
     def receive_messages(self, target_queue='primary'):
