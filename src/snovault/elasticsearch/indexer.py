@@ -28,6 +28,7 @@ log = structlog.getLogger(__name__)
 def includeme(config):
     config.add_route('index', '/index')
     config.scan(__name__)
+    config.add_request_method(lambda request: False, '_is_indexing', reify=True)
     registry = config.registry
     registry[INDEXER] = Indexer(registry)
 
@@ -40,6 +41,8 @@ def index(request):
     dry_run = request.json.get('dry_run', False)  # if True, do not actually index
     es = request.registry[ELASTIC_SEARCH]
     indexer = request.registry[INDEXER]
+    # use this property to track if a request in indexing
+    request._is_indexing = True
 
     # ensure we get the latest version of what is in the db as much as possible
     session = request.registry[DBSESSION]()
@@ -361,11 +364,6 @@ class Indexer(object):
                 # (on the secondary queue with strict=True)
                 if sid and isinstance(add_to_secondary, set):
                     add_to_secondary |= set(result.get('embedded_uuids', []))
-                    # remove the uuid we are indexing (included in result['embedded_uuids'])
-                    try:
-                        add_to_secondary.remove(uuid)
-                    except KeyError:  # catch a possible edge case?
-                        pass
                 duration = timer() - start
                 log.info('update object success', duration=duration, cat=cat)
                 return

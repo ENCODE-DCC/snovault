@@ -300,8 +300,6 @@ class Item(Resource):
         return self.upgrade_properties()
 
     def __resource_url__(self, request, info):
-        # Record linking objects
-        request._linked_uuids.add(str(self.uuid))
         return None
 
     @classmethod

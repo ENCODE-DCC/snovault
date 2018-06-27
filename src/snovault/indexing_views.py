@@ -60,7 +60,6 @@ def item_index_data(context, request):
                 for key in unique_keys[key_name])
 
     path = path + '/'
-    request._embedded_uuids.add(uuid)
     embedded = request.embed(path, '@@embedded')
     audit = request.embed(path, '@@audit')['audit']
     obj = request.embed(path, '@@object')
@@ -70,7 +69,6 @@ def item_index_data(context, request):
         'embedded': embedded,
         'embedded_uuids': sorted(request._embedded_uuids),
         'item_type': context.type_info.item_type,
-        'linked_uuids': sorted(request._linked_uuids),
         'links': links,
         'object': obj,
         'paths': sorted(paths),

@@ -19,7 +19,6 @@ def includeme(config):
     config.add_renderer('null_renderer', NullRenderer)
     config.add_request_method(embed, 'embed')
     config.add_request_method(lambda request: set(), '_embedded_uuids', reify=True)
-    config.add_request_method(lambda request: set(), '_linked_uuids', reify=True)
     config.add_request_method(lambda request: None, '__parent__', reify=True)
 
 
@@ -55,23 +54,24 @@ def embed(request, *elements, **kw):
     # Should really be more careful about what gets included instead.
     # Cache cut response time from ~800ms to ~420ms.
     embed_cache = request.registry[CONNECTION].embed_cache
+    print('--> %s' % len(embed_cache.cache))
     as_user = kw.get('as_user')
     path = join(*elements)
     path = unquote_bytes_to_wsgi(native_(path))
+    # as_user controls whether or not the embed_cache is used
     if as_user is not None:
-        result, embedded_uuids, linked_uuids = _embed(request, path, as_user)
+        result, embedded_uuids = _embed(request, path, as_user)
     else:
-        # Carl: caching restarts at every call to _embed
+        # Carl: caching restarts at every call to embed()
         cached = embed_cache.get(path, None)
         if cached is None:
             cached = _embed(request, path)
             embed_cache[path] = cached
-        result, embedded_uuids, linked_uuids = cached
+        result, embedded_uuids = cached
         result = deepcopy(result)
     log.debug('embed: %s', path)
     if not '@@audit' in path:
         request._embedded_uuids.update(embedded_uuids)
-        request._linked_uuids.update(linked_uuids)
     return result
 
 
@@ -84,6 +84,7 @@ def _embed(request, path, as_user='EMBED'):
     if '@@audit' in path and hasattr(request, '_embedded_uuids'):
             subreq._embedded_uuids = request._embedded_uuids
     subreq.override_renderer = 'null_renderer'
+    subreq._is_indexing = request._is_indexing
     if as_user is not True:
         if 'HTTP_COOKIE' in subreq.environ:
             del subreq.environ['HTTP_COOKIE']
@@ -92,7 +93,7 @@ def _embed(request, path, as_user='EMBED'):
         result = request.invoke_subrequest(subreq)
     except HTTPNotFound:
         raise KeyError(path)
-    return result, subreq._embedded_uuids, subreq._linked_uuids
+    return result, subreq._embedded_uuids
 
 
 class NullRenderer:

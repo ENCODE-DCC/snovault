@@ -434,10 +434,6 @@ def es_mapping(mapping):
                 'type': 'text',
                 'include_in_all': False
             },
-            'linked_uuids': {
-                'type': 'text',
-                'include_in_all': False
-            },
             'unique_keys': {
                 'type': 'object'
             },

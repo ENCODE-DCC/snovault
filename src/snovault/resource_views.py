@@ -180,16 +180,22 @@ def item_view_object(context, request):
 @view_config(context=Item, permission='view', request_method='GET',
              name='embedded')
 def item_view_embedded(context, request):
+    # we want to set as_user = None for embeds if indexing to enable caching
+    as_user = None if request._is_indexing else True
     item_path = request.resource_path(context)
-    properties = request.embed(item_path, '@@object', as_user=True)
+    properties = request.embed(item_path, '@@object', as_user=as_user)
     embedded_model = build_embedded_model(context.embedded)
-    embedded = expand_embedded_model(request, properties, embedded_model)
+    embedded = expand_embedded_model(request, properties, embedded_model, as_user)
     return embedded
 
 
 @view_config(context=Item, permission='view', request_method='GET',
              name='page')
 def item_view_page(context, request):
+    """
+    as_user is always True because this view is not used in embedding
+    and therefore doesn't need to be cached
+    """
     item_path = request.resource_path(context)
     properties = request.embed(item_path, '@@embedded', as_user=True)
     calculated = calculate_properties(context, request, properties, category='page')
@@ -200,8 +206,9 @@ def item_view_page(context, request):
 @view_config(context=Item, permission='expand', request_method='GET',
              name='expand')
 def item_view_expand(context, request):
+    as_user = None if request._is_indexing else True
     path = request.resource_path(context)
-    properties = request.embed(path, '@@object', as_user=True)
+    properties = request.embed(path, '@@object', as_user=as_user)
     for path in request.params.getall('expand'):
         expand_path(request, properties, path)
     return properties
