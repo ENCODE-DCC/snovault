@@ -28,7 +28,6 @@ log = structlog.getLogger(__name__)
 def includeme(config):
     config.add_route('index', '/index')
     config.scan(__name__)
-    config.add_request_method(lambda request: False, '_is_indexing', reify=True)
     registry = config.registry
     registry[INDEXER] = Indexer(registry)
 
@@ -37,12 +36,12 @@ def includeme(config):
 def index(request):
     # Setting request.datastore here only works because routed views are not traversed.
     request.datastore = 'database'
+    # use the embedding cache for the whole duration of a call to /index
+    request._use_embed_cache = True
     record = request.json.get('record', False)  # if True, make a record in es
     dry_run = request.json.get('dry_run', False)  # if True, do not actually index
     es = request.registry[ELASTIC_SEARCH]
-    indexer = request.registry[INDEXER]
-    # use this property to track if a request in indexing
-    request._is_indexing = True
+    indexer = request.registry[INDEXER]    
 
     # ensure we get the latest version of what is in the db as much as possible
     session = request.registry[DBSESSION]()

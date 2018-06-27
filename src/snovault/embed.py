@@ -19,6 +19,7 @@ def includeme(config):
     config.add_renderer('null_renderer', NullRenderer)
     config.add_request_method(embed, 'embed')
     config.add_request_method(lambda request: set(), '_embedded_uuids', reify=True)
+    config.add_request_method(lambda request: False, '_use_embed_cache', reify=True)
     config.add_request_method(lambda request: None, '__parent__', reify=True)
 
 
@@ -59,10 +60,10 @@ def embed(request, *elements, **kw):
     path = join(*elements)
     path = unquote_bytes_to_wsgi(native_(path))
     # as_user controls whether or not the embed_cache is used
-    if as_user is not None:
+    # if request._use_embed_cache is True, always use the cache
+    if as_user is not None and not request._use_embed_cache:
         result, embedded_uuids = _embed(request, path, as_user)
     else:
-        # Carl: caching restarts at every call to embed()
         cached = embed_cache.get(path, None)
         if cached is None:
             cached = _embed(request, path)
@@ -84,7 +85,7 @@ def _embed(request, path, as_user='EMBED'):
     if '@@audit' in path and hasattr(request, '_embedded_uuids'):
             subreq._embedded_uuids = request._embedded_uuids
     subreq.override_renderer = 'null_renderer'
-    subreq._is_indexing = request._is_indexing
+    subreq._use_embed_cache = request._use_embed_cache
     if as_user is not True:
         if 'HTTP_COOKIE' in subreq.environ:
             del subreq.environ['HTTP_COOKIE']

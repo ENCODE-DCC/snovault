@@ -36,7 +36,7 @@ def simple_path_ids(obj, path):
             yield result
 
 
-def secure_embed(request, item_path, addition='@@object', as_user=True):
+def secure_embed(request, item_path, addition='@@object'):
     """
     Make a call to embed() with the given item path and user status
     Handles substituting a no view permissions message if a the given
@@ -47,7 +47,7 @@ def secure_embed(request, item_path, addition='@@object', as_user=True):
     try:
         # if empty item_path reqeust.embed returns just addition as a string
         if item_path:
-            res = request.embed(str(item_path), addition, as_user=as_user)
+            res = request.embed(str(item_path), addition, as_user=True)
         else:
             res = ''
         # add uuid to _embedded_uuids
@@ -73,22 +73,21 @@ def expand_path(request, obj, path):
     if isinstance(value, list):
         for index, member in enumerate(value):
             if not isinstance(member, dict):
-                res = secure_embed(request, member, '@@object', as_user=True)
+                res = secure_embed(request, member, '@@object')
                 member = value[index] = res
             expand_path(request, member, remaining)
     else:
         if not isinstance(value, dict):
-            res = secure_embed(request, value, '@@object', as_user=True)
+            res = secure_embed(request, value, '@@object')
             value = obj[name] = res
         expand_path(request, value, remaining)
 
 
-def expand_embedded_model(request, obj, model, as_user):
+def expand_embedded_model(request, obj, model):
     """
     A similar idea to expand_path, but takes in a model from build_embedded_model
     instead. Takes in the @@object view of the item (obj) and returns a
     fully embedded result.
-    as_user is passed to the inner level embed() call through secure_embed()
     """
     embedded_res = {}
     # first take care of the fields_to_use at this level
@@ -108,13 +107,13 @@ def expand_embedded_model(request, obj, model, as_user):
         obj_val = obj.get(to_embed)
         if obj_val is None:
             continue
-        obj_embedded = expand_val_for_embedded_model(request, obj_val, model[to_embed], as_user)
+        obj_embedded = expand_val_for_embedded_model(request, obj_val, model[to_embed])
         if obj_embedded is not None:
             embedded_res[to_embed] = obj_embedded
     return embedded_res
 
 
-def expand_val_for_embedded_model(request, obj_val, downstream_model, as_user):
+def expand_val_for_embedded_model(request, obj_val, downstream_model):
     """
     Take a value from an object and the relevant piece of the embedded_model
     and perform embedding.
@@ -124,19 +123,19 @@ def expand_val_for_embedded_model(request, obj_val, downstream_model, as_user):
     if isinstance(obj_val, list):
         obj_list = []
         for member in obj_val:
-            obj_embedded = expand_val_for_embedded_model(request, member, downstream_model, as_user)
+            obj_embedded = expand_val_for_embedded_model(request, member, downstream_model)
             if obj_embedded is not None:
                 obj_list.append(obj_embedded)
         return obj_list
     elif isinstance(obj_val, dict):
-        obj_embedded = expand_embedded_model(request, obj_val, downstream_model, as_user)
+        obj_embedded = expand_embedded_model(request, obj_val, downstream_model)
         return obj_embedded
     elif isinstance(obj_val, basestring):
         # get the @@object view of obj to embed
-        obj_val = secure_embed(request, obj_val, '@@object', as_user=as_user)
+        obj_val = secure_embed(request, obj_val, '@@object')
         if not obj_val or obj_val == {'error': 'no view permissions'}:
             return obj_val
-        obj_embedded = expand_embedded_model(request, obj_val, downstream_model, as_user)
+        obj_embedded = expand_embedded_model(request, obj_val, downstream_model)
         return obj_embedded
     else:
         # this means the object should be returned as-is
