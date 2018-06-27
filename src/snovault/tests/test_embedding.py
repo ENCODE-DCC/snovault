@@ -40,7 +40,7 @@ def content(testapp):
 def test_embedded_uuids_object(content, dummy_request, threadlocals):
     dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@object')
     # the starting item's uuid is no longer in _embedded_uuids
-    assert dummy_request._embedded_uuids == {}
+    assert dummy_request._embedded_uuids == set()
 
 
 def test_embedded_uuids_embedded(content, dummy_request, threadlocals):
