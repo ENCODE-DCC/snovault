@@ -55,7 +55,6 @@ def embed(request, *elements, **kw):
     # Should really be more careful about what gets included instead.
     # Cache cut response time from ~800ms to ~420ms.
     embed_cache = request.registry[CONNECTION].embed_cache
-    print('--> %s' % len(embed_cache.cache))
     as_user = kw.get('as_user')
     path = join(*elements)
     path = unquote_bytes_to_wsgi(native_(path))
@@ -66,11 +65,12 @@ def embed(request, *elements, **kw):
     else:
         cached = embed_cache.get(path, None)
         if cached is None:
-            cached = _embed(request, path)
+            # handle common cases of as_user, otherwise use what's given
+            subreq_user = 'EMBED' if as_user in [None, True] else as_user
+            cached = _embed(request, path, as_user=subreq_user)
             embed_cache[path] = cached
         result, embedded_uuids = cached
         result = deepcopy(result)
-    log.debug('embed: %s', path)
     if not '@@audit' in path:
         request._embedded_uuids.update(embedded_uuids)
     return result
