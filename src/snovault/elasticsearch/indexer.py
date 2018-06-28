@@ -33,11 +33,28 @@ import copy
 import json
 import requests
 
+global es_time_log
+
+
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
-es_time_log = open('/srv/encoded/indexing.log', 'a')
 log = logging.getLogger(__name__)
+es_time_lag = None
 MAX_CLAUSES_FOR_ES = 8192
+LOG_ES_TIME = True
+
+
+def get_es_log_handler(tag=None):
+    if not tag:
+        tag = str(int(time.time()*1000000))
+    es_log_name = '/srv/encoded/indexing-{tag}.log'.format(
+        tag=tag,
+    )
+    return open(es_log_name, 'a')
+
+if LOG_ES_TIME:
+    es_time_log = get_es_log_handler(tag='initial')
+
 
 def includeme(config):
     config.add_route('index', '/index')
@@ -229,6 +246,7 @@ def index(request):
                     snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
 
     if invalidated and not dry_run:
+
         if len(stage_for_followup) > 0:
             # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
             state.prep_for_followup(xmin, invalidated)
@@ -236,9 +254,12 @@ def index(request):
         result = state.start_cycle(invalidated, result)
 
         # Do the work...
-
+        global es_time_log
+        if LOG_ES_TIME and not es_time_log:
+            es_time_log = get_es_log_handler()
         errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
-
+        es_time_log.close()
+        es_time_log = None
         result = state.finish_cycle(result,errors)
 
         if errors:
