@@ -430,7 +430,7 @@ def es_mapping(mapping):
                     }
                 }
             },
-            'embedded_uuids': {
+            'referenced_uuids': {
                 'type': 'text',
                 'include_in_all': False
             },

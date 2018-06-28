@@ -36,8 +36,6 @@ def includeme(config):
 def index(request):
     # Setting request.datastore here only works because routed views are not traversed.
     request.datastore = 'database'
-    # use the embedding cache for the whole duration of a call to /index
-    # request._use_embed_cache = True
     record = request.json.get('record', False)  # if True, make a record in es
     dry_run = request.json.get('dry_run', False)  # if True, do not actually index
     es = request.registry[ELASTIC_SEARCH]

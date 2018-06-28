@@ -56,7 +56,7 @@ def test_embedded_uuids_page(content, dummy_request, threadlocals):
 def test_embedded_uuids_expand_target(content, dummy_request, threadlocals):
     dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@expand?expand=target')
     # expanding does not add to the embedded_list
-    assert dummy_request._embedded_uuids == {}
+    assert dummy_request._embedded_uuids == set()
 
 
 def test_updated_source(content, testapp):

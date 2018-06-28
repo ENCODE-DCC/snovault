@@ -181,7 +181,7 @@ def item_view_object(context, request):
              name='embedded')
 def item_view_embedded(context, request):
     """
-    This is the ONLY view that actually populates request._embedded_uuids
+    This is the ONLY view that actually populates request._referenced_uuids
     """
     item_path = request.resource_path(context)
     properties = request.embed(item_path, '@@object', as_user=True)
@@ -194,7 +194,7 @@ def item_view_embedded(context, request):
              name='page')
 def item_view_page(context, request):
     """
-    Will populate request._embedded_uuids because request.embed is called
+    Will populate request._referenced_uuids because request.embed is called
     with @@embedded
     """
     item_path = request.resource_path(context)

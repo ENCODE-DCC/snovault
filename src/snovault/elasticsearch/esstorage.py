@@ -87,11 +87,11 @@ class CachedModel(object):
         if edits is None:
             return False
         version = self.meta['version']
-        embedded_uuids = set(self.source['embedded_uuids'])
+        referenced_uuids = set(self.source['referenced_uuids'])
         for xid, updated, linked in edits:
             if xid < version:
                 continue
-            if not embedded_uuids.isdisjoint(updated):
+            if not referenced_uuids.isdisjoint(updated):
                 return True
         return False
 

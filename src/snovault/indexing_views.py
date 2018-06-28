@@ -60,16 +60,19 @@ def item_index_data(context, request):
                 for key in unique_keys[key_name])
 
     path = path + '/'
-    # since request._use_embed_cache is set to True in indexer.py,
+    # setting _indexing_view enables the embed_cache and cause population of
+    # request._referenced_uuids
+    request._indexing_view = True
+    # since request._indexing_view is set to True in indexer.py,
     # all embeds (including subrequests) below will use the embed cache
-    embedded = request.embed(path, '@@embedded')
-    audit = request.embed(path, '@@audit')['audit']
-    obj = request.embed(path, '@@object')
+    embedded = request.get_item(path, '@@embedded')
+    audit = request.get_item(path, '@@audit')['audit']
+    obj = request.get_item(path, '@@object')
 
     document = {
         'audit': audit,
         'embedded': embedded,
-        'embedded_uuids': sorted(request._embedded_uuids),
+        'referenced_uuids': sorted(request._referenced_uuids),
         'item_type': context.type_info.item_type,
         'links': links,
         'object': obj,

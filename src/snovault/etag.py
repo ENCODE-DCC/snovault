@@ -9,7 +9,7 @@ def etag_tid(view_callable):
     def wrapped(context, request):
         result = view_callable(context, request)
         conn = request.registry[CONNECTION]
-        embedded = (conn.get_by_uuid(uuid) for uuid in sorted(request._embedded_uuids))
+        embedded = (conn.get_by_uuid(uuid) for uuid in sorted(request._referenced_uuids))
         uuid_tid = ((item.uuid, item.tid) for item in embedded)
         request.response.etag = '&'.join('%s=%s' % (u, t) for u, t in uuid_tid)
         cache_control = request.response.cache_control
