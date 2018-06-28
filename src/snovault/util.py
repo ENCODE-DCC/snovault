@@ -41,7 +41,6 @@ def secure_embed(request, item_path, addition='@@object'):
     Make a call to embed() with the given item path and user status
     Handles substituting a no view permissions message if a the given
     request does not have permission to see the object
-    IMPORTANT: this function is used to populate request._embedded_uuids
     """
     res = {'error': 'no view permissions'}
     try:
@@ -50,13 +49,25 @@ def secure_embed(request, item_path, addition='@@object'):
             res = request.embed(str(item_path), addition, as_user=True)
         else:
             res = ''
-        # add uuid to _embedded_uuids
-        if hasattr(request, '_embedded_uuids') and 'uuid' in res:
-            request._embedded_uuids.add(res['uuid'])
         return res
     except HTTPForbidden:
         print("you don't have access to this object")
 
+    return res
+
+
+def secure_embed_with_embedded_uuid(request, item_path, addition='@@object'):
+    """
+    Wrapper function for secure_embed that is used in the
+    building of embedded models
+    IMPORTANT: this function is responsible for populating
+    the _embedded_uuids of the request, which is in turn
+    used for invalidation
+    """
+    res = secure_embed(request, item_path, addition)
+    # add uuid to _embedded_uuids
+    if res and 'uuid' in res:
+        request._embedded_uuids.add(res['uuid'])
     return res
 
 
@@ -132,7 +143,7 @@ def expand_val_for_embedded_model(request, obj_val, downstream_model):
         return obj_embedded
     elif isinstance(obj_val, basestring):
         # get the @@object view of obj to embed
-        obj_val = secure_embed(request, obj_val, '@@object')
+        obj_val = secure_embed_with_embedded_uuid(request, obj_val, '@@object')
         if not obj_val or obj_val == {'error': 'no view permissions'}:
             return obj_val
         obj_embedded = expand_embedded_model(request, obj_val, downstream_model)
