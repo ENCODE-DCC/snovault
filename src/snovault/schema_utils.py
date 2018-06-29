@@ -352,7 +352,7 @@ def validate_request(schema, request, data=None, current=None):
         context = []
         for context_error in error.context:
             context.append({
-              'name': list(context_error.absolute_schema_path),
+              'name': list(context_error.schema_path),
               'description': context_error.message,
             })
         if context:
