@@ -56,21 +56,6 @@ def secure_embed(request, item_path, addition='@@object'):
     return res
 
 
-# def secure_embed_with_referenced_uuid(request, item_path, addition='@@object'):
-#     """
-#     Wrapper function for secure_embed that is used in the
-#     building of embedded models
-#     IMPORTANT: this function is responsible for populating
-#     the _referenced_uuids of the request, which is in turn
-#     used for invalidation
-#     """
-#     res = secure_embed(request, item_path, addition)
-#     # add uuid to _referenced_uuids
-#     if res and 'uuid' in res:
-#         request._referenced_uuids.add(res['uuid'])
-#     return res
-
-
 def expand_path(request, obj, path):
     if isinstance(path, basestring):
         path = path.split('.')

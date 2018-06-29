@@ -166,14 +166,21 @@ def uuid_to_path(request, obj, path):
 @view_config(context=Item, permission='view', request_method='GET',
              name='object')
 def item_view_object(context, request):
-    """ Render json structure
+    """
+    Render json structure. This is the most basic view and contains the scope
+    of only one item. The steps to generate it are:
     1. Fetch stored properties, possibly upgrading.
     2. Link canonicalization (overwriting uuids.)
-    3. Calculated properties (including reverse links.)
+    3. Calculated properties
+    4. If applicable, add uuid to request._referenced_uuids
     """
     properties = item_links(context, request)
     calculated = calculate_properties(context, request, properties)
     properties.update(calculated)
+    # add the uuid of the object to request._referenced_uuids
+    # uuid should *ALWAYS* be an available field in the properties
+    if getattr(request, '_indexing_view', False) is True:
+        request._referenced_uuids.add(properties['uuid'])
     return properties
 
 

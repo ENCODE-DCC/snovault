@@ -156,15 +156,21 @@ class Indexer(object):
         return messages, target_queue
 
 
-    def find_and_queue_secondary_items(self, source_uuids, telemetry_id=None):
+    def find_and_queue_secondary_items(self, source_uuids, post_uuids, telemetry_id=None):
         """
         Should be used when strict is False
         Find all associated uuids of the given set of uuid using ES and queue
         them in the secondary queue.
+        Add post_uuids after find secondary uuids (they are "strict")
         """
-        associated_uuids = find_uuids_for_indexing(self.registry, source_uuids, log)
-        # remove already indexed primary uuids used to find them
-        secondary_uuids = list(associated_uuids - source_uuids)
+        if source_uuids:
+            associated_uuids = find_uuids_for_indexing(self.registry, source_uuids, log)
+            associated_uuids |= post_uuids
+            # remove already indexed primary uuids used to find them
+            secondary_uuids = list(associated_uuids - source_uuids)
+        else:
+            secondary_uuids = post_uuids
+
         return self.queue.add_uuids(self.registry, secondary_uuids, strict=True,
                                     target_queue='secondary', telemetry_id=telemetry_id)
 
@@ -176,6 +182,8 @@ class Indexer(object):
         errors = []
         # hold uuids that will be used to find secondary uuids
         non_strict_uuids = set()
+        # hold the _referenced_uuids from items that are POSTed
+        post_uuids = set()
         to_delete = []  # hold messages that will be deleted
         # only check deferred queue on the first run, since there shouldn't
         # be much in there at any given point
@@ -187,6 +195,7 @@ class Indexer(object):
                 msg_uuid= msg_body['uuid']
                 msg_sid = msg_body['sid']
                 msg_curr_time = msg_body['timestamp']
+                msg_method = msg_body.get('method')
                 msg_detail = msg_body.get('detail')
                 msg_telemetry = msg_body.get('telemetry_id')
 
@@ -198,9 +207,15 @@ class Indexer(object):
                     continue
                 if msg_body['strict'] is False:
                     non_strict_uuids.add(msg_uuid)
-                error = self.update_object(request, msg_uuid, sid=msg_sid,
-                    curr_time=msg_curr_time, target_queue=target_queue,
-                    telemetry_id=msg_telemetry)
+                # keep track of _referenced_uuids from a POST
+                if msg_method == 'POST':
+                    error = self.update_object(request, msg_uuid, sid=msg_sid,
+                        curr_time=msg_curr_time, target_queue=target_queue,
+                        add_to_secondary=post_uuids, telemetry_id=msg_telemetry)
+                else:
+                    error = self.update_object(request, msg_uuid, sid=msg_sid,
+                        curr_time=msg_curr_time, target_queue=target_queue,
+                        add_to_secondary=None, telemetry_id=msg_telemetry)
                 if error:
                     if error.get('error_message') == 'deferred_retry':
                         # send this to the deferred queue
@@ -225,14 +240,15 @@ class Indexer(object):
                     self.queue.delete_messages(to_delete, target_queue=target_queue)
                     to_delete = []
             # add to secondary queue, if applicable
-            # reset embedded/non-strict uuids after adding
-            if non_strict_uuids:
-                queued, failed = self.find_and_queue_secondary_items(non_strict_uuids, msg_telemetry)
+            # reset uuid tracking after adding
+            if non_strict_uuids or post_uuids:
+                queued, failed = self.find_and_queue_secondary_items(non_strict_uuids, post_uuids, msg_telemetry)
                 if failed:
                     error_msg = 'Failure(s) queueing secondary uuids: %s' % str(failed)
                     log.error('INDEXER: ', error=error_msg)
                     errors.append({'error_message': error_msg})
                 non_strict_uuids = set()
+                post_uuids = set()
             prev_target_queue = target_queue
             messages, target_queue = self.get_messages_from_queue(skip_deferred=True)
             # if we have switched between primary and secondary queues, delete
@@ -262,11 +278,13 @@ class Indexer(object):
 
 
     def update_object(self, request, uuid, sid=None, curr_time=None,
-                      target_queue=None, telemetry_id=None):
+                      target_queue=None, add_to_secondary=None, telemetry_id=None):
         """
         Actually index the uuid using the index-data view.
         target_queue is an optional string queue name:
             'primary', 'secondary', or 'deferred'
+        add_to_secondary is an optional set. If provided, the _referenced_uuids
+        from the request.embed(/<uuid>/@@index-data) will be added to the set.
         """
 
         # logging constant
@@ -338,6 +356,13 @@ class Indexer(object):
                 last_exc = repr(e)
                 break
             else:
+                if sid and isinstance(add_to_secondary, set):
+                    add_to_secondary |= set(result.get('referenced_uuids', []))
+                    # remove the uuid we are indexing (included in result['referenced_uuids'])
+                    try:
+                        add_to_secondary.remove(uuid)
+                    except KeyError:  # catch a possible edge case?
+                        pass
                 duration = timer() - start
                 log.info('update object success', duration=duration, cat=cat)
                 return

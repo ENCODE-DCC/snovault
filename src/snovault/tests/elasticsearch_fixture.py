@@ -38,6 +38,9 @@ def server_process(datadir, host='localhost', port=9200, prefix='', echo=False):
     elif os.path.exists('/etc/elasticsearch'):
         # elasticsearch.deb setup
        args.append('-Epath.conf=/etc/elasticsearch')
+    # set JVM heap size for ES
+    if not os.environ.get('ES_JAVA_OPTS'):
+        os.environ['ES_JAVA_OPTS'] = "-Xms4G -Xmx4G"
 
     process = subprocess.Popen(
         args,

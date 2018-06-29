@@ -60,6 +60,7 @@ def embed(request, *elements, **kw):
     as_user = kw.get('as_user')
     path = join(*elements)
     path = unquote_bytes_to_wsgi(native_(path))
+    print('-- %s' % path)
     # as_user controls whether or not the embed_cache is used
     # if request._indexing_view is True, always use the cache
     if as_user is not None and not request._indexing_view:
@@ -73,8 +74,7 @@ def embed(request, *elements, **kw):
             embed_cache[path] = cached
         result, referenced_uuids = cached
         result = deepcopy(result)
-    if not '@@audit' in path:
-        request._referenced_uuids.update(referenced_uuids)
+    request._referenced_uuids.update(referenced_uuids)
     return result
 
 
@@ -92,6 +92,7 @@ def _embed(request, path, as_user='EMBED'):
         if 'HTTP_COOKIE' in subreq.environ:
             del subreq.environ['HTTP_COOKIE']
         subreq.remote_user = as_user
+    # _referenced_uuids are populated in item_view_object of resource_views.py
     try:
         result = request.invoke_subrequest(subreq)
     except HTTPNotFound:
