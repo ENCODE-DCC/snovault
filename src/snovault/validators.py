@@ -66,6 +66,9 @@ def add_delete_fields(request, data, schema):
                 continue
             if 'default' in field_schema:
                 val = field_schema['default']
+            elif isinstance(field_schema.get('enum'), list):
+                # an enum used with no default; use previous value
+                continue
             elif field_schema.get('type') == 'array':
                 val = []
             elif field_schema.get('type') == 'object':
@@ -104,4 +107,5 @@ def validate_item_content_patch(context, request):
         raise ValidationFailure('body', ['uuid'], msg)
     current = context.upgrade_properties().copy()
     current['uuid'] = str(context.uuid)
+    # this will add defaults values back to deleted fields with schema defaults
     validate_request(schema, request, data, current)
