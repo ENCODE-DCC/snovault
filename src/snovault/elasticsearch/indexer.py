@@ -156,7 +156,7 @@ class Indexer(object):
         return messages, target_queue
 
 
-    def find_and_queue_secondary_items(self, source_uuids, embedded_uuids):
+    def find_and_queue_secondary_items(self, source_uuids, embedded_uuids, telemetry_id=None):
         """
         Should be used when strict is False
         Find all associated uuids of the given set of uuid using ES and queue
@@ -171,7 +171,8 @@ class Indexer(object):
         else:
             secondary_uuids = embedded_uuids
 
-        return self.queue.add_uuids(self.registry, secondary_uuids, strict=True, target_queue='secondary')
+        return self.queue.add_uuids(self.registry, secondary_uuids, strict=True,
+                                    target_queue='secondary', telemetry_id=telemetry_id)
 
 
     def update_objects_queue(self, request, counter):
@@ -188,35 +189,31 @@ class Indexer(object):
         messages, target_queue = self.get_messages_from_queue(skip_deferred=False)
         while len(messages) > 0:
             for idx, msg in enumerate(messages):
-                # this code is needed for integration with old style messages
-                try:
-                    msg_body = json.loads(msg['Body'])
-                except ValueError:
-                    msg_body = msg['Body']
-                if isinstance(msg_body, dict):
-                    msg_uuid= msg_body['uuid']
-                    msg_sid = msg_body['sid']
-                    msg_curr_time = msg_body['timestamp']
-                    msg_detail = msg_body.get('detail')
-                    # check to see if we are using the same txn that caused a deferral
-                    if target_queue == 'deferred' and msg_detail == str(request.tm.get()):
-                        # re-create a new message so we don't affect retry count (dlq)
-                        self.queue.send_messages([msg_body], target_queue=target_queue)
-                        to_delete.append(msg)
-                        continue
-                    if msg_body['strict'] is False:
-                        non_strict_uuids.add(msg_uuid)
-                else:  # old uuid message format
-                    msg_uuid = str(msg_body)
-                    msg_sid = None
-                    msg_curr_time = None
+                # get all the details
+                msg_body = json.loads(msg['Body'])
+                msg_uuid= msg_body['uuid']
+                msg_sid = msg_body['sid']
+                msg_curr_time = msg_body['timestamp']
+                msg_detail = msg_body.get('detail')
+                msg_telemetry = msg_body.get('telemetry_id')
+
+                # check to see if we are using the same txn that caused a deferral
+                if target_queue == 'deferred' and msg_detail == str(request.tm.get()):
+                    # re-create a new message so we don't affect retry count (dlq)
+                    self.queue.send_messages([msg_body], target_queue=target_queue)
+                    to_delete.append(msg)
+                    continue
+                if msg_body['strict'] is False:
+                    non_strict_uuids.add(msg_uuid)
                 # add embedded uuids to secondary, but only if not using secondary
                 if target_queue != 'secondary':
                     error = self.update_object(request, msg_uuid, sid=msg_sid,
-                        curr_time=msg_curr_time, add_to_secondary=embedded_uuids, target_queue=target_queue)
+                        curr_time=msg_curr_time, add_to_secondary=embedded_uuids,
+                        target_queue=target_queue, telemetry_id=msg_telemetry)
                 else:
                     error = self.update_object(request, msg_uuid, sid=msg_sid,
-                        curr_time=msg_curr_time, add_to_secondary=None, target_queue=target_queue)
+                        curr_time=msg_curr_time, add_to_secondary=None,
+                        target_queue=target_queue, telemetry_id=msg_telemetry)
                 if error:
                     if error.get('error_message') == 'deferred_retry':
                         # send this to the deferred queue
@@ -230,7 +227,8 @@ class Indexer(object):
                     else:
                         # on a regular error, replace the message back in the queue
                         # could do something with error, like putting on elasticache
-                        self.queue.replace_messages([msg], target_queue=target_queue)
+                        # set VisibilityTimeout high so that other items can process
+                        self.queue.replace_messages([msg], target_queue=target_queue, vis_timeout=180)
                         errors.append(error)
                 else:
                     if counter: counter[0] += 1  # do not increment on error
@@ -242,7 +240,8 @@ class Indexer(object):
             # add to secondary queue, if applicable
             # reset embedded/non-strict uuids after adding
             if non_strict_uuids or embedded_uuids:
-                queued, failed = self.find_and_queue_secondary_items(non_strict_uuids, embedded_uuids)
+                queued, failed = self.find_and_queue_secondary_items(non_strict_uuids,
+                                                                     embedded_uuids, msg_telemetry)
                 if failed:
                     error_msg = 'Failure(s) queueing secondary uuids: %s' % str(failed)
                     log.error('INDEXER: ', error=error_msg)
@@ -277,7 +276,8 @@ class Indexer(object):
         return errors
 
 
-    def update_object(self, request, uuid, sid=None, curr_time=None, add_to_secondary=None, target_queue=None):
+    def update_object(self, request, uuid, sid=None, curr_time=None, add_to_secondary=None,
+                      target_queue=None, telemetry_id=None):
         """
         Actually index the uuid using the index-data view.
         add_to_secondary is an optional set. If provided, the embedded uuids
@@ -286,6 +286,9 @@ class Indexer(object):
             'primary', 'secondary', or 'deferred'
         """
 
+        # logging constant
+        cat = 'update object'
+
         #timing stuff
         start = timer()
         if not curr_time:
@@ -293,6 +296,8 @@ class Indexer(object):
 
         # to add to each log message
         log.bind(embed_uuid=uuid, sid=sid, uo_start_time=curr_time)
+        if telemetry_id:
+            log.bind(telemetry_id=telemetry_id)
 
         # check the sid with a less intensive view than @@index-data
         if sid:
@@ -302,24 +307,27 @@ class Indexer(object):
 
         try:
             result = request.embed(index_data_query, as_user='INDEXER')
+            duration = timer() - start
+            log.bind(collection=result.get('item_type'))
+            log.info("time to embed", duration=duration, cat="embed time")
         except SidException as e:
             duration = timer() - start
-            log.warning('Invalid sid found', duration=duration)
+            log.warning('Invalid sid found', duration=duration, cat=cat)
             # this will cause the item to be sent to the deferred queue
             return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
         except KeyError as e:
             # only consider a KeyError deferrable if not already in deferred queue
             duration = timer() - start
             if target_queue != 'deferred':
-                log.info('KeyError', duration=duration)
+                log.info('KeyError', duration=duration, cat=cat)
                 # this will cause the item to be sent to the deferred queue
                 return {'error_message': 'deferred_retry', 'txn_str': str(request.tm.get())}
             else:
-                log.error('KeyError rendering @@index-data', duration=duration, exc_info=True)
+                log.error('KeyError rendering @@index-data', duration=duration, exc_info=True, cat=cat)
                 return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
         except Exception as e:
             duration = timer() - start
-            log.error('Error rendering @@index-data', duration=duration, exc_info=True)
+            log.error('Error rendering @@index-data', duration=duration, exc_info=True, cat=cat)
             return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
 
         last_exc = None
@@ -333,17 +341,17 @@ class Indexer(object):
                 )
             except ConflictError:
                 duration = timer() - start
-                log.warning('Conflict indexing', sid=result['sid'], duration=duration)
+                log.warning('Conflict indexing', sid=result['sid'], duration=duration, cat=cat)
                 # this may be somewhat common and is not harmful
                 # do not return an error so the item is removed from the queue
                 return
             except (ConnectionError, ReadTimeoutError, TransportError) as e:
                 duration = timer() - start
-                log.warning('Retryable error indexing', error=str(e), duration=duration)
+                log.warning('Retryable error indexing', error=str(e), duration=duration, cat=cat)
                 last_exc = repr(e)
             except Exception as e:
                 duration = timer() - start
-                log.error('Error indexing', duration=duration, exc_info=True)
+                log.error('Error indexing', duration=duration, exc_info=True, cat=cat)
                 last_exc = repr(e)
                 break
             else:
@@ -359,8 +367,9 @@ class Indexer(object):
                     except KeyError:  # catch a possible edge case?
                         pass
                 duration = timer() - start
-                log.debug('Conflict indexing',  sid=result['sid'], duration=duration)
+                log.info('update object success', duration=duration, cat=cat)
                 return
+
         return {'error_message': last_exc, 'time': curr_time, 'uuid': str(uuid)}
 
 

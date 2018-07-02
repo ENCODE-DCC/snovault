@@ -181,6 +181,13 @@ class TestingPostPutPatchSno(Item):
             'field_no_default': {
                 'type': 'string',
             },
+            'enum_no_default': {
+                'type': 'string',
+                'enum': [
+                    '1',
+                    '2'
+                ]
+            },
             'protected': {
                 # This should be allowed on PUT so long as value is the same
                 'type': 'string',

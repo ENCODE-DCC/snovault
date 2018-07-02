@@ -904,6 +904,13 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     es = registry[ELASTIC_SEARCH]
     indexer_queue = registry[INDEXER_QUEUE]
     cat = 'start create mapping'
+
+    # we shouldn't have telemetry id here but just double check and set if not set
+    global log
+    telemetry_id = log._context.get('telemetry_id', None)
+    if not telemetry_id:
+        telemetry_id='cm_run_' + datetime.datetime.now().isoformat()
+        log = log.bind(telemetry_id=telemetry_id)
     log.warning('\n___CREATE-MAPPING___:\ncollections: %s\ncheck_first %s\n index_diff %s\n' %
                 (collections, check_first, index_diff), cat=cat)
     log.warning('\n___ES___:\n %s\n' % (str(es.cat.client)), cat=cat)
@@ -1011,11 +1018,11 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     # TODO: maybe put items on primary/secondary by type
     if uuids_to_index:
         count=len(uuids_to_index)
-        # lets not knock over ES trying to get all theses uuids
+        # lets not knock over ES trying to get all these uuids
         # we need to find associated uuids if all items are not indexed or not strict mode
         if not total_reindex and not strict:
             if count > 30000:  # arbitrary large number, that hopefully is within ES limits
-                uuids_to_index = get_uuids_for_types(registry)
+                uuids_to_index = set(get_uuids_for_types(registry))  # all uuids
             else:
                 uuids_to_index = find_uuids_for_indexing(registry, uuids_to_index, log)
         # only index (synchronously) if --sync-index option is used
@@ -1026,7 +1033,8 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
         else:
             log.warning('\n___UUIDS TO INDEX (QUEUED)___: %s\n' % count,
                         cat='uuids to index', count=count)
-            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True, target_queue='secondary')
+            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True,
+                                    target_queue='secondary', telemetry_id=telemetry_id)
     return timings
 
 
@@ -1091,11 +1099,11 @@ def main():
 
     # Loading app will have configured from config file. Reconfigure here:
     set_logging(app.registry.settings.get('production'), level=logging.INFO)
-    global log
-    log = structlog.get_logger(__name__)
+    #global log
+    #log = structlog.get_logger(__name__)
 
     uuids = run(app, args.item_type, args.dry_run, args.check_first, args.skip_indexing,
-               args.index_diff, args.strict, args.sync_index, args.no_meta,
+                args.index_diff, args.strict, args.sync_index, args.no_meta,
                args.print_count_only, args.purge_queue)
     return
 

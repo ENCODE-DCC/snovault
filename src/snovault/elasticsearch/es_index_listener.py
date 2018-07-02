@@ -235,11 +235,11 @@ def main():
         level = logging.DEBUG
 
     set_logging(app.registry.settings.get('production'), level=level)
-    global log
-    log = structlog.get_logger(__name__)
+    #global log
+    #log = structlog.get_logger(__name__)
 
     # Loading app will have configured from config file. Reconfigure here:
-    logging.getLogger('snovault').setLevel(logging.DEBUG)
+    #logging.getLogger('snovault').setLevel(logging.DEBUG)
 
     return run(testapp, args.poll_interval, args.dry_run, args.path)
 
