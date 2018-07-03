@@ -133,6 +133,25 @@ def test_patch_delete_fields(content, testapp):
     assert res.json['@graph'][0]['simple1'] == 'simple1 default'
 
 
+def test_patch_delete_fields_enum(content, testapp):
+    """
+    enum with no default set, should delete completely
+    """
+    url = content['@id']
+    res = testapp.get(url)
+    assert res.json['simple1'] == 'simple1 default'
+    assert res.json['simple2'] == 'simple2 default'
+
+    res = testapp.patch_json(url, {'enum_no_default': '2', 'simple1': 'this is a test'}, status=200)
+    assert res.json['@graph'][0]['enum_no_default'] == '2'
+    assert res.json['@graph'][0]['simple1'] == 'this is a test'
+
+    # delete enums without a default removes it completely
+    res = testapp.patch_json(url + "?delete_fields=simple1,enum_no_default", {}, status=200)
+    assert 'enum_no_default' not in res.json['@graph'][0].keys()
+    assert res.json['@graph'][0]['simple1'] == 'simple1 default'
+
+
 def test_patch_delete_fields_non_string(content, testapp):
     url = content['@id']
     res = testapp.get(url)
