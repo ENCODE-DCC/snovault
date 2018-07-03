@@ -36,41 +36,37 @@ def content(testapp):
     for item in sources:
         testapp.post_json(url, item, status=201)
 
-
-def test_embedded_uuids_object(content, dummy_request, threadlocals):
+def test_referenced_uuids_unset(content, dummy_request, threadlocals):
+    # without setting _indexing_view =True on the request,
+    # _referenced_uuids are not tracked
     dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@object')
-    assert dummy_request._embedded_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd'}
+    assert dummy_request._referenced_uuids == set()
 
 
-def test_embedded_uuids_embedded(content, dummy_request, threadlocals):
+def test_referenced_uuids_object(content, dummy_request, threadlocals):
+    # needed to track _referenced_uuids
+    dummy_request._indexing_view = True
+    dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@object')
+    assert dummy_request._referenced_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd'}
+
+
+def test_referenced_uuids_embedded(content, dummy_request, threadlocals):
+    # needed to track _referenced_uuids
+    dummy_request._indexing_view = True
     dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@embedded')
-    assert dummy_request._embedded_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd', '775795d3-4410-4114-836b-8eeecf1d0c2f'}
+    assert dummy_request._referenced_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd', '775795d3-4410-4114-836b-8eeecf1d0c2f'}
 
 
-def test_embedded_uuids_page(content, dummy_request, threadlocals):
+def test_referenced_uuids_page(content, dummy_request, threadlocals):
+    # needed to track _referenced_uuids
+    dummy_request._indexing_view = True
     dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@page')
-    assert dummy_request._embedded_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd', '775795d3-4410-4114-836b-8eeecf1d0c2f'}
+    assert dummy_request._referenced_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd', '775795d3-4410-4114-836b-8eeecf1d0c2f'}
 
 
-def test_embedded_uuids_expand_target(content, dummy_request, threadlocals):
+def test_referenced_uuids_expand_target(content, dummy_request, threadlocals):
+    # needed to track _referenced_uuids
+    dummy_request._indexing_view = True
     dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@expand?expand=target')
     # expanding does not add to the embedded_list
-    assert dummy_request._embedded_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd', '775795d3-4410-4114-836b-8eeecf1d0c2f'}
-
-
-def test_updated_source(content, testapp):
-    url = '/testing-link-sources-sno/' + sources[0]['uuid']
-    res = testapp.patch_json(url, {})
-    assert set(res.headers['X-Updated'].split(',')) == {sources[0]['uuid']}
-
-
-def test_updated_source_changed(content, testapp):
-    url = '/testing-link-sources-sno/' + sources[0]['uuid']
-    res = testapp.patch_json(url, {'target': targets[1]['uuid']})
-    assert set(res.headers['X-Updated'].split(',')) == {sources[0]['uuid'], targets[1]['uuid']}
-
-
-def test_updated_target(content, testapp):
-    url = '/testing-link-targets-sno/' + targets[0]['uuid']
-    res = testapp.patch_json(url, {})
-    assert set(res.headers['X-Updated'].split(',')) == {targets[0]['uuid']}
+    assert dummy_request._referenced_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd', '775795d3-4410-4114-836b-8eeecf1d0c2f'}

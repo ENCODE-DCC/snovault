@@ -13,7 +13,7 @@ es = Elasticsearch('localhost:9200')
 
 def embeds_uuid(es, uuid, item_type):
     query = {
-        'query': {'terms': {'embedded_uuids': [uuid]}},
+        'query': {'terms': {'referenced_uuids': [uuid]}},
         'aggregations': {
             'item_type': {'terms': {'field': 'item_type'}},
         },

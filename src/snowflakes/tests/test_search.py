@@ -72,10 +72,10 @@ def recursively_find_uuids(json, uuids):
 
 @dont_run_on_travis
 @pytest.mark.es
-def test_embedded_uuids_real(workbook, testapp, app):
+def test_referenced_uuids_real(workbook, testapp, app):
     """
     Find all uuids from a search result and ensure they match the
-    embedded_uuids of the es result
+    referenced_uuids of the es result
     """
     from snovault.elasticsearch.interfaces import ELASTIC_SEARCH
     es = app.registry[ELASTIC_SEARCH]
@@ -83,5 +83,5 @@ def test_embedded_uuids_real(workbook, testapp, app):
     test_case = res['@graph'][0]
     test_uuids = recursively_find_uuids(test_case, set())
     test_doc = es.get(index='snowflake', doc_type='snowflake', id=test_case['uuid'])
-    embedded_uuids = set(test_doc['_source']['embedded_uuids'])
-    assert test_uuids == embedded_uuids
+    referenced_uuids = set(test_doc['_source']['referenced_uuids'])
+    assert test_uuids == referenced_uuids

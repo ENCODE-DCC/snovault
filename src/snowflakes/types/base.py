@@ -66,17 +66,18 @@ ALLOW_SUBMITTER_ADD = [
 ]
 
 
-
 def paths_filtered_by_status(request, paths, exclude=('deleted', 'replaced'), include=None):
+    """filter out status that shouldn't be visible.
+    Also convert path to str as functions like rev_links return uuids"""
     if include is not None:
         return [
             path for path in paths
-            if traverse(request.root, path)['context'].__json__(request).get('status') in include
+            if traverse(request.root, str(path))['context'].__json__(request).get('status') in include
         ]
     else:
         return [
             path for path in paths
-            if traverse(request.root, path)['context'].__json__(request).get('status') not in exclude
+            if traverse(request.root, str(path))['context'].__json__(request).get('status') not in exclude
         ]
 
 

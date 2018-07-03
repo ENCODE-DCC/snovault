@@ -109,6 +109,8 @@ def test_link_target_audit_fail(testapp):
     target = {'uuid': '775795d3-4410-4114-836b-8eeecf1d0c2f', 'status': 'CHECK'}
     testapp.post_json('/testing_link_target_sno', target, status=201)
     res = testapp.get('/%s/@@index-data' % target['uuid']).maybe_follow()
+    # make sure referenced_uuids are in response
+    assert 'referenced_uuids' in res and len(res['referenced_uuids']) > 0
     errors_dict = res.json['audit']
     errors_list = []
     for error_type in errors_dict:
@@ -127,6 +129,8 @@ def test_link_target_audit_pass(testapp):
     source = {'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd', 'target': target['uuid']}
     testapp.post_json('/testing_link_source_sno', source, status=201)
     res = testapp.get('/%s/@@index-data' % target['uuid']).maybe_follow()
+    # make sure referenced_uuids are in response
+    assert 'referenced_uuids' in res and len(res['referenced_uuids']) > 0
     errors_dict = res.json['audit']
     errors_list = []
     for error_type in errors_dict:
