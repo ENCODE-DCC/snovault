@@ -69,6 +69,8 @@ def add_delete_fields(request, data, schema):
             elif isinstance(field_schema.get('enum'), list):
                 # an enum used with no default; use previous value
                 continue
+            elif field_schema.get('type') == 'boolean':
+                val = False
             elif field_schema.get('type') == 'array':
                 val = []
             elif field_schema.get('type') == 'object':
