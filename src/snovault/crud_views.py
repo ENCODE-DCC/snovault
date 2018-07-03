@@ -242,7 +242,15 @@ def item_edit(context, request, render=None):
 @view_config(context=Item, permission='edit', request_method='DELETE', decorator=if_match_tid)
 def item_delete_full(context, request, render=None):
     # possibly temporary fix to check if user is admin
-    user_details = request.user_info.get('details', {})
+    if hasattr(request, 'user_info'):
+        user_details = request.user_info.get('details', {})
+    else:
+        from pyramid.security import effective_principals
+        principals = effective_principals(request)
+        if 'group.admin' in principals:
+            user_details = {'groups': 'admin'}  # you can do it
+        else:
+            user_details = {}  # you cannot
     if 'admin' not in user_details.get('groups', []):
         msg = u'Must be admin to fully delete items.'
         raise ValidationFailure('body', ['userid'], msg)
