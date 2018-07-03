@@ -514,9 +514,6 @@ class Resource(Base):
         """
         return self.data[''].sid
 
-    def invalidated(self):
-        return False
-
     def used_for(self, item):
         pass
 

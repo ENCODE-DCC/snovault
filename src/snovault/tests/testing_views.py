@@ -125,6 +125,11 @@ class TestingLinkTargetSno(Item):
         'reverse.*',
     ]
 
+    def rev_link_atids(self, request, rev_name):
+        conn = request.registry[snovault.interfaces.CONNECTION]
+        return [request.resource_path(conn[uuid]) for uuid in
+                paths_filtered_by_status(request, self.get_rev_links(rev_name))]
+
     @calculated_property(schema={
         "title": "Sources",
         "type": "array",

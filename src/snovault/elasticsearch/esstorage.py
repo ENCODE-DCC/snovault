@@ -79,22 +79,6 @@ class CachedModel(object):
     def sid(self):
         return self.source.get('sid')
 
-    def invalidated(self):
-        request = get_root_request()
-        if request is None:
-            return False
-        edits = dict.get(request.session, 'edits', None)
-        if edits is None:
-            return False
-        version = self.meta['version']
-        referenced_uuids = set(self.source['referenced_uuids'])
-        for xid, updated, linked in edits:
-            if xid < version:
-                continue
-            if not referenced_uuids.isdisjoint(updated):
-                return True
-        return False
-
     def used_for(self, item):
         alsoProvides(item, ICachedItem)
 
@@ -115,7 +99,7 @@ class PickStorage(object):
         storage = self.storage()
         model = storage.get_by_uuid(uuid)
         if storage is self.read:
-            if model is None or model.invalidated():
+            if model is None:
                 return self.write.get_by_uuid(uuid)
         return model
 
@@ -123,7 +107,7 @@ class PickStorage(object):
         storage = self.storage()
         model = storage.get_by_unique_key(unique_key, name)
         if storage is self.read:
-            if model is None or model.invalidated():
+            if model is None:
                 return self.write.get_by_unique_key(unique_key, name)
         return model
 
@@ -132,7 +116,7 @@ class PickStorage(object):
         storage = self.storage()
         model = storage.get_by_json(key, value, item_type)
         if storage is self.read:
-            if model is None or model.invalidated():
+            if model is None:
                 return self.write.get_by_json(key, value, item_type)
         return model
 
