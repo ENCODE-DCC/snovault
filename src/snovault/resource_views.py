@@ -288,14 +288,4 @@ def item_view_raw(context, request):
 def item_view_edit(context, request):
     conn = request.registry[CONNECTION]
     properties = item_links(context, request)
-    schema_rev_links = context.type_info.schema_rev_links
-
-    for propname in schema_rev_links:
-        properties[propname] = sorted(
-            request.resource_path(child)
-            for child in (
-                conn.get_by_uuid(uuid) for uuid in context.get_rev_links(propname)
-            ) if request.has_permission('visible_for_edit', child)
-        )
-
     return properties

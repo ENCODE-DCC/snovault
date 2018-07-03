@@ -103,15 +103,22 @@ class User(Item):
         "type": "array",
         "items": {
             "type": ['string', 'object'],
-            "linkFrom": "AccessKey.user",
-        },
+            "linkTo": "AccessKey"
+        }
     }, category='page')
     def access_keys(self, request):
         if not request.has_permission('view_details'):
-            return
-        uuids = self.registry[CONNECTION].get_rev_links(self.model, 'user', 'AccessKey')
-        objects = (request.embed('/', str(uuid), '@@object') for uuid in uuids)
-        return [obj for obj in objects if obj['status'] not in ('deleted', 'replaced')]
+            return []
+        key_coll = self.registry['collections']['AccessKey']
+        # need to handle both esstorage and db storage results
+        uuids = [str(uuid) for uuid in key_coll]
+        acc_keys = [request.embed('/', uuid, '@@object')
+                for uuid in paths_filtered_by_status(request, uuids)]
+        my_keys = [acc_key for acc_key in acc_keys if acc_key['user'] == request.path]
+        if my_keys:
+            return [key for key in my_keys if key['status'] not in ('deleted', 'replaced')]
+        else:
+            return []
 
 
 @view_config(context=User, permission='view', request_method='GET', name='page')

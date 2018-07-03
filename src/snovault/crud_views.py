@@ -41,72 +41,9 @@ def includeme(config):
     config.scan(__name__)
 
 
-def split_child_props(type_info, properties):
-    propname_children = {}
-    item_properties = properties.copy()
-    if type_info.schema_rev_links:
-        for key, spec in type_info.schema_rev_links.items():
-            if key in item_properties:
-                propname_children[key] = item_properties.pop(key)
-    return item_properties, propname_children
-
-
-def update_children(context, request, propname_children):
-    registry = request.registry
-    conn = registry[CONNECTION]
-    collections = registry[COLLECTIONS]
-    schema_rev_links = context.type_info.schema_rev_links
-
-    for propname, children in propname_children.items():
-        link_type, link_attr = schema_rev_links[propname]
-        child_collection = collections[link_type]
-        found = set()
-
-        # Add or update children included in properties
-        for i, child_props in enumerate(children):
-            if isinstance(child_props, basestring):  # IRI of (existing) child
-                child = find_resource(child_collection, child_props)
-            else:
-                child_props = child_props.copy()
-                child_props[link_attr] = str(context.uuid)
-                if 'uuid' in child_props:  # update existing child
-                    child_id = child_props.pop('uuid')
-                    child = conn.get_by_uuid(child_id)
-                    if not request.has_permission('edit', child):
-                        msg = u'edit forbidden to %s' % request.resource_path(child)
-                        raise ValidationFailure('body', [propname, i], msg)
-                    try:
-                        update_item(child, request, child_props)
-                    except ValidationFailure as e:
-                        e.location = [propname, i] + e.location
-                        raise
-                else:  # add new child
-                    if not request.has_permission('add', child_collection):
-                        msg = u'edit forbidden to %s' % request.resource_path(child)
-                        raise ValidationFailure('body', [propname, i], msg)
-                    child = create_item(child_collection.type_info, request, child_props)
-            found.add(child.uuid)
-
-        # Remove existing children that are not in properties
-        for link_uuid in context.get_rev_links(propname):
-            if link_uuid in found:
-                continue
-            child = conn.get_by_uuid(link_uuid)
-            if not request.has_permission('visible_for_edit', child):
-                continue
-            if not request.has_permission('edit', child):
-                msg = u'edit forbidden to %s' % request.resource_path(child)
-                raise ValidationFailure('body', [propname, i], msg)
-            try:
-                delete_item(child, request)
-            except ValidationFailure as e:
-                e.location = [propname, i] + e.location
-                raise
-
-
 def create_item(type_info, request, properties, sheets=None):
     registry = request.registry
-    item_properties, propname_children = split_child_props(type_info, properties)
+    item_properties = properties.copy()
 
     if 'uuid' in item_properties:
         try:
@@ -119,22 +56,15 @@ def create_item(type_info, request, properties, sheets=None):
 
     item = type_info.factory.create(registry, uuid, item_properties, sheets)
     registry.notify(Created(item, request))
-
-    if propname_children:
-        update_children(item, request, propname_children)
     return item
 
 
 def update_item(context, request, properties, sheets=None):
     registry = request.registry
-    item_properties, propname_children = split_child_props(context.type_info, properties)
-
+    item_properties = properties.copy()
     registry.notify(BeforeModified(context, request))
     context.update(item_properties, sheets)
     registry.notify(AfterModified(context, request))
-
-    if propname_children:
-        update_children(context, request, propname_children)
 
 
 def delete_item(context, request):
@@ -285,3 +215,70 @@ def item_delete_full(context, request, render=None):
         '@type': ['result'],
         '@graph': [uuid]
     }
+
+
+###############################################################################
+# These functions are unused now that we are no longer using rev_links/linkFrom
+# keep it around a while for reference
+
+# def split_child_props(type_info, properties):
+#     propname_children = {}
+#     item_properties = properties.copy()
+#     if type_info.schema_rev_links:
+#         for key, spec in type_info.schema_rev_links.items():
+#             if key in item_properties:
+#                 propname_children[key] = item_properties.pop(key)
+#     return item_properties, propname_children
+
+
+# def update_children(context, request, propname_children):
+#     registry = request.registry
+#     conn = registry[CONNECTION]
+#     collections = registry[COLLECTIONS]
+#     schema_rev_links = context.type_info.schema_rev_links
+#
+#     for propname, children in propname_children.items():
+#         link_type, link_attr = schema_rev_links[propname]
+#         child_collection = collections[link_type]
+#         found = set()
+#
+#         # Add or update children included in properties
+#         for i, child_props in enumerate(children):
+#             if isinstance(child_props, basestring):  # IRI of (existing) child
+#                 child = find_resource(child_collection, child_props)
+#             else:
+#                 child_props = child_props.copy()
+#                 child_props[link_attr] = str(context.uuid)
+#                 if 'uuid' in child_props:  # update existing child
+#                     child_id = child_props.pop('uuid')
+#                     child = conn.get_by_uuid(child_id)
+#                     if not request.has_permission('edit', child):
+#                         msg = u'edit forbidden to %s' % request.resource_path(child)
+#                         raise ValidationFailure('body', [propname, i], msg)
+#                     try:
+#                         update_item(child, request, child_props)
+#                     except ValidationFailure as e:
+#                         e.location = [propname, i] + e.location
+#                         raise
+#                 else:  # add new child
+#                     if not request.has_permission('add', child_collection):
+#                         msg = u'edit forbidden to %s' % request.resource_path(child)
+#                         raise ValidationFailure('body', [propname, i], msg)
+#                     child = create_item(child_collection.type_info, request, child_props)
+#             found.add(child.uuid)
+#
+#         # Remove existing children that are not in properties
+#         for link_uuid in context.get_rev_links(propname):
+#             if link_uuid in found:
+#                 continue
+#             child = conn.get_by_uuid(link_uuid)
+#             if not request.has_permission('visible_for_edit', child):
+#                 continue
+#             if not request.has_permission('edit', child):
+#                 msg = u'edit forbidden to %s' % request.resource_path(child)
+#                 raise ValidationFailure('body', [propname, i], msg)
+#             try:
+#                 delete_item(child, request)
+#             except ValidationFailure as e:
+#                 e.location = [propname, i] + e.location
+#                 raise

@@ -39,24 +39,23 @@ def content(testapp):
 
 def test_embedded_uuids_object(content, dummy_request, threadlocals):
     dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@object')
-    # the starting item's uuid is no longer in _embedded_uuids
-    assert dummy_request._embedded_uuids == set()
+    assert dummy_request._embedded_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd'}
 
 
 def test_embedded_uuids_embedded(content, dummy_request, threadlocals):
     dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@embedded')
-    assert dummy_request._embedded_uuids == {'775795d3-4410-4114-836b-8eeecf1d0c2f'}
+    assert dummy_request._embedded_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd', '775795d3-4410-4114-836b-8eeecf1d0c2f'}
 
 
 def test_embedded_uuids_page(content, dummy_request, threadlocals):
     dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@page')
-    assert dummy_request._embedded_uuids == {'775795d3-4410-4114-836b-8eeecf1d0c2f'}
+    assert dummy_request._embedded_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd', '775795d3-4410-4114-836b-8eeecf1d0c2f'}
 
 
 def test_embedded_uuids_expand_target(content, dummy_request, threadlocals):
     dummy_request.embed('/testing-link-sources-sno/', sources[0]['uuid'], '@@expand?expand=target')
     # expanding does not add to the embedded_list
-    assert dummy_request._embedded_uuids == set()
+    assert dummy_request._embedded_uuids == {'16157204-8c8f-4672-a1a4-14f4b8021fcd', '775795d3-4410-4114-836b-8eeecf1d0c2f'}
 
 
 def test_updated_source(content, testapp):

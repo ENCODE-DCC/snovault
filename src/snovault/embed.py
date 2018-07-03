@@ -60,7 +60,6 @@ def embed(request, *elements, **kw):
     as_user = kw.get('as_user')
     path = join(*elements)
     path = unquote_bytes_to_wsgi(native_(path))
-    print('-- %s' % path)
     # as_user controls whether or not the embed_cache is used
     # if request._indexing_view is True, always use the cache
     if as_user is not None and not request._indexing_view:

@@ -130,11 +130,11 @@ class TestingLinkTargetSno(Item):
         "type": "array",
         "items": {
             "type": ['string', 'object'],
-            "linkFrom": "TestingLinkSourceSno.target",
+            "linkTo": "TestingLinkSourceSno",
         },
     })
-    def reverse(self, request, reverse):
-        return paths_filtered_by_status(request, reverse)
+    def reverse(self, request):
+        return self.rev_link_atids(request, "reverse")
 
 
 # Renamed from TestingPostPutPatch to TestingPostPutPatchSno so that indices
