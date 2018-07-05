@@ -163,6 +163,9 @@ def schema_mapping(name, schema):
 
 
 def index_settings():
+    # special_characters_filter is based on:
+    # https://www.javacodegeeks.com/2018/03/elasticsearch-ignore-special-characters-query-pattern-replace-filter-custom-analyzer.html#
+
     return {
         'index': {
             'number_of_shards': 5,
@@ -178,6 +181,11 @@ def index_settings():
                         'type': 'nGram',
                         'min_gram': 1,
                         'max_gram': 33
+                    },
+                    'ignore_special_characters': {
+                        'type': 'pattern_capture',
+                        'preserve_original': True,
+                        'patterns': []
                     }
                 },
                 'analyzer': {
@@ -193,7 +201,7 @@ def index_settings():
                     'snovault_index_analyzer': {
                         'type': 'custom',
                         'tokenizer': 'whitespace',
-                        'char_filter': 'html_strip',
+                        'char_filter': ['html_strip', 'special_characters_filter'],
                         'filter': [
                             'standard',
                             'lowercase',
@@ -203,6 +211,7 @@ def index_settings():
                     },
                     'snovault_search_analyzer': {
                         'type': 'custom',
+                        'char_filter': ['special_characters_filter'],
                         'tokenizer': 'whitespace',
                         'filter': [
                             'standard',
@@ -221,6 +230,13 @@ def index_settings():
                         'type': 'path_hierarchy',
                         'reverse': True
                     }
+                },
+                'char_filter': {
+                    'special_characters_filter': {
+                        'pattern': '[^A-Za-z0-9]',
+                        'type': 'pattern_replace',
+                        'replacement': ''
+                    }
                 }
             }
         }
@@ -235,7 +251,7 @@ def audit_mapping():
         },
         'detail': {
             'type': 'string',
-            'index': 'analyzed', 
+            'index': 'analyzed',
         },
         'level_name': {
             'type': 'string',
@@ -453,7 +469,7 @@ def type_mapping(types, item_type, embed=True):
 
     # Automatic boost for uuid
     if 'uuid' in mapping['properties']:
-        mapping['properties']['uuid']['index'] = 'not_analyzed' 
+        mapping['properties']['uuid']['index'] = 'not_analyzed'
         mapping['properties']['uuid']['include_in_all'] = False
     return mapping
 
