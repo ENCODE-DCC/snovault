@@ -3,7 +3,7 @@ Dependency tracking and invalidation
 
 Keeping elasticsearch in sync.
 
-The /_indexer wsgi app (es_index_listener.py) drives the incremental indexing process. Previoudly in the ENCODE setup, the listener was driven by database transactions. We have moved this to a queue-based setup that does not operate on DB snapshot. At a fixed, short time interval (at time of writing: 3 seconds), the index listener calls the /index view (indexer.py) which works out what needs to be reindexed. The actual reindexing happens in parallel in multiprocessing subprocesses (mpindexer.py.)
+The /_indexer wsgi app (es_index_listener.py) drives the incremental indexing process. Previously in the ENCODE setup, the listener was driven by database transactions. We have moved this to a queue-based setup that does not operate on DB snapshot. At a fixed, short time interval (at time of writing: 3 seconds), the index listener calls the /index view (indexer.py) which works out what needs to be reindexed. The actual reindexing happens in parallel in multiprocessing subprocesses (mpindexer.py.)
 
 When rendering a response, we record the set of embedded_uuids and linked_uuids used.
 

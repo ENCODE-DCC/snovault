@@ -79,7 +79,7 @@ A couple endpoints were added to make the queue more useful. First, /indexing_st
 
 The queue is only actively cleared when create-mapping is run for a total reindex. This is because past records should not be lost for the alternate create-mapping functions, such as --check-first or --index-diff. The queue can be managed directly from the AWS console.
 
-Please note that you must have the correct AWS credentials configured gor your project to use it.
+Please note that you must have the correct AWS credentials configured for your project to use it.
 
 Further possible improvements to the queue system include:
 - Creating a metadata layer that would allow for deduplication of <uuid/sid> combinations within the queue.
