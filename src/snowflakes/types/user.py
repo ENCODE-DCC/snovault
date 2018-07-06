@@ -11,6 +11,7 @@ from pyramid.security import (
 )
 from .base import (
     Item,
+    paths_filtered_by_status,
 )
 from snovault import (
     CONNECTION,

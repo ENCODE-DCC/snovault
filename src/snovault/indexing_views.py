@@ -65,9 +65,9 @@ def item_index_data(context, request):
     request._indexing_view = True
     # since request._indexing_view is set to True in indexer.py,
     # all embeds (including subrequests) below will use the embed cache
-    embedded = request.get_item(path, '@@embedded')
-    audit = request.get_item(path, '@@audit')['audit']
-    obj = request.get_item(path, '@@object')
+    embedded = request.invoke_view(path, '@@embedded')
+    audit = request.invoke_view(path, '@@audit')['audit']
+    obj = request.invoke_view(path, '@@object')
 
     document = {
         'audit': audit,

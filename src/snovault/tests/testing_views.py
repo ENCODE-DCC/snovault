@@ -90,6 +90,10 @@ class TestingLinkSourceSno(Item):
                 'type': 'string',
                 'linkTo': 'TestingLinkTargetSno',
             },
+            'ppp': {
+                'type': 'string',
+                'linkTo': 'TestingPostPutPatchSno',
+            },
             'status': {
                 'type': 'string',
             },

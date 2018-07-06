@@ -110,7 +110,7 @@ def test_link_target_audit_fail(testapp):
     testapp.post_json('/testing_link_target_sno', target, status=201)
     res = testapp.get('/%s/@@index-data' % target['uuid']).maybe_follow()
     # make sure referenced_uuids are in response
-    assert 'referenced_uuids' in res and len(res['referenced_uuids']) > 0
+    assert 'referenced_uuids' in res.json and len(res.json['referenced_uuids']) > 0
     errors_dict = res.json['audit']
     errors_list = []
     for error_type in errors_dict:
@@ -130,7 +130,7 @@ def test_link_target_audit_pass(testapp):
     testapp.post_json('/testing_link_source_sno', source, status=201)
     res = testapp.get('/%s/@@index-data' % target['uuid']).maybe_follow()
     # make sure referenced_uuids are in response
-    assert 'referenced_uuids' in res and len(res['referenced_uuids']) > 0
+    assert 'referenced_uuids' in res.json and len(res.json['referenced_uuids']) > 0
     errors_dict = res.json['audit']
     errors_list = []
     for error_type in errors_dict:

@@ -160,6 +160,7 @@ def test_queue_indexing_deferred(app, testapp):
     # delete all messages afterwards
     # also check telemetry_id and make sure it gets put on the queue
     indexer_queue = app.registry[INDEXER_QUEUE]
+    indexer_queue.clear_queue()
     testapp.post_json(TEST_COLL + '?telemetry_id=test_telem', {'required': ''})
     time.sleep(2)
     secondary_body = {
@@ -175,7 +176,7 @@ def test_queue_indexing_deferred(app, testapp):
         'target_queue': 'deferred',
     }
     testapp.post_json('/queue_indexing?telemetry_id=test_telem', deferred_body)
-    time.sleep(5)
+    time.sleep(3)
     msg_count = indexer_queue.number_of_messages()
     assert msg_count['primary_waiting'] == 1
     assert msg_count['secondary_waiting'] == 2
@@ -190,11 +191,44 @@ def test_queue_indexing_deferred(app, testapp):
             msg_body = json.loads(msg['Body'])
             assert msg_body['telemetry_id'] == 'test_telem'
         indexer_queue.delete_messages(received, target_queue=target)
-    time.sleep(8)
+    time.sleep(3)
     msg_count = indexer_queue.number_of_messages()
     assert msg_count['primary_waiting'] == 0
     assert msg_count['secondary_waiting'] == 0
     assert msg_count['deferred_waiting'] == 0
+
+
+def test_queue_indexing_after_post_patch(app, testapp):
+    # make sure that the right stuff gets queued up on a post or a patch
+    indexer_queue = app.registry[INDEXER_QUEUE]
+    # POST
+    post_res = testapp.post_json(TEST_COLL, {'required': ''})
+    post_uuid = post_res.json['@graph'][0]['uuid']
+    received = indexer_queue.receive_messages()
+    assert len(received) == 1
+    msg_body = json.loads(received[0]['Body'])
+    assert isinstance(msg_body, dict)
+    assert msg_body['uuid'] == post_uuid
+    assert msg_body['strict'] is True
+    assert msg_body['method'] == 'POST'
+    assert 'timestamp' in msg_body
+    assert 'sid' in msg_body
+    post_sid = msg_body['sid']
+    indexer_queue.delete_messages(received)
+    time.sleep(3)
+    # PATCH
+    testapp.patch_json(TEST_COLL + post_uuid, {'required': 'meh'})
+    received = indexer_queue.receive_messages()
+    assert len(received) == 1
+    msg_body = json.loads(received[0]['Body'])
+    assert isinstance(msg_body, dict)
+    assert msg_body['uuid'] == post_uuid
+    assert msg_body['strict'] is False
+    assert msg_body['method'] == 'PATCH'
+    assert 'timestamp' in msg_body
+    assert 'sid' in msg_body
+    assert msg_body['sid'] > post_sid
+    indexer_queue.delete_messages(received)
 
 
 def test_indexing_simple(app, testapp, indexer_testapp):
@@ -314,9 +348,9 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     assert doc_count == 2
 
 
-def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
+def test_queue_indexing_with_referenced(app, testapp, indexer_testapp):
     """
-    When an item is indexed, queue up all its embedded uuids for indexing
+    When an item is POSTed, queue up all its referenced uuids for indexing
     as well.
     Test indexer_utils.find_uuids_for_indexing here as well
     """
@@ -328,10 +362,13 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
         collections=['testing_link_target_sno', 'testing_link_source_sno'],
         skip_indexing=True
     )
+    ppp_res = testapp.post_json(TEST_COLL, {'required': ''})
+    ppp_uuid = ppp_res.json['@graph'][0]['uuid']
     target  = {'name': 'one', 'uuid': '775795d3-4410-4114-836b-8eeecf1d0c2f'}
     source = {
         'name': 'A',
         'target': '775795d3-4410-4114-836b-8eeecf1d0c2f',
+        'ppp': ppp_uuid,
         'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd',
         'status': 'current',
     }
@@ -339,18 +376,23 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
     res = indexer_testapp.post_json('/index', {'record': True})
     time.sleep(2)
     # wait for the first item to index
-    doc_count = es.count(index='testing_link_target_sno', doc_type='testing_link_target_sno').get('count')
+    doc_count_target = es.count(index='testing_link_target_sno', doc_type='testing_link_target_sno').get('count')
+    doc_count_ppp = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
     tries = 0
-    while doc_count < 1 and tries < 5:
+    while (doc_count_target < 1 or doc_count_ppp < 1) and tries < 5:
         time.sleep(4)
-        doc_count = es.count(index='testing_link_target_sno', doc_type='testing_link_target_sno').get('count')
+        doc_count_target = es.count(index='testing_link_target_sno', doc_type='testing_link_target_sno').get('count')
+        doc_count_ppp = es.count(index=TEST_TYPE, doc_type=TEST_TYPE).get('count')
         tries += 1
-    assert doc_count == 1
-    # indexing the source will also reindex the target
+    assert doc_count_target == 1
+    assert doc_count_ppp == 1
+    # indexing the source will also reindex the target and the ppp
+    # since all referenced_uuids in an item are queued along with its POST
     source_res = testapp.post_json('/testing-link-sources-sno/', source, status=201)
+    source_uuid = source_res.json['@graph'][0]['uuid']
     time.sleep(2)
     res = indexer_testapp.post_json('/index', {'record': True})
-    assert res.json['indexing_count'] == 2
+    assert res.json['indexing_count'] == 3
     time.sleep(2)
     # wait for them to index
     doc_count = es.count(index='testing_link_source_sno', doc_type='testing_link_source_sno').get('count')
@@ -359,10 +401,18 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
         time.sleep(4)
         doc_count = es.count(index='testing_link_source_sno', doc_type='testing_link_source_sno').get('count')
     assert doc_count == 1
+    # patching json will not queue embedded uuids
+    # the target will be indexed though, since it has a linkTo back to the source
+    testapp.patch_json('/testing-link-sources-sno/' + source_uuid, {'name': 'ABC'})
+    time.sleep(2)
+    res = indexer_testapp.post_json('/index', {'record': True})
+    assert res.json['indexing_count'] == 2
 
     # test find_uuids_for_indexing
     to_index = indexer_utils.find_uuids_for_indexing(app.registry, {target['uuid']})
     assert to_index == {target['uuid'], source['uuid']}
+    to_index = indexer_utils.find_uuids_for_indexing(app.registry, {ppp_uuid})
+    assert to_index == {ppp_uuid, source['uuid']}
     # now use a made-up uuid; only result should be itself
     fake_uuid = str(uuid.uuid4())
     to_index = indexer_utils.find_uuids_for_indexing(app.registry, {fake_uuid})

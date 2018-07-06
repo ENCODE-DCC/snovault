@@ -84,4 +84,6 @@ def test_referenced_uuids_real(workbook, testapp, app):
     test_uuids = recursively_find_uuids(test_case, set())
     test_doc = es.get(index='snowflake', doc_type='snowflake', id=test_case['uuid'])
     referenced_uuids = set(test_doc['_source']['referenced_uuids'])
-    assert test_uuids == referenced_uuids
+    # uuids in the doc are a subset of total referenced_uuids, which include
+    # uuids referenced in calc properties and audits, etc.
+    assert set(test_uuids) <= set(referenced_uuids)

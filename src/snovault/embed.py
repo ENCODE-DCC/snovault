@@ -18,7 +18,7 @@ def includeme(config):
     config.scan(__name__)
     config.add_renderer('null_renderer', NullRenderer)
     config.add_request_method(embed, 'embed')
-    config.add_request_method(embed, 'get_item')
+    config.add_request_method(embed, 'invoke_view')
     config.add_request_method(lambda request: set(), '_referenced_uuids', reify=True)
     config.add_request_method(lambda request: False, '_indexing_view', reify=True)
     config.add_request_method(lambda request: None, '__parent__', reify=True)
