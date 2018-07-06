@@ -62,6 +62,7 @@ before_install:
 - npm config set python /usr/bin/python2.7
 - curl -O  ${ES_DOWNLOAD_URL} && sudo dpkg -i --force-confnew elasticsearch-${ES_VERSION}.deb && sudo service elasticsearch stop
 - pip install -U zc.buildout setuptools
+- gem install compass
 install:
 - buildout bootstrap
 - bin/buildout -c buildout-travis.cfg || (echo "Retrying buildout" && bin/buildout
