@@ -297,12 +297,12 @@ class Item(Resource):
         return properties
 
     def __json__(self, request):
-        # Record embedding objects
+        '''Record embedding objects'''
         request._embedded_uuids.add(str(self.uuid))
         return self.upgrade_properties()
 
     def __resource_url__(self, request, info):
-        # Record linking objects
+        '''Record linking objects'''
         request._linked_uuids.add(str(self.uuid))
         return None
 
@@ -310,13 +310,20 @@ class Item(Resource):
     def create(cls, registry, uuid, properties, sheets=None):
         model = registry[CONNECTION].create(cls.__name__, uuid)
         self = cls(registry, model)
+        properties = self._create(properties, sheets) or properties
         self._update(properties, sheets)
         return self
 
+    def _create(self, properties, sheets=None):
+        '''This is called in Item.create (classmethod)'''
+        return properties
+
     def update(self, properties, sheets=None):
+        '''Alias of _update'''
         self._update(properties, sheets)
 
     def _update(self, properties, sheets=None):
+        '''This is called in Item.create (classmethod) as well as in crud_views.py - item_edit'''
         unique_keys = None
         links = None
         if properties is not None:
