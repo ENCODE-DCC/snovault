@@ -52,6 +52,7 @@ def split_child_props(type_info, properties):
 
 
 def update_children(context, request, propname_children):
+    '''Seemingly, recursively creates or updates linkedTo children.'''
     registry = request.registry
     conn = registry[CONNECTION]
     collections = registry[COLLECTIONS]
@@ -105,6 +106,10 @@ def update_children(context, request, propname_children):
 
 
 def create_item(type_info, request, properties, sheets=None):
+    '''
+    Validates or generates new UUID, instantiates & saves an Item in database using provided `type_info` & `properties`,
+    sends 'Created' notification, and then recursively creates or updates any linkedTo children in `properties`.
+    '''
     registry = request.registry
     item_properties, propname_children = split_child_props(type_info, properties)
 
@@ -126,6 +131,10 @@ def create_item(type_info, request, properties, sheets=None):
 
 
 def update_item(context, request, properties, sheets=None):
+    '''
+    Updates retrieved-from-database `context` (Item class instance) with `properties` (dict) in database,
+    sends 'BeforeModified' & 'AfterModified' notifications, and recursively creates or updates any linkedTo children in `properties`.
+    '''
     registry = request.registry
     item_properties, propname_children = split_child_props(context.type_info, properties)
 
@@ -169,6 +178,7 @@ def render_item(request, context, render, return_uri_also=False):
              validators=[no_validate_item_content_post],
              request_param=['validate=false'])
 def collection_add(context, request, render=None):
+    '''Endpoint for adding a new Item.'''
     txn = transaction.get()
 
     if render is None:
@@ -206,13 +216,15 @@ def collection_add(context, request, render=None):
              validators=[no_validate_item_content_patch],
              request_param=['validate=false'], decorator=if_match_tid)
 def item_edit(context, request, render=None):
-    """ This handles both PUT and PATCH, difference is the validator
+    '''
+    Endpoint for editing an existing Item.
+    This handles both PUT and PATCH, difference is the validator
 
     PUT - replaces the current properties with the new body
     PATCH - updates the current properties with those supplied.
     Note validators will handle the PATH ?delete_fields parameter if you want
     field to be deleted
-    """
+    '''
 
     txn = transaction.get()
 
