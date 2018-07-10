@@ -304,15 +304,29 @@ class Item(Resource):
 
     @classmethod
     def create(cls, registry, uuid, properties, sheets=None):
+        '''
+        This class method is called in crud_views.py - `collection_add` (API endpoint) > `create_item` (method) > `type_info.factory.create` (this class method)
+
+        This method instantiates a new Item class instance from provided `uuid` and `properties`,
+        then runs the `_update` (instance method) to save the Item to the database.
+        '''
         model = registry[CONNECTION].create(cls.__name__, uuid)
-        self = cls(registry, model)
-        self._update(properties, sheets)
-        return self
+        item_instance = cls(registry, model)
+        item_instance._update(properties, sheets)
+        return item_instance
 
     def update(self, properties, sheets=None):
+        '''Alias of _update, called in crud_views.py - `update_item` (method)'''
         self._update(properties, sheets)
 
     def _update(self, properties, sheets=None):
+        '''
+        This instance method is called in Item.create (classmethod) as well as in crud_views.py - `item_edit` (API endpoint) > `update_item` (method) > `context.update` (instance method).
+
+        This method is used to assert lack of duplicate unique keys in database and then to perform database update of `properties` (dict).
+
+        Optionally define this method in inherited classes to extend `properties` on Item updates.
+        '''
         unique_keys = None
         links = None
         if properties is not None:
