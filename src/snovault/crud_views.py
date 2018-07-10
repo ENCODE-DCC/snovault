@@ -8,7 +8,6 @@ from uuid import (
     UUID,
     uuid4,
 )
-from .etag import if_match_tid
 from .interfaces import (
     COLLECTIONS,
     CONNECTION,
@@ -138,15 +137,15 @@ def collection_add(context, request, render=None):
 
 
 @view_config(context=Item, permission='edit', request_method='PUT',
-             validators=[validate_item_content_put], decorator=if_match_tid)
+             validators=[validate_item_content_put])
 @view_config(context=Item, permission='edit', request_method='PATCH',
-             validators=[validate_item_content_patch], decorator=if_match_tid)
+             validators=[validate_item_content_patch])
 @view_config(context=Item, permission='edit_unvalidated', request_method='PUT',
              validators=[no_validate_item_content_put],
-             request_param=['validate=false'], decorator=if_match_tid)
+             request_param=['validate=false'])
 @view_config(context=Item, permission='edit_unvalidated', request_method='PATCH',
              validators=[no_validate_item_content_patch],
-             request_param=['validate=false'], decorator=if_match_tid)
+             request_param=['validate=false'])
 def item_edit(context, request, render=None):
     '''
     Endpoint for editing an existing Item.
@@ -183,7 +182,7 @@ def item_edit(context, request, render=None):
     return result
 
 
-@view_config(context=Item, permission='edit', request_method='DELETE', decorator=if_match_tid)
+@view_config(context=Item, permission='edit', request_method='DELETE')
 def item_delete_full(context, request, render=None):
     # possibly temporary fix to check if user is admin
     if hasattr(request, 'user_info'):

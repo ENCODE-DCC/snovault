@@ -281,11 +281,3 @@ def item_view_raw(context, request):
     # add uuid to raw view
     props['uuid'] = str(context.uuid)
     return props
-
-
-@view_config(context=Item, permission='edit', request_method='GET',
-             name='edit', decorator=etag_tid)
-def item_view_edit(context, request):
-    conn = request.registry[CONNECTION]
-    properties = item_links(context, request)
-    return properties

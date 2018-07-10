@@ -52,12 +52,3 @@ def test_schemas_etag(testapp):
     etag = testapp.get('/profiles/', status=200).etag
     assert etag
     testapp.get('/profiles/', headers={'If-None-Match': etag}, status=304)
-
-
-def test_etag_if_match_tid(testapp, award):
-    # TODO: remove this test
-    # etags aren't really being used the same way
-    res = testapp.get(award['@id'] + '?frame=edit', status=200)
-    etag = res.etag
-    assert etag == ''
-    testapp.patch_json(award['@id'], {}, headers={'If-Match': etag}, status=200)
