@@ -316,18 +316,8 @@ class Item(Resource):
         '''
         model = registry[CONNECTION].create(cls.__name__, uuid)
         item_instance = cls(registry, model)
-        properties = item_instance._create(properties, sheets) or properties
         item_instance._update(properties, sheets)
         return item_instance
-
-    def _create(self, properties, sheets=None):
-        '''
-        This instance method is called in `Item.create` (class method).
-
-        Optionally define this method in inherited classes to extend `properties` (dict) on Item creation (initial save to database).
-        May return (same instance or copy of) `properties` or modify `properties` in place.
-        '''
-        return properties
 
     def update(self, properties, sheets=None):
         '''Alias of _update, called in crud_views.py - `update_item` (method)'''
@@ -340,7 +330,6 @@ class Item(Resource):
         This method is used to assert lack of duplicate unique keys in database and then to perform database update of `properties` (dict).
 
         Optionally define this method in inherited classes to extend `properties` on Item updates.
-        Must call `super(ItemClassNameSuchAsExperimentSet, self)._create(properties, sheets)` at end of inherited function to perform update.
         '''
         unique_keys = None
         links = None

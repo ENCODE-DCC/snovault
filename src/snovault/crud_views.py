@@ -52,7 +52,6 @@ def split_child_props(type_info, properties):
 
 
 def update_children(context, request, propname_children):
-    '''Seemingly, recursively creates or updates linkedTo children.'''
     registry = request.registry
     conn = registry[CONNECTION]
     collections = registry[COLLECTIONS]
@@ -107,8 +106,9 @@ def update_children(context, request, propname_children):
 
 def create_item(type_info, request, properties, sheets=None):
     '''
-    Validates or generates new UUID, instantiates & saves an Item in database using provided `type_info` & `properties`,
-    sends 'Created' notification, and then recursively creates or updates any linkedTo children in `properties`.
+    Validates or generates new UUID, instantiates & saves an Item in
+    database using provided `type_info` & `properties`, sends 'Created'
+    notification, which can be subscribed to using the @subscriber(Created) decorator
     '''
     registry = request.registry
     item_properties, propname_children = split_child_props(type_info, properties)
@@ -132,8 +132,10 @@ def create_item(type_info, request, properties, sheets=None):
 
 def update_item(context, request, properties, sheets=None):
     '''
-    Updates retrieved-from-database `context` (Item class instance) with `properties` (dict) in database,
-    sends 'BeforeModified' & 'AfterModified' notifications, and recursively creates or updates any linkedTo children in `properties`.
+    Updates retrieved-from-database `context` (Item class instance) with
+    `properties` (dict) in database, sends 'BeforeModified' & 'AfterModified'
+    notifications, which can be subscribed to using the
+    @subscriber(BeforeModified) or @subscriber(AfterModified) decorators
     '''
     registry = request.registry
     item_properties, propname_children = split_child_props(context.type_info, properties)
