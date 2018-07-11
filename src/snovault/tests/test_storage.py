@@ -236,12 +236,12 @@ def test_S3BlobStorage_boto3(mocker):
     storage.store_blob('data', download_meta)
     assert download_meta['bucket'] == 'test'
     assert 'key' in download_meta
-    storage.store_conn.put_object.assert_called_once()
+    assert storage.store_conn.put_object.call_count == 1
     storage.read_conn.return_value = mock_key
     storage.read_conn.get_object()['Body'].read.return_value = 'data'
     data = storage.get_blob(download_meta)
     assert data == 'data'
-    storage.read_conn.get_object().read().assert_called_once()
+    assert storage.read_conn.get_object.call_count == 2
 
 
 def test_S3BlobStorage_boto3_with_header(mocker):
