@@ -149,7 +149,9 @@ def get_search_fields(request, doc_types):
     for doc_type in doc_types:
         type_info = types[doc_type]
         for value in type_info.schema.get('boost_values', ()):
-            fields.add('embedded.' + value)
+            # boost value empirically selected
+            boost = '' if 'accession' not in value else '^4'
+            fields.add('embedded.' + value + boost)
             highlights['embedded.' + value] = {}
     return list(fields), highlights
 
