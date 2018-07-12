@@ -126,7 +126,7 @@ def test_access_key_edit(anontestapp, access_key):
     assert res.json['description'] == NEW_DESCRIPTION
 
 
-@pytest.mark.parametrize('frame', ['', 'raw', 'edit', 'object', 'embedded', 'page'])
+@pytest.mark.parametrize('frame', ['', 'raw', 'object', 'embedded', 'page'])
 def test_access_key_view_hides_secret_access_key_hash(testapp, access_key, frame):
     query = '?frame=' + frame if frame else ''
     res = testapp.get(access_key['@id'] + query)
