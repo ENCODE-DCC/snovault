@@ -1,6 +1,6 @@
 from snovault.json_renderer import json_renderer
 from snovault.util import get_root_request
-from elasticsearch import Elasticsearch, RequestsHttpConnection
+from dcicutils.es_utils import create_es_client
 from elasticsearch.connection import Urllib3HttpConnection
 from elasticsearch.serializer import SerializationError
 from pyramid.settings import (
@@ -23,26 +23,18 @@ def includeme(config):
 
     config.add_request_method(datastore, 'datastore', reify=True)
 
-    addresses = aslist(settings['elasticsearch.server'])
+    address = settings['elasticsearch.server']
     use_aws_auth = settings.get('elasticsearch.aws_auth')
-
+    # make sure use_aws_auth is bool
+    if not isinstance(use_aws_auth, bool):
+        use_aws_auth = True if use_aws_auth == 'true' else False
+    # snovault specific ES options
     es_options = {'serializer': PyramidJSONSerializer(json_renderer),
-                  'connection_class': TimedUrllib3HttpConnection,
-                  'retry_on_timeout': True,
-                  'maxsize': 50  # parallellism...
-                 }
-    if use_aws_auth:
-        # drop port if it's there
-        host = addresses[0].split(':')
-        auth = BotoAWSRequestsAuth(aws_host=host[0],
-                                   aws_region='us-east-1',
-                                   aws_service='es')
-        es_options['connection_class'] = RequestsHttpConnection
-        es_options['http_auth'] = auth
+                  'connection_class': TimedUrllib3HttpConnection}
 
-
-    config.registry[ELASTIC_SEARCH] = Elasticsearch(
-        addresses, **es_options)
+    config.registry[ELASTIC_SEARCH] = create_es_client(address,
+                                                       use_aws_auth=use_aws_auth,
+                                                       **es_options)
 
     config.include('.cached_views')
     config.include('.esstorage')
