@@ -29,8 +29,9 @@ def includeme(config):
     if not isinstance(use_aws_auth, bool):
         use_aws_auth = True if use_aws_auth == 'true' else False
     # snovault specific ES options
-    es_options = {'serializer': PyramidJSONSerializer(json_renderer),
-                  'connection_class': TimedUrllib3HttpConnection}
+    # this previously-used option was causing problems (?)
+    # 'connection_class': TimedUrllib3HttpConnection
+    es_options = {'serializer': PyramidJSONSerializer(json_renderer)}
 
     config.registry[ELASTIC_SEARCH] = create_es_client(address,
                                                        use_aws_auth=use_aws_auth,
