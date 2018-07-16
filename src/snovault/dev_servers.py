@@ -86,11 +86,10 @@ def main():
     ### may have to `rm /tmp/snovault/pgdata/postmaster.pid`
 
     postgres = postgresql_fixture.server_process(pgdata, echo=True)
+    elasticsearch = elasticsearch_fixture.server_process(esdata, echo=True)
     nginx = nginx_server_process(echo=True)
-    processes = [postgres, nginx]
-    if not config.get('elasticsearch.aws_auth'):
-        elasticsearch = elasticsearch_fixture.server_process(esdata, echo=True)
-        processes = [postgres, elasticsearch, nginx]
+    processes = [postgres, elasticsearch, nginx]
+        
 
     @atexit.register
     def cleanup_process():
