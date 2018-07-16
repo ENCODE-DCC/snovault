@@ -31,7 +31,8 @@ def includeme(config):
     # snovault specific ES options
     # this previously-used option was causing problems (?)
     # 'connection_class': TimedUrllib3HttpConnection
-    es_options = {'serializer': PyramidJSONSerializer(json_renderer)}
+    es_options = {'serializer': PyramidJSONSerializer(json_renderer),
+                  'connection_class': TimedUrllib3HttpConnection}
 
     config.registry[ELASTIC_SEARCH] = create_es_client(address,
                                                        use_aws_auth=use_aws_auth,

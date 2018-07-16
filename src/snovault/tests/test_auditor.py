@@ -131,6 +131,8 @@ def test_link_target_audit_pass(testapp):
     res = testapp.get('/%s/@@index-data' % target['uuid']).maybe_follow()
     # make sure referenced_uuids are in response
     assert 'referenced_uuids' in res.json and len(res.json['referenced_uuids']) > 0
+    # make sure source uuid is in _referenced_uuids
+    assert source['uuid'] in res.json['referenced_uuids']
     errors_dict = res.json['audit']
     errors_list = []
     for error_type in errors_dict:
