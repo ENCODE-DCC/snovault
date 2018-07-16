@@ -219,9 +219,6 @@ class Indexer(object):
                 if error:
                     if error.get('error_message') == 'deferred_retry':
                         # send this to the deferred queue
-                        # should be set to strict, since associated uuids will
-                        # already have been found if it was intitially not
-                        msg_body['strict'] = False
                         msg_body['detail'] = error['txn_str']
                         self.queue.send_messages([msg_body], target_queue='deferred')
                         # delete the old message
