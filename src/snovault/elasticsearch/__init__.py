@@ -1,7 +1,7 @@
 from snovault.json_renderer import json_renderer
 from snovault.util import get_root_request
 from dcicutils.es_utils import create_es_client
-from elasticsearch.connection import Urllib3HttpConnection
+from elasticsearch.connection import RequestsHttpConnection
 from elasticsearch.serializer import SerializationError
 from pyramid.settings import (
     asbool,
@@ -32,7 +32,7 @@ def includeme(config):
     # this previously-used option was causing problems (?)
     # 'connection_class': TimedUrllib3HttpConnection
     es_options = {'serializer': PyramidJSONSerializer(json_renderer),
-                  'connection_class': TimedUrllib3HttpConnection}
+                  'connection_class': TimedRequestsHttpConnection}
 
     config.registry[ELASTIC_SEARCH] = create_es_client(address,
                                                        use_aws_auth=use_aws_auth,
@@ -83,7 +83,8 @@ class PyramidJSONSerializer(object):
             raise SerializationError(data, e)
 
 
-class TimedUrllib3HttpConnection(Urllib3HttpConnection):
+# changed to work with Urllib3HttpConnection (from ES) to RequestsHttpConnection
+class TimedRequestsHttpConnection(RequestsHttpConnection):
     stats_count_key = 'es_count'
     stats_time_key = 'es_time'
 
@@ -99,10 +100,10 @@ class TimedUrllib3HttpConnection(Urllib3HttpConnection):
 
     def log_request_success(self, method, full_url, path, body, status_code, response, duration):
         self.stats_record(duration)
-        return super(TimedUrllib3HttpConnection, self).log_request_success(
+        return super(RequestsHttpConnection, self).log_request_success(
             method, full_url, path, body, status_code, response, duration)
 
     def log_request_fail(self, method, full_url, path, body, duration, status_code=None, exception=None):
         self.stats_record(duration)
-        return super(TimedUrllib3HttpConnection, self).log_request_fail(
+        return super(RequestsHttpConnection, self).log_request_fail(
             method, full_url, path, body, duration, status_code, exception)
