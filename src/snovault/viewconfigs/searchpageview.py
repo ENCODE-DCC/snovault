@@ -207,7 +207,7 @@ class SearchPageView(BaseView):
                 es_results = es.search(body=query, index=es_index, search_type='query_then_fetch')
             else:
                 es_results = es.search(body=query, index=es_index, from_=from_, size=size)
-ß
+
             result['total'] = total = es_results['hits']['total']
 
             schemas = (types[item_type].schema for item_type in doc_types)
