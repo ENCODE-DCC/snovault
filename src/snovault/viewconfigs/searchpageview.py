@@ -52,7 +52,7 @@ class SearchPageView(BaseView):
             self.search_type = search_type
             self.return_generator = return_generator
 
-        def search(self):
+        def preprocess_view(self):
             """
             Search view connects to ElasticSearch and returns the results
             """

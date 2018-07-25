@@ -61,8 +61,8 @@ DEFAULT_DOC_TYPES = [
 
 @view_config(route_name='search', request_method='GET', permission='search')
 def search(context, request, search_type=None, return_generator=False):
-    return SearchPageView(context, request, search_type. return_generator)
-
+    search = SearchPageView(context, request, search_type. return_generator)
+    return search.preprocess_view()
 
 def iter_search_results(context, request):
     return search(context, request, return_generator=True)
