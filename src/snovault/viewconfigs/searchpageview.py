@@ -37,11 +37,16 @@ AUDIT_FACETS = [
 ]
 
 DEFAULT_DOC_TYPES = [
-    'Lab',
-    'Snowset',
-    'Snowball',
-    'Snowfort',
-    'Snowflake',
+    'AntibodyLot',
+    'Award',
+    'Biosample',
+    'Dataset',
+    'GeneticModification',
+    'Page',
+    'Pipeline',
+    'Publication',
+    'Software',
+    'Target',
 ]
 
 class SearchPageView(BaseView):
