@@ -108,6 +108,8 @@ def mixinSchemas(schema, resolver, key_name = 'properties'):
                     continue
                 if prop[k] == v:
                     continue
+                if key_name == 'facets':
+                    continue # Allow schema facets to override, as well.
                 raise ValueError('Schema mixin conflict for %s/%s' % (name, k))
     # Allow schema properties to override
     base = schema.get(key_name, {})
@@ -310,11 +312,12 @@ def load_schema(filename):
         schema = json.load(utf8(asset.stream()),
                            object_pairs_hook=collections.OrderedDict)
         resolver = RefResolverOrdered('file://' + asset.abspath(), schema)
-    # use mixinProperties, mixinFacets, and mixinColumns (if provided)
+    # use mixinProperties, mixinFacets, mixinAggregations, and mixinColumns (if provided)
     schema = mixinSchemas(
         mixinSchemas(
-            mixinSchemas(schema, resolver, 'properties'),
-            resolver, 'facets'
+            mixinSchemas( mixinSchemas(schema, resolver, 'properties'), resolver, 'facets' ),
+            resolver,
+            'aggregations'
         ),
         resolver, 'columns'
     )

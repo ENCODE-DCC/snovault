@@ -69,6 +69,19 @@ def sorted_pairs_hook(pairs):
 def sorted_dict(d):
     return json.loads(json.dumps(d), object_pairs_hook=sorted_pairs_hook)
 
+def determine_if_is_date_field(field, schema):
+    is_date_field = False
+    if schema.get('format') is not None:
+        if schema['format'] == 'date' or schema['format'] == 'date-time':
+            is_date_field = True
+    elif schema.get('anyOf') is not None and len(schema['anyOf']) > 1:
+        is_date_field = True # Will revert to false unless all anyOfs are format date/datetime.
+        for schema_option in schema['anyOf']:
+            if schema_option.get('format') not in ['date', 'date-time']:
+                is_date_field = False
+                break
+    return is_date_field
+
 
 def schema_mapping(field, schema, top_level=False):
     """
@@ -80,6 +93,9 @@ def schema_mapping(field, schema, top_level=False):
         type_ = 'string'
     else:
         type_ = schema['type']
+
+    # Find out if we have a date or datetime field via schema formats.
+    is_date_field = determine_if_is_date_field(field, schema)
 
     # Elasticsearch handles multiple values for a field
     if type_ == 'array' and schema['items']:
@@ -104,7 +120,7 @@ def schema_mapping(field, schema, top_level=False):
             }
 
     # hardcode fields with dates for now
-    if field == 'date_created':
+    if is_date_field or field == 'date_created':
         return {
             'type': 'date',
             'format': "date_optional_time",
