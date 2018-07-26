@@ -94,9 +94,6 @@ def schema_mapping(field, schema, top_level=False):
     else:
         type_ = schema['type']
 
-    # Find out if we have a date or datetime field via schema formats.
-    is_date_field = determine_if_is_date_field(field, schema)
-
     # Elasticsearch handles multiple values for a field
     if type_ == 'array' and schema['items']:
         return schema_mapping(field, schema['items'])
@@ -119,8 +116,7 @@ def schema_mapping(field, schema, top_level=False):
                 'properties': properties,
             }
 
-    # hardcode fields with dates for now
-    if is_date_field or field == 'date_created':
+    if determine_if_is_date_field(field, schema):
         return {
             'type': 'date',
             'format': "date_optional_time",
