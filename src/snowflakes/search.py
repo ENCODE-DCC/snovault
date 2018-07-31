@@ -589,7 +589,7 @@ def iter_long_json(name, iterable, other):
         yield ']' + other_stuff + '}'
 
 @view_config(route_name='search', request_method='GET', permission='search')
-def search(context, request, search_type=None, return_generator=False):
+def search(context, request, return_generator=False):
     """
     Search view connects to ElasticSearch and returns the results
     """
@@ -618,13 +618,9 @@ def search(context, request, search_type=None, return_generator=False):
     search_term = prepare_search_term(request)
 
     ## converts type= query parameters to list of doc_types to search, "*" becomes super class Item
-    if search_type is None:
-        doc_types = request.params.getall('type')
-        if '*' in doc_types:
-            doc_types = ['Item']
-
-    else:
-        doc_types = [search_type]
+    doc_types = request.params.getall('type')
+    if '*' in doc_types:
+        doc_types = ['Item']
 
     # Normalize to item_type
     try:
