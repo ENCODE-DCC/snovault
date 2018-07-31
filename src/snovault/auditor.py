@@ -16,8 +16,8 @@ from .interfaces import (
 )
 from .resources import Item
 
-logger = logging.getLogger(__name__)
-
+logger = logging.getLogger("__name__")
+logger.setLevel(logging.ERROR)
 
 def includeme(config):
     config.include('.calculated')
@@ -217,6 +217,7 @@ def inherit_audits(request, embedded, embedded_paths):
 
     audits = {}
     for audit_path in audit_paths:
+        logger.error("AUDITING (inherited) %s" % audit_path)
         result = request.embed(audit_path, '@@audit-self')
         for audit in result['audit']:
             if audit['level_name'] in audits:
@@ -242,6 +243,7 @@ def item_view_audit_self(context, request):
 def item_view_audit(context, request):
     path = request.resource_path(context)
     properties = request.embed(path, '@@object')
+    logger.error("AUDITING %s" % path)
     audit = inherit_audits(request, properties, context.audit_inherit or context.embedded)
     return {
         '@id': path,
