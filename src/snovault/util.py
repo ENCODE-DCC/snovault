@@ -89,7 +89,7 @@ def expand_embedded_model(request, obj, model):
         else:
             for field in fields_to_use:
                 found = obj.get(field)
-                if found:
+                if found is not None:
                     embedded_res[field] = found
     # then handle objects at the next level
     for to_embed in model:
