@@ -618,9 +618,12 @@ def search(context, request, return_generator=False):
     search_term = prepare_search_term(request)
 
     ## converts type= query parameters to list of doc_types to search, "*" becomes super class Item
-    doc_types = request.params.getall('type')
-    if '*' in doc_types:
-        doc_types = ['Item']
+    if context.type_info.name:
+        doc_types = [context.type_info.name]
+    else:
+        doc_types = request.params.getall('type')
+        if '*' in doc_types:
+            doc_types = ['Item']
 
     # Normalize to item_type
     try:
@@ -810,7 +813,7 @@ def collection_view_listing_es(context, request):
     if request.datastore != 'elasticsearch':
         return collection_view_listing_db(context, request)
 
-    return search(context, request, context.type_info.name)
+    return search(context, request)
 
 
 @view_config(route_name='report', request_method='GET', permission='search')
