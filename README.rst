@@ -23,16 +23,20 @@ Step 2: Install or update dependencies::
 
     $ brew install libevent libmagic libxml2 libxslt openssl postgresql graphviz nginx python3
     $ brew install freetype libjpeg libtiff littlecms webp  # Required by Pillow
+    $ brew tap homebrew/cask
     $ brew cask install java8
+    $ brew cask install chromedriver
     $ brew tap homebrew/versions
-    $ brew install elasticsearch17 node4-lts
+    $ brew install elasticsearch5@6 node@6
     $ npm install
 
     NOTE:
-    Elasticsearch 1.7 does not work with Java 9.  If Brew cannot find java8
+    Elasticsearch 5.4 does not work with Java 9.  If Brew cannot find java8
     $ brew tap caskroom/versions # lookup more versions
     $ brew cask search java # java8 now in list
     $ brew cask install java8
+
+    $ gem install compass # This is a Ruby gem to compile Sass to CSS
 
 If you need to update dependencies::
 
@@ -47,13 +51,13 @@ Step 3: Run buildout::
     $ buildout bootstrap
     $ bin/buildout
 
-    NOTE:  
-    If you have issues with postgres or the python interface to it (psycogpg2) you probably need to install postgresql 
+    NOTE:
+    If you have issues with postgres or the python interface to it (psycogpg2) you probably need to install postgresql
     via homebrew (as above)
     If you have issues with Pillow you may need to install new xcode command line tools:
     - First update Xcode from AppStore (reboot)
-    $ xcode-select --install 
-    
+    $ xcode-select --install
+
 
 
 If you wish to completely rebuild the application, or have updated dependencies:
@@ -85,12 +89,12 @@ Running tests
 =============
 
 To run specific tests locally::
-    
+
     $ bin/test -k test_name
-    
+
 To run with a debugger::
-    
-    $ bin/test --pdb 
+
+    $ bin/test --pdb
 
 Specific tests to run locally for schema changes::
 
