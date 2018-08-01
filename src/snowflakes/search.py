@@ -618,7 +618,9 @@ def search(context, request, return_generator=False):
     search_term = prepare_search_term(request)
 
     ## converts type= query parameters to list of doc_types to search, "*" becomes super class Item
-    if context.type_info.name:
+    if (hasattr(context, 'type_info') and
+            hasattr(context.type_info, 'name')
+            and context.type_info.name):
         doc_types = [context.type_info.name]
     else:
         doc_types = request.params.getall('type')
