@@ -24,7 +24,6 @@ from snovault.helpers.helper import (
     set_filters,
     set_facets,
     format_results,
-    search_result_actions,
     format_facets,
     normalize_query,
     iter_long_json

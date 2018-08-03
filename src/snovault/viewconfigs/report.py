@@ -27,12 +27,16 @@ class ReportView(SearchView):
 
         super(ReportView, self).preprocess_view()
 
+        self.result['@id'] = '/report/' + self.search_base
+
+        if "self.result['views']" not in locals():
+            self.result['views'] = [{}]
+
         self.result['views'][0] = {
             'href': self.result['@id'],
             'title': 'View results as list',
-            'icon': 'list-alt',
+            'icon': 'list-alt'
         }
-        self.result['@id'] = '/report/' + self.search_base
         self.result['download_tsv'] = self.request.route_path('report_download') + self.search_base
         self.result['title'] = 'Report'
         self.result['@type'] = ['Report']
