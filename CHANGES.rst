@@ -1,3 +1,7 @@
+1.0.13
+1. SNO-46 Remove unused search type arg (#122)
+2. SNO-43 Clean up snovault startup (#116)
+
 1.0.12
 1. SNO-42 Check call count explicitly (#118)
 
