@@ -1,3 +1,6 @@
+1.0.14
+1. SNO-45 Increase embed_capacity (#123)
+
 1.0.13
 1. SNO-46 Remove unused search type arg (#122)
 2. SNO-43 Clean up snovault startup (#116)
