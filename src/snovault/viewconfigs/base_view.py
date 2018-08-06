@@ -33,4 +33,4 @@ class BaseView(object):
         ]
         self.used_filters = None
         self.from_, self.size = get_pagination(self.request)
-        self.audit_facets = ('audit.ERROR.category', {'title': 'Audit category: ERROR'})
+        self.audit_facets = ()

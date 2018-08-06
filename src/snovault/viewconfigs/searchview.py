@@ -11,7 +11,6 @@ from snovault.helpers.helper import (
     list_result_fields,
     set_filters,
     set_facets,
-    format_facets,
     iter_long_json,
     format_results,
     get_pagination,
@@ -194,7 +193,7 @@ class SearchView(BaseView):
 
         # Display all audits if logged in, or all but INTERNAL_ACTION if logged out
         for audit_facet in self.audit_facets:
-            if search_audit and 'group.submitter' in self.principals or 'INTERNAL_ACTION' not in audit_facet[0]:
+            if search_audit and 'group.submitter' in self.principals or (audit_facet and audit_facet[0] and 'INTERNAL_ACTION' not in audit_facet[0]):
                 facets.append(audit_facet)
 
         query['aggs'] = set_facets(facets, used_filters, self.principals, doc_types)
