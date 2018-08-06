@@ -261,11 +261,20 @@ class Item(Resource):
             for path in self.type_info.schema_links
         }
 
-    def get_rev_links(self, name):
+    def get_rev_links(self, name, request=None):
+        """
+        Return all rev links for this item under field with <name>
+        If a request is provided and request._indexing view, add these uuids
+        to request._rev_linked_uuids, which controls invalidation of rev-linked
+        items
+        """
         types = self.registry[TYPES]
         type_name, rel = self.rev[name]
         types = types[type_name].subtypes
-        return self.registry[CONNECTION].get_rev_links(self.model, rel, *types)
+        uuids = self.registry[CONNECTION].get_rev_links(self.model, rel, *types)
+        if request and getattr(request, '_indexing_view', False) is True:
+            request._rev_linked_uuids.update(uuids)
+        return uuids
 
     def unique_keys(self, properties):
         return {

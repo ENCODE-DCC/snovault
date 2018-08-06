@@ -171,15 +171,15 @@ def item_view_object(context, request):
     1. Fetch stored properties, possibly upgrading.
     2. Link canonicalization (overwriting uuids.)
     3. Calculated properties
-    4. If applicable, add uuid to request._referenced_uuids
+    4. If applicable, add uuid to request._embedded_uuids
     """
     properties = item_links(context, request)
     calculated = calculate_properties(context, request, properties)
     properties.update(calculated)
-    # add the uuid of the object to request._referenced_uuids
+    # add the uuid of the object to request._embedded_uuids
     # uuid should *ALWAYS* be an available field in the properties
     if getattr(request, '_indexing_view', False) is True:
-        request._referenced_uuids.add(properties['uuid'])
+        request._embedded_uuids.add(properties['uuid'])
     return properties
 
 
@@ -187,7 +187,7 @@ def item_view_object(context, request):
              name='embedded')
 def item_view_embedded(context, request):
     """
-    This is the ONLY view that actually populates request._referenced_uuids
+    This is the ONLY view that actually populates request._embedded_uuids
     """
     item_path = request.resource_path(context)
     properties = request.embed(item_path, '@@object', as_user=True)
@@ -200,7 +200,7 @@ def item_view_embedded(context, request):
              name='page')
 def item_view_page(context, request):
     """
-    Will populate request._referenced_uuids because request.embed is called
+    Will populate request._embedded_uuids because request.embed is called
     with @@embedded
     """
     item_path = request.resource_path(context)

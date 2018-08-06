@@ -442,7 +442,7 @@ def es_mapping(mapping):
                     }
                 }
             },
-            'referenced_uuids': {
+            'embedded_uuids': {
                 'type': 'text',
                 'include_in_all': False
             },

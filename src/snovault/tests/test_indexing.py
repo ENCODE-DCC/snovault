@@ -348,9 +348,9 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     assert doc_count == 2
 
 
-def test_queue_indexing_with_referenced(app, testapp, indexer_testapp):
+def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
     """
-    When an item is POSTed, queue up all its referenced uuids for indexing
+    When an item is POSTed, queue up all its embedded uuids for indexing
     as well.
     Test indexer_utils.find_uuids_for_indexing here as well
     """
@@ -387,7 +387,7 @@ def test_queue_indexing_with_referenced(app, testapp, indexer_testapp):
     assert doc_count_target == 1
     assert doc_count_ppp == 1
     # indexing the source will also reindex the target and the ppp
-    # since all referenced_uuids in an item are queued along with its POST
+    # since all embedded_uuids in an item are queued along with its POST
     source_res = testapp.post_json('/testing-link-sources-sno/', source, status=201)
     source_uuid = source_res.json['@graph'][0]['uuid']
     time.sleep(2)

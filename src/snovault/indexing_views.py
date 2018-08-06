@@ -61,18 +61,23 @@ def item_index_data(context, request):
 
     path = path + '/'
     # setting _indexing_view enables the embed_cache and cause population of
-    # request._referenced_uuids
+    # request._embedded_uuids
     request._indexing_view = True
     # since request._indexing_view is set to True in indexer.py,
     # all embeds (including subrequests) below will use the embed cache
     embedded = request.invoke_view(path, '@@embedded')
+    # get _embedded and _rev_linked uuids from the request before
+    # the @@audit views add to them
+    embedded_uuids = sorted(request._embedded_uuids.copy())
+    rev_linked_uuids = sorted(request._rev_linked_uuids.copy())
     audit = request.invoke_view(path, '@@audit')['audit']
     obj = request.invoke_view(path, '@@object')
+    import pdb; pdb.set_trace()
 
     document = {
         'audit': audit,
         'embedded': embedded,
-        'referenced_uuids': sorted(request._referenced_uuids),
+        'embedded_uuids': embedded_uuids,
         'item_type': context.type_info.item_type,
         'links': links,
         'object': obj,
@@ -83,8 +88,9 @@ def item_index_data(context, request):
             name: context.propsheets[name]
             for name in context.propsheets.keys() if name != ''
         },
-        'tid': context.tid,
+        'rev_linked_uuids': rev_linked_uuids,
         'sid': context.sid,
+        'tid': context.tid,
         'unique_keys': unique_keys,
         'uuid': uuid,
     }
