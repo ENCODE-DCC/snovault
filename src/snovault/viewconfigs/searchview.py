@@ -19,13 +19,6 @@ from snovault.helpers.helper import (
     normalize_query
 )
 
-audit_facets = [
-    ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
-    ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
-    ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
-    ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
-]
-
 class SearchView(BaseView):
     def __init__(self, context, request, search_type=None, return_generator=False, default_data_types=['lot']):
         super(SearchView, self).__init__(context, request)
@@ -37,7 +30,7 @@ class SearchView(BaseView):
         if len(self.doc_types) == 1 and 'facets' in self.types[self.doc_types[0]].schema:
             self.facets.extend(self.types[self.doc_types[0]].schema['facets'].items())
         # Display all audits if logged in, or all but INTERNAL_ACTION if logged out
-        for audit_facet in audit_facets:
+        for audit_facet in self.audit_facets:
             if self.search_audit and 'group.submitter' in self.principals or 'INTERNAL_ACTION' not in audit_facet[0]:
                 self.facets.append(audit_facet)
 
@@ -185,8 +178,12 @@ class SearchView(BaseView):
         # Set sort order
         set_sort_order(self.request, search_term, types, doc_types, query, result)
 
+        filter_fields = ['type', 'limit', 'mode', 'annotation',
+            'format', 'frame', 'datastore', 'field', 'region', 'genome',
+            'sort', 'from', 'referrer']
+
         # Setting filters
-        used_filters = set_filters(self.request, query, result)
+        used_filters = set_filters(self.request, query, result, filter_fields)
 
         # Adding facets to the query
         facets = [
@@ -196,7 +193,7 @@ class SearchView(BaseView):
             facets.extend(types[doc_types[0]].schema['facets'].items())
 
         # Display all audits if logged in, or all but INTERNAL_ACTION if logged out
-        for audit_facet in audit_facets:
+        for audit_facet in self.audit_facets:
             if search_audit and 'group.submitter' in self.principals or 'INTERNAL_ACTION' not in audit_facet[0]:
                 facets.append(audit_facet)
 
@@ -224,8 +221,8 @@ class SearchView(BaseView):
         result['total'] = total = es_results['hits']['total']
 
         schemas = (types[item_type].schema for item_type in doc_types)
-        result['facets'] = format_facets(
-            es_results, facets, used_filters, schemas, total, self.principals)
+        # result['facets'] = format_facets(
+            # es_results, facets, used_filters, schemas, total, self.principals)
 
         # Add batch actions
         # result.update(search_result_actions(request, doc_types, es_results))

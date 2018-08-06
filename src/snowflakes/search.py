@@ -41,14 +41,6 @@ def includeme(config):
 
 SANITIZE_SEARCH_STRING_RE = re.compile(r'[\\\+\-\&\|\!\(\)\{\}\[\]\^\~\:\/\\\*\?]')
 
-AUDIT_FACETS = [
-    ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
-    ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
-    ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
-    ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
-]
-
-
 DEFAULT_DOC_TYPES = [
     'Lab',
     'Snowset',
