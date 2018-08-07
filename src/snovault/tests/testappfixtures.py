@@ -62,6 +62,16 @@ def teardown(app, dbapi_conn):
     cursor = dbapi_conn.cursor()
     cursor.execute("""TRUNCATE resources, transactions CASCADE;""")
     cursor.close()
+    
+
+@pytest.yield_fixture
+def dbapi_conn(DBSession):
+    connection = DBSession.bind.pool.unique_connection()
+    connection.detach()
+    conn = connection.connection
+    conn.autocommit = True
+    yield conn
+    conn.close()
 
 
 @pytest.fixture
