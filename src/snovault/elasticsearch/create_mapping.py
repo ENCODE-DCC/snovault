@@ -446,7 +446,12 @@ def type_mapping(types, item_type, embed=True):
 
 
 def create_elasticsearch_index(es, index, body):
-    es.indices.create(index=index, body=body, wait_for_active_shards=1, ignore=[400, 404], master_timeout='5m', request_timeout=300)
+    try:
+        es.indices.create(index=index, body=body, wait_for_active_shards=1, master_timeout='5m', request_timeout=300)
+    except Exception as ex:
+        if ex.error == 'index_already_exists_exception':
+            es.indices.delete(index=index)
+            es.indices.create(index=index, body=body, wait_for_active_shards=1, master_timeout='5m', request_timeout=300)
 
 
 def set_index_mapping(es, index, doc_type, mapping):

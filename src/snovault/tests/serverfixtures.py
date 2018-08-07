@@ -26,7 +26,7 @@ def pytest_configure():
 @pytest.yield_fixture(scope='session')
 def engine_url(request):
     # Ideally this would use a different database on the same postgres server
-    if os.environ.get("CIRCLECI") or True:
+    if os.environ.get("CIRCLECI"):
         yield 'postgresql://postgres@localhost:5432/postgres'
     else:
         from urllib.parse import quote
@@ -46,7 +46,8 @@ def engine_url(request):
 @pytest.mark.fixture_cost(10)
 @pytest.yield_fixture(scope='session')
 def postgresql_server(request):
-    if os.environ.get("CIRCLECI") or True:
+    if os.environ.get("CIRCLECI"):
+        print("PG_SERVER")
         yield 'postgresql://postgres@localhost:5432/postgres'
     else:
         from urllib.parse import quote
@@ -72,7 +73,8 @@ def elasticsearch_host_port():
 @pytest.mark.fixture_cost(10)
 @pytest.yield_fixture(scope='session')
 def elasticsearch_server(request, elasticsearch_host_port):
-    if os.environ.get("CIRCLECI") or True:
+    if os.environ.get("CIRCLECI"):
+        print("ES_SERVER")
         yield 'http://localhost:9200'
     else:
         from .elasticsearch_fixture import server_process
