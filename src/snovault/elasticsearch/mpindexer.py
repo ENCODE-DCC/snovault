@@ -4,6 +4,7 @@ from multiprocessing import get_context
 from multiprocessing.pool import Pool
 from pyramid.decorator import reify
 from pyramid.request import apply_request_extensions
+from pyramid.settings import asbool
 from pyramid.threadlocal import (
     get_current_request,
     manager,
@@ -29,7 +30,12 @@ def includeme(config):
         processes = int(processes)
     except:
         processes = None
-    config.registry[INDEXER] = MPIndexer(config.registry, processes=processes)
+    if processes and processes > 1:
+        do_log = False
+        if asbool(config.registry.settings.get('indexer')):
+            print('Set primary MP indexer in indexer.py')
+            do_log = True
+        config.registry[INDEXER] = MPIndexer(config.registry, processes=processes, do_log=do_log)
 
 
 # Running in subprocess
@@ -112,8 +118,8 @@ def update_object_in_snapshot(args):
 class MPIndexer(Indexer):
     maxtasks = 1  # pooled processes will exit and be replaced after this many tasks are completed.
 
-    def __init__(self, registry, processes=None):
-        super(MPIndexer, self).__init__(registry)
+    def __init__(self, registry, processes=None, do_log=False):
+        super(MPIndexer, self).__init__(registry, do_log=do_log)
         self.processes = processes
         self.chunksize = int(registry.settings.get('indexer.chunk_size',1024))  # in production.ini (via buildout.cfg) as 1024
         self.initargs = (registry[APP_FACTORY], registry.settings,)
@@ -131,6 +137,7 @@ class MPIndexer(Indexer):
     def update_objects(self, request, uuids, xmin, snapshot_id, restart):
         # Ensure that we iterate over uuids in this thread not the pool task handler.
         uuid_count = len(uuids)
+        self._indexer_log.new_log(uuid_count, xmin, snapshot_id)
         workers = 1
         if self.processes is not None and self.processes > 0:
             workers = self.processes
@@ -141,10 +148,15 @@ class MPIndexer(Indexer):
         tasks = [(uuid, xmin, snapshot_id, restart) for uuid in uuids]
         errors = []
         try:
-            for i, error in enumerate(self.pool.imap_unordered(
-                    update_object_in_snapshot, tasks, chunkiness)):
-                if error is not None:
-                    errors.append(error)
+            for i, output in enumerate(self.pool.imap_unordered(update_object_in_snapshot, tasks, chunkiness)):
+                self._indexer_log.append_output(output)
+                if output:
+                    if output['error_message'] is not None:
+                        errors.append({
+                            'error_message': output['error_message'],
+                            'timestamp': output['end_timestamp'],
+                            'uuid': output['uuid'],
+                        })
                 if (i + 1) % 50 == 0:
                     log.info('Indexing %d', i + 1)
         except:

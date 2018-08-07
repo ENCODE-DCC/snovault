@@ -5,6 +5,7 @@ from elasticsearch.exceptions import (
     TransportError,
 )
 from pyramid.view import view_config
+from pyramid.settings import asbool
 from sqlalchemy.exc import StatementError
 from snovault import (
     COLLECTIONS,
@@ -19,6 +20,7 @@ from .interfaces import (
     ELASTIC_SEARCH,
     INDEXER
 )
+from .index_logger import IndexLogger
 from .indexer_state import (
     IndexerState,
     all_uuids,
@@ -42,7 +44,11 @@ def includeme(config):
     config.add_route('index', '/index')
     config.scan(__name__)
     registry = config.registry
-    registry[INDEXER] = Indexer(registry)
+    do_log = False
+    if asbool(registry.settings.get('indexer')):
+        do_log = True
+        print('Set primary indexer in indexer.py')
+    registry[INDEXER] = Indexer(registry, do_log=do_log)
 
 def get_related_uuids(request, es, updated, renamed):
     '''Returns (set of uuids, False) or (list of all uuids, True) if full reindex triggered'''
@@ -293,17 +299,25 @@ def get_current_xmin(request):
     return xmin
 
 class Indexer(object):
-    def __init__(self, registry):
+    def __init__(self, registry, do_log=False):
         self.es = registry[ELASTIC_SEARCH]
         self.esstorage = registry[STORAGE]
         self.index = registry.settings['snovault.elasticsearch.index']
+        self._indexer_log = IndexLogger(do_log=do_log)
 
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
+        self._indexer_log.new_log(len(uuids), xmin, snapshot_id)
         errors = []
         for i, uuid in enumerate(uuids):
-            error = self.update_object(request, uuid, xmin)
-            if error is not None:
-                errors.append(error)
+            output = self.update_object(request, uuid, xmin)
+            if output:
+                self._indexer_log.append_output(output)
+                if output['error_message'] is not None:
+                    errors.append({
+                        'error_message': output['error_message'],
+                        'timestamp': output['end_timestamp'],
+                        'uuid': output['uuid'],
+                    })
             if (i + 1) % 50 == 0:
                 log.info('Indexing %d', i + 1)
 
@@ -324,20 +338,44 @@ class Indexer(object):
         #         pass
         # OPTIONAL: restart support
 
-        last_exc = None
+        output = {
+            'doc_embedded': None,
+            'doc_linked': None,
+            'doc_path': None,
+            'doc_type': None,
+            'embed_ecp': None,
+            'embed_time': None,
+            'es_ecp': None,
+            'es_time': None,
+            'error_message': None,
+            'start_time': time.time(),
+            'timestamp': None,
+            'uuid': str(uuid),
+        }
         try:
             doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
+            output['embed_ecp'] = 'Embed StatementError'
             raise
         except Exception as e:
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
-            last_exc = repr(e)
+            output['embed_ecp'] = 'Embed Exception'
+            output['error_message'] = repr(e)
+        else:
+            doc_paths = doc.get('paths')
+            if doc_paths:
+                output['doc_path'] = doc_paths[0]
+            output['doc_type'] = doc.get('item_type')
+            output['doc_embedded'] = len(doc.get('embedded_uuids', []))
+            output['doc_linked'] = len(doc.get('linked_uuids', []))
+        output['embed_time'] = time.time() - output['start_time']
 
-        if last_exc is None:
+        if output['error_message'] is None:
             for backoff in [0, 10, 20, 40, 80]:
                 time.sleep(backoff)
                 try:
+                    es_start_time = time.time()
                     self.es.index(
                         index=doc['item_type'], doc_type=doc['item_type'], body=doc,
                         id=str(uuid), version=xmin, version_type='external_gte',
@@ -345,23 +383,32 @@ class Indexer(object):
                     )
                 except StatementError:
                     # Can't reconnect until invalid transaction is rolled back
+                    output['es_time'] = time.time() - es_start_time
+                    output['es_ecp'] = 'StatementError'
                     raise
                 except ConflictError:
+                    output['es_time'] = time.time() - es_start_time
+                    output['es_ecp'] = 'ConflictError'
                     log.warning('Conflict indexing %s at version %d', uuid, xmin)
-                    return
+                    break
                 except (ConnectionError, ReadTimeoutError, TransportError) as e:
+                    output['es_time'] = time.time() - es_start_time
+                    output['es_ecp'] = 'ConnectionError, ReadTimeoutError, TransportError'
                     log.warning('Retryable error indexing %s: %r', uuid, e)
-                    last_exc = repr(e)
+                    output['error_message'] = repr(e)
                 except Exception as e:
+                    output['es_time'] = time.time() - es_start_time
+                    output['es_ecp'] = 'Exception'
                     log.error('Error indexing %s', uuid, exc_info=True)
-                    last_exc = repr(e)
+                    output['error_message'] = repr(e)
                     break
                 else:
                     # Get here on success and outside of try
-                    return
+                    output['es_time'] = time.time() - es_start_time
+                    break
 
-        timestamp = datetime.datetime.now().isoformat()
-        return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
+        output['end_timestamp'] = datetime.datetime.now().isoformat()
+        return output
 
     def shutdown(self):
         pass
