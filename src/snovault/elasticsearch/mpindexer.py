@@ -141,10 +141,13 @@ class MPIndexer(Indexer):
         tasks = [(uuid, xmin, snapshot_id, restart) for uuid in uuids]
         errors = []
         try:
-            for i, error in enumerate(self.pool.imap_unordered(
-                    update_object_in_snapshot, tasks, chunkiness)):
-                if error is not None:
-                    errors.append(error)
+            for i, output in enumerate(self.pool.imap_unordered(update_object_in_snapshot, tasks, chunkiness)):
+                if output['error_message'] is not None:
+                    errors.append({
+                        'error_message': output['error_message'],
+                        'timestamp': output['timestamp'],
+                        'uuid': output['uuid'],
+                    })
                 if (i + 1) % 50 == 0:
                     log.info('Indexing %d', i + 1)
         except:

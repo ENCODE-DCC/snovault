@@ -301,9 +301,13 @@ class Indexer(object):
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         errors = []
         for i, uuid in enumerate(uuids):
-            error = self.update_object(request, uuid, xmin)
-            if error is not None:
-                errors.append(error)
+            output = self.update_object(request, uuid, xmin)
+            if output['error_message'] is not None:
+                errors.append({
+                    'error_message': output['error_message'],
+                    'timestamp': output['timestamp'],
+                    'uuid': output['uuid'],
+                })
             if (i + 1) % 50 == 0:
                 log.info('Indexing %d', i + 1)
 
@@ -324,20 +328,44 @@ class Indexer(object):
         #         pass
         # OPTIONAL: restart support
 
-        last_exc = None
+        output = {
+            'doc_embedded_uuids': None,
+            'doc_linked_uuids': None,
+            'doc_path': None,
+            'doc_type': None,
+            'embed_ecp': None,
+            'embed_time': None,
+            'es_ecp': None,
+            'es_time': None,
+            'error_message': None,
+            'timestamp': None,
+            'uuid': str(uuid),
+        }
         try:
+            embed_start_time = time.time()
             doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
+            output['embed_ecp'] = 'Embed StatementError'
             raise
         except Exception as e:
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
-            last_exc = repr(e)
+            output['embed_ecp'] = 'Embed Exception'
+            output['error_message'] = repr(e)
+        else:
+            doc_paths = doc.get('paths')
+            if doc_paths:
+                output['doc_path'] = doc_paths[0]
+            output['doc_type'] = doc.get('item_type')
+            output['doc_embedded'] = len(doc.get('embedded_uuids', []))
+            output['doc_linked'] = len(doc.get('linked_uuids', []))
+        output['embed_time'] = time.time() - embed_start_time
 
-        if last_exc is None:
+        if output['error_message'] is None:
             for backoff in [0, 10, 20, 40, 80]:
                 time.sleep(backoff)
                 try:
+                    es_start_time = time.time()
                     self.es.index(
                         index=doc['item_type'], doc_type=doc['item_type'], body=doc,
                         id=str(uuid), version=xmin, version_type='external_gte',
@@ -345,23 +373,32 @@ class Indexer(object):
                     )
                 except StatementError:
                     # Can't reconnect until invalid transaction is rolled back
+                    output['es_time'] = time.time() - es_start_time
+                    output['es_ecp'] = 'StatementError'
                     raise
                 except ConflictError:
+                    output['es_time'] = time.time() - es_start_time
+                    output['es_ecp'] = 'ConflictError'
                     log.warning('Conflict indexing %s at version %d', uuid, xmin)
-                    return
+                    break
                 except (ConnectionError, ReadTimeoutError, TransportError) as e:
+                    output['es_time'] = time.time() - es_start_time
+                    output['es_ecp'] = 'ConnectionError, ReadTimeoutError, TransportError'
                     log.warning('Retryable error indexing %s: %r', uuid, e)
-                    last_exc = repr(e)
+                    output['error_message'] = repr(e)
                 except Exception as e:
+                    output['es_time'] = time.time() - es_start_time
+                    output['es_ecp'] = 'Exception'
                     log.error('Error indexing %s', uuid, exc_info=True)
-                    last_exc = repr(e)
+                    output['error_message'] = repr(e)
                     break
                 else:
                     # Get here on success and outside of try
-                    return
+                    output['es_time'] = time.time() - es_start_time
+                    break
 
-        timestamp = datetime.datetime.now().isoformat()
-        return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
+        output['timestamp'] = datetime.datetime.now().isoformat()
+        return output
 
     def shutdown(self):
         pass
