@@ -55,25 +55,6 @@ def testapp(app):
     return TestApp(app, environ)
 
 
-@pytest.fixture(autouse=True)
-def teardown(app, dbapi_conn):
-    from snovault.elasticsearch import create_mapping
-    create_mapping.run(app)
-    cursor = dbapi_conn.cursor()
-    cursor.execute("""TRUNCATE resources, transactions CASCADE;""")
-    cursor.close()
-    
-
-@pytest.yield_fixture
-def dbapi_conn(DBSession):
-    connection = DBSession.bind.pool.unique_connection()
-    connection.detach()
-    conn = connection.connection
-    conn.autocommit = True
-    yield conn
-    conn.close()
-
-
 @pytest.fixture
 def anontestapp(app):
     '''TestApp with JSON accept header.
