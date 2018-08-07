@@ -68,13 +68,13 @@ class IndexLogger(object):
             '{es_time} {es_ecp} '
             '{embeds} {linked} '
             ''.format(
-                embeds=output.get('doc_embedded_uuids'),
+                embeds=output.get('doc_embedded'),
                 embed_ecp=output.get('embed_ecp'),
                 embed_time=output.get('embed_time'),
                 es_time=output.get('es_time'),
                 es_ecp=output.get('es_ecp'),
-                doc_path=output.get('doc_paths_zero'),
-                linked=output.get('doc_linked_uuids'),
+                doc_path=output.get('doc_path'),
+                linked=output.get('doc_linked'),
                 timestamp=output.get('timestamp'),
             )
         )
