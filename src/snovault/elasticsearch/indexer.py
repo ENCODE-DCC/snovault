@@ -5,6 +5,7 @@ from elasticsearch.exceptions import (
     TransportError,
 )
 from pyramid.view import view_config
+from pyramid.settings import asbool
 from sqlalchemy.exc import StatementError
 from snovault import (
     COLLECTIONS,
@@ -19,6 +20,7 @@ from .interfaces import (
     ELASTIC_SEARCH,
     INDEXER
 )
+from .index_logger import IndexLogger
 from .indexer_state import (
     IndexerState,
     all_uuids,
@@ -42,7 +44,10 @@ def includeme(config):
     config.add_route('index', '/index')
     config.scan(__name__)
     registry = config.registry
-    registry[INDEXER] = Indexer(registry)
+    do_log = False
+    if asbool(registry.settings.get('indexer')):
+        do_log = True
+    registry[INDEXER] = Indexer(registry, do_log=do_log)
 
 def get_related_uuids(request, es, updated, renamed):
     '''Returns (set of uuids, False) or (list of all uuids, True) if full reindex triggered'''
@@ -293,15 +298,18 @@ def get_current_xmin(request):
     return xmin
 
 class Indexer(object):
-    def __init__(self, registry):
+    def __init__(self, registry, do_log=False):
         self.es = registry[ELASTIC_SEARCH]
         self.esstorage = registry[STORAGE]
         self.index = registry.settings['snovault.elasticsearch.index']
+        self._indexer_log = IndexLogger(do_log=do_log)
 
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
+        self._indexer_log.new_log(len(uuids), xmin, snapshot_id)
         errors = []
         for i, uuid in enumerate(uuids):
             output = self.update_object(request, uuid, xmin)
+            self._indexer_log.append_output(output)
             if output['error_message'] is not None:
                 errors.append({
                     'error_message': output['error_message'],
