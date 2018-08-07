@@ -20,6 +20,7 @@ from sqlalchemy.orm import (
     collections,
     scoped_session,
     sessionmaker,
+    backref,
 )
 from sqlalchemy.orm.exc import (
     FlushError,
@@ -31,7 +32,8 @@ from .interfaces import (
     STORAGE,
 )
 from .json_renderer import json_renderer
-import boto
+import boto3
+import botocore
 import json
 import transaction
 import uuid
@@ -49,7 +51,7 @@ def includeme(config):
         registry[BLOBS] = S3BlobStorage(
             registry.settings['blob_bucket'],
             read_profile_name=registry.settings.get('blob_read_profile_name'),
-            store_profile_name=registry.settings.get('blob_store_profile_name'),
+            store_profile_name=registry.settings.get('blob_store_profile_name')
         )
     else:
         registry[BLOBS] = RDBBlobStorage(registry[DBSESSION])
@@ -92,7 +94,7 @@ class RDBStorage(object):
             return default
         return model
 
-    def get_by_unique_key(self, unique_key, name, default=None):
+    def get_by_unique_key(self, unique_key, name, default=None, index=None):
         session = self.DBSession()
         try:
             key = baked_query_unique_key(session).params(name=unique_key, value=name).one()
@@ -166,6 +168,25 @@ class RDBStorage(object):
         assert conflicts
         msg = 'Keys conflict: %r' % conflicts
         raise HTTPConflict(msg)
+
+    def delete_by_uuid(self, rid):
+        # WARNING USE WITH CARE PERMANENTLY DELETES RESOURCES
+        session = self.DBSession()
+        sp = session.begin_nested()
+        model = self.get_by_uuid(rid)
+        try:
+            for current_propsheet in model.data.values():
+                # delete the propsheet history
+                for propsheet in current_propsheet.history:
+                    session.delete(propsheet)
+                # now delete the currentPropsheet
+                session.delete(current_propsheet)
+            # now delete the resource, keys and links(via cascade)
+            session.delete(model)
+            sp.commit()
+        except Exception as e:
+            sp.rollback()
+            raise e
 
     def _update_properties(self, model, properties, sheets=None):
         if properties is not None:
@@ -279,21 +300,35 @@ class RDBBlobStorage(object):
 
 class S3BlobStorage(object):
     def __init__(self, bucket, read_profile_name=None, store_profile_name=None):
-        self.store_conn = boto.connect_s3(profile_name=store_profile_name)
-        self.read_conn = boto.connect_s3(profile_name=read_profile_name)
-        self.bucket = self.store_conn.get_bucket(bucket, validate=False)
+        self.store_conn = boto3.Session(profile_name=store_profile_name).client('s3')
+        # Have to use client API for presigned_url.
+        self.read_conn = boto3.Session(profile_name=read_profile_name).client('s3')
+        self.bucket = boto3.Session(profile_name=read_profile_name).resource('s3').Bucket(bucket)
 
     def store_blob(self, data, download_meta, blob_id=None):
         if blob_id is None:
             blob_id = str(uuid.uuid4())
             key = None
         else:
-            key = self.bucket.get_key(blob_id)
+            # Have to check existence manually with boto3.
+            try:
+                key = self.store_conn.get_object(
+                    Bucket=self.bucket.name,
+                    Key=blob_id
+                )
+            except botocore.exceptions.ClientError as e:
+                # Possible that UUID exists but is not in bucket during migration.
+                if e.response['Error']['Code'] == 'NoSuchKey':
+                    key = None
+                else:
+                    raise
         if key is None:
-            key = self.bucket.new_key(blob_id)
-            if 'type' in download_meta:
-                key.content_type = download_meta['type']
-            key.set_contents_from_string(data)
+            self.store_conn.put_object(
+                Bucket=self.bucket.name,
+                Key=blob_id,
+                Body=data,
+                ContentType=download_meta.get('type', 'application/octet-stream')
+            )
         download_meta['bucket'] = self.bucket.name
         download_meta['key'] = blob_id
 
@@ -306,15 +341,22 @@ class S3BlobStorage(object):
 
     def get_blob_url(self, download_meta):
         bucket_name, key = self._get_bucket_key(download_meta)
-        location = self.read_conn.generate_url(
-            36*60*60, method='GET', bucket=bucket_name, key=key)
+        location = self.read_conn.generate_presigned_url(
+            ClientMethod='get_object',
+            Params={
+                'Bucket': bucket_name,
+                'Key': key
+            },
+            ExpiresIn=36*60*60
+        )
         return location
 
     def get_blob(self, download_meta):
         bucket_name, key = self._get_bucket_key(download_meta)
-        bucket = self.read_conn.get_bucket(bucket_name, validate=False)
-        key_obj = bucket.get_key(key, validate=False)
-        return key_obj.get_contents_as_string()
+        return self.read_conn.get_object(
+            Bucket=bucket_name,
+            Key=key
+        )['Body'].read()
 
 
 class JSON(types.TypeDecorator):
@@ -364,7 +406,7 @@ class Key(Base):
                  nullable=False, index=True)
 
     # Be explicit about dependencies to the ORM layer
-    resource = orm.relationship('Resource', backref='unique_keys')
+    resource = orm.relationship('Resource', backref=backref('unique_keys', cascade='all, delete-orphan'))
 
 
 class Link(Base):
@@ -379,9 +421,9 @@ class Link(Base):
         index=True)  # Single column index for reverse lookup
 
     source = orm.relationship(
-        'Resource', foreign_keys=[source_rid], backref='rels')
+        'Resource', foreign_keys=[source_rid], backref=backref('rels', cascade='all, delete-orphan'))
     target = orm.relationship(
-        'Resource', foreign_keys=[target_rid], backref='revs')
+        'Resource', foreign_keys=[target_rid], backref=backref('revs', cascade='all, delete-orphan'))
 
 
 class PropertySheet(Base):
@@ -402,7 +444,8 @@ class PropertySheet(Base):
                  ForeignKey('resources.rid',
                             deferrable=True,
                             initially='DEFERRED'),
-                 nullable=False)
+                 nullable=False,
+                 index=True)
     name = Column(types.String, nullable=False)
     properties = Column(JSON)
     tid = Column(UUID,
@@ -433,6 +476,9 @@ class CurrentPropertySheet(Base):
         viewonly=True,
     )
     resource = orm.relationship('Resource')
+    __mapper_args__ = {
+        'confirm_deleted_rows': False,
+    }
 
 
 class Resource(Base):
@@ -527,6 +573,7 @@ class TransactionRecord(Base):
 # User specific stuff
 import cryptacular.bcrypt
 crypt = cryptacular.bcrypt.BCRYPTPasswordManager()
+
 
 def hash_password(password):
     return crypt.encode(password)

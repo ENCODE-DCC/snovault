@@ -1,7 +1,6 @@
 # See http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/resources.html
 import logging
 from collections import Mapping
-from copy import deepcopy
 from pyramid.decorator import reify
 from pyramid.httpexceptions import HTTPInternalServerError
 from pyramid.security import (
@@ -23,6 +22,7 @@ from .interfaces import (
 from .validation import ValidationFailure
 from .util import (
     ensurelist,
+    quick_deepcopy,
     simple_path_ids,
 )
 
@@ -168,7 +168,12 @@ class AbstractCollection(Resource, Mapping):
                 return default
             return resource
         if self.unique_key is not None:
-            resource = self.connection.get_by_unique_key(self.unique_key, name)
+            # Give the storage a hint of which index to search.
+            # If this is a collection of an abstract type,
+            # the item_type will be None and we'll search all snovault indices.
+            index = getattr(self.type_info, 'item_type', None)
+            resource = self.connection.get_by_unique_key(
+                self.unique_key, name, index=index)
             if resource is not None:
                 if not self._allow_contained(resource):
                     return default
@@ -268,7 +273,7 @@ class Item(Resource):
         }
 
     def upgrade_properties(self):
-        properties = deepcopy(self.properties)
+        properties = quick_deepcopy(self.properties)
         current_version = properties.get('schema_version', '')
         target_version = self.type_info.schema_version
         if target_version is not None and current_version != target_version:

@@ -2,8 +2,6 @@
 SnoVault JSON-LD Database Framework
 ========================
 
-Version 0.22
-
 |Build status|_
 
 .. |Build status| image:: https://travis-ci.org/ENCODE-DCC/snovault.png?branch=master
@@ -25,8 +23,16 @@ Step 2: Install or update dependencies::
 
     $ brew install libevent libmagic libxml2 libxslt openssl postgresql graphviz nginx python3
     $ brew install freetype libjpeg libtiff littlecms webp  # Required by Pillow
+    $ brew cask install java8
     $ brew tap homebrew/versions
     $ brew install elasticsearch17 node4-lts
+    $ npm install
+
+    NOTE:
+    Elasticsearch 1.7 does not work with Java 9.  If Brew cannot find java8
+    $ brew tap caskroom/versions # lookup more versions
+    $ brew cask search java # java8 now in list
+    $ brew cask install java8
 
 If you need to update dependencies::
 
@@ -37,7 +43,8 @@ If you need to update dependencies::
 
 Step 3: Run buildout::
 
-    $ python3 bootstrap.py --buildout-version 2.4.1 --setuptools-version 18.5
+    $ pip3 install -U zc.buildout setuptools
+    $ buildout bootstrap
     $ bin/buildout
 
     NOTE:  

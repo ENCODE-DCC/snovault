@@ -7,18 +7,19 @@ To load the initial data:
 
 """
 from pyramid.paster import get_app
-from elasticsearch import RequestError
 from functools import reduce
 from snovault import (
     COLLECTIONS,
     TYPES,
 )
 from snovault.schema_utils import combine_schemas
-from .interfaces import ELASTIC_SEARCH
+from .interfaces import (
+    ELASTIC_SEARCH,
+    RESOURCES_INDEX,
+)
 import collections
 import json
 import logging
-
 
 
 log = logging.getLogger(__name__)
@@ -30,21 +31,32 @@ log = logging.getLogger(__name__)
 
 # An index to store non-content metadata
 META_MAPPING = {
+    '_all': {
+        'enabled': False,
+        'analyzer': 'snovault_index_analyzer',
+        'search_analyzer': 'snovault_search_analyzer'
+    },
     'dynamic_templates': [
         {
             'store_generic': {
                 'match': '*',
                 'mapping': {
-                    'index': 'no',
-                    'store': 'yes',
+                    'index': False,
+                    'store': True,
                 },
             },
         },
     ],
 }
 
+
 PATH_FIELDS = ['submitted_file_name']
-NON_SUBSTRING_FIELDS = ['uuid', '@id', 'submitted_by', 'md5sum', 'references', 'submitted_file_name']
+NON_SUBSTRING_FIELDS = ['uuid', '@id', 'submitted_by', 'md5sum',
+                        'references', 'submitted_file_name']
+KEYWORD_FIELDS = ['schema_version', 'uuid', 'accession', 'alternate_accessions',
+                  'aliases', 'status', 'date_created', 'submitted_by',
+                  'internal_status', 'target', 'biosample_type']
+TEXT_FIELDS = ['pipeline_error_detail', 'description', 'notes']
 
 
 def sorted_pairs_hook(pairs):
@@ -56,13 +68,19 @@ def sorted_dict(d):
 
 
 def schema_mapping(name, schema):
+    # If a mapping is explicitly defined, use it
+    if 'mapping' in schema:
+        return schema['mapping']
+
     if 'linkFrom' in schema:
         type_ = 'string'
+    # elif 'linkTo' in schema:
+    #     type_ = 'object'
     else:
         type_ = schema['type']
 
     # Elasticsearch handles multiple values for a field
-    if type_ == 'array' and schema['items']:
+    if type_ == 'array':
         return schema_mapping(name, schema['items'])
 
     if type_ == 'object':
@@ -79,61 +97,46 @@ def schema_mapping(name, schema):
 
     if type_ == ["number", "string"]:
         return {
-            'type': 'string',
+            'type': 'keyword',
             'copy_to': [],
-            'index': 'not_analyzed',
             'fields': {
                 'value': {
                     'type': 'float',
-                    'copy_to': '',
                     'ignore_malformed': True,
-                    'copy_to': []
                 },
                 'raw': {
-                    'type': 'string',
-                    'index': 'not_analyzed'
+                    'type': 'keyword',
                 }
             }
         }
 
     if type_ == 'boolean':
         return {
-            'type': 'string',
+            'type': 'boolean',
             'store': True,
             'fields': {
                 'raw': {
-                    'type': 'string',
-                    'index': 'not_analyzed'
+                    'type': 'keyword',
                 }
             }
         }
 
     if type_ == 'string':
 
+        if name in KEYWORD_FIELDS:
+            field_type = 'keyword'
+        elif name in TEXT_FIELDS:
+            field_type = 'text'
+        else:
+            field_type = 'keyword'
+
         sub_mapping = {
-            'type': 'string',
-            'store': True
+            'type': field_type
         }
 
-        if schema.get('elasticsearch_mapping_index_type'):
-             if schema.get('elasticsearch_mapping_index_type')['default'] == 'analyzed':
-                return sub_mapping
-        else:
-            sub_mapping.update({
-                            'fields': {
-                                'raw': {
-                                    'type': 'string',
-                                    'index': 'not_analyzed'
-                                }
-                            }
-                        })
-            # these fields are unintentially partially matching some small search
-            # keywords because fields are analyzed by nGram analyzer
+        # these fields are unintentially partially matching some small search
+        # keywords because fields are analyzed by nGram analyzer
         if name in NON_SUBSTRING_FIELDS:
-            if name in PATH_FIELDS:
-                sub_mapping['index_analyzer'] = 'snovault_path_analyzer'
-            else:
-                sub_mapping['index'] = 'not_analyzed'
             sub_mapping['include_in_all'] = False
         return sub_mapping
 
@@ -143,8 +146,7 @@ def schema_mapping(name, schema):
             'store': True,
             'fields': {
                 'raw': {
-                    'type': 'string',
-                    'index': 'not_analyzed'
+                    'type': 'keyword',
                 }
             }
         }
@@ -155,8 +157,7 @@ def schema_mapping(name, schema):
             'store': True,
             'fields': {
                 'raw': {
-                    'type': 'string',
-                    'index': 'not_analyzed'
+                    'type': 'keyword',
                 }
             }
         }
@@ -164,14 +165,11 @@ def schema_mapping(name, schema):
 
 def index_settings():
     return {
-        'index': {
-            'number_of_shards': 5,
-            'merge': {
-                'policy': {
-                    'max_merged_segment': '2gb',
-                    'max_merge_at_once': 5
-                }
-            },
+        'settings': {
+            'index.max_result_window': 99999,
+            'index.mapping.total_fields.limit': 5000,
+            'index.number_of_shards': 5,
+            'index.number_of_replicas': 2,
             'analysis': {
                 'filter': {
                     'substring': {
@@ -230,16 +228,14 @@ def index_settings():
 def audit_mapping():
     return {
         'category': {
-            'type': 'string',
-            'index': 'not_analyzed',
+            'type': 'keyword',
         },
         'detail': {
-            'type': 'string',
-            'index': 'analyzed', 
+            'type': 'text',
+            'index': 'true',
         },
         'level_name': {
-            'type': 'string',
-            'index': 'not_analyzed',
+            'type': 'keyword',
         },
         'level': {
             'type': 'integer',
@@ -251,52 +247,70 @@ def es_mapping(mapping):
     return {
         '_all': {
             'enabled': True,
-            'index_analyzer': 'snovault_index_analyzer',
+            'analyzer': 'snovault_index_analyzer',
             'search_analyzer': 'snovault_search_analyzer'
         },
         'dynamic_templates': [
             {
                 'template_principals_allowed': {
                     'path_match': "principals_allowed.*",
+                    'match_mapping_type': "string",
                     'mapping': {
-                        'type': 'string',
-                        'index': 'not_analyzed',
+                        'type': 'keyword',
                     },
                 },
             },
             {
                 'template_unique_keys': {
                     'path_match': "unique_keys.*",
+                    'match_mapping_type': "string",
                     'mapping': {
-                        'type': 'string',
-                        'index': 'not_analyzed',
+                        'type': 'keyword',
                     },
                 },
             },
             {
                 'template_links': {
                     'path_match': "links.*",
+                    'match_mapping_type': "string",
                     'mapping': {
-                        'type': 'string',
-                        'index': 'not_analyzed',
+                        'type': 'keyword',
                     },
                 },
             },
+            {
+                'strings': {
+                    'match_mapping_type': "string",
+                    'mapping': {
+                        'type': 'keyword',
+                    },
+                },
+            },
+            {
+                'integers': {
+                    'match_mapping_type': "long",
+                    'mapping': {
+                        'type': 'long',
+                        'fields': {
+                            'raw': {
+                                'type': 'keyword'
+                            }
+                        }
+                    },
+                },
+            }
         ],
         'properties': {
             'uuid': {
-                'type': 'string',
-                'index': 'not_analyzed',
+                'type': 'keyword',
                 'include_in_all': False,
             },
             'tid': {
-                'type': 'string',
-                'index': 'not_analyzed',
+                'type': 'keyword',
                 'include_in_all': False,
             },
             'item_type': {
-                'type': 'string',
-                'index': 'not_analyzed'
+                'type': 'keyword',
             },
             'embedded': mapping,
             'object': {
@@ -314,32 +328,17 @@ def es_mapping(mapping):
                 'enabled': False,
                 'include_in_all': False,
             },
-            'principals_allowed': {
-                'type': 'object',
-                'include_in_all': False,
-            },
             'embedded_uuids': {
-                'type': 'string',
+                'type': 'keyword',
                 'include_in_all': False,
-                'index': 'not_analyzed'
             },
             'linked_uuids': {
-                'type': 'string',
-                'include_in_all': False,
-                'index': 'not_analyzed'
-            },
-            'unique_keys': {
-                'type': 'object',
-                'include_in_all': False,
-            },
-            'links': {
-                'type': 'object',
+                'type': 'keyword',
                 'include_in_all': False,
             },
             'paths': {
-                'type': 'string',
+                'type': 'keyword',
                 'include_in_all': False,
-                'index': 'not_analyzed'
             },
             'audit': {
                 'type': 'object',
@@ -390,7 +389,6 @@ def type_mapping(types, item_type, embed=True):
     mapping = schema_mapping(item_type, schema)
     if not embed:
         return mapping
-
     for prop in type_info.embedded:
         s = schema
         m = mapping
@@ -421,7 +419,7 @@ def type_mapping(types, item_type, embed=True):
 
             # Check if mapping for property is already an object
             # multiple subobjects may be embedded, so be carful here
-            if m['properties'][p]['type'] == 'string':
+            if m['properties'][p]['type'] in ['keyword', 'text']:
                 m['properties'][p] = schema_mapping(p, s)
 
             m = m['properties'][p]
@@ -442,20 +440,21 @@ def type_mapping(types, item_type, embed=True):
         new_mapping[last]['boost'] = boost
         if last in NON_SUBSTRING_FIELDS:
             new_mapping[last]['include_in_all'] = False
-            if last in PATH_FIELDS:
-                new_mapping[last]['index_analyzer'] = 'snovault_path_analyzer'
-            else:
-                new_mapping[last]['index'] = 'not_analyzed'
         else:
-            new_mapping[last]['index_analyzer'] = 'snovault_index_analyzer'
-            new_mapping[last]['search_analyzer'] = 'snovault_search_analyzer'
             new_mapping[last]['include_in_all'] = True
-
-    # Automatic boost for uuid
-    if 'uuid' in mapping['properties']:
-        mapping['properties']['uuid']['index'] = 'not_analyzed' 
-        mapping['properties']['uuid']['include_in_all'] = False
     return mapping
+
+
+def create_elasticsearch_index(es, index, body):
+    es.indices.create(index=index, body=body, wait_for_active_shards=1, ignore=[400, 404], master_timeout='5m', request_timeout=300)
+
+
+def set_index_mapping(es, index, doc_type, mapping):
+    es.indices.put_mapping(index=index, doc_type=doc_type, body=mapping, ignore=[400], request_timeout=300)
+
+
+def create_snovault_index_alias(es, indices):
+    es.indices.put_alias(index=','.join(indices), name=RESOURCES_INDEX, request_timeout=300)
 
 
 def run(app, collections=None, dry_run=False):
@@ -463,40 +462,32 @@ def run(app, collections=None, dry_run=False):
     registry = app.registry
     if not dry_run:
         es = app.registry[ELASTIC_SEARCH]
-        try:
-            es.indices.create(index=index, body=index_settings())
-        except RequestError:
-            if collections is None:
-                es.indices.delete(index=index)
-                es.indices.create(index=index, body=index_settings())
+        print('CREATE MAPPING RUNNING')
 
     if not collections:
         collections = ['meta'] + list(registry[COLLECTIONS].by_item_type.keys())
 
+    indices = []
     for collection_name in collections:
         if collection_name == 'meta':
             doc_type = 'meta'
             mapping = META_MAPPING
         else:
-            doc_type = collection_name
+            index = doc_type = collection_name
             collection = registry[COLLECTIONS].by_item_type[collection_name]
-            mapping = type_mapping(registry[TYPES], collection.type_info.item_type)
+            mapping = es_mapping(type_mapping(registry[TYPES], collection.type_info.item_type))
 
         if mapping is None:
             continue  # Testing collections
         if dry_run:
             print(json.dumps(sorted_dict({index: {doc_type: mapping}}), indent=4))
             continue
+        create_elasticsearch_index(es, index, index_settings())
+        set_index_mapping(es, index, doc_type, {doc_type: mapping})
+        if collection_name != 'meta':
+            indices.append(index)
 
-        if collection_name is not 'meta':
-            mapping = es_mapping(mapping)
-
-        try:
-            es.indices.put_mapping(index=index, doc_type=doc_type, body={doc_type: mapping})
-        except:
-            log.exception("Could not create mapping for the collection %s", doc_type)
-        else:
-            es.indices.refresh(index=index)
+    create_snovault_index_alias(es, indices)
 
 
 def main():

@@ -1,12 +1,11 @@
-from copy import deepcopy
-from .cache import ManagerLRUCache
-from past.builtins import basestring
+from .util import quick_deepcopy
 from posixpath import join
 from pyramid.compat import (
     native_,
     unquote_bytes_to_wsgi,
 )
 from pyramid.httpexceptions import HTTPNotFound
+from .interfaces import CONNECTION
 import logging
 log = logging.getLogger(__name__)
 
@@ -45,14 +44,13 @@ def make_subrequest(request, path):
     return subreq
 
 
-embed_cache = ManagerLRUCache('embed_cache')
-
 
 def embed(request, *elements, **kw):
     """ as_user=True for current user
     """
     # Should really be more careful about what gets included instead.
     # Cache cut response time from ~800ms to ~420ms.
+    embed_cache = request.registry[CONNECTION].embed_cache
     as_user = kw.get('as_user')
     path = join(*elements)
     path = unquote_bytes_to_wsgi(native_(path))
@@ -65,7 +63,7 @@ def embed(request, *elements, **kw):
             cached = _embed(request, path)
             embed_cache[path] = cached
         result, embedded, linked = cached
-        result = deepcopy(result)
+        result = quick_deepcopy(result)
     request._embedded_uuids.update(embedded)
     request._linked_uuids.update(linked)
     return result

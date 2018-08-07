@@ -66,6 +66,11 @@ def wait_for_form(browser):
     assert browser.is_element_present_by_css("#content form")
 
 
+@when(u'I wait for the form to close')
+def wait_for_form_close(browser):
+    assert browser.is_element_not_present_by_css('#content form')
+
+
 @when(u'I wait for the content to load')
 def wait_for_content(browser):
     assert browser.is_element_present_by_css("#application")

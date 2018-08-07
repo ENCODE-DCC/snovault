@@ -124,7 +124,7 @@ def submitter_user(browser, base_url, admin_user):
     browser.visit(base_url + '/#!impersonate-user')
     browser.find_by_name('userid').first.fill('massa.porta@varius.mauris')
     browser.find_by_text('Submit').first.click()
-    browser.is_text_present('J. Michael Cherry', wait_time=5)
+    browser.is_text_present('J. Michael Cherry', wait_time=15)
     yield
     browser.visit(base_url + '/logout')
 

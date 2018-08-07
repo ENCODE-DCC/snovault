@@ -44,13 +44,16 @@ def run(testapp, timeout=DEFAULT_TIMEOUT, dry_run=False, path='/index', control=
         timestamp=timestamp,
         timeout=timeout,
     )
-
     # Make sure elasticsearch is up before trying to index.
     if path == '/index_file':
         es = testapp.app.registry['snp_search']
     else:
         es = testapp.app.registry[ELASTIC_SEARCH]
+    # Wait until cluster comes up
+    es.cluster.health(wait_for_status='yellow', request_timeout=60)
     es.info()
+
+    log.info('es_index_listener given path: ' + path)
 
     max_xid = 0
     DBSession = testapp.app.registry[STORAGE].write.DBSession
@@ -242,7 +245,6 @@ def composite(loader, global_conf, **settings):
         if result is not None:
             status['results'] = [result] + status['results'][:9]
         status_holder['status'] = status
-
     kwargs = {
         'testapp': testapp,
         'control': control,

@@ -1,11 +1,24 @@
 from pytest import fixture
 
 
-def test_server_defaults(admin, anontestapp):
+COLLECTION_URL = '/testing-server-defaults'
+
+
+@fixture
+def extra_environ(admin):
     email = admin['email']
-    extra_environ = {'REMOTE_USER': str(email)}
+    return {'REMOTE_USER': str(email)}
+
+
+@fixture
+def default_content(testapp, external_tx):
+    res = testapp.post_json(COLLECTION_URL, {}, status=201)
+    return {'@id': res.json['@graph'][0]['@id']}
+
+
+def test_server_defaults(admin, anontestapp, extra_environ):
     res = anontestapp.post_json(
-        '/testing_server_default', {}, status=201,
+        COLLECTION_URL, {}, status=201,
         extra_environ=extra_environ,
     )
     item = res.json['@graph'][0]
@@ -38,15 +51,25 @@ def test_accession_anontestapp(request, test_accession_app, external_tx, zsa_sav
     return TestApp(test_accession_app, environ)
 
 
-def test_test_accession_server_defaults(admin, test_accession_anontestapp):
-    email = admin['email']
-    extra_environ = {'REMOTE_USER': str(email)}
+@fixture
+def test_accession_authtestapp(request, test_accession_app, external_tx, zsa_savepoints):
+    '''TestApp with JSON accept header.
+    '''
+    from webtest import TestApp
+    environ = {
+        'HTTP_ACCEPT': 'application/json',
+        'REMOTE_USER': 'TEST_AUTHENTICATED',
+    }
+    return TestApp(test_accession_app, environ)
+
+
+def test_test_accession_server_defaults(admin, test_accession_anontestapp, extra_environ):
     res = test_accession_anontestapp.post_json(
-        '/testing_server_default', {}, status=201,
+        COLLECTION_URL, {}, status=201,
         extra_environ=extra_environ,
     )
     item = res.json['@graph'][0]
-    assert item['accession'].startswith('TSTAB')
+    assert item['accession'].startswith('TSTSS')
 
     test_accession_anontestapp.patch_json(
         res.location, {}, status=200,

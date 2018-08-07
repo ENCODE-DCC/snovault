@@ -1,4 +1,3 @@
-import elasticsearch.exceptions
 from snovault.util import get_root_request
 from elasticsearch.helpers import scan
 from pyramid.threadlocal import get_current_request
@@ -6,7 +5,9 @@ from zope.interface import alsoProvides
 from .interfaces import (
     ELASTIC_SEARCH,
     ICachedItem,
+    RESOURCES_INDEX,
 )
+
 
 SEARCH_MAX = (2 ** 31) - 1
 
@@ -15,9 +16,15 @@ def includeme(config):
     from snovault import STORAGE
     registry = config.registry
     es = registry[ELASTIC_SEARCH]
-    es_index = registry.settings['snovault.elasticsearch.index']
+    es_index = RESOURCES_INDEX
     wrapped_storage = registry[STORAGE]
     registry[STORAGE] = PickStorage(ElasticSearchStorage(es, es_index), wrapped_storage)
+
+
+def force_database_for_request():
+    request = get_current_request()
+    if request:
+        request.datastore = 'database'
 
 
 class CachedModel(object):
@@ -85,19 +92,24 @@ class PickStorage(object):
         model = storage.get_by_uuid(uuid)
         if storage is self.read:
             if model is None or model.invalidated():
+                force_database_for_request()
                 return self.write.get_by_uuid(uuid)
         return model
 
-    def get_by_unique_key(self, unique_key, name):
+    def get_by_unique_key(self, unique_key, name, index=None):
         storage = self.storage()
-        model = storage.get_by_unique_key(unique_key, name)
+        model = storage.get_by_unique_key(unique_key, name, index=index)
         if storage is self.read:
             if model is None or model.invalidated():
-                return self.write.get_by_unique_key(unique_key, name)
+                force_database_for_request()
+                return self.write.get_by_unique_key(unique_key, name, index=index)
         return model
 
     def get_rev_links(self, model, rel, *item_types):
-        return self.storage().get_rev_links(model, rel, *item_types)
+        storage = self.storage()
+        if isinstance(model, CachedModel) and storage is self.write:
+            model = storage.get_by_uuid(str(model.uuid))
+        return storage.get_rev_links(model, rel, *item_types)
 
     def __iter__(self, *item_types):
         return self.storage().__iter__(*item_types)
@@ -119,8 +131,10 @@ class ElasticSearchStorage(object):
         self.es = es
         self.index = index
 
-    def _one(self, query):
-        data = self.es.search(index=self.index, body=query)
+    def _one(self, query, index=None):
+        if index is None:
+            index = self.index
+        data = self.es.search(index=index, body=query)
         hits = data['hits']['hits']
         if len(hits) != 1:
             return None
@@ -128,40 +142,58 @@ class ElasticSearchStorage(object):
         return model
 
     def get_by_uuid(self, uuid):
-        try:
-            hit = self.es.get(index=self.index, id=str(uuid))
-        except elasticsearch.exceptions.NotFoundError:
+        query = {
+            'query': {
+                'term': {
+                    'uuid': str(uuid)
+                }
+            },
+            'version': True
+        }
+        result = self.es.search(index=self.index, body=query, _source=True, size=1)
+        if result['hits']['total'] == 0:
             return None
+        hit = result['hits']['hits'][0]
         return CachedModel(hit)
 
-    def get_by_unique_key(self, unique_key, name):
+    def get_by_unique_key(self, unique_key, name, index=None):
         term = 'unique_keys.' + unique_key
         query = {
-            'filter': {'term': {term: name}},
+            'query': {
+                'term': {term: name}
+            },
             'version': True,
         }
-        return self._one(query)
+        return self._one(query, index)
 
     def get_rev_links(self, model, rel, *item_types):
         filter_ = {'term': {'links.' + rel: str(model.uuid)}}
         if item_types:
-            filter_ = {'and': [
+            filter_ = [
                 filter_,
                 {'terms': {'item_type': item_types}},
-            ]}
+            ]
         query = {
-            'fields': [],
-            'filter': filter_,
+            'stored_fields': [],
+            'query': {
+                'bool': {
+                    'filter': filter_,
+                }
+            }
         }
-        data = self.es.search(index=self.index, body=query, size=SEARCH_MAX)
+
         return [
-            hit['_id'] for hit in data['hits']['hits']
+            hit['_id'] for hit in scan(self.es, query=query)
         ]
 
     def __iter__(self, *item_types):
         query = {
-            'fields': [],
-            'filter': {'terms': {'item_type': item_types}} if item_types else {'match_all': {}},
+            'stored_fields': [],
+            'query': {
+                'bool': {
+                    'filter': {'terms': {'item_type': item_types}} if item_types else {'match_all': {}}
+                }
+            }
         }
         for hit in scan(self.es, query=query):
             yield hit['_id']

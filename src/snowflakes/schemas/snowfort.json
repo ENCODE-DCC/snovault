@@ -41,7 +41,8 @@
     },
     "properties": {
         "schema_version": {
-            "default": "1"
+            "default": "2",
+            "comment": "for testing upgrades"
         },
         "method": {
             "title": "Method",
@@ -69,16 +70,13 @@
     },
     "facets": {
         "method": {
-            "title": "Method",
-            "type": "string"
+            "title": "Method"
         },
         "size": {
-            "title": "Size",
-            "type": "string"
+            "title": "Size"
         },
         "award.project": {
-            "title": "Project",
-            "type": "string"
+            "title": "Project"
         },
         "award.rfa": {
             "title": "RFA"

@@ -13,11 +13,10 @@ requires = [
     'SQLAlchemy>=1.0.0b1',
     'WSGIProxy2',
     'WebTest',
-    'boto',
     'botocore',
     'jmespath',
     'boto3',
-    'elasticsearch',
+    'elasticsearch>=5.2',
     'lucenequery',
     'future',
     'humanfriendly',
@@ -61,7 +60,7 @@ tests_require = [
 
 setup(
     name='snovault',
-    version='0.22',
+    version='1.0.12',
     description='Snovault Hybrid Object Relational Database Framework',
     long_description=README + '\n\n' + CHANGES,
     packages=find_packages('src'),

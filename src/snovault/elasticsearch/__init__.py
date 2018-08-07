@@ -29,14 +29,14 @@ def includeme(config):
         serializer=PyramidJSONSerializer(json_renderer),
         connection_class=TimedUrllib3HttpConnection,
         retry_on_timeout=True,
-        maxsize=50
+        # maxsize=50
     )
 
     config.include('.cached_views')
-    if not config.registry.settings.get('indexer'):
-        config.include('.esstorage')
+    config.include('.esstorage')
 
     config.include('.indexer')
+    config.include('.indexer_state')
     if asbool(settings.get('indexer')) and not PY2:
         config.include('.mpindexer')
 
@@ -96,7 +96,7 @@ class TimedUrllib3HttpConnection(Urllib3HttpConnection):
         return super(TimedUrllib3HttpConnection, self).log_request_success(
             method, full_url, path, body, status_code, response, duration)
 
-    def log_request_fail(self, method, full_url, body, duration, status_code=None, exception=None):
+    def log_request_fail(self, method, full_url, path, body, duration, status_code=None, response=None, exception=None):
         self.stats_record(duration)
         return super(TimedUrllib3HttpConnection, self).log_request_fail(
-            method, full_url, body, duration, status_code, exception)
+            method, full_url, path, body, duration, status_code, response, exception)

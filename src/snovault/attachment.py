@@ -100,7 +100,7 @@ class ItemWithAttachment(Item):
         try:
             mime_type_detected = magic.from_buffer(data, mime=True).decode('utf-8')
         except AttributeError:
-            mime_type_detected = magic/from_buffer(data, mime=Tre)
+            mime_type_detected = magic.from_buffer(data, mime=True)
 
         if not mimetypes_are_equal(mime_type, mime_type_detected):
             msg = "Incorrect file type. (Appears to be %s)" % mime_type_detected

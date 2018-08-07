@@ -67,3 +67,34 @@ def select_distinct_values(request, value_path, *from_paths):
         values = {value for value_list in value_lists for value in value_list}
 
     return list(values)
+
+
+def quick_deepcopy(obj):
+    """Deep copy an object consisting of dicts, lists, and primitives.
+
+    This is faster than Python's `copy.deepcopy` because it doesn't
+    do bookkeeping to avoid duplicating objects in a cyclic graph.
+
+    This is intended to work fine for data deserialized from JSON,
+    but won't work for everything.
+    """
+    if isinstance(obj, dict):
+        obj = {k: quick_deepcopy(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        obj = [quick_deepcopy(v) for v in obj]
+    return obj
+
+
+def mutated_schema(schema, mutator):
+    """Apply a change to all levels of a schema.
+
+    Returns a new schema rather than modifying the original.
+    """
+    schema = mutator(schema.copy())
+    if 'items' in schema:
+        schema['items'] = mutated_schema(schema['items'], mutator)
+    if 'properties' in schema:
+        schema['properties'] = schema['properties'].copy()
+        for k, v in schema['properties'].items():
+            schema['properties'][k] = mutated_schema(v, mutator)
+    return schema

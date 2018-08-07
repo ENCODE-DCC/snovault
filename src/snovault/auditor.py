@@ -9,6 +9,7 @@ import venusian
 from past.builtins import basestring
 from pyramid.view import view_config
 from .calculated import calculated_property
+from .elasticsearch.interfaces import ICachedItem
 from .interfaces import (
     AUDITOR,
     TYPES,
@@ -248,8 +249,20 @@ def item_view_audit(context, request):
     }
 
 
+def audit_condition(context, request):
+    # Audits must be explicitly requested if they
+    # are not available in precached form from elasticsearch
+    force_audit = request.params.get('audit', False)
+    if not ICachedItem.providedBy(context) and not force_audit:
+        return False
+    # Don't embed audits unless user has permission to see them
+    if not request.has_permission('audit'):
+        return False
+    return True
+
+
 @calculated_property(context=Item, category='page', name='audit',
-                     condition=lambda request: request.has_permission('audit'))
+                     condition=audit_condition)
 def audit_property(context, request):
     path = request.resource_path(context)
     return request.embed(path, '@@audit')['audit']

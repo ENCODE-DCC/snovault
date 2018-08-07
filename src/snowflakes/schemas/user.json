@@ -71,7 +71,8 @@
             "uniqueItems": true,
             "permission": "import-items",
             "items": {
-                "type": "string",                "enum": [
+                "type": "string",
+                "enum": [
                     "ENCODE",
                     "GGR",
                     "REMC"
@@ -117,7 +118,6 @@
         }
     },
     "boost_values": {
-        "title": 1.0,
-        "lab": 1.0
+        "title": 1.0
     }
 }

@@ -54,6 +54,7 @@ def item_index_data(context, request):
     path = path + '/'
     embedded = request.embed(path, '@@embedded')
     object = request.embed(path, '@@object')
+
     audit = request.embed(path, '@@audit')['audit']
 
     document = {

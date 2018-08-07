@@ -111,14 +111,15 @@ def batch_upgrade(request):
             item = find_resource(root, uuid)
             item_type = item.type_info.item_type
             update, errors = update_item(storage, item)
-        except Exception:
-            logger.exception('Error updating: /%s/%s', item_type, uuid)
+        except Exception as e:
+            logger.error('Error %s updating: /%s/%s' % (e, item_type, uuid))
             sp.rollback()
             error = True
         else:
             if errors:
+                # redmine 5161 sometimes error.path has an int
                 errortext = [
-                    '%s: %s' % ('/'.join(error.path) or '<root>', error.message)
+                    '%s: %s' % ('/'.join([str(x) or '<root>' for x in error.path]), error.message)
                     for error in errors]
                 logger.error(
                     'Validation failure: /%s/%s\n%s', item_type, uuid, '\n'.join(errortext))
