@@ -88,6 +88,10 @@ class IndexLogger(object):
                 len_uuids, xmin, snapshot_id,
             )
         )
+        self.write_log(
+            'date time timestamp doc_path embed_time embed_ecp '
+            'es_time es_ecp embeds linked'
+        )
 
     def write_log(self, msg, uuid=None, start_time=None):
         '''Handles all logging message'''

@@ -37,10 +37,10 @@ def fake_index_uuid_output():
         'es_ecp': 'fake-es_ecp',
         'embed_time': 0.456,
         'embed_ecp': 'fake-embed_ecp',
-        'doc_paths_zero':'fake-doc_paths_zero',
-        'doc_item_type': 'fake-doc_item_type',
-        'doc_embedded_uuids': 'fake-doc_embedded_uuids',
-        'doc_linked_uuids': 'fake-doc_linked_uuids',
+        'doc_path':'fake-doc_path',
+        'doc_type': 'fake-doc_type',
+        'doc_embedded': 'fake-doc_embedded',
+        'doc_linked': 'fake-doc_linked',
     }
 
 
@@ -129,7 +129,7 @@ def test_log_on_write_new_append(index_logger_on, fake_index_uuid_output):
     with open(log_file_path, 'r') as file_handler:
         for line in file_handler.readlines():
             lines.append(line.strip())
-    assert len(lines) == 2
+    assert len(lines) == 3
     expected_new_line = (
         'fake-timestamp fake-doc_paths_zero 0.456000 '
         'fake-embed_ecp 0.123000 fake-es_ecp '
@@ -140,10 +140,16 @@ def test_log_on_write_new_append(index_logger_on, fake_index_uuid_output):
         'Starting Indexing 5 with xmin=fake-xmin and snapshot_id=fake-snapshot_id'
     )
     assert  new_line == expected_new_line
-    expected_append_line = (
-        'fake-timestamp fake-doc_paths_zero 0.456000 '
-        'fake-embed_ecp 0.123000 fake-es_ecp '
-        'fake-doc_embedded_uuids fake-doc_linked_uuids'
+    expected_title_line = (
+        'date time timestamp doc_path embed_time embed_ecp '
+        'es_time es_ecp embeds linked'
     )
-    append_line = lines[1].split(' ', 2)[-1]
+    title_line = lines[1].split(' ', 2)[-1]
+    assert  title_line == expected_title_line
+    expected_append_line = (
+        'fake-timestamp fake-doc_path 0.456000 '
+        'fake-embed_ecp 0.123000 fake-es_ecp '
+        'fake-doc_embedded fake-doc_linked'
+    )
+    append_line = lines[2].split(' ', 2)[-1]
     assert  append_line == expected_append_line
