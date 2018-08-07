@@ -133,7 +133,7 @@ class TestingLinkTargetSno(Item):
     def rev_link_atids(self, request, rev_name):
         conn = request.registry[CONNECTION]
         return [request.resource_path(conn[uuid]) for uuid in
-                paths_filtered_by_status(request, self.get_rev_links(rev_name))]
+                paths_filtered_by_status(request, self.get_rev_links(request, rev_name))]
 
     @calculated_property(schema={
         "title": "Sources",

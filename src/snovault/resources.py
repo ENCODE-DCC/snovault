@@ -24,6 +24,7 @@ from .validation import ValidationFailure
 from .util import (
     ensurelist,
     simple_path_ids,
+    uuid_to_path
 )
 
 from .fourfront_utils import add_default_embeds
@@ -261,10 +262,10 @@ class Item(Resource):
             for path in self.type_info.schema_links
         }
 
-    def get_rev_links(self, name, request=None):
+    def get_rev_links(self, request, name):
         """
         Return all rev links for this item under field with <name>
-        If a request is provided and request._indexing view, add these uuids
+        Requires a request; if request._indexing view, add these uuids
         to request._rev_linked_uuids, which controls invalidation of rev-linked
         items
         """
@@ -272,7 +273,7 @@ class Item(Resource):
         type_name, rel = self.rev[name]
         types = types[type_name].subtypes
         uuids = self.registry[CONNECTION].get_rev_links(self.model, rel, *types)
-        if request and getattr(request, '_indexing_view', False) is True:
+        if getattr(request, '_indexing_view', False) is True:
             request._rev_linked_uuids.update(uuids)
         return uuids
 
@@ -307,6 +308,19 @@ class Item(Resource):
 
     def __json__(self, request):
         return self.upgrade_properties()
+
+    def item_with_links(self, request):
+        # This works from the schema rather than the links table
+        # so that upgrade on GET can work.
+        ### context.__json__ CALLS THE UPGRADER ###
+        properties = self.__json__(request)
+        for path in self.type_info.schema_links:
+            uuid_to_path(request, properties, path)
+
+        # if indexing, add the uuid of this object to request._embedded_uuids
+        if getattr(request, '_indexing_view', False) is True:
+            request._embedded_uuids.add(str(self.uuid))
+        return properties
 
     def __resource_url__(self, request, info):
         return None

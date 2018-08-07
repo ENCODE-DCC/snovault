@@ -125,43 +125,6 @@ def item_view(context, request):
     return request.embed(path, as_user=True)
 
 
-def item_links(context, request):
-    # This works from the schema rather than the links table
-    # so that upgrade on GET can work.
-    ### context.__json__ CALLS THE UPGRADER ###
-    properties = context.__json__(request)
-    for path in context.type_info.schema_links:
-        uuid_to_path(request, properties, path)
-    return properties
-
-
-def uuid_to_path(request, obj, path):
-    if isinstance(path, basestring):
-        path = path.split('.')
-    if not path:
-        return
-    name = path[0]
-    remaining = path[1:]
-    value = obj.get(name, None)
-    if value is None:
-        return
-    if remaining:
-        if isinstance(value, list):
-            for v in value:
-                uuid_to_path(request, v, remaining)
-        else:
-            uuid_to_path(request, value, remaining)
-        return
-    conn = request.registry[CONNECTION]
-    if isinstance(value, list):
-        obj[name] = [
-            request.resource_path(conn[v])
-            for v in value
-        ]
-    else:
-        obj[name] = request.resource_path(conn[value])
-
-
 @view_config(context=Item, permission='view', request_method='GET',
              name='object')
 def item_view_object(context, request):
@@ -173,13 +136,9 @@ def item_view_object(context, request):
     3. Calculated properties
     4. If applicable, add uuid to request._embedded_uuids
     """
-    properties = item_links(context, request)
+    properties = context.item_with_links(request)
     calculated = calculate_properties(context, request, properties)
     properties.update(calculated)
-    # add the uuid of the object to request._embedded_uuids
-    # uuid should *ALWAYS* be an available field in the properties
-    if getattr(request, '_indexing_view', False) is True:
-        request._embedded_uuids.add(properties['uuid'])
     return properties
 
 
