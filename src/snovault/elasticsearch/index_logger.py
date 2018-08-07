@@ -52,8 +52,8 @@ class IndexLogger(object):
         * Logger gets logs name so we call twice to clear and get a new one
         '''
         if self._do_log:
-            self._the_log = self._get_log()
-            self._close_handlers()
+            if self._the_log:
+                self._close_handlers()
             self._the_log = self._get_log()
 
     def append_output(self, output):
