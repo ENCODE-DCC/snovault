@@ -10,7 +10,7 @@ import time
 class IndexLogger(object):
     '''Basic Logger tailored to our indexing process'''
     log_name = 'indexing_time'
-    log_path = '/srv/encoded/develop/snovault/src/snovault/elasticsearch'
+    log_path = './src/snovault/elasticsearch'
 
     def __init__(self, do_log=False, log_name=None, log_path=None):
         self._do_log = do_log

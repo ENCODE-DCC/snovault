@@ -56,7 +56,7 @@ def test_log_off_init(index_logger_off):
     assert hasattr(index_logger_off, 'log_path')
     assert (
         getattr(index_logger_off, 'log_path') ==
-        '/srv/encoded/develop/snovault/src/snovault/elasticsearch'
+        './src/snovault/elasticsearch'
     )
     # pylint: disable=protected-access
     assert index_logger_off._get_log() is None
