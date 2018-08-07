@@ -337,8 +337,8 @@ class Indexer(object):
         # OPTIONAL: restart support
 
         output = {
-            'doc_embedded_uuids': None,
-            'doc_linked_uuids': None,
+            'doc_embedded': None,
+            'doc_linked': None,
             'doc_path': None,
             'doc_type': None,
             'embed_ecp': None,
