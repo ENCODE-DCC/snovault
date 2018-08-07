@@ -28,6 +28,7 @@ class IndexLogger(object):
 
     def _get_log(self):
         if self._do_log:
+            # Timestamp converted to micro seconds to separate index logs
             file_name = "{}-{}.log".format(
                 self.log_name,
                 str(int(time.time() * 10000000)),
