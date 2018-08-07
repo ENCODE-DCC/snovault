@@ -55,6 +55,15 @@ def testapp(app):
     return TestApp(app, environ)
 
 
+@pytest.fixture(autouse=True)
+def teardown(app, dbapi_conn):
+    from snovault.elasticsearch import create_mapping
+    create_mapping.run(app)
+    cursor = dbapi_conn.cursor()
+    cursor.execute("""TRUNCATE resources, transactions CASCADE;""")
+    cursor.close()
+
+
 @pytest.fixture
 def anontestapp(app):
     '''TestApp with JSON accept header.
