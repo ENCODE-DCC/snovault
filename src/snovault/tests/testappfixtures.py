@@ -47,7 +47,6 @@ def app(app_settings):
 def testapp(app):
     '''TestApp with JSON accept header.
     '''
-    print("FROM TESTAPPFIXTURES")
     from webtest import TestApp
     environ = {
         'HTTP_ACCEPT': 'application/json',
