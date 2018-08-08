@@ -1,6 +1,7 @@
 from past.builtins import basestring
 from pyramid.threadlocal import manager as threadlocal_manager
 from pyramid.httpexceptions import HTTPForbidden
+from .interfaces import CONNECTION
 
 
 def includeme(config):

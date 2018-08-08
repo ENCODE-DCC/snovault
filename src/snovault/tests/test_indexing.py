@@ -654,7 +654,7 @@ def test_es_delete_simple(app, testapp, indexer_testapp, session):
     assert es_item['_source']['embedded']['simple2'] == test_body['simple2']
 
     # The actual delete
-    storage.delete_by_uuid(test_uuid) # We can optionally pass in TEST_TYPE as well for better performance.
+    storage.purge_uuid(test_uuid) # We can optionally pass in TEST_TYPE as well for better performance.
 
     check_post_from_rdb_2 = storage.write.get_by_uuid(test_uuid)
 

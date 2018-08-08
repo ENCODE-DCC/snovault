@@ -14,7 +14,6 @@ from pyramid.view import (
 )
 from urllib.parse import urlencode
 from .calculated import calculate_properties
-from .interfaces import CONNECTION
 from .resources import (
     AbstractCollection,
     Item,

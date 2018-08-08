@@ -72,7 +72,6 @@ def item_index_data(context, request):
     rev_linked_uuids = sorted(request._rev_linked_uuids.copy())
     audit = request.invoke_view(path, '@@audit')['audit']
     obj = request.invoke_view(path, '@@object')
-    import pdb; pdb.set_trace()
 
     document = {
         'audit': audit,

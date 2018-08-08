@@ -178,7 +178,7 @@ class RDBStorage(object):
         msg = 'Keys conflict: %r' % conflicts
         raise HTTPConflict(msg)
 
-    def delete_by_uuid(self, rid):
+    def purge_uuid(self, rid):
         # WARNING USE WITH CARE PERMANENTLY DELETES RESOURCES
         session = self.DBSession()
         sp = session.begin_nested()

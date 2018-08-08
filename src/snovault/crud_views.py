@@ -45,9 +45,12 @@ def create_item(type_info, request, properties, sheets=None):
     Validates or generates new UUID, instantiates & saves an Item in
     database using provided `type_info` & `properties`, sends 'Created'
     notification, which can be subscribed to using the @subscriber(Created) decorator
+
+    Queues the created item for indexing using a hook on the current transaction
     '''
     registry = request.registry
     item_properties = properties.copy()
+    txn = transaction.get()
 
     if 'uuid' in item_properties:
         try:
@@ -59,7 +62,15 @@ def create_item(type_info, request, properties, sheets=None):
         uuid = uuid4()
 
     item = type_info.factory.create(registry, uuid, item_properties, sheets)
+    # add the item to the queue
+    to_queue = {'uuid': str(item.uuid), 'sid': item.sid}
+    telemetry_id = request.params.get('telemetry_id', None)
+    if telemetry_id:
+        to_queue['telemetry_id'] = telemetry_id
+    log.info(event='add_to_indexing_queue', **to_queue)
+    txn.addAfterCommitHook(add_to_indexing_queue, args=(request, to_queue, 'add',))
     registry.notify(Created(item, request))
+
     return item
 
 
@@ -69,25 +80,47 @@ def update_item(context, request, properties, sheets=None):
     `properties` (dict) in database, sends 'BeforeModified' & 'AfterModified'
     notifications, which can be subscribed to using the
     @subscriber(BeforeModified) or @subscriber(AfterModified) decorators
+
+    Queues the updated item for indexing using a hook on the current transaction
     '''
+    txn = transaction.get()
     registry = request.registry
     item_properties = properties.copy()
     registry.notify(BeforeModified(context, request))
     context.update(item_properties, sheets)
+    # set up hook for queueing indexing
+    to_queue = {'uuid': str(context.uuid), 'sid': context.sid}
+    telemetry_id = request.params.get('telemetry_id', None)
+    if telemetry_id:
+        to_queue['telemetry_id'] = telemetry_id
+    txn.addAfterCommitHook(add_to_indexing_queue, args=(request, to_queue, 'edit',))
     registry.notify(AfterModified(context, request))
 
 
 def delete_item(context, request):
+    """
+    Sets the status of an item to deleted and triggers indexing
+    """
     properties = context.properties.copy()
     properties['status'] = 'deleted'
     update_item(context, request, properties)
     return True
 
 
-def delete_item_from_database(context, request):
+def purge_item(context, request):
+    """
+    Fully delete an item from the DB and Elasticsearch if all links to that
+    have been removed. Requires that the status of the item == 'deleted',
+    otherwise will throw a validation failure
+    """
     item_type = context.collection.type_info.item_type
     item_uuid = str(context.uuid)
-    request.registry[STORAGE].delete_by_uuid(item_uuid, item_type)
+    if context.properties.get('status') != 'deleted':
+        msg = (u'Item status must equal deleted before purging from DB.' +
+               ' It currently is %s' % context.properties.get('status'))
+        raise ValidationFailure('body', ['status'], msg)
+    # purge_uuid fxn ensures that all links to the item are removed
+    request.registry[STORAGE].purge_uuid(item_uuid, item_type)
     return True
 
 
@@ -103,6 +136,7 @@ def render_item(request, context, render, return_uri_also=False):
         rendered = item_uri
     return (rendered, item_uri) if return_uri_also else rendered
 
+
 @view_config(context=Collection, permission='add', request_method='POST',
              validators=[validate_item_content_post])
 @view_config(context=Collection, permission='add_unvalidated', request_method='POST',
@@ -110,20 +144,10 @@ def render_item(request, context, render, return_uri_also=False):
              request_param=['validate=false'])
 def collection_add(context, request, render=None):
     '''Endpoint for adding a new Item.'''
-    txn = transaction.get()
-
     if render is None:
         render = request.params.get('render', True)
 
     item = create_item(context.type_info, request, request.validated)
-    # set up hook for queueing indexing
-    to_queue = {'uuid': str(item.uuid), 'sid': item.sid}
-    telemetry_id = request.params.get('telemetry_id', None)
-    if telemetry_id:
-        to_queue['telemetry_id'] = telemetry_id
-    log.info(event='add_to_indexing_queue', **to_queue)
-
-    txn.addAfterCommitHook(add_to_indexing_queue, args=(request, to_queue, 'add',))
 
     rendered, item_uri = render_item(request, item, render, True)
     request.response.status = 201
@@ -156,21 +180,11 @@ def item_edit(context, request, render=None):
     Note validators will handle the PATH ?delete_fields parameter if you want
     field to be deleted
     '''
-
-    txn = transaction.get()
-
     if render is None:
         render = request.params.get('render', True)
 
-    # This *sets* the property sheet
+    # This *sets* the property sheet and adds the item to the indexing queue
     update_item(context, request, request.validated)
-
-    # set up hook for queueing indexing
-    to_queue = {'uuid': str(context.uuid), 'sid': context.sid}
-    telemetry_id = request.params.get('telemetry_id', None)
-    if telemetry_id:
-        to_queue['telemetry_id'] = telemetry_id
-    txn.addAfterCommitHook(add_to_indexing_queue, args=(request, to_queue, 'edit',))
 
     rendered = render_item(request, context, render)
     request.response.status = 200
@@ -182,8 +196,35 @@ def item_edit(context, request, render=None):
     return result
 
 
+@view_config(context=Item, permission='view', request_method='GET',
+             name='links')
+def get_linking_items(context, request, render=None):
+    """
+    Utilize find_uuids_linked_to_item function in PickStorage to find
+    any items that link to the given item context
+    """
+    item_uuid = str(context.uuid)
+    links = request.registry[STORAGE].find_uuids_linked_to_item(item_uuid)
+    request.response.status = 200
+    result = {
+        'status': 'success',
+        '@type': ['result'],
+        'notification' : '%s items have links to %s' % (len(links), item_uuid),
+        'links': links
+    }
+    return result
+
+
 @view_config(context=Item, permission='edit', request_method='DELETE')
 def item_delete_full(context, request, render=None):
+    """
+    DELETE method that either sets the status of an item to deleted (base
+    functionality) or fully purges the item from the DB and ES if all links
+    to that item have been removed. Default behavior is delete
+
+    To purge, use ?purge=true query string
+    For example: DELETE `/<item-type>/<uuid>?purge=true`
+    """
     # possibly temporary fix to check if user is admin
     if hasattr(request, 'user_info'):
         user_details = request.user_info.get('details', {})
@@ -198,12 +239,12 @@ def item_delete_full(context, request, render=None):
         msg = u'Must be admin to fully delete items.'
         raise ValidationFailure('body', ['userid'], msg)
 
-    delete_from_database = asbool(request.GET and request.GET.get('delete_from_database'))
+    purge_from_database = asbool(request.GET and request.GET.get('purge'))
     uuid = str(context.uuid)
-
-    if delete_from_database:
+    if purge_from_database:
         # Delete entirely - WARNING USE WITH CAUTION - DELETES PERMANENTLY
-        result = delete_item_from_database(context, request)
+        # checking of item status and links is done within purge_item()
+        result = purge_item(context, request)
         if result:
             return {
                 'status': 'success',
@@ -221,77 +262,9 @@ def item_delete_full(context, request, render=None):
                 '@graph': [ render_item(request, context, render) ]
             }
 
-    #TODO: Throw error of some sort if no exceptions?
-
     return {
         'status': 'failure',
         '@type': ['result'],
+        'notification' : 'Deletion failed',
         '@graph': [uuid]
     }
-
-
-###############################################################################
-# These functions are unused now that we are no longer using rev_links/linkFrom
-# keep it around a while for reference
-
-# def split_child_props(type_info, properties):
-#     propname_children = {}
-#     item_properties = properties.copy()
-#     if type_info.schema_rev_links:
-#         for key, spec in type_info.schema_rev_links.items():
-#             if key in item_properties:
-#                 propname_children[key] = item_properties.pop(key)
-#     return item_properties, propname_children
-
-
-# def update_children(context, request, propname_children):
-#     registry = request.registry
-#     conn = registry[CONNECTION]
-#     collections = registry[COLLECTIONS]
-#     schema_rev_links = context.type_info.schema_rev_links
-#
-#     for propname, children in propname_children.items():
-#         link_type, link_attr = schema_rev_links[propname]
-#         child_collection = collections[link_type]
-#         found = set()
-#
-#         # Add or update children included in properties
-#         for i, child_props in enumerate(children):
-#             if isinstance(child_props, basestring):  # IRI of (existing) child
-#                 child = find_resource(child_collection, child_props)
-#             else:
-#                 child_props = child_props.copy()
-#                 child_props[link_attr] = str(context.uuid)
-#                 if 'uuid' in child_props:  # update existing child
-#                     child_id = child_props.pop('uuid')
-#                     child = conn.get_by_uuid(child_id)
-#                     if not request.has_permission('edit', child):
-#                         msg = u'edit forbidden to %s' % request.resource_path(child)
-#                         raise ValidationFailure('body', [propname, i], msg)
-#                     try:
-#                         update_item(child, request, child_props)
-#                     except ValidationFailure as e:
-#                         e.location = [propname, i] + e.location
-#                         raise
-#                 else:  # add new child
-#                     if not request.has_permission('add', child_collection):
-#                         msg = u'edit forbidden to %s' % request.resource_path(child)
-#                         raise ValidationFailure('body', [propname, i], msg)
-#                     child = create_item(child_collection.type_info, request, child_props)
-#             found.add(child.uuid)
-#
-#         # Remove existing children that are not in properties
-#         for link_uuid in context.get_rev_links(propname):
-#             if link_uuid in found:
-#                 continue
-#             child = conn.get_by_uuid(link_uuid)
-#             if not request.has_permission('visible_for_edit', child):
-#                 continue
-#             if not request.has_permission('edit', child):
-#                 msg = u'edit forbidden to %s' % request.resource_path(child)
-#                 raise ValidationFailure('body', [propname, i], msg)
-#             try:
-#                 delete_item(child, request)
-#             except ValidationFailure as e:
-#                 e.location = [propname, i] + e.location
-#                 raise

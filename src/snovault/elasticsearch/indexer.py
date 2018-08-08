@@ -354,7 +354,7 @@ class Indexer(object):
                 break
             else:
                 if add_to_secondary is not None:
-                    add_to_secondary.update(result._rev_linked_uuids)
+                    add_to_secondary.update(result['rev_linked_uuids'])
                 duration = timer() - start
                 log.info('update object success', duration=duration, cat=cat)
                 return

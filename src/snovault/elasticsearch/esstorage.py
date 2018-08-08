@@ -27,7 +27,9 @@ def includeme(config):
 
 
 def find_linking_property(our_dict, value_to_find):
-
+    """
+    Helper function used in PickStorage.find_uuids_linked_to_item
+    """
     def find_it(d, parent_key=None):
         if isinstance(d, list):
             for idx, v in enumerate(d):
@@ -37,7 +39,6 @@ def find_linking_property(our_dict, value_to_find):
                         return (parent_key if parent_key else '') + '[' + str(idx) + '].' + found
                 elif v == value_to_find:
                     return '[' + str(idx) + ']'
-
         elif isinstance(d, dict):
             for k, v in d.items():
                 if isinstance(v, dict) or isinstance(v, list):
@@ -49,6 +50,7 @@ def find_linking_property(our_dict, value_to_find):
         return None
 
     return find_it(our_dict)
+
 
 class CachedModel(object):
     def __init__(self, hit):
@@ -120,29 +122,49 @@ class PickStorage(object):
                 return self.write.get_by_json(key, value, item_type)
         return model
 
-    def delete_by_uuid(self, rid, item_type=None):
-        if not item_type: # ES deletion requires index & doc_type, which are both == item_type
-            model = self.get_by_uuid(rid)
-            item_type = model.item_type
-        uuids_linking_to_item = find_uuids_for_indexing(self.registry, set([rid])) - set([rid])
+
+    def find_uuids_linked_to_item(self, rid):
+        """
+        Given a resource id (rid), such as uuid, find all items in the DB
+        that have a linkTo to that item.
+        Returns some extra information about the fields/links that are
+        present
+        """
+        linked_info = []
+        uuids_linking_to_item = find_uuids_for_indexing(self.registry, set([rid]))
+        # remove the item itself from the list
+        uuids_linking_to_item = uuids_linking_to_item - set([rid])
         if len(uuids_linking_to_item) > 0:
-            # Return list of { '@id', 'display_title', 'uuid' } in 'comment' property of HTTPException response to assist with any manual unlinking.
-            conflicts = []
+            # Return list of { '@id', 'display_title', 'uuid' } in 'comment'
+            # property of HTTPException response to assist with any manual unlinking.
             for linking_uuid in uuids_linking_to_item:
                 linking_dict = self.read.get_by_uuid(linking_uuid).source.get('embedded')
                 linking_property = find_linking_property(linking_dict, rid)
-                conflicts.append({
+                linked_info.append({
                     '@id' : linking_dict['@id'],
                     'display_title' : linking_dict['display_title'],
                     'uuid' : linking_uuid,
                     'field' : linking_property or "Not Embedded"
                 })
+        return linked_info
 
-            raise HTTPLocked(detail="Cannot delete an Item from the database if other Items are still linking to it.", comment=conflicts)
 
-        self.write.delete_by_uuid(rid)                  # Deletes from RDB
+    def purge_uuid(self, rid, item_type=None):
+        """
+        Attempt to purge an item by given resource id (rid), completely
+        removing it from ES and DB.
+        """
+        if not item_type: # ES deletion requires index & doc_type, which are both == item_type
+            model = self.get_by_uuid(rid)
+            item_type = model.item_type
+        uuids_linking_to_item = self.find_uuids_linked_to_item(rid)
+        if len(uuids_linking_to_item) > 0:
+            raise HTTPLocked(detail="Cannot purge item as other items still link to it",
+                             comment=uuids_linking_to_item)
+
+        self.write.purge_uuid(rid)                  # Deletes from RDB
         try:
-            self.read.delete_by_uuid(rid, item_type)    # Deletes from ES
+            self.read.purge_uuid(rid, item_type)    # Deletes from ES
         except elasticsearch.exceptions.NotFoundError:
             # Case: Not yet indexed
             print('Couldn\'t find ' + rid + ' in ElasticSearch. Continuing.')
@@ -214,7 +236,7 @@ class ElasticSearchStorage(object):
         hits = search.execute()
         return [hit.to_dict().get('uuid', hit.to_dict().get('_id')) for hit in hits]
 
-    def delete_by_uuid(self, rid, item_type=None):
+    def purge_uuid(self, rid, item_type=None):
         if not item_type:
             model = self.get_by_uuid(rid)
             item_type = model.item_type
