@@ -309,13 +309,14 @@ class Indexer(object):
         errors = []
         for i, uuid in enumerate(uuids):
             output = self.update_object(request, uuid, xmin)
-            self._indexer_log.append_output(output)
-            if output['error_message'] is not None:
-                errors.append({
-                    'error_message': output['error_message'],
-                    'timestamp': output['end_timestamp'],
-                    'uuid': output['uuid'],
-                })
+            if output:
+                self._indexer_log.append_output(output)
+                if output['error_message'] is not None:
+                    errors.append({
+                        'error_message': output['error_message'],
+                        'timestamp': output['end_timestamp'],
+                        'uuid': output['uuid'],
+                    })
             if (i + 1) % 50 == 0:
                 log.info('Indexing %d', i + 1)
 
