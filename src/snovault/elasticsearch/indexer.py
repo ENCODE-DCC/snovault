@@ -313,7 +313,7 @@ class Indexer(object):
             if output['error_message'] is not None:
                 errors.append({
                     'error_message': output['error_message'],
-                    'timestamp': output['timestamp'],
+                    'timestamp': output['end_timestamp'],
                     'uuid': output['uuid'],
                 })
             if (i + 1) % 50 == 0:
@@ -346,11 +346,11 @@ class Indexer(object):
             'es_ecp': None,
             'es_time': None,
             'error_message': None,
+            'start_time': time.time(),
             'timestamp': None,
             'uuid': str(uuid),
         }
         try:
-            embed_start_time = time.time()
             doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
@@ -367,7 +367,7 @@ class Indexer(object):
             output['doc_type'] = doc.get('item_type')
             output['doc_embedded'] = len(doc.get('embedded_uuids', []))
             output['doc_linked'] = len(doc.get('linked_uuids', []))
-        output['embed_time'] = time.time() - embed_start_time
+        output['embed_time'] = time.time() - output['start_time']
 
         if output['error_message'] is None:
             for backoff in [0, 10, 20, 40, 80]:
@@ -405,7 +405,7 @@ class Indexer(object):
                     output['es_time'] = time.time() - es_start_time
                     break
 
-        output['timestamp'] = datetime.datetime.now().isoformat()
+        output['end_timestamp'] = datetime.datetime.now().isoformat()
         return output
 
     def shutdown(self):

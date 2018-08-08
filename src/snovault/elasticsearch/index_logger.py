@@ -63,7 +63,7 @@ class IndexLogger(object):
         if 'es_time' in output and isinstance(output['es_time'], float):
             output['es_time'] = '%0.6f' % output['es_time']
         self.write_log(
-            '{timestamp} {doc_path} {doc_type} '
+            '{start_time} {end_timestamp} {doc_path} {doc_type} '
             '{embed_time} {embed_ecp} '
             '{es_time} {es_ecp} '
             '{embeds} {linked} '
@@ -71,12 +71,13 @@ class IndexLogger(object):
                 embeds=output.get('doc_embedded'),
                 embed_ecp=output.get('embed_ecp'),
                 embed_time=output.get('embed_time'),
+                end_timestamp=output.get('end_timestamp'),
                 es_time=output.get('es_time'),
                 es_ecp=output.get('es_ecp'),
                 doc_path=output.get('doc_path'),
-                linked=output.get('doc_linked'),
                 doc_type=output.get('doc_type'),
-                timestamp=output.get('timestamp'),
+                linked=output.get('doc_linked'),
+                start_time=output.get('start_time'),
             )
         )
 
@@ -90,7 +91,7 @@ class IndexLogger(object):
             )
         )
         self.write_log(
-            'date time timestamp doc_path doc_type '
+            'start_time end_timestamp doc_path doc_type '
             'embed_time embed_ecp es_time es_ecp embeds linked'
         )
 

@@ -31,7 +31,7 @@ def fake_index_uuid_output():
     '''Builds some fake output from the Indexer.update_object'''
     return {
         'error_message': 'fake-error_message',
-        'timestamp': 'fake-timestamp',
+        'end_timestamp': 'fake-end_timestamp',
         'uuid': 'fake-uuid',
         'es_time': 0.123,
         'es_ecp': 'fake-es_ecp',
@@ -41,6 +41,7 @@ def fake_index_uuid_output():
         'doc_type': 'fake-doc_type',
         'doc_embedded': 'fake-doc_embedded',
         'doc_linked': 'fake-doc_linked',
+        'start_time': 'fake-start_time',
     }
 
 
@@ -131,7 +132,7 @@ def test_log_on_write_new_append(index_logger_on, fake_index_uuid_output):
             lines.append(line.strip())
     assert len(lines) == 3
     expected_new_line = (
-        'fake-timestamp fake-doc_paths_zero 0.456000 '
+        'fake-start_time fake-end_timestamp fake-doc_paths_zero 0.456000 '
         'fake-embed_ecp 0.123000 fake-es_ecp '
         'fake-doc_embedded_uuids fake-doc_linked_uuids'
     )
@@ -141,14 +142,14 @@ def test_log_on_write_new_append(index_logger_on, fake_index_uuid_output):
     )
     assert  new_line == expected_new_line
     expected_title_line = (
-        'date time timestamp doc_path doc_type '
+        'start_time end_timestamp doc_path doc_type '
         'embed_time embed_ecp es_time es_ecp '
         'embeds linked'
     )
     title_line = lines[1].split(' ', 2)[-1]
     assert  title_line == expected_title_line
     expected_append_line = (
-        'fake-timestamp fake-doc_path fake-doc_type '
+        'fake-start_time fake-end_timestamp fake-doc_path fake-doc_type '
         '0.456000 fake-embed_ecp 0.123000 fake-es_ecp '
         'fake-doc_embedded fake-doc_linked'
     )

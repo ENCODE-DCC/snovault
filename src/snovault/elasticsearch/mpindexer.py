@@ -151,7 +151,7 @@ class MPIndexer(Indexer):
                 if output['error_message'] is not None:
                     errors.append({
                         'error_message': output['error_message'],
-                        'timestamp': output['timestamp'],
+                        'timestamp': output['end_timestamp'],
                         'uuid': output['uuid'],
                     })
                 if (i + 1) % 50 == 0:
