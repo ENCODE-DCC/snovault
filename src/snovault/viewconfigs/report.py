@@ -39,7 +39,7 @@ class ReportView(SearchView):
             del self.request.GET['limit']
         # Reuse search view
         res = SearchView(self.context, self.request).preprocess_view()
-
+        
         # change @id, @type, and views
         res['views'][0] = {
             'href': res['@id'],
@@ -48,7 +48,7 @@ class ReportView(SearchView):
         }
         search_base = normalize_query(self.request)
         res['@id'] = '/report/' + search_base
-        res['download_tsv'] = self.request.route_path('report_download') + search_base
+        #res['download_tsv'] = self.request.route_path('report_download') + search_base
         res['title'] = 'Report'
         res['@type'] = ['Report']
         res['non_sortable'] = TEXT_FIELDS

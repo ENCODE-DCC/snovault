@@ -609,119 +609,119 @@ def test_set_facets_type_exists():
     } == aggs
 
 
-def test_format_facets():
-    from snovault.helpers.helper import format_facets
-    es_result = {
-        'aggregations': {
-            'field1': {
-                'field1': {
-                    'buckets': [
-                        {
-                            'key': 'value1',
-                            'doc_count': 2,
-                        },
-                        {
-                            'key': 'value2',
-                            'doc_count': 1,
-                        }
-                    ]
-                },
-                'doc_count': 3,
-            }
-        }
-    }
-    facets = [
-        ('field1', {'title': 'Field 1'}),
-    ]
-    used_filters = {}
-    schemas = []
-    total = 42
-    principals = []
-    result = format_facets(
-        es_result, facets, used_filters, schemas, total, principals)
+# def test_format_facets():
+#     from snovault.helpers.helper import format_facets
+#     es_result = {
+#         'aggregations': {
+#             'field1': {
+#                 'field1': {
+#                     'buckets': [
+#                         {
+#                             'key': 'value1',
+#                             'doc_count': 2,
+#                         },
+#                         {
+#                             'key': 'value2',
+#                             'doc_count': 1,
+#                         }
+#                     ]
+#                 },
+#                 'doc_count': 3,
+#             }
+#         }
+#     }
+#     facets = [
+#         ('field1', {'title': 'Field 1'}),
+#     ]
+#     used_filters = {}
+#     schemas = []
+#     total = 42
+#     principals = []
+#     result = format_facets(
+#         es_result, facets, used_filters, schemas, total, principals)
 
-    assert result == [{
-        'field': 'field1',
-        'title': 'Field 1',
-        'terms': [
-            {
-                'key': 'value1',
-                'doc_count': 2,
-            },
-            {
-                'key': 'value2',
-                'doc_count': 1,
-            }
-        ],
-        'total': 3,
-        'type': 'terms',
-    }]
-
-
-def test_format_facets_no_aggregations():
-    from snovault.helpers.helper import format_facets
-    result = format_facets({}, [], [], [], 0, [])
-    assert result == []
+#     assert result == [{
+#         'field': 'field1',
+#         'title': 'Field 1',
+#         'terms': [
+#             {
+#                 'key': 'value1',
+#                 'doc_count': 2,
+#             },
+#             {
+#                 'key': 'value2',
+#                 'doc_count': 1,
+#             }
+#         ],
+#         'total': 3,
+#         'type': 'terms',
+#     }]
 
 
-def test_format_facets_skips_single_bucket_facets():
-    from snovault.helpers.helper import format_facets
-    es_result = {
-        'aggregations': {
-            'field1': {
-                'field1': {
-                    'buckets': [
-                        {
-                            'key': 'value1',
-                            'doc_count': 2,
-                        },
-                    ]
-                },
-                'doc_count': 2,
-            }
-        }
-    }
-    facets = [
-        ('field1', {'title': 'Field 1'}),
-    ]
-    used_filters = {}
-    schemas = []
-    total = 42
-    principals = []
-    result = format_facets(
-        es_result, facets, used_filters, schemas, total, principals)
-
-    assert result == []
+# def test_format_facets_no_aggregations():
+#     from snovault.helpers.helper import format_facets
+#     result = format_facets({}, [], [], [], 0, [])
+#     assert result == []
 
 
-def test_format_facets_adds_pseudo_facet_for_extra_filters():
-    from snovault.helpers.helper import format_facets
-    es_result = {
-        'aggregations': {},
-    }
-    facets = []
-    used_filters = {
-        'title': ['titlevalue'],
-    }
-    schemas = [{
-        'properties': {
-            'title': {
-                'title': 'Title',
-            },
-        },
-    }]
-    total = 42
-    principals = []
-    result = format_facets(
-        es_result, facets, used_filters, schemas, total, principals)
+# def test_format_facets_skips_single_bucket_facets():
+#     from snovault.helpers.helper import format_facets
+#     es_result = {
+#         'aggregations': {
+#             'field1': {
+#                 'field1': {
+#                     'buckets': [
+#                         {
+#                             'key': 'value1',
+#                             'doc_count': 2,
+#                         },
+#                     ]
+#                 },
+#                 'doc_count': 2,
+#             }
+#         }
+#     }
+#     facets = [
+#         ('field1', {'title': 'Field 1'}),
+#     ]
+#     used_filters = {}
+#     schemas = []
+#     total = 42
+#     principals = []
+#     result = format_facets(
+#         es_result, facets, used_filters, schemas, total, principals)
 
-    assert result == [{
-        'field': 'title',
-        'title': 'Title',
-        'terms': [
-            {
-                'key': 'titlevalue',
-            },
-        ],
-        'total': 42,
-    }]
+#     assert result == []
+
+
+# def test_format_facets_adds_pseudo_facet_for_extra_filters():
+#     from snovault.helpers.helper import format_facets
+#     es_result = {
+#         'aggregations': {},
+#     }
+#     facets = []
+#     used_filters = {
+#         'title': ['titlevalue'],
+#     }
+#     schemas = [{
+#         'properties': {
+#             'title': {
+#                 'title': 'Title',
+#             },
+#         },
+#     }]
+#     total = 42
+#     principals = []
+#     result = format_facets(
+#         es_result, facets, used_filters, schemas, total, principals)
+
+#     assert result == [{
+#         'field': 'title',
+#         'title': 'Title',
+#         'terms': [
+#             {
+#                 'key': 'titlevalue',
+#             },
+#         ],
+#         'total': 42,
+#     }]
