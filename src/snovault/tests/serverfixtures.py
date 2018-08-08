@@ -47,7 +47,6 @@ def engine_url(request):
 @pytest.yield_fixture(scope='session')
 def postgresql_server(request):
     if os.environ.get("CIRCLECI"):
-        print("PG_SERVER")
         yield 'postgresql://postgres@localhost:5432/postgres'
     else:
         from urllib.parse import quote
@@ -74,7 +73,6 @@ def elasticsearch_host_port():
 @pytest.yield_fixture(scope='session')
 def elasticsearch_server(request, elasticsearch_host_port):
     if os.environ.get("CIRCLECI"):
-        print("ES_SERVER")
         yield 'http://localhost:9200'
     else:
         from .elasticsearch_fixture import server_process
