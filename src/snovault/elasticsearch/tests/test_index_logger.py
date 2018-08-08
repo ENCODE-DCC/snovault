@@ -141,14 +141,15 @@ def test_log_on_write_new_append(index_logger_on, fake_index_uuid_output):
     )
     assert  new_line == expected_new_line
     expected_title_line = (
-        'date time timestamp doc_path embed_time embed_ecp '
-        'es_time es_ecp embeds linked'
+        'date time timestamp doc_path doc_type '
+        'embed_time embed_ecp es_time es_ecp '
+        'embeds linked'
     )
     title_line = lines[1].split(' ', 2)[-1]
     assert  title_line == expected_title_line
     expected_append_line = (
-        'fake-timestamp fake-doc_path 0.456000 '
-        'fake-embed_ecp 0.123000 fake-es_ecp '
+        'fake-timestamp fake-doc_path fake-doc_type '
+        '0.456000 fake-embed_ecp 0.123000 fake-es_ecp '
         'fake-doc_embedded fake-doc_linked'
     )
     append_line = lines[2].split(' ', 2)[-1]
