@@ -237,6 +237,7 @@ def download(context, request):
 
     # If blob is external, serve via proxy using X-Accel-Redirect
     blob_storage = request.registry[BLOBS]
+    log.error('\nBLOB STORAGE: %s\n' % blob_storage)
     if hasattr(blob_storage, 'get_blob_url'):
         blob_url = blob_storage.get_blob_url(download_meta)
         # we don't use nginx in production
@@ -244,7 +245,7 @@ def download(context, request):
         raise HTTPFound(location=str(blob_url))
 
     # Otherwise serve the blob data ourselves
-    blob = request.registry[BLOBS].get_blob(download_meta)
+    blob = blob_storage.get_blob(download_meta)
     headers = {
         'Content-Type': mimetype,
     }
