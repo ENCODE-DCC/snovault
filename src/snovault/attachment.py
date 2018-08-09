@@ -22,9 +22,6 @@ from .validation import ValidationFailure
 import magic
 import mimetypes
 import uuid
-import logging
-
-log = logging.getLogger(__name__)
 
 def includeme(config):
     config.scan(__name__)
@@ -71,7 +68,6 @@ class ItemWithAttachment(Item):
         attachment = properties[prop_name]
         href = attachment['href']
 
-        log.error('\n\nPROCESS HREF: %s\n\n' % href)
         if not href.startswith('data:'):
             msg = "Expected data URI."
             raise ValidationFailure('body', [prop_name, 'href'], msg)
@@ -163,7 +159,6 @@ class ItemWithAttachment(Item):
                 continue
 
             attachment = properties[prop_name]
-            log.error('\n\nNEW ATTACH: %s\n\n' % attachment)
             if 'href' not in attachment:
                 msg = "Expected data uri or existing uri."
                 raise ValidationFailure('body', [prop_name, 'href'], msg)
@@ -174,7 +169,6 @@ class ItemWithAttachment(Item):
                     existing = self.properties[prop_name]['href']
                 except KeyError:
                     existing = None
-                log.error('\n\nEXISTING VS HREF: %s ... %s\n\n' % (existing, href))
                 if existing and existing != href:
                     msg = "Expected data uri or existing uri."
                     raise ValidationFailure('body', [prop_name, 'href'], msg)
