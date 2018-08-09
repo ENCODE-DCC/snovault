@@ -22,13 +22,13 @@ from .validation import ValidationFailure
 import magic
 import mimetypes
 import uuid
-import structlog
+import logger
 
 
 def includeme(config):
     config.scan(__name__)
 
-log = structlog.getLogger(__name__)
+log = logger.getLogger(__name__)
 
 
 def parse_data_uri(uri):
@@ -153,6 +153,7 @@ class ItemWithAttachment(Item):
         unchanged = []
         removed = []
         log.error('\nATTACH BEFORE UPDATE: %s\n' % self.propsheets.get('downloads', {}))
+        log.error('\nPROPS BEFORE UPDATE: %s\n' % self.propsheets.get('downloads', {}))
         for prop_name, prop in self.schema['properties'].items():
             if not prop.get('attachment', False):
                 continue
@@ -202,7 +203,7 @@ class ItemWithAttachment(Item):
 def download(context, request):
     prop_name, filename = request.subpath
     downloads = context.propsheets.get('downloads')
-    log.error('\nATTACH AT DOWNLOAD: %s\n' % self.propsheets.get('downloads', {}))
+    log.error('\nATTACH AT DOWNLOAD: %s\n' % downloads)
     return
     # if not downloads:
     #     # try rebuilding sheets
