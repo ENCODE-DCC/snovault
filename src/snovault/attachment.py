@@ -218,11 +218,6 @@ def download(context, request):
     prop_name, filename = request.subpath
     downloads = context.propsheets.get('downloads')
     log.error('\nATTACH AT DOWNLOAD: %s\n' % downloads)
-    return
-    # if not downloads:
-    #     # try rebuilding sheets
-    #     context._update(context.properties)
-    #     downloads = context.propsheets['downloads']
     try:
         download_meta = downloads[prop_name]
     except KeyError:
