@@ -22,10 +22,13 @@ from .validation import ValidationFailure
 import magic
 import mimetypes
 import uuid
+import structlog
 
 
 def includeme(config):
     config.scan(__name__)
+
+log = structlog.getLogger(__name__)
 
 
 def parse_data_uri(uri):
@@ -149,6 +152,7 @@ class ItemWithAttachment(Item):
         changed = []
         unchanged = []
         removed = []
+        log.error('\nATTACH BEFORE UPDATE: %s\n' % self.propsheets.get('downloads', {}))
         for prop_name, prop in self.schema['properties'].items():
             if not prop.get('attachment', False):
                 continue
@@ -169,14 +173,17 @@ class ItemWithAttachment(Item):
                     existing = self.properties[prop_name]['href']
                 except KeyError:
                     existing = None
-                if existing != href:
+                if not existing:
+                    changed.append(prop_name)
+                elif existing != href:
                     msg = "Expected data uri or existing uri."
                     raise ValidationFailure('body', [prop_name, 'href'], msg)
-                unchanged.append(prop_name)
+                else:
+                    unchanged.append(prop_name)
             else:
                 changed.append(prop_name)
 
-        if changed or removed:
+        if changed or unchanged:
             properties = properties.copy()
             sheets = {} if sheets is None else sheets.copy()
             sheets['downloads'] = downloads = {}
@@ -186,7 +193,7 @@ class ItemWithAttachment(Item):
 
             for prop_name in changed:
                 self._process_downloads(prop_name, properties, downloads)
-
+        log.error('\nATTACH AFTER UPDATE: %s\n' % self.propsheets.get('downloads', {}))
         super(ItemWithAttachment, self)._update(properties, sheets)
 
 
@@ -194,7 +201,13 @@ class ItemWithAttachment(Item):
              permission='view', subpath_segments=2)
 def download(context, request):
     prop_name, filename = request.subpath
-    downloads = context.propsheets['downloads']
+    downloads = context.propsheets.get('downloads')
+    log.error('\nATTACH AT DOWNLOAD: %s\n' % self.propsheets.get('downloads', {}))
+    return
+    # if not downloads:
+    #     # try rebuilding sheets
+    #     context._update(context.properties)
+    #     downloads = context.propsheets['downloads']
     try:
         download_meta = downloads[prop_name]
     except KeyError:
