@@ -22,13 +22,13 @@ from .validation import ValidationFailure
 import magic
 import mimetypes
 import uuid
-import logger
+import logging
 
 
 def includeme(config):
     config.scan(__name__)
 
-log = logger.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 def parse_data_uri(uri):
@@ -153,7 +153,7 @@ class ItemWithAttachment(Item):
         unchanged = []
         removed = []
         log.error('\nATTACH BEFORE UPDATE: %s\n' % self.propsheets.get('downloads', {}))
-        log.error('\nPROPS BEFORE UPDATE: %s\n' % self.propsheets.get('downloads', {}))
+        log.error('\nPROPS BEFORE UPDATE: %s\n' % self.properties)
         for prop_name, prop in self.schema['properties'].items():
             if not prop.get('attachment', False):
                 continue
@@ -176,13 +176,18 @@ class ItemWithAttachment(Item):
                     existing = None
                 if not existing:
                     changed.append(prop_name)
-                elif existing != href:
+                if existing and existing != href:
                     msg = "Expected data uri or existing uri."
                     raise ValidationFailure('body', [prop_name, 'href'], msg)
-                else:
+                if self.propsheets.get('downloads', {}).get(prop_name):
                     unchanged.append(prop_name)
+                else:
+                    changed.append(prop_name)
             else:
                 changed.append(prop_name)
+
+        log.error('\nCHANGED: %s\n' % changed)
+        log.error('\nUNCHANGED: %s\n' % unchanged)
 
         if changed or unchanged:
             properties = properties.copy()
