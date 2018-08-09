@@ -151,7 +151,8 @@ class ItemWithAttachment(Item):
     def _update(self, properties, sheets=None):
         changed = []
         unchanged = []
-        removed = []
+        removed = []  # unused?
+        forced = []  # allow POST/PATCH of already uploaded attachment info
         log.error('\nATTACH BEFORE UPDATE: %s\n' % self.propsheets.get('downloads', {}))
         log.error('\nPROPS BEFORE UPDATE: %s\n' % self.properties)
         for prop_name, prop in self.schema['properties'].items():
@@ -180,16 +181,20 @@ class ItemWithAttachment(Item):
                     msg = "Expected data uri or existing uri."
                     raise ValidationFailure('body', [prop_name, 'href'], msg)
                 if self.propsheets.get('downloads', {}).get(prop_name):
+                    # there is already a propsheet present with same href
                     unchanged.append(prop_name)
                 else:
-                    changed.append(prop_name)
+                    # @@download href was provided externally. attempt
+                    # to set the value we've got in download propsheet
+                    forced.append(prop_name)
             else:
                 changed.append(prop_name)
 
         log.error('\nCHANGED: %s\n' % changed)
         log.error('\nUNCHANGED: %s\n' % unchanged)
+        log.error('\nFORCED\n: %s\n' % forced)
 
-        if changed or unchanged:
+        if changed or unchanged or forced:
             properties = properties.copy()
             sheets = {} if sheets is None else sheets.copy()
             sheets['downloads'] = downloads = {}
@@ -198,7 +203,11 @@ class ItemWithAttachment(Item):
                 downloads[prop_name] = self.propsheets['downloads'][prop_name]
 
             for prop_name in changed:
+                # hrefs for these attachments are raw data URIs
                 self._process_downloads(prop_name, properties, downloads)
+
+            for prop_name in forced:
+                downloads[prop_name] = attachment
         log.error('\nATTACH AFTER UPDATE: %s\n' % self.propsheets.get('downloads', {}))
         super(ItemWithAttachment, self)._update(properties, sheets)
 
