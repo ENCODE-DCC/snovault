@@ -200,7 +200,10 @@ class ItemWithAttachment(Item):
              permission='view', subpath_segments=2)
 def download(context, request):
     prop_name, filename = request.subpath
-    downloads = context.propsheets.get('downloads')
+    try:
+        downloads = context.propsheets['downloads']
+    except KeyError:
+        raise HTTPNotFound("Cannot find downloads propsheet. Update item.")
     try:
         download_meta = downloads[prop_name]
     except KeyError:
