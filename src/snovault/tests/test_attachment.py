@@ -200,7 +200,6 @@ def test_download_update_bad_change(testapp, testing_download, href):
 @pytest.mark.parametrize(
     'href',
     [
-        '@@download/attachment/another.png',
         'http://example.com/another.png',
         'data:image/png;base64,NOT_BASE64',
         'data:image/png;NOT_A_PNG',
