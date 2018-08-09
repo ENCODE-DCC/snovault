@@ -22,13 +22,9 @@ from .validation import ValidationFailure
 import magic
 import mimetypes
 import uuid
-import logging
-
 
 def includeme(config):
     config.scan(__name__)
-
-log = logging.getLogger(__name__)
 
 
 def parse_data_uri(uri):
@@ -153,8 +149,6 @@ class ItemWithAttachment(Item):
         unchanged = []
         removed = []  # unused?
         forced = []  # allow POST/PATCH of already uploaded attachment info
-        log.error('\nATTACH BEFORE UPDATE: %s\n' % self.propsheets.get('downloads', {}))
-        log.error('\nPROPS BEFORE UPDATE: %s\n' % self.properties)
         for prop_name, prop in self.schema['properties'].items():
             if not prop.get('attachment', False):
                 continue
@@ -190,25 +184,17 @@ class ItemWithAttachment(Item):
             else:
                 changed.append(prop_name)
 
-        log.error('\nCHANGED: %s\n' % changed)
-        log.error('\nUNCHANGED: %s\n' % unchanged)
-        log.error('\nFORCED\n: %s\n' % forced)
-
         if changed or unchanged or forced:
             properties = properties.copy()
             sheets = {} if sheets is None else sheets.copy()
             sheets['downloads'] = downloads = {}
-
             for prop_name in unchanged:
                 downloads[prop_name] = self.propsheets['downloads'][prop_name]
-
             for prop_name in changed:
                 # hrefs for these attachments are raw data URIs
                 self._process_downloads(prop_name, properties, downloads)
-
             for prop_name in forced:
                 downloads[prop_name] = attachment
-        log.error('\nATTACH AFTER UPDATE: %s\n' % self.propsheets.get('downloads', {}))
         super(ItemWithAttachment, self)._update(properties, sheets)
 
 
@@ -217,7 +203,6 @@ class ItemWithAttachment(Item):
 def download(context, request):
     prop_name, filename = request.subpath
     downloads = context.propsheets.get('downloads')
-    log.error('\nATTACH AT DOWNLOAD: %s\n' % downloads)
     try:
         download_meta = downloads[prop_name]
     except KeyError:
@@ -232,7 +217,6 @@ def download(context, request):
 
     # If blob is external, serve via proxy using X-Accel-Redirect
     blob_storage = request.registry[BLOBS]
-    log.error('\nBLOB STORAGE: %s\n' % blob_storage)
     if hasattr(blob_storage, 'get_blob_url'):
         blob_url = blob_storage.get_blob_url(download_meta)
         # we don't use nginx in production
