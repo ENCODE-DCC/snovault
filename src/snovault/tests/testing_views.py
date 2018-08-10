@@ -92,6 +92,9 @@ class TestingLinkSource(Item):
             'status': {
                 'type': 'string',
             },
+            'condition1': {
+                'type': 'boolean',
+            },
         },
         'required': ['target'],
         'additionalProperties': False,
@@ -124,6 +127,7 @@ class TestingLinkTarget(Item):
     embedded = [
         'reverse',
     ]
+    audit_inherit = ['*']
 
     @calculated_property(schema={
         "title": "Sources",
