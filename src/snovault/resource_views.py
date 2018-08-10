@@ -131,9 +131,9 @@ def item_view_object(context, request):
     Render json structure. This is the most basic view and contains the scope
     of only one item. The steps to generate it are:
     1. Fetch stored properties, possibly upgrading.
-    2. Link canonicalization (overwriting uuids.)
+    2. Link canonicalization (overwriting uuids.) with item_with_links
+       - adds uuid to request._embedded_uuids if request._indexing_view
     3. Calculated properties
-    4. If applicable, add uuid to request._embedded_uuids
     """
     properties = context.item_with_links(request)
     calculated = calculate_properties(context, request, properties)
@@ -144,9 +144,6 @@ def item_view_object(context, request):
 @view_config(context=Item, permission='view', request_method='GET',
              name='embedded')
 def item_view_embedded(context, request):
-    """
-    This is the ONLY view that actually populates request._embedded_uuids
-    """
     item_path = request.resource_path(context)
     properties = request.embed(item_path, '@@object', as_user=True)
     embedded_model = build_embedded_model(context.embedded)
@@ -157,10 +154,6 @@ def item_view_embedded(context, request):
 @view_config(context=Item, permission='view', request_method='GET',
              name='page')
 def item_view_page(context, request):
-    """
-    Will populate request._embedded_uuids because request.embed is called
-    with @@embedded
-    """
     item_path = request.resource_path(context)
     properties = request.embed(item_path, '@@embedded', as_user=True)
     calculated = calculate_properties(context, request, properties, category='page')
