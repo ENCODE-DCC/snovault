@@ -23,7 +23,6 @@ import magic
 import mimetypes
 import uuid
 
-
 def includeme(config):
     config.scan(__name__)
 
@@ -148,7 +147,8 @@ class ItemWithAttachment(Item):
     def _update(self, properties, sheets=None):
         changed = []
         unchanged = []
-        removed = []
+        removed = []  # unused?
+        forced = []  # allow POST/PATCH of already uploaded attachment info
         for prop_name, prop in self.schema['properties'].items():
             if not prop.get('attachment', False):
                 continue
@@ -169,24 +169,30 @@ class ItemWithAttachment(Item):
                     existing = self.properties[prop_name]['href']
                 except KeyError:
                     existing = None
-                if existing != href:
+                if existing and existing != href:
                     msg = "Expected data uri or existing uri."
                     raise ValidationFailure('body', [prop_name, 'href'], msg)
-                unchanged.append(prop_name)
+                if self.propsheets.get('downloads', {}).get(prop_name):
+                    # there is already a propsheet present with same href
+                    unchanged.append(prop_name)
+                else:
+                    # @@download href was provided externally. attempt
+                    # to set the value we've got in download propsheet
+                    forced.append(prop_name)
             else:
                 changed.append(prop_name)
 
-        if changed or removed:
+        if changed or unchanged or forced:
             properties = properties.copy()
             sheets = {} if sheets is None else sheets.copy()
             sheets['downloads'] = downloads = {}
-
             for prop_name in unchanged:
                 downloads[prop_name] = self.propsheets['downloads'][prop_name]
-
             for prop_name in changed:
+                # hrefs for these attachments are raw data URIs
                 self._process_downloads(prop_name, properties, downloads)
-
+            for prop_name in forced:
+                downloads[prop_name] = attachment
         super(ItemWithAttachment, self)._update(properties, sheets)
 
 
@@ -194,7 +200,10 @@ class ItemWithAttachment(Item):
              permission='view', subpath_segments=2)
 def download(context, request):
     prop_name, filename = request.subpath
-    downloads = context.propsheets['downloads']
+    try:
+        downloads = context.propsheets['downloads']
+    except KeyError:
+        raise HTTPNotFound("Cannot find downloads propsheet. Update item.")
     try:
         download_meta = downloads[prop_name]
     except KeyError:
@@ -216,7 +225,7 @@ def download(context, request):
         raise HTTPFound(location=str(blob_url))
 
     # Otherwise serve the blob data ourselves
-    blob = request.registry[BLOBS].get_blob(download_meta)
+    blob = blob_storage.get_blob(download_meta)
     headers = {
         'Content-Type': mimetype,
     }
