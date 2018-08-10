@@ -8,6 +8,8 @@ cache:
   - node_modules
 addons:
   apt:
+    conifig:
+      retries: true
     packages:
     - oracle-java8-set-default
     - bsdtar
