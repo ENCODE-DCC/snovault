@@ -1,3 +1,6 @@
+1.0.15
+1. SNO-48-add-embed-cache-to-ini (#127)
+
 1.0.14
 1. SNO-45 Increase embed_capacity (#123)
 
