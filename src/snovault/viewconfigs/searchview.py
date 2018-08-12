@@ -12,10 +12,12 @@ from snovault.helpers.helper import (
     set_filters,
     set_facets,
     iter_long_json,
+    format_facets,
+    search_result_actions,
     format_results,
     get_pagination,
     prepare_search_term,
-    normalize_query
+    normalize_query,
 )
 
 audit_facets = [
@@ -25,12 +27,16 @@ audit_facets = [
     ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
 ]
 
+DEFAULT_DOC_TYPES = [
+    'Lab'
+]
+
 class SearchView(BaseView):
-    def __init__(self, context, request, search_type=None, return_generator=False, default_data_types=['lot']):
+    def __init__(self, context, request, search_type=None, return_generator=False, default_data_types=None):
         super(SearchView, self).__init__(context, request)
         self.search_type = search_type
         self.return_generator = return_generator
-        self.default_data_types = default_data_types
+        self.default_data_types = default_data_types or DEFAULT_DOC_TYPES
 
     def set_facets(self):
         if len(self.doc_types) == 1 and 'facets' in self.types[self.doc_types[0]].schema:
@@ -223,11 +229,10 @@ class SearchView(BaseView):
         result['total'] = total = es_results['hits']['total']
 
         schemas = (types[item_type].schema for item_type in doc_types)
-        # result['facets'] = format_facets(
-            # es_results, facets, used_filters, schemas, total, self.principals)
+        result['facets'] = format_facets(es_results, facets, used_filters, schemas, total, self.principals)
 
         # Add batch actions
-        # result.update(search_result_actions(request, doc_types, es_results))
+        result.update(search_result_actions(self.request, doc_types, es_results))
 
 
         # Add all link for collections

@@ -1,3 +1,16 @@
+1.0.15
+1. SNO-48-add-embed-cache-to-ini (#127)
+
+1.0.14
+1. SNO-45 Increase embed_capacity (#123)
+
+1.0.13
+1. SNO-46 Remove unused search type arg (#122)
+2. SNO-43 Clean up snovault startup (#116)
+
+1.0.12
+1. SNO-42 Check call count explicitly (#118)
+
 1.0.11
 01. SNO-41-put-validator-accession (#112)
 

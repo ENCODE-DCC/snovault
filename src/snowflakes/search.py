@@ -8,7 +8,7 @@ from snovault import (
     AbstractCollection,
     TYPES,
 )
-from snovault.viewconfigs.searchpageview import SearchPageView
+from snovault.viewconfigs.searchview import SearchView
 from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.resource_views import collection_view_listing_db
@@ -60,7 +60,7 @@ DEFAULT_DOC_TYPES = [
 
 @view_config(route_name='search', request_method='GET', permission='search')
 def search(context, request, search_type=None, return_generator=False):
-    search = SearchPageView(context, request, search_type. return_generator)
+    search = SearchView(context, request, search_type, return_generator, DEFAULT_DOC_TYPES)
     return search.preprocess_view()
 
 def iter_search_results(context, request):
