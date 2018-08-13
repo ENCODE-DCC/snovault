@@ -484,56 +484,6 @@ def format_facets(es_results, facets, used_filters, schemas, total, principals):
 
     return result
 
-def search_result_actions(request, doc_types, es_results, position=None):
-    actions = {}
-    aggregations = es_results['aggregations']
-
-    # generate batch hub URL for experiments
-    # TODO we could enable them for Datasets as well here, but not sure how well it will work
-    if doc_types == ['Experiment'] or doc_types == ['Annotation']:
-        viz = {}
-        for bucket in aggregations['assembly']['assembly']['buckets']:
-            if bucket['doc_count'] > 0:
-                assembly = bucket['key']
-                if assembly in viz:  # mm10 and mm10-minimal resolve to the same thing
-                    continue
-                search_params = request.query_string.replace('&', ',,')
-                if not request.params.getall('assembly') \
-                or assembly in request.params.getall('assembly'):
-                    # filter  assemblies that are not selected
-                    hub_url = request.route_url('batch_hub',search_params=search_params,
-                                                txt='hub.txt')
-                    browser_urls = {}
-                    pos = None
-                    if 'region-search' in request.url and position is not None:
-                        pos = position
-                    ucsc_url = vis_format_url("ucsc", hub_url, assembly, pos)
-                    if ucsc_url is not None:
-                        browser_urls['UCSC'] = ucsc_url
-                    ensembl_url = vis_format_url("ensembl", hub_url, assembly, pos)
-                    if ensembl_url is not None:
-                        browser_urls['Ensembl'] = ensembl_url
-                    if browser_urls:
-                        viz[assembly] = browser_urls
-                        #actions.setdefault('visualize_batch', {})[assembly] = browser_urls  # formerly 'batch_hub'
-        if viz:
-            actions.setdefault('visualize_batch',viz)
-
-    # generate batch download URL for experiments
-    # TODO we could enable them for Datasets as well here, but not sure how well it will work
-    # batch download disabled for region-search results
-    if '/region-search/' not in request.url:
-        #if (doc_types == ['Experiment'] or doc_types == ['Annotation']) and any(
-        if (doc_types == ['Experiment']) and any(
-                bucket['doc_count'] > 0
-                for bucket in aggregations['files-file_type']['files-file_type']['buckets']):
-            actions['batch_download'] = request.route_url(
-                'batch_download',
-                search_params=request.query_string
-            )
-
-    return actions
-
 
 def format_results(request, hits, result=None):
     """
