@@ -74,10 +74,6 @@ class CachedModel(object):
         return self.source['uuid']
 
     @property
-    def tid(self):
-        return self.source['tid']
-
-    @property
     def sid(self):
         return self.source.get('sid')
 

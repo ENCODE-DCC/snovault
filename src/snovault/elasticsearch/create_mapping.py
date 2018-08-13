@@ -401,10 +401,6 @@ def es_mapping(mapping):
                 'type': 'text',
                 'include_in_all': False,
             },
-            'tid': {
-                'type': 'text',
-                'include_in_all': False,
-            },
             'sid': {
                 'type': 'long',
                 'include_in_all': False,

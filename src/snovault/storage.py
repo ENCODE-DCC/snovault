@@ -32,7 +32,6 @@ from .interfaces import (
     STORAGE,
 )
 import boto3
-import transaction
 import uuid
 
 
@@ -415,13 +414,7 @@ class PropertySheet(Base):
                  nullable=False)
     name = Column(types.String, nullable=False)
     properties = Column(JSON)
-    tid = Column(UUID,
-                 ForeignKey('transactions.tid',
-                            deferrable=True,
-                            initially='DEFERRED'),
-                 nullable=False)
     resource = orm.relationship('Resource')
-    transaction = orm.relationship('TransactionRecord')
 
 
 class CurrentPropertySheet(Base):
@@ -502,11 +495,6 @@ class Resource(Base):
         return self.rid
 
     @property
-    def tid(self):
-        tids = (str(self.data[k].propsheet.tid) for k in self.data.keys())
-        return ','.join(sorted(set(tids)))
-
-    @property
     def sid(self):
         """
         In some cases there may be more than one sid, but we care about the
@@ -524,20 +512,6 @@ class Blob(Base):
     __tablename__ = 'blobs'
     blob_id = Column(UUID, primary_key=True)
     data = Column(types.LargeBinary)
-
-
-class TransactionRecord(Base):
-    __tablename__ = 'transactions'
-    order = Column(types.Integer, autoincrement=True, primary_key=True)
-    tid = Column(UUID, default=uuid.uuid4, nullable=False, unique=True)
-    data = Column(JSON)
-    timestamp = Column(
-        types.DateTime(timezone=True), nullable=False, server_default=func.now())
-    # A server_default is necessary for the notify_ddl overwrite to work
-    xid = Column(types.BigInteger, nullable=True, server_default=null())
-    __mapper_args__ = {
-        'eager_defaults': True,
-    }
 
 
 # User specific stuff
@@ -582,107 +556,10 @@ class User(Base):
         if not user:
             return False
         return crypt.check(user.password, password)
-notify_ddl = DDL("""
-    ALTER TABLE %(table)s ALTER COLUMN "xid" SET DEFAULT txid_current();
-    CREATE OR REPLACE FUNCTION snovault_transaction_notify() RETURNS trigger AS $$
-    DECLARE
-    BEGIN
-        PERFORM pg_notify('snovault.transaction', NEW.xid::TEXT);
-        RETURN NEW;
-    END;
-    $$ LANGUAGE plpgsql;
-
-    CREATE TRIGGER snovault_transactions_insert AFTER INSERT ON %(table)s
-    FOR EACH ROW EXECUTE PROCEDURE snovault_transaction_notify();
-""")
-
-event.listen(
-    TransactionRecord.__table__, 'after_create',
-    notify_ddl.execute_if(dialect='postgresql'),
-)
-
-
-@event.listens_for(PropertySheet, 'before_insert')
-def set_tid(mapper, connection, target):
-    if target.tid is not None:
-        return
-    txn = transaction.get()
-    data = txn._extension
-    target.tid = data['tid']
 
 
 def register(DBSession):
-    event.listen(DBSession, 'before_flush', add_transaction_record)
-    event.listen(DBSession, 'before_commit', record_transaction_data)
-    event.listen(DBSession, 'after_begin', set_transaction_isolation_level)
-
-
-def add_transaction_record(session, flush_context, instances):
-    txn = transaction.get()
-    # Set data with txn.setExtendedInfo(name, value)
-    data = txn._extension
-    record = data.get('_snovault_transaction_record')
-    if record is not None:
-        if orm.object_session(record) is None:
-            # Savepoint rolled back
-            session.add(record)
-        # Transaction has already been recorded
-        return
-
-    tid = data['tid'] = uuid.uuid4()
-    record = TransactionRecord(tid=tid)
-    data['_snovault_transaction_record'] = record
-    session.add(record)
-
-
-def record_transaction_data(session):
-    txn = transaction.get()
-    data = txn._extension
-    if '_snovault_transaction_record' not in data:
-        return
-
-    record = data['_snovault_transaction_record']
-
-    # txn.note(text)
-    if txn.description:
-        data['description'] = txn.description
-
-    # txn.setUser(user_name, path='/') -> '/ user_name'
-    # Set by pyramid_tm as (userid, '')
-    if txn.user:
-        user_path, userid = txn.user.split(' ', 1)
-        data['userid'] = userid
-
-    record.data = {k: v for k, v in data.items() if not k.startswith('_')}
-    session.add(record)
-
-
-_set_transaction_snapshot = text(
-    "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY;"
-    "SET TRANSACTION SNAPSHOT :snapshot_id;"
-)
-
-
-def set_transaction_isolation_level(session, sqla_txn, connection):
-    ''' Set appropriate transaction isolation level.
-
-    Doomed transactions can be read-only.
-    ``transaction.doom()`` must be called before the connection is used.
-
-    Othewise assume it is a write which must be REPEATABLE READ.
-    '''
-    if connection.engine.url.drivername != 'postgresql':
-        return
-
-    txn = transaction.get()
-    if not txn.isDoomed():
-        # connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;")
-        return
-
-    data = txn._extension
-    if 'snapshot_id' in data:
-        connection.execute(
-            _set_transaction_snapshot,
-            snapshot_id=data['snapshot_id'])
-    else:
-        connection.execute("SET TRANSACTION READ ONLY;")
+    """
+    Previously, with a Transaction table, this function registered listeners
+    """
+    pass

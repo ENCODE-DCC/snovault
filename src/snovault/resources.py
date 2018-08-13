@@ -249,10 +249,6 @@ class Item(Resource):
         return self.model.uuid
 
     @property
-    def tid(self):
-        return self.model.tid
-
-    @property
     def sid(self):
         return self.model.sid
 

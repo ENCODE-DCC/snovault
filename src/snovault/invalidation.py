@@ -40,6 +40,6 @@ def add_to_indexing_queue(success, request, item, edit_or_add):
         except Exception as e:
             error_msg = repr(e)
     else:
-        error_msg = 'Transaction not successful! %s not queued for method %s.' % (str(item), edit_or_add)
+        error_msg = 'Queueing not successful! %s not queued for method %s.' % (str(item), edit_or_add)
     if error_msg:
         log.error('___Error queueing %s for indexing. Error: %s' % (str(item), error_msg))
