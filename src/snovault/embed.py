@@ -20,7 +20,7 @@ def includeme(config):
     config.add_request_method(embed, 'embed')
     config.add_request_method(embed, 'invoke_view')
     config.add_request_method(lambda request: set(), '_embedded_uuids', reify=True)
-    config.add_request_method(lambda request: set(), '_rev_linked_uuids', reify=True)
+    config.add_request_method(lambda request: {}, '_rev_linked_uuids_by_item', reify=True)
     config.add_request_method(lambda request: False, '_indexing_view', reify=True)
     config.add_request_method(lambda request: None, '__parent__', reify=True)
 
@@ -64,7 +64,7 @@ def embed(request, *elements, **kw):
     # as_user controls whether or not the embed_cache is used
     # if request._indexing_view is True, always use the cache
     if as_user is not None and not request._indexing_view:
-        result, embedded_uuids, rev_linked_uuids = _embed(request, path, as_user)
+        result, embedded_uuids, rev_linked_uuids_by_item = _embed(request, path, as_user)
     else:
         cached = embed_cache.get(path, None)
         if cached is None:
@@ -73,10 +73,16 @@ def embed(request, *elements, **kw):
             cached = _embed(request, path, as_user=subreq_user)
             # caching audits is safe because they don't add to embedded_uuids
             embed_cache[path] = cached
-        result, embedded_uuids, rev_linked_uuids = cached
+        result, embedded_uuids, rev_linked_uuids_by_item = cached
         result = deepcopy(result)
     request._embedded_uuids.update(embedded_uuids)
-    request._rev_linked_uuids.update(rev_linked_uuids)
+    # this is required because rev_linked_uuids_by_item is formatted as
+    # a dict keyed by item with value of set of uuids rev linking to that item
+    for item, rev_links in rev_linked_uuids_by_item.items():
+        if item in request._rev_linked_uuids_by_item:
+            request._rev_linked_uuids_by_item[item].update(rev_links)
+        else:
+            request._rev_linked_uuids_by_item[item] = rev_links
     return result
 
 
@@ -101,7 +107,7 @@ def _embed(request, path, as_user='EMBED'):
         result = request.invoke_subrequest(subreq)
     except HTTPNotFound:
         raise KeyError(path)
-    return result, subreq._embedded_uuids, subreq._rev_linked_uuids
+    return result, subreq._embedded_uuids, subreq._rev_linked_uuids_by_item
 
 
 class NullRenderer:

@@ -202,15 +202,18 @@ def get_linking_items(context, request, render=None):
     """
     Utilize find_uuids_linked_to_item function in PickStorage to find
     any items that link to the given item context
+    Split the answer into linkTos and rev_links
     """
     item_uuid = str(context.uuid)
-    links = request.registry[STORAGE].find_uuids_linked_to_item(item_uuid)
+    link_tos = request.registry[STORAGE].find_uuids_linked_to_item(item_uuid, skip_rev=True)
+    rev_links = request.registry[STORAGE].find_uuids_linked_to_item(item_uuid, skip_link=True)
     request.response.status = 200
     result = {
         'status': 'success',
         '@type': ['result'],
         'notification' : '%s items have links to %s' % (len(links), item_uuid),
-        'links': links
+        'uuids_linking_to': link_tos,
+        'uuids_rev_linking_to': rev_links
     }
     return result
 

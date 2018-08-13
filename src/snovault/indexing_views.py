@@ -68,11 +68,18 @@ def item_index_data(context, request):
     embedded = request.invoke_view(path, '@@embedded')
     # get _embedded and _rev_linked uuids from the request before
     # the @@audit views add to them
+    if request._rev_linked_uuids_by_item:
+        import pdb; pdb.set_trace()
     embedded_uuids = sorted(request._embedded_uuids.copy())
-    rev_linked_uuids = sorted(request._rev_linked_uuids.copy())
+    rev_linked_uuids = sorted(request._rev_linked_uuids_by_item.get(uuid, set()))
+    # find uuids traversed that rev link to this item
+    rev_linked_to_me = sorted(set([id for id in request._rev_linked_uuids_by_item
+                                   if uuid in request._rev_linked_uuids_by_item[id]]))
+    sorted(request._rev_linked_uuids_by_item.copy())
     audit = request.invoke_view(path, '@@audit')['audit']
     obj = request.invoke_view(path, '@@object')
-
+    print('\n\n%s\nembedded: %s\nrev linked: %s\nrev linked to me: %s\n\n'
+          % (obj['@id'], len(embedded_uuids), len(rev_linked_uuids), len(rev_linked_to_me)))
     document = {
         'audit': audit,
         'embedded': embedded,
@@ -92,6 +99,7 @@ def item_index_data(context, request):
         'tid': context.tid,
         'unique_keys': unique_keys,
         'uuid': uuid,
+        'uuids_rev_linked_to_me': rev_linked_to_me
     }
 
     return document

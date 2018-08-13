@@ -156,21 +156,23 @@ class Indexer(object):
         return messages, target_queue
 
 
-    def find_and_queue_secondary_items(self, source_uuids, rev_link_uuids, telemetry_id=None):
+    def find_and_queue_secondary_items(self, source_uuids, rev_linked_uuids, telemetry_id=None):
         """
-        Should be used when strict is False
-        Find all associated uuids of the given set of uuid using ES and queue
-        them in the secondary queue.
-        Add rev_link_uuids after find secondary uuids (they are "strict")
+        Find all associated uuids of the given set of  non-strict uuids using ES
+        and queue them in the secondary queue. Associated uuids include uuids
+        that linkTo or are rev_linked to a given item.
+        Add rev_linked_uuids found from @@indexing-view after finding
+        secondary uuids (they are "strict")
         """
-        if source_uuids:
-            associated_uuids = find_uuids_for_indexing(self.registry, source_uuids, log)
-            associated_uuids |= rev_link_uuids
-            # remove already indexed primary uuids used to find them
-            secondary_uuids = list(associated_uuids - source_uuids)
-        else:
-            secondary_uuids = rev_link_uuids
-
+        # find_uuids_for_indexing() will return items linking to and items
+        # rev_linking to this item currently in ES (find old rev_links)
+        associated_uuids = find_uuids_for_indexing(self.registry, source_uuids, log)
+        # update this with rev_links found from @@indexing-view (includes new rev_links)
+        associated_uuids |= rev_linked_uuids
+        # remove already indexed primary uuids used to find them
+        secondary_uuids = list(associated_uuids - source_uuids)
+        print('\nfound and queued: %s' % len(secondary_uuids))
+        # items queued through this function are ALWAYS strict in secondary queue
         return self.queue.add_uuids(self.registry, secondary_uuids, strict=True,
                                     target_queue='secondary', telemetry_id=telemetry_id)
 
@@ -183,7 +185,7 @@ class Indexer(object):
         # hold uuids that will be used to find secondary uuids
         non_strict_uuids = set()
         # hold the reverse-linked uuids that need to be invalidated
-        rev_link_uuids = set()
+        rev_linked_uuids = set()
         to_delete = []  # hold messages that will be deleted
         # only check deferred queue on the first run, since there shouldn't
         # be much in there at any given point
@@ -195,7 +197,6 @@ class Indexer(object):
                 msg_uuid= msg_body['uuid']
                 msg_sid = msg_body['sid']
                 msg_curr_time = msg_body['timestamp']
-                msg_method = msg_body.get('method')
                 msg_detail = msg_body.get('detail')
                 msg_telemetry = msg_body.get('telemetry_id')
 
@@ -207,15 +208,18 @@ class Indexer(object):
                     continue
                 if msg_body['strict'] is False:
                     non_strict_uuids.add(msg_uuid)
-                # keep track of _embedded_uuids from a POST
-                if msg_method == 'POST':
-                    error = self.update_object(request, msg_uuid, sid=msg_sid,
-                        curr_time=msg_curr_time, target_queue=target_queue,
-                        add_to_secondary=rev_link_uuids, telemetry_id=msg_telemetry)
+                # build the object and index into ES
+                # if strict==True, do not add uuids rev_linking to item to queue
+                if msg_body['strict'] is True:
+                    error = self.update_object(request, msg_uuid, None,
+                                               sid=msg_sid, curr_time=msg_curr_time,
+                                               target_queue=target_queue,
+                                               telemetry_id=msg_telemetry)
                 else:
-                    error = self.update_object(request, msg_uuid, sid=msg_sid,
-                        curr_time=msg_curr_time, target_queue=target_queue,
-                        add_to_secondary=None, telemetry_id=msg_telemetry)
+                    error = self.update_object(request, msg_uuid, rev_linked_uuids,
+                                               sid=msg_sid, curr_time=msg_curr_time,
+                                               target_queue=target_queue,
+                                               telemetry_id=msg_telemetry)
                 if error:
                     if error.get('error_message') == 'deferred_retry':
                         # send this to the deferred queue
@@ -237,15 +241,19 @@ class Indexer(object):
                     self.queue.delete_messages(to_delete, target_queue=target_queue)
                     to_delete = []
             # add to secondary queue, if applicable
-            # reset uuid tracking after adding
-            if non_strict_uuids or rev_link_uuids:
-                queued, failed = self.find_and_queue_secondary_items(non_strict_uuids, rev_link_uuids, msg_telemetry)
+            # search for all items that linkTo the non-strict items or contain
+            # a rev_link to to them
+            # reset uuid tracking (non_strict_uuids and rev_linked_uuids) after
+            if non_strict_uuids or rev_linked_uuids:
+                queued, failed = self.find_and_queue_secondary_items(non_strict_uuids,
+                                                                     rev_linked_uuids,
+                                                                     msg_telemetry)
                 if failed:
                     error_msg = 'Failure(s) queueing secondary uuids: %s' % str(failed)
                     log.error('INDEXER: ', error=error_msg)
                     errors.append({'error_message': error_msg})
                 non_strict_uuids = set()
-                rev_link_uuids = set()
+                rev_linked_uuids = set()
             prev_target_queue = target_queue
             messages, target_queue = self.get_messages_from_queue(skip_deferred=True)
             # if we have switched between primary and secondary queues, delete
@@ -263,10 +271,12 @@ class Indexer(object):
         """
         Used with sync uuids (simply loop through)
         sync_uuids is a list of string uuids. Use timestamp of index run
+        all uuids behave here as strict == true
         """
         errors = []
         for i, uuid in enumerate(sync_uuids):
-            error = self.update_object(request, uuid)
+            # add_to_secondary = None here since invalidation is not used
+            error = self.update_object(request, uuid, None)
             if error is not None:  # don't increment counter on an error
                 errors.append(error)
             elif counter:
@@ -274,14 +284,14 @@ class Indexer(object):
         return errors
 
 
-    def update_object(self, request, uuid, sid=None, curr_time=None,
-                      target_queue=None, add_to_secondary=None, telemetry_id=None):
+    def update_object(self, request, uuid, add_to_secondary=None, sid=None,
+                      curr_time=None, target_queue=None, telemetry_id=None):
         """
         Actually index the uuid using the index-data view.
+        add_to_secondary is a set that gets the _rev_linked_uuids
+        from the request.embed(/<uuid>/@@index-data)
         target_queue is an optional string queue name:
             'primary', 'secondary', or 'deferred'
-        add_to_secondary is an optional set. If provided, the _rev_linked_uuids
-        from the request.embed(/<uuid>/@@index-data) will be added to the set.
         """
 
         # logging constant
@@ -307,7 +317,7 @@ class Indexer(object):
             result = request.embed(index_data_query, as_user='INDEXER')
             duration = timer() - start
             log.bind(collection=result.get('item_type'))
-            log.info("time to embed", duration=duration, cat="embed time")
+            # log.info("time to embed", duration=duration, cat="embed time")
         except SidException as e:
             duration = timer() - start
             log.warning('Invalid sid found', duration=duration, cat=cat)
@@ -327,6 +337,11 @@ class Indexer(object):
             duration = timer() - start
             log.error('Error rendering @@index-data', duration=duration, exc_info=True, cat=cat)
             return {'error_message': repr(e), 'time': curr_time, 'uuid': str(uuid)}
+        # add found uuids that rev_link this item to be put in the secondary queue
+        # find_and_queue_secondary_items() serves to find rev_linking items that
+        # are currently in ES; this will pick up new rev links as well
+        if add_to_secondary is not None:
+            add_to_secondary.update(result['uuids_rev_linked_to_me'])
 
         last_exc = None
         for backoff in [0, 1, 2]:
@@ -353,10 +368,8 @@ class Indexer(object):
                 last_exc = repr(e)
                 break
             else:
-                if add_to_secondary is not None:
-                    add_to_secondary.update(result['rev_linked_uuids'])
                 duration = timer() - start
-                log.info('update object success', duration=duration, cat=cat)
+                # log.info('update object success', duration=duration, cat=cat)
                 return
 
         return {'error_message': last_exc, 'time': curr_time, 'uuid': str(uuid)}

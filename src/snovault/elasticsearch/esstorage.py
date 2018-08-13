@@ -131,7 +131,9 @@ class PickStorage(object):
         present
         """
         linked_info = []
-        uuids_linking_to_item = find_uuids_for_indexing(self.registry, set([rid]))
+        # we only care about linkTos the item and not reverse links here
+        uuids_linking_to_item = find_uuids_for_indexing(self.registry, set([rid]),
+                                                        skip_revs=True)
         # remove the item itself from the list
         uuids_linking_to_item = uuids_linking_to_item - set([rid])
         if len(uuids_linking_to_item) > 0:
@@ -162,9 +164,11 @@ class PickStorage(object):
             raise HTTPLocked(detail="Cannot purge item as other items still link to it",
                              comment=uuids_linking_to_item)
 
-        self.write.purge_uuid(rid)                  # Deletes from RDB
+        self.write.purge_uuid(rid)  # Deletes from RDB
+        # queue related items for reindexing
+        self.registry[INDEXER].find_and_queue_secondary_items(set(rid), set())
         try:
-            self.read.purge_uuid(rid, item_type)    # Deletes from ES
+            self.read.purge_uuid(rid, item_type)  # Deletes from ES
         except elasticsearch.exceptions.NotFoundError:
             # Case: Not yet indexed
             print('Couldn\'t find ' + rid + ' in ElasticSearch. Continuing.')

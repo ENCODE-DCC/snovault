@@ -23,8 +23,6 @@ def add_to_indexing_queue(success, request, item, edit_or_add):
         try:
             # use strict mode if the item was added
             item['strict'] = edit_or_add == 'add'
-            # add the type of request used to make the uuid
-            item['method'] = 'POST' if item['strict'] else 'PATCH'
             item['timestamp'] = datetime.datetime.utcnow().isoformat()
             indexer_queue = request.registry.get(INDEXER_QUEUE)
             indexer_queue_mirror = request.registry.get(INDEXER_QUEUE_MIRROR)

@@ -4,15 +4,20 @@ from elasticsearch.helpers import scan
 import time
 
 
-def find_uuids_for_indexing(registry, updated, log=None):
+def find_uuids_for_indexing(registry, updated, log=None,
+                            skip_links=False, skip_revs=False):
     """
-    Run a search to find uuids of objects with that contain the given updated
-    uuids either in their embedded_uuids.
-    Uses elasticsearch.helpers.scan to iterate through ES results
+    Run a search to find uuids of objects with that contain the given set of
+    updated uuids either in their embedded_uuids or rev_linked_uuids.
+    Uses elasticsearch.helpers.scan to iterate through ES results.
+    If skip_links==True, do not report uuids that linkTo <updated>
+    If skips_rev==True, do not report uuids to that reverse link to <updated>
     Returns a set containing original uuids and the found uuids (INCLUDING
     uuids that were passed into this function)
     """
     es = registry[ELASTIC_SEARCH]
+    use_links = [] if skip_links else list(updated)
+    use_revs = [] if skip_revs else list(updated)
     scan_query = {
         'query': {
             'bool': {
@@ -21,16 +26,22 @@ def find_uuids_for_indexing(registry, updated, log=None):
                         'should': [
                             {
                                 'terms': {
-                                    'embedded_uuids': list(updated),
+                                    'embedded_uuids': use_links,
                                     '_cache': False,
-                                },
+                                }
                             },
-                        ],
-                    },
-                },
-            },
+                            {
+                                'terms': {
+                                    'rev_linked_uuids': use_revs,
+                                    '_cache': False,
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
         },
-        '_source': False,
+        '_source': False
     }
     results = scan(es, index='_all', query=scan_query)
     invalidated = {res['_id'] for res in results}

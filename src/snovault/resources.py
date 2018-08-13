@@ -268,13 +268,18 @@ class Item(Resource):
         Requires a request; if request._indexing view, add these uuids
         to request._rev_linked_uuids, which controls invalidation of rev-linked
         items
+        _rev_linked_uuids is a list of dictionaries in form:
+        {<item uuid originating rev link>: <item uuid that is rev linked to>}
         """
         types = self.registry[TYPES]
         type_name, rel = self.rev[name]
         types = types[type_name].subtypes
         uuids = self.registry[CONNECTION].get_rev_links(self.model, rel, *types)
         if getattr(request, '_indexing_view', False) is True:
-            request._rev_linked_uuids.update(uuids)
+            if str(self.uuid) in request._rev_linked_uuids_by_item:
+                request._rev_linked_uuids_by_item[str(self.uuid)].update([str(id) for id in uuids])
+            else:
+                request._rev_linked_uuids_by_item[str(self.uuid)] = set([str(id) for id in uuids])
         return uuids
 
     def unique_keys(self, properties):
