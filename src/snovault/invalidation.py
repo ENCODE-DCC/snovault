@@ -14,15 +14,15 @@ def add_to_indexing_queue(success, request, item, edit_or_add):
     addAfterCommitHook.
     item arg is a dict: {'uuid': <item uuid>, 'sid': <item sid>}
     See item_edit and collection_add in .crud_view.py.
-    edit_or_add is a string with value 'edit' or 'add'. If 'add', the item
-    will be queued with strict indexing (no secondary items indexed).
-    Otherwise, secondary items will also be queued.
+    edit_or_add is a string with value 'edit' or 'add'.
+    Queue item with strict=False so that secondary items and new rev links
+    are also indexed
     """
     error_msg = None
     if success:  # only queue if the transaction is successful
         try:
-            # use strict mode if the item was added
-            item['strict'] = edit_or_add == 'add'
+            item['strict'] = False
+            item['method'] = 'POST' if edit_or_add == 'add' else 'PATCH'
             item['timestamp'] = datetime.datetime.utcnow().isoformat()
             indexer_queue = request.registry.get(INDEXER_QUEUE)
             indexer_queue_mirror = request.registry.get(INDEXER_QUEUE_MIRROR)
@@ -40,6 +40,6 @@ def add_to_indexing_queue(success, request, item, edit_or_add):
         except Exception as e:
             error_msg = repr(e)
     else:
-        error_msg = 'Queueing not successful! %s not queued for method %s.' % (str(item), edit_or_add)
+        error_msg = 'DB transaction not successful! %s not queued for method %s.' % (str(item), edit_or_add)
     if error_msg:
         log.error('___Error queueing %s for indexing. Error: %s' % (str(item), error_msg))

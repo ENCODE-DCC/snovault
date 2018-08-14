@@ -171,7 +171,6 @@ class Indexer(object):
         associated_uuids |= rev_linked_uuids
         # remove already indexed primary uuids used to find them
         secondary_uuids = list(associated_uuids - source_uuids)
-        print('\nfound and queued: %s' % len(secondary_uuids))
         # items queued through this function are ALWAYS strict in secondary queue
         return self.queue.add_uuids(self.registry, secondary_uuids, strict=True,
                                     target_queue='secondary', telemetry_id=telemetry_id)

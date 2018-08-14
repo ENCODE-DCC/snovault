@@ -13,8 +13,6 @@ def find_uuids_for_indexing(registry, updated, log=None):
     uuids that were passed into this function)
     """
     es = registry[ELASTIC_SEARCH]
-    use_links = [] if skip_links else list(updated)
-    use_revs = [] if skip_revs else list(updated)
     scan_query = {
         'query': {
             'bool': {
@@ -23,7 +21,7 @@ def find_uuids_for_indexing(registry, updated, log=None):
                         'should': [
                             {
                                 'terms': {
-                                    'linked_uuids': use_links,
+                                    'linked_uuids': list(updated),
                                     '_cache': False,
                                 }
                             }
