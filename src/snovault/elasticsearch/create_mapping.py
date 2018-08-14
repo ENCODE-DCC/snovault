@@ -438,11 +438,7 @@ def es_mapping(mapping):
                     }
                 }
             },
-            'embedded_uuids': {
-                'type': 'text',
-                'include_in_all': False
-            },
-            'rev_linked_uuids': {
+            'linked_uuids': {
                 'type': 'text',
                 'include_in_all': False
             },

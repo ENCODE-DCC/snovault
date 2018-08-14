@@ -4,14 +4,11 @@ from elasticsearch.helpers import scan
 import time
 
 
-def find_uuids_for_indexing(registry, updated, log=None,
-                            skip_links=False, skip_revs=False):
+def find_uuids_for_indexing(registry, updated, log=None):
     """
     Run a search to find uuids of objects with that contain the given set of
-    updated uuids either in their embedded_uuids or rev_linked_uuids.
+    updated uuids in their linked_uuids.
     Uses elasticsearch.helpers.scan to iterate through ES results.
-    If skip_links==True, do not report uuids that linkTo <updated>
-    If skips_rev==True, do not report uuids to that reverse link to <updated>
     Returns a set containing original uuids and the found uuids (INCLUDING
     uuids that were passed into this function)
     """
@@ -26,13 +23,7 @@ def find_uuids_for_indexing(registry, updated, log=None,
                         'should': [
                             {
                                 'terms': {
-                                    'embedded_uuids': use_links,
-                                    '_cache': False,
-                                }
-                            },
-                            {
-                                'terms': {
-                                    'rev_linked_uuids': use_revs,
+                                    'linked_uuids': use_links,
                                     '_cache': False,
                                 }
                             }

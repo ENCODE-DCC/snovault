@@ -161,8 +161,8 @@ class Indexer(object):
         Find all associated uuids of the given set of  non-strict uuids using ES
         and queue them in the secondary queue. Associated uuids include uuids
         that linkTo or are rev_linked to a given item.
-        Add rev_linked_uuids found from @@indexing-view after finding
-        secondary uuids (they are "strict")
+        Add rev_linked_uuids linking to source items found from @@indexing-view
+        after finding secondary uuids (they are "strict")
         """
         # find_uuids_for_indexing() will return items linking to and items
         # rev_linking to this item currently in ES (find old rev_links)
@@ -288,7 +288,7 @@ class Indexer(object):
                       curr_time=None, target_queue=None, telemetry_id=None):
         """
         Actually index the uuid using the index-data view.
-        add_to_secondary is a set that gets the _rev_linked_uuids
+        add_to_secondary is a set that gets the uuids_rev_linked_to_me
         from the request.embed(/<uuid>/@@index-data)
         target_queue is an optional string queue name:
             'primary', 'secondary', or 'deferred'

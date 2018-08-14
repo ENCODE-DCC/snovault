@@ -387,7 +387,7 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
     assert doc_count_target == 1
     assert doc_count_ppp == 1
     # indexing the source will also reindex the target and the ppp
-    # since all embedded_uuids in an item are queued along with its POST
+    # since all linked_uuids in an item are queued along with its POST
     source_res = testapp.post_json('/testing-link-sources-sno/', source, status=201)
     source_uuid = source_res.json['@graph'][0]['uuid']
     time.sleep(2)

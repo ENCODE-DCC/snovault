@@ -262,9 +262,9 @@ class Item(Resource):
         """
         Return all rev links for this item under field with <name>
         Requires a request; if request._indexing view, add these uuids
-        to request._rev_linked_uuids, which controls invalidation of rev-linked
-        items
-        _rev_linked_uuids is a list of dictionaries in form:
+        to request._rev_linked_uuids_by_item, which controls invalidation of
+        newly created rev links.
+        _rev_linked_uuids_by_item is a list of dictionaries in form:
         {<item uuid originating rev link>: <item uuid that is rev linked to>}
         """
         types = self.registry[TYPES]
@@ -318,9 +318,9 @@ class Item(Resource):
         for path in self.type_info.schema_links:
             uuid_to_path(request, properties, path)
 
-        # if indexing, add the uuid of this object to request._embedded_uuids
+        # if indexing, add the uuid of this object to request._linked_uuids
         if getattr(request, '_indexing_view', False) is True:
-            request._embedded_uuids.add(str(self.uuid))
+            request._linked_uuids.add(str(self.uuid))
         return properties
 
     def __resource_url__(self, request, info):

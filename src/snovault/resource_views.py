@@ -132,7 +132,7 @@ def item_view_object(context, request):
     of only one item. The steps to generate it are:
     1. Fetch stored properties, possibly upgrading.
     2. Link canonicalization (overwriting uuids.) with item_with_links
-       - adds uuid to request._embedded_uuids if request._indexing_view
+       - adds uuid to request._linked_uuids if request._indexing_view
     3. Calculated properties
     """
     properties = context.item_with_links(request)
