@@ -348,9 +348,9 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
     assert doc_count == 2
 
 
-def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
+def test_queue_indexing_with_linked(app, testapp, indexer_testapp):
     """
-    When an item is POSTed, queue up all its embedded uuids for indexing
+    When an item is POSTed, queue up all its linked uuids for indexing
     as well.
     Test indexer_utils.find_uuids_for_indexing here as well
     """
@@ -401,7 +401,7 @@ def test_queue_indexing_with_embedded(app, testapp, indexer_testapp):
         time.sleep(4)
         doc_count = es.count(index='testing_link_source_sno', doc_type='testing_link_source_sno').get('count')
     assert doc_count == 1
-    # patching json will not queue embedded uuids
+    # patching json will not queue linked uuids
     # the target will be indexed though, since it has a linkTo back to the source
     testapp.patch_json('/testing-link-sources-sno/' + source_uuid, {'name': 'ABC'})
     time.sleep(2)
