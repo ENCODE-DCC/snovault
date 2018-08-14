@@ -73,13 +73,22 @@ def app(app_settings):
     DBSession.bind.pool.dispose()
 
 
-@pytest.fixture(autouse=True)
-def teardown(app):
+@pytest.yield_fixture(autouse=True)
+def setup_and_teardown(app):
+    """
+    Run create mapping and purge queue before tests and clear out the
+    DB tables after the test
+    """
     import transaction
     from sqlalchemy import MetaData
     from zope.sqlalchemy import mark_changed
-    # just run for the TEST_TYPE by default
+    # BEFORE THE TEST - just run CM for the TEST_TYPE by default
     create_mapping.run(app, collections=[TEST_TYPE], skip_indexing=True)
+    app.registry[INDEXER_QUEUE].clear_queue()
+
+    yield  # run the test
+
+    # AFTER THE TEST
     session = app.registry[DBSESSION]
     connection = session.connection().connect()
     meta = MetaData(bind=session.connection(), reflect=True)
@@ -191,7 +200,7 @@ def test_queue_indexing_deferred(app, testapp):
             msg_body = json.loads(msg['Body'])
             assert msg_body['telemetry_id'] == 'test_telem'
         indexer_queue.delete_messages(received, target_queue=target)
-    time.sleep(3)
+    time.sleep(5)
     msg_count = indexer_queue.number_of_messages()
     assert msg_count['primary_waiting'] == 0
     assert msg_count['secondary_waiting'] == 0
@@ -350,10 +359,13 @@ def test_sync_and_queue_indexing(app, testapp, indexer_testapp):
 
 def test_queue_indexing_with_linked(app, testapp, indexer_testapp):
     """
-    When an item is POSTed, queue up all its linked uuids for indexing
-    as well.
-    Test indexer_utils.find_uuids_for_indexing here as well
+    Test a whole bumch of things here:
+    - posting/patching invalidates rev linked items
+    - check linked_uuids/uuids_rev_linked_to_me fields in ES
+    - test indexer_utils.find_uuids_for_indexing fxn
+    - test purge functionality before and after removing links to an item
     """
+    import webtest
     es = app.registry[ELASTIC_SEARCH]
     indexer_queue = app.registry[INDEXER_QUEUE]
     # first, run create mapping with the indices we will use
@@ -386,13 +398,12 @@ def test_queue_indexing_with_linked(app, testapp, indexer_testapp):
         tries += 1
     assert doc_count_target == 1
     assert doc_count_ppp == 1
-    # indexing the source will also reindex the target and the ppp
-    # since all linked_uuids in an item are queued along with its POST
+    # indexing the source will also reindex the target, since it has a reverse link
     source_res = testapp.post_json('/testing-link-sources-sno/', source, status=201)
     source_uuid = source_res.json['@graph'][0]['uuid']
     time.sleep(2)
     res = indexer_testapp.post_json('/index', {'record': True})
-    assert res.json['indexing_count'] == 3
+    assert res.json['indexing_count'] == 2
     time.sleep(2)
     # wait for them to index
     doc_count = es.count(index='testing_link_source_sno', doc_type='testing_link_source_sno').get('count')
@@ -401,22 +412,58 @@ def test_queue_indexing_with_linked(app, testapp, indexer_testapp):
         time.sleep(4)
         doc_count = es.count(index='testing_link_source_sno', doc_type='testing_link_source_sno').get('count')
     assert doc_count == 1
-    # patching json will not queue linked uuids
+    # patching json will not queue the embedded ppp
     # the target will be indexed though, since it has a linkTo back to the source
     testapp.patch_json('/testing-link-sources-sno/' + source_uuid, {'name': 'ABC'})
     time.sleep(2)
     res = indexer_testapp.post_json('/index', {'record': True})
     assert res.json['indexing_count'] == 2
 
+    time.sleep(3)
+    # test linked_uuids and uuids_rev_linked_to_me manually
+    es_source = es.get(index='testing_link_source_sno', doc_type='testing_link_source_sno', id=source['uuid'])
+    assert set(es_source['_source']['linked_uuids']) == {target['uuid'], source['uuid'], ppp_uuid}
+    assert set(es_source['_source']['uuids_rev_linked_to_me']) == {target['uuid']}
+    es_target = es.get(index='testing_link_target_sno', doc_type='testing_link_target_sno', id=target['uuid'])
+    assert source['uuid'] in es_target['_source']['linked_uuids']
+
     # test find_uuids_for_indexing
     to_index = indexer_utils.find_uuids_for_indexing(app.registry, {target['uuid']})
     assert to_index == {target['uuid'], source['uuid']}
     to_index = indexer_utils.find_uuids_for_indexing(app.registry, {ppp_uuid})
     assert to_index == {ppp_uuid, source['uuid']}
+    # this will return the target uuid, since it has an indexed rev link
+    to_index = indexer_utils.find_uuids_for_indexing(app.registry, {source['uuid']})
+    assert to_index == {target['uuid'], source['uuid']}
     # now use a made-up uuid; only result should be itself
     fake_uuid = str(uuid.uuid4())
     to_index = indexer_utils.find_uuids_for_indexing(app.registry, {fake_uuid})
     assert to_index == {fake_uuid}
+
+    # lastly, test purge_uuid and delete functionality
+    with pytest.raises(webtest.AppError) as excinfo:
+        del_res0 = testapp.delete_json('/' + source['uuid'] + '/?purge=True')
+    assert 'Item status must equal deleted before purging' in str(excinfo.value)
+    del_res1 = testapp.delete_json('/' + source['uuid'])
+    assert del_res1.json['status'] == 'success'
+    # this item will still have items linking to it indexing occurs
+    with pytest.raises(webtest.AppError) as excinfo:
+        del_res2 = testapp.delete_json('/' + source['uuid'] + '/?purge=True')
+    assert 'Cannot purge item as other items still link to it' in str(excinfo.value)
+    res = indexer_testapp.post_json('/index', {'record': True})
+    del_res3 = testapp.delete_json('/' + source['uuid'] + '/?purge=True')
+    assert del_res3.json['status'] == 'success'
+    assert del_res3.json['notification'] == 'Permanently deleted ' + source['uuid']
+    time.sleep(3)
+    # make sure everything has updated on ES
+    check_es_source = es.get(index='testing_link_source_sno', doc_type='testing_link_source_sno',
+                             id=source['uuid'], ignore=[404])
+    assert check_es_source['found'] == False
+    check_es_target = es.get(index='testing_link_target_sno', doc_type='testing_link_target_sno',
+                             id=target['uuid'])
+    assert source['uuid'] not in check_es_target['_source']['linked_uuids']
+    # the source is now deleted
+    testapp.get('/' + source['uuid'], status=404)
 
 
 def test_indexing_invalid_sid(app, testapp, indexer_testapp):
@@ -623,7 +670,7 @@ def test_check_and_reindex_existing(app, testapp):
     assert(len(test_uuids)) == 1
 
 
-def test_es_delete_simple(app, testapp, indexer_testapp, session):
+def test_es_purge_uuid(app, testapp, indexer_testapp, session):
     indexer_queue = app.registry[INDEXER_QUEUE]
     es = app.registry[ELASTIC_SEARCH]
     ## Adding new test resource to DB

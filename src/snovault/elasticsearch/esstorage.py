@@ -9,6 +9,7 @@ from pyramid.httpexceptions import (
 from zope.interface import alsoProvides
 from .interfaces import (
     ELASTIC_SEARCH,
+    INDEXER,
     ICachedItem,
 )
 from ..storage import RDBStorage
@@ -138,8 +139,8 @@ class PickStorage(object):
                 linking_dict = self.read.get_by_uuid(linking_uuid).source.get('embedded')
                 linking_property = find_linking_property(linking_dict, rid)
                 linked_info.append({
-                    '@id' : linking_dict['@id'],
-                    'display_title' : linking_dict['display_title'],
+                    '@id' : linking_dict.get('@id', linking_dict['uuid']),
+                    'display_title' : linking_dict.get('display_title', linking_dict['uuid']),
                     'uuid' : linking_uuid,
                     'field' : linking_property or "Not Embedded"
                 })

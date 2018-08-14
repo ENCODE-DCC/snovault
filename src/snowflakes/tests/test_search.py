@@ -1,10 +1,13 @@
 # Use workbook fixture from BDD tests (including elasticsearch)
 # these take far to long to run on travis... I'll turn them off there
-from .features.conftest import app_settings, app, workbook
 import pytest
 import os
-dont_run_on_travis = pytest.mark.skipif(os.environ.get('TRAVIS', False) != False,
-                                        reason='to slow to run on travis')
+on_travis = os.environ.get('TRAVIS', False) != False
+dont_run_on_travis = pytest.mark.skipif(on_travis, reason='to slow to run on travis')
+if not on_travis:
+    from .features.conftest import app_settings, app, workbook
+else:
+    app_settings = app = workbook = None
 
 @dont_run_on_travis
 def test_search_view(workbook, testapp):
