@@ -176,7 +176,7 @@ def test_queue_indexing_deferred(app, testapp):
         'target_queue': 'deferred',
     }
     testapp.post_json('/queue_indexing?telemetry_id=test_telem', deferred_body)
-    time.sleep(3)
+    time.sleep(5)
     msg_count = indexer_queue.number_of_messages()
     assert msg_count['primary_waiting'] == 1
     assert msg_count['secondary_waiting'] == 2
@@ -209,7 +209,7 @@ def test_queue_indexing_after_post_patch(app, testapp):
     msg_body = json.loads(received[0]['Body'])
     assert isinstance(msg_body, dict)
     assert msg_body['uuid'] == post_uuid
-    assert msg_body['strict'] is True
+    assert msg_body['strict'] is False
     assert msg_body['method'] == 'POST'
     assert 'timestamp' in msg_body
     assert 'sid' in msg_body

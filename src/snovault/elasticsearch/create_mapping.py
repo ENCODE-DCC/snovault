@@ -1038,12 +1038,12 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
                     uuids_to_index = find_uuids_for_indexing(registry, uuids_to_index, log)
                 log.error('___SYNC INDEXING WITH STRICT=FALSE MAY CAUSE REV_LINK INCONSISTENCY___')
             log.warning('\n___UUIDS TO INDEX (SYNC)___: %s\n' % count,
-                        cat='uuids to index', count=count)
+                        cat='uuids to index', count=len(uuid_to_index))
             run_indexing(app, uuids_to_index)
         else:
             use_strict = strict or total_reindex
             log.warning('\n___UUIDS TO INDEX (QUEUED)___: %s\n' % count,
-                        cat='uuids to index', count=count)
+                        cat='uuids to index', count=len(uuid_to_index))
             indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=use_strict,
                                     target_queue='secondary', telemetry_id=telemetry_id)
     return timings
