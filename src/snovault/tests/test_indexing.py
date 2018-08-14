@@ -157,10 +157,16 @@ def test_indexer_queue(app):
     assert len(received) == 1
     # finally, delete
     indexer_queue.delete_messages(received)
-    time.sleep(5)
-    msg_count = indexer_queue.number_of_messages()
-    assert msg_count['primary_waiting'] == 0
-    assert msg_count['primary_inflight'] == 0
+    # make sure the queue eventually sorts itself out
+    tries_left = 5
+    while tries_left > 0:
+        msg_count = indexer_queue.number_of_messages()
+        if (msg_count['primary_waiting'] == 0 and
+            msg_count['primary_inflight'] == 0):
+            break
+        tries_left -= 0
+        time.sleep(3)
+    assert tries_left > 0
 
 
 def test_queue_indexing_deferred(app, testapp):
@@ -185,11 +191,17 @@ def test_queue_indexing_deferred(app, testapp):
         'target_queue': 'deferred',
     }
     testapp.post_json('/queue_indexing?telemetry_id=test_telem', deferred_body)
-    time.sleep(5)
-    msg_count = indexer_queue.number_of_messages()
-    assert msg_count['primary_waiting'] == 1
-    assert msg_count['secondary_waiting'] == 2
-    assert msg_count['deferred_waiting'] == 1
+    # make sure the queue eventually sorts itself out
+    tries_left = 5
+    while tries_left > 0:
+        msg_count = indexer_queue.number_of_messages()
+        if (msg_count['primary_waiting'] == 1 and
+            msg_count['secondary_waiting'] == 2 and
+            msg_count['deferred_waiting'] == 1):
+            break
+        tries_left -= 0
+        time.sleep(3)
+    assert tries_left > 0
     # delete the messages
     for target in ['primary', 'secondary', 'deferred']:
         received = indexer_queue.receive_messages(target_queue=target)
@@ -200,11 +212,17 @@ def test_queue_indexing_deferred(app, testapp):
             msg_body = json.loads(msg['Body'])
             assert msg_body['telemetry_id'] == 'test_telem'
         indexer_queue.delete_messages(received, target_queue=target)
-    time.sleep(5)
-    msg_count = indexer_queue.number_of_messages()
-    assert msg_count['primary_waiting'] == 0
-    assert msg_count['secondary_waiting'] == 0
-    assert msg_count['deferred_waiting'] == 0
+    # make sure the queue eventually sorts itself out
+    tries_left = 5
+    while tries_left > 0:
+        msg_count = indexer_queue.number_of_messages()
+        if (msg_count['primary_waiting'] == 0 and
+            msg_count['secondary_waiting'] == 0 and
+            msg_count['deferred_waiting'] == 0):
+            break
+        tries_left -= 0
+        time.sleep(3)
+    assert tries_left > 0
 
 
 def test_queue_indexing_after_post_patch(app, testapp):
