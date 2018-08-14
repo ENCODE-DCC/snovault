@@ -205,15 +205,13 @@ def get_linking_items(context, request, render=None):
     Split the answer into linkTos and rev_links
     """
     item_uuid = str(context.uuid)
-    link_tos = request.registry[STORAGE].find_uuids_linked_to_item(item_uuid, skip_rev=True)
-    rev_links = request.registry[STORAGE].find_uuids_linked_to_item(item_uuid, skip_link=True)
+    links = request.registry[STORAGE].find_uuids_linked_to_item(item_uuid)
     request.response.status = 200
     result = {
         'status': 'success',
         '@type': ['result'],
-        'notification' : '%s items have links to %s' % (len(links), item_uuid),
-        'uuids_linking_to': link_tos,
-        'uuids_rev_linking_to': rev_links
+        'notification' : '%s has %s items linking to it. This may include rev_links if status != deleted' % (item_uuid, len(links)),
+        'uuids_linking_to': links
     }
     return result
 
