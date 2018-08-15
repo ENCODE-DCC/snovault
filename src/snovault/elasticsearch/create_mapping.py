@@ -1041,7 +1041,13 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
                         cat='uuids to index', count=len(uuids_to_index))
             run_indexing(app, uuids_to_index)
         else:
+            # if non-strict and attempting to reindex a ton, it is faster
+            # just to strictly reindex all items
             use_strict = strict or total_reindex
+            if len(uuids_to_index) > 30000 and not use_strict:
+                log.error('___MAPPING ALL ITEMS WITH STRICT=TRUE TO SAVE TIME___')
+                uuids_to_index = set(get_uuids_for_types(registry))  # all uuids
+                use_strict = True
             log.warning('\n___UUIDS TO INDEX (QUEUED)___: %s\n' % len(uuids_to_index),
                         cat='uuids to index', count=len(uuids_to_index))
             indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=use_strict,
