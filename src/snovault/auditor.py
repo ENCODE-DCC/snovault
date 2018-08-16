@@ -240,14 +240,8 @@ def item_view_audit_self(context, request):
              name='audit')
 def item_view_audit(context, request):
     path = request.resource_path(context)
-    # run @@audit-self on all _linked_uuids
-    if hasattr(request, '_linked_uuids'):
-        linked_uuids = request._linked_uuids.copy()
-    else:
-        # back up case: run audits on all @@object linked_uuids
-        properties = request.embed(path, '@@object')
-        linked_uuids = request._linked_uuids.copy()
-    audit = inherit_audits(request, linked_uuids)
+    audit_uuids = request._audit_uuids.copy()
+    audit = inherit_audits(request, audit_uuids)
     return {
         '@id': path,
         'audit': audit,

@@ -62,9 +62,11 @@ def item_index_data(context, request):
     path = path + '/'
     # setting _indexing_view enables the embed_cache and cause population of
     # request._linked_uuids and request._rev_linked_uuids_by_item
+
     request._indexing_view = True
     # reset these properties
     request._linked_uuids = set()
+    request._audit_uuids = set()
     request._rev_linked_uuids_by_item = {}
     # since request._indexing_view is set to True in indexer.py,
     # all embeds (including subrequests) below will use the embed cache
@@ -74,10 +76,10 @@ def item_index_data(context, request):
     rev_linked_by_item = request._rev_linked_uuids_by_item.copy()
     # find uuids traversed that rev link to this item
     rev_linked_to_me = sorted(set([id for id in rev_linked_by_item if uuid in rev_linked_by_item[id]]))
+    # set the uuids we want to audit on
+    request._audit_uuids = linked_uuids
     audit = request.invoke_view(path, '@@audit')['audit']
     obj = request.invoke_view(path, '@@object')
-    print('\n\n%s\nembedded: %s\nrev linked to me: %s\n\n'
-          % (obj['@id'], len(linked_uuids), len(rev_linked_to_me)))
     document = {
         'audit': audit,
         'embedded': embedded,
