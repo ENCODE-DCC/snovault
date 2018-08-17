@@ -239,6 +239,15 @@ def item_view_audit_self(context, request):
 @view_config(context=Item, permission='audit', request_method='GET',
              name='audit')
 def item_view_audit(context, request):
+    """
+    View for running audits on an item. Will run @@audit-self for each uuid in
+    request._audit_uuids, which is the actual view that runs the audits.
+    _audit_uuids is populated from the @@index-data view, or can be set
+    manually from tests
+
+    Check embed.py but requests to @@audit do NOT add uuids to the set of
+    request._linked_uuids or request._rev_linked_uuids_by_item
+    """
     path = request.resource_path(context)
     audit_uuids = request._audit_uuids.copy()
     audit = inherit_audits(request, audit_uuids)
