@@ -95,7 +95,8 @@ def _embed(request, path, as_user='EMBED'):
     subreq.override_renderer = 'null_renderer'
     subreq._indexing_view = request._indexing_view
     # pass the uuids we want to run audits on
-    subreq._audit_uuids = request._audit_uuids
+    if '@@audit' in path:
+        subreq._audit_uuids = request._audit_uuids
     if as_user is not True:
         if 'HTTP_COOKIE' in subreq.environ:
             del subreq.environ['HTTP_COOKIE']
