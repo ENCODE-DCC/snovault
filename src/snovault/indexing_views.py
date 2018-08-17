@@ -72,10 +72,10 @@ def item_index_data(context, request):
     # all embeds (including subrequests) below will use the embed cache
     embedded = request.invoke_view(path, '@@embedded')
     # get _linked and _rev_linked uuids from the request before @@audit views add to them
-    linked_uuids = sorted(request._linked_uuids.copy())
+    linked_uuids = request._linked_uuids.copy()
     rev_linked_by_item = request._rev_linked_uuids_by_item.copy()
     # find uuids traversed that rev link to this item
-    rev_linked_to_me = sorted(set([id for id in rev_linked_by_item if uuid in rev_linked_by_item[id]]))
+    rev_linked_to_me = set([id for id in rev_linked_by_item if uuid in rev_linked_by_item[id]])
     # set the uuids we want to audit on
     request._audit_uuids = linked_uuids
     audit = request.invoke_view(path, '@@audit')['audit']
@@ -83,7 +83,7 @@ def item_index_data(context, request):
     document = {
         'audit': audit,
         'embedded': embedded,
-        'linked_uuids': linked_uuids,
+        'linked_uuids': sorted(linked_uuids),
         'item_type': context.type_info.item_type,
         'links': links,
         'object': obj,
@@ -97,7 +97,7 @@ def item_index_data(context, request):
         'sid': context.sid,
         'unique_keys': unique_keys,
         'uuid': uuid,
-        'uuids_rev_linked_to_me': rev_linked_to_me
+        'uuids_rev_linked_to_me': sorted(rev_linked_to_me)
     }
 
     return document
