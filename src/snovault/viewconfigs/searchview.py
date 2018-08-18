@@ -12,7 +12,6 @@ from snovault.helpers.helper import (
     set_filters,
     set_facets,
     iter_long_json,
-    format_facets,
     # search_result_actions,
     format_results,
     get_pagination,
@@ -229,7 +228,7 @@ class SearchView(BaseView):
         result['total'] = total = es_results['hits']['total']
 
         schemas = (types[item_type].schema for item_type in doc_types)
-        result['facets'] = format_facets(es_results, facets, used_filters, schemas, total, self.principals)
+        result['facets'] = self.format_facets(es_results, facets, used_filters, schemas, total, self.principals)
 
         # Add batch actions
         # result.update(search_result_actions(self.request, doc_types, es_results))
