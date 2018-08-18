@@ -34,7 +34,8 @@ class BaseView(object):
         self.used_filters = None
         self.from_, self.size = get_pagination(self.request)
         
-    def format_facets(self, es_results, facets, used_filters, schemas, total, principals):
+    @staticmethod
+    def format_facets(es_results, facets, used_filters, schemas, total, principals):
         result = []
         # Loading facets in to the results
         if 'aggregations' not in es_results:
