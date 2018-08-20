@@ -242,7 +242,6 @@ class ElasticSearchStorage(object):
         If there is a mirror environment set up for the indexer, also attempt
         to remove the uuid from the mirror Elasticsearch
         """
-        import pdb; pdb.set_trace()
         if not item_type:
             model = self.get_by_uuid(rid)
             item_type = model.item_type
