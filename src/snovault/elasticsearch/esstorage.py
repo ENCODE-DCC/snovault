@@ -9,11 +9,16 @@ from pyramid.httpexceptions import (
 from zope.interface import alsoProvides
 from .interfaces import (
     ELASTIC_SEARCH,
+    INDEXER_QUEUE_MIRROR,
     INDEXER,
     ICachedItem,
 )
 from ..storage import RDBStorage
 from .indexer_utils import find_uuids_for_indexing
+from dcicutils import ff_utils, es_utils
+import structlog
+
+log = structlog.getLogger(__name__)
 
 SEARCH_MAX = 99999  # OutOfMemoryError if too high. Previously: (2 ** 31) - 1
 
@@ -159,18 +164,13 @@ class PickStorage(object):
         if len(uuids_linking_to_item) > 0:
             raise HTTPLocked(detail="Cannot purge item as other items still link to it",
                              comment=uuids_linking_to_item)
-
-        self.write.purge_uuid(rid)  # Deletes from RDB
+        log.error('PURGE: purging %s' % rid)
+        # delete the item from DB
+        self.write.purge_uuid(rid)
+        # delete the item from ES and also the mirrored ES if present
+        self.read.purge_uuid(rid, item_type, self.registry)
         # queue related items for reindexing
         self.registry[INDEXER].find_and_queue_secondary_items(set(rid), set())
-        try:
-            self.read.purge_uuid(rid, item_type)  # Deletes from ES
-        except elasticsearch.exceptions.NotFoundError:
-            # Case: Not yet indexed
-            print('Couldn\'t find ' + rid + ' in ElasticSearch. Continuing.')
-        except elasticsearch.exceptions.UnknownItemTypeError:
-            # Case: Deleting in-database item for collection which no longer exists. Probably temporary.
-            print('Item type ' + str(item_type) + ' does not exist in ElasticSearch. Continuing.')
 
     def get_rev_links(self, model, rel, *item_types):
         return self.storage().get_rev_links(model, rel, *item_types)
@@ -236,11 +236,48 @@ class ElasticSearchStorage(object):
         hits = search.execute()
         return [hit.to_dict().get('uuid', hit.to_dict().get('_id')) for hit in hits]
 
-    def purge_uuid(self, rid, item_type=None):
+    def purge_uuid(self, rid, item_type=None, registry=None):
+        """
+        Purge a uuid from the write storage (Elasticsearch)
+        If there is a mirror environment set up for the indexer, also attempt
+        to remove the uuid from the mirror Elasticsearch
+        """
+        import pdb; pdb.set_trace()
         if not item_type:
             model = self.get_by_uuid(rid)
             item_type = model.item_type
-        self.es.delete(id=rid, index=item_type, doc_type=item_type)
+        try:
+            self.es.delete(id=rid, index=item_type, doc_type=item_type)
+        except elasticsearch.exceptions.NotFoundError:
+            # Case: Not yet indexed
+            log.error('PURGE: Couldn\'t find %s in ElasticSearch. Continuing.' % rid)
+        except Exception as exc:
+            log.error('PURGE: Cannot delete %s in ElasticSearch. Error: %s Continuing.' % (item_type, str(exc)))
+        if not registry:
+            log.error('PURGE: Registry not available for ESStorage purge_uuid')
+            return
+        # for data/staging, delete the item from the mirrored ES as well
+        if (registry[INDEXER_QUEUE_MIRROR] and
+            getattr(registry[INDEXER_QUEUE_MIRROR], 'env_name', None) != 'fourfront-backup'):
+            # get es information about the mirror env
+            mirror_env = registry[INDEXER_QUEUE_MIRROR].env_name
+            health_res = ff_utils.get_health_page(ff_env=mirror_env)
+            mirror_es = health_res.get('elasticsearch')
+            if not mirror_es:  # bail if we can't find elasticsearch address
+                log.error('PURGE: Couldn\'t read the health page for mirrored env %s' % mirror_env)
+                return
+            use_aws_auth = registry.settings.get('elasticsearch.aws_auth')
+            # make sure use_aws_auth is bool
+            if not isinstance(use_aws_auth, bool):
+                use_aws_auth = True if use_aws_auth == 'true' else False
+            mirror_client = es_utils.create_es_client(mirror_es, use_aws_auth=use_aws_auth)
+            try:
+                mirror_client.delete(id=rid, index=item_type, doc_type=item_type)
+            except elasticsearch.exceptions.NotFoundError:
+                # Case: Not yet indexed
+                log.error('PURGE: Couldn\'t find %s in mirrored ElasticSearch (%s). Continuing.' % (rid, mirror_env))
+            except Exception as exc:
+                log.error('PURGE: Cannot delete %s in mirrored ElasticSearch (%s). Error: %s Continuing.' % (item_type, mirror_env, str(exc)))
 
     def __iter__(self, *item_types):
         query = {'query': {

@@ -39,7 +39,7 @@ uuids visited during audits are NOT added to the linked_uuids of an item, meanin
 Finding items to invalidate
 ---------------------------
 
-This has already been somewhat covered, but it's worth reiterating. Whenever an item is indexed, the `find_uuids_for_indexing` function is run to find all items in Elasticsearch that contain the indexed item in their linked_uuids. In addition to this, any items added from the `uuids_rev_linked_to_me` list generated from the @@index-data view are also invalidated, since new reverse links may have been created and those items need to be updated as well.
+This has already been somewhat covered, but it's worth reiterating. Whenever an item is indexed, the `find_uuids_for_indexing` function is run to find all items in Elasticsearch that contain the indexed item in their linked_uuids. In addition to this, any items added from the `uuids_rev_linked_to_me` list generated from the @@index-data view are also invalidated, since new reverse links may have been created and those items need to be updated as well. All of these items are added to the secondary queue after a primary item has been indexed.
 
 
 Total Reindexing
@@ -54,7 +54,7 @@ NOTE: use `development.ini` locally
 Purging items
 -------------
 
-There is another spot `find_uuids_for_indexing` is used, and that is to find all linked items when attempting to "purge" an item (fully remove from postgresql and Elasticsearch). Before removing an item, it is crucial to remove all links to that item, which is why this function is used.
+There is another spot `find_uuids_for_indexing` is used, and that is to find all linked items when attempting to "purge" an item (fully remove from postgresql and Elasticsearch). Before removing an item, it is crucial to ensure that all links to that item have been removed, which is why this function is used.
 
 
 
@@ -78,7 +78,7 @@ However, writes must be at least REPEATABLE READ in order for overalapping PATCH
 
 During recovery indexing uses READ COMMITTED isolation. Indexed objects may be internally inconsistent if there are concurrent updates to embedded objects. But indexing is still eventually consistent as any concurrent update will invalidate the object and it will be reindexed later.
 
-To avoid internal possible internal inconsistancies of indexed objects, SERIALIZABLE isolation is required. It is used once it becomes available when recovery is complete.
+To avoid internal possible internal inconsistencies of indexed objects, SERIALIZABLE isolation is required. It is used once it becomes available when recovery is complete.
 
 
 Back references
