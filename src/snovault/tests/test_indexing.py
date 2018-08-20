@@ -458,6 +458,12 @@ def test_queue_indexing_with_linked(app, testapp, indexer_testapp):
     to_index = indexer_utils.find_uuids_for_indexing(app.registry, {fake_uuid})
     assert to_index == {fake_uuid}
 
+    # test @@links functionality
+    source_links_res = testapp.get('/' + source['uuid'] + '/@@links', status=200)
+    linking_uuids = source_links_res.json.get('uuids_linking_to')
+    assert linking_uuids and len(linking_uuids) == 1
+    assert linking_uuids[0]['uuid'] == target['uuid']  # rev_link from target
+
     # lastly, test purge_uuid and delete functionality
     with pytest.raises(webtest.AppError) as excinfo:
         del_res0 = testapp.delete_json('/' + source['uuid'] + '/?purge=True')
