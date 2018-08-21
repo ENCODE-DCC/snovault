@@ -10,6 +10,7 @@ from pyramid.threadlocal import (
 )
 import atexit
 import logging
+import random
 import time
 import transaction
 from .indexer import (
@@ -115,7 +116,7 @@ class MPIndexer(Indexer):
     def __init__(self, registry, processes=None):
         super(MPIndexer, self).__init__(registry)
         self.processes = processes
-        self.chunksize = int(registry.settings.get('indexer.chunk_size',1024))  # in production.ini (via buildout.cfg) as 1024
+        self.chunksize = 512 #int(registry.settings.get('indexer.chunk_size', 1024))  # in production.ini (via buildout.cfg) as 1024
         self.initargs = (registry[APP_FACTORY], registry.settings,)
 
     @reify
@@ -137,7 +138,7 @@ class MPIndexer(Indexer):
         chunkiness = int((uuid_count - 1) / workers) + 1
         if chunkiness > self.chunksize:
             chunkiness = self.chunksize
-
+        uuids = random.shuffle(uuids)
         tasks = [(uuid, xmin, snapshot_id, restart) for uuid in uuids]
         errors = []
         try:
