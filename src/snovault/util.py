@@ -1,6 +1,7 @@
 from past.builtins import basestring
 from pyramid.threadlocal import manager as threadlocal_manager
 from pyramid.httpexceptions import HTTPForbidden
+from .interfaces import CONNECTION
 
 
 def includeme(config):
@@ -16,6 +17,33 @@ def ensurelist(value):
     if isinstance(value, basestring):
         return [value]
     return value
+
+
+def uuid_to_path(request, obj, path):
+    if isinstance(path, basestring):
+        path = path.split('.')
+    if not path:
+        return
+    name = path[0]
+    remaining = path[1:]
+    value = obj.get(name, None)
+    if value is None:
+        return
+    if remaining:
+        if isinstance(value, list):
+            for v in value:
+                uuid_to_path(request, v, remaining)
+        else:
+            uuid_to_path(request, value, remaining)
+        return
+    conn = request.registry[CONNECTION]
+    if isinstance(value, list):
+        obj[name] = [
+            request.resource_path(conn[v])
+            for v in value
+        ]
+    else:
+        obj[name] = request.resource_path(conn[value])
 
 
 def simple_path_ids(obj, path):
@@ -37,6 +65,11 @@ def simple_path_ids(obj, path):
 
 
 def secure_embed(request, item_path, addition='@@object'):
+    """
+    Make a call to embed() with the given item path and user status
+    Handles substituting a no view permissions message if a the given
+    request does not have permission to see the object
+    """
     res = {'error': 'no view permissions'}
     try:
         # if empty item_path reqeust.embed returns just addition as a string
@@ -123,6 +156,9 @@ def expand_val_for_embedded_model(request, obj_val, downstream_model):
         return obj_embedded
     elif isinstance(obj_val, basestring):
         # get the @@object view of obj to embed
+        # TODO: per-field invalidation by adding uuids to request._linked_uuids
+        # ONLY if the field is used in downstream_model (i.e. actually in the
+        # context embedded_list)
         obj_val = secure_embed(request, obj_val, '@@object')
         if not obj_val or obj_val == {'error': 'no view permissions'}:
             return obj_val

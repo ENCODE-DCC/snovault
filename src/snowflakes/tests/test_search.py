@@ -1,10 +1,13 @@
 # Use workbook fixture from BDD tests (including elasticsearch)
 # these take far to long to run on travis... I'll turn them off there
-from .features.conftest import app_settings, app, workbook
 import pytest
 import os
-dont_run_on_travis = pytest.mark.skipif(os.environ.get('TRAVIS', False) != False,
-                                        reason='to slow to run on travis')
+on_travis = os.environ.get('TRAVIS', False) != False
+dont_run_on_travis = pytest.mark.skipif(on_travis, reason='to slow to run on travis')
+if not on_travis:
+    from .features.conftest import app_settings, app, workbook
+else:
+    app_settings = app = workbook = None
 
 @dont_run_on_travis
 def test_search_view(workbook, testapp):
@@ -72,10 +75,10 @@ def recursively_find_uuids(json, uuids):
 
 @dont_run_on_travis
 @pytest.mark.es
-def test_embedded_uuids_real(workbook, testapp, app):
+def test_linked_uuids_real(workbook, testapp, app):
     """
     Find all uuids from a search result and ensure they match the
-    embedded_uuids of the es result
+    linked_uuids of the es result
     """
     from snovault.elasticsearch.interfaces import ELASTIC_SEARCH
     es = app.registry[ELASTIC_SEARCH]
@@ -83,5 +86,7 @@ def test_embedded_uuids_real(workbook, testapp, app):
     test_case = res['@graph'][0]
     test_uuids = recursively_find_uuids(test_case, set())
     test_doc = es.get(index='snowflake', doc_type='snowflake', id=test_case['uuid'])
-    embedded_uuids = set(test_doc['_source']['embedded_uuids'])
-    assert test_uuids == embedded_uuids
+    linked_uuids = set(test_doc['_source']['linked_uuids'])
+    # uuids in the doc are a subset of total linked_uuids, which include
+    # uuids embedded and referenced in embedded calc properties
+    assert set(test_uuids) <= set(linked_uuids)

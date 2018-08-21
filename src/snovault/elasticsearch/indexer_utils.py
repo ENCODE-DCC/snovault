@@ -6,9 +6,9 @@ import time
 
 def find_uuids_for_indexing(registry, updated, log=None):
     """
-    Run a search to find uuids of objects with that contain the given updated
-    uuids either in their embedded_uuids.
-    Uses elasticsearch.helpers.scan to iterate through ES results
+    Run a search to find uuids of objects with that contain the given set of
+    updated uuids in their linked_uuids.
+    Uses elasticsearch.helpers.scan to iterate through ES results.
     Returns a set containing original uuids and the found uuids (INCLUDING
     uuids that were passed into this function)
     """
@@ -21,16 +21,16 @@ def find_uuids_for_indexing(registry, updated, log=None):
                         'should': [
                             {
                                 'terms': {
-                                    'embedded_uuids': list(updated),
+                                    'linked_uuids': list(updated),
                                     '_cache': False,
-                                },
-                            },
-                        ],
-                    },
-                },
-            },
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
         },
-        '_source': False,
+        '_source': False
     }
     results = scan(es, index='_all', query=scan_query)
     invalidated = {res['_id'] for res in results}

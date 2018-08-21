@@ -60,16 +60,31 @@ def item_index_data(context, request):
                 for key in unique_keys[key_name])
 
     path = path + '/'
-    embedded = request.embed(path, '@@embedded')
-    audit = request.embed(path, '@@audit')['audit']
-    obj = request.embed(path, '@@object')
+    # setting _indexing_view enables the embed_cache and cause population of
+    # request._linked_uuids and request._rev_linked_uuids_by_item
 
+    request._indexing_view = True
+    # reset these properties
+    request._linked_uuids = set()
+    request._audit_uuids = set()
+    request._rev_linked_uuids_by_item = {}
+    # since request._indexing_view is set to True in indexer.py,
+    # all embeds (including subrequests) below will use the embed cache
+    embedded = request.invoke_view(path, '@@embedded')
+    # get _linked and _rev_linked uuids from the request before @@audit views add to them
+    linked_uuids = request._linked_uuids.copy()
+    rev_linked_by_item = request._rev_linked_uuids_by_item.copy()
+    # find uuids traversed that rev link to this item
+    rev_linked_to_me = set([id for id in rev_linked_by_item if uuid in rev_linked_by_item[id]])
+    # set the uuids we want to audit on
+    request._audit_uuids = linked_uuids
+    audit = request.invoke_view(path, '@@audit')['audit']
+    obj = request.invoke_view(path, '@@object')
     document = {
         'audit': audit,
         'embedded': embedded,
-        'embedded_uuids': sorted(request._embedded_uuids),
+        'linked_uuids': sorted(linked_uuids),
         'item_type': context.type_info.item_type,
-        'linked_uuids': sorted(request._linked_uuids),
         'links': links,
         'object': obj,
         'paths': sorted(paths),
@@ -79,10 +94,10 @@ def item_index_data(context, request):
             name: context.propsheets[name]
             for name in context.propsheets.keys() if name != ''
         },
-        'tid': context.tid,
         'sid': context.sid,
         'unique_keys': unique_keys,
         'uuid': uuid,
+        'uuids_rev_linked_to_me': sorted(rev_linked_to_me)
     }
 
     return document

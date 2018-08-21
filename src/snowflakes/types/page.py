@@ -99,12 +99,6 @@ class Page(SharedItem):
         return default
 
     def __resource_url__(self, request, info):
-        # Record ancestor uuids in linked_uuids so renames of ancestors
-        # invalidate linking objects.
-        for obj in lineage(self):
-            uuid = getattr(obj, 'uuid', None)
-            if uuid is not None:
-                request._linked_uuids.add(str(uuid))
         return None
 
 

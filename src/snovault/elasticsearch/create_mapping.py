@@ -401,10 +401,6 @@ def es_mapping(mapping):
                 'type': 'text',
                 'include_in_all': False,
             },
-            'tid': {
-                'type': 'text',
-                'include_in_all': False,
-            },
             'sid': {
                 'type': 'long',
                 'include_in_all': False,
@@ -442,11 +438,11 @@ def es_mapping(mapping):
                     }
                 }
             },
-            'embedded_uuids': {
+            'linked_uuids': {
                 'type': 'text',
                 'include_in_all': False
             },
-            'linked_uuids': {
+            'uuids_rev_linked_to_me': {
                 'type': 'text',
                 'include_in_all': False
             },
@@ -1029,23 +1025,32 @@ def run(app, collections=None, dry_run=False, check_first=False, skip_indexing=F
     # now, queue items for indexing in the secondary queue
     # TODO: maybe put items on primary/secondary by type
     if uuids_to_index:
-        count=len(uuids_to_index)
-        # lets not knock over ES trying to get all these uuids
-        # we need to find associated uuids if all items are not indexed or not strict mode
-        if not total_reindex and not strict:
-            if count > 30000:  # arbitrary large number, that hopefully is within ES limits
-                uuids_to_index = set(get_uuids_for_types(registry))  # all uuids
-            else:
-                uuids_to_index = find_uuids_for_indexing(registry, uuids_to_index, log)
         # only index (synchronously) if --sync-index option is used
         if sync_index:
-            log.warning('\n___UUIDS TO INDEX (SYNC)___: %s\n' % count,
-                        cat='uuids to index', count=count)
+            # using sync_index and NOT strict could cause issues with picking
+            # up newly rev linked items. Print out an error and deal with it
+            # for now
+            if not strict:
+                 # arbitrary large number, that hopefully is within ES limits
+                if len(uuids_to_index) > 30000 or total_reindex:
+                    uuids_to_index = set(get_uuids_for_types(registry))  # all uuids
+                else:
+                    uuids_to_index = find_uuids_for_indexing(registry, uuids_to_index, log)
+                log.error('___SYNC INDEXING WITH STRICT=FALSE MAY CAUSE REV_LINK INCONSISTENCY___')
+            log.warning('\n___UUIDS TO INDEX (SYNC)___: %s\n' % len(uuids_to_index),
+                        cat='uuids to index', count=len(uuids_to_index))
             run_indexing(app, uuids_to_index)
         else:
-            log.warning('\n___UUIDS TO INDEX (QUEUED)___: %s\n' % count,
-                        cat='uuids to index', count=count)
-            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=True,
+            # if non-strict and attempting to reindex a ton, it is faster
+            # just to strictly reindex all items
+            use_strict = strict or total_reindex
+            if len(uuids_to_index) > 30000 and not use_strict:
+                log.error('___MAPPING ALL ITEMS WITH STRICT=TRUE TO SAVE TIME___')
+                uuids_to_index = set(get_uuids_for_types(registry))  # all uuids
+                use_strict = True
+            log.warning('\n___UUIDS TO INDEX (QUEUED)___: %s\n' % len(uuids_to_index),
+                        cat='uuids to index', count=len(uuids_to_index))
+            indexer_queue.add_uuids(app.registry, list(uuids_to_index), strict=use_strict,
                                     target_queue='secondary', telemetry_id=telemetry_id)
     return timings
 

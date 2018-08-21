@@ -215,7 +215,7 @@ def main(global_config, **local_config):
         config.registry['snp_search'] = Elasticsearch(
             addresses,
             serializer=PyramidJSONSerializer(json_renderer),
-            connection_class=TimedUrllib3HttpConnection,
+            connection_class=TimedRequestsHttpConnection,
             retry_on_timeout=True,
             timeout=60,
             maxsize=50

@@ -103,17 +103,6 @@ class TypeInfo(AbstractTypeInfo):
                 schema['properties'][name] = prop.schema
         return schema
 
-    @reify
-    def schema_rev_links(self):
-        revs = {}
-        for key, prop in self.schema['properties'].items():
-            linkFrom = prop.get('linkFrom', prop.get('items', {}).get('linkFrom'))
-            if linkFrom is None:
-                continue
-            linkType, linkProp = linkFrom.split('.')
-            revs[key] = linkType, linkProp
-        return revs
-
 
 class TypesTool(object):
     def __init__(self, registry):

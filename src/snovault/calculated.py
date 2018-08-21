@@ -56,7 +56,7 @@ class ItemNamespace(object):
             setattr(self, name, value)
             return value
         if name in context.rev:
-            value = context.get_rev_links(name)
+            value = context.get_rev_links(request, name)
             value = [
                 request.resource_path(conn.get_by_uuid(v))
                 for v in value

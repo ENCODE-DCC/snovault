@@ -14,8 +14,6 @@ from pyramid.view import (
 )
 from urllib.parse import urlencode
 from .calculated import calculate_properties
-from .etag import etag_tid
-from .interfaces import CONNECTION
 from .resources import (
     AbstractCollection,
     Item,
@@ -126,52 +124,18 @@ def item_view(context, request):
     return request.embed(path, as_user=True)
 
 
-def item_links(context, request):
-    # This works from the schema rather than the links table
-    # so that upgrade on GET can work.
-    ### context.__json__ CALLS THE UPGRADER ###
-    properties = context.__json__(request)
-    for path in context.type_info.schema_links:
-        uuid_to_path(request, properties, path)
-    return properties
-
-
-def uuid_to_path(request, obj, path):
-    if isinstance(path, basestring):
-        path = path.split('.')
-    if not path:
-        return
-    name = path[0]
-    remaining = path[1:]
-    value = obj.get(name, None)
-    if value is None:
-        return
-    if remaining:
-        if isinstance(value, list):
-            for v in value:
-                uuid_to_path(request, v, remaining)
-        else:
-            uuid_to_path(request, value, remaining)
-        return
-    conn = request.registry[CONNECTION]
-    if isinstance(value, list):
-        obj[name] = [
-            request.resource_path(conn[v])
-            for v in value
-        ]
-    else:
-        obj[name] = request.resource_path(conn[value])
-
-
 @view_config(context=Item, permission='view', request_method='GET',
              name='object')
 def item_view_object(context, request):
-    """ Render json structure
-    1. Fetch stored properties, possibly upgrading.
-    2. Link canonicalization (overwriting uuids.)
-    3. Calculated properties (including reverse links.)
     """
-    properties = item_links(context, request)
+    Render json structure. This is the most basic view and contains the scope
+    of only one item. The steps to generate it are:
+    1. Fetch stored properties, possibly upgrading.
+    2. Link canonicalization (overwriting uuids.) with item_with_links
+       - adds uuid to request._linked_uuids if request._indexing_view
+    3. Calculated properties
+    """
+    properties = context.item_with_links(request)
     calculated = calculate_properties(context, request, properties)
     properties.update(calculated)
     return properties
@@ -267,21 +231,3 @@ def item_view_raw(context, request):
     # add uuid to raw view
     props['uuid'] = str(context.uuid)
     return props
-
-
-@view_config(context=Item, permission='edit', request_method='GET',
-             name='edit', decorator=etag_tid)
-def item_view_edit(context, request):
-    conn = request.registry[CONNECTION]
-    properties = item_links(context, request)
-    schema_rev_links = context.type_info.schema_rev_links
-
-    for propname in schema_rev_links:
-        properties[propname] = sorted(
-            request.resource_path(child)
-            for child in (
-                conn.get_by_uuid(uuid) for uuid in context.get_rev_links(propname)
-            ) if request.has_permission('visible_for_edit', child)
-        )
-
-    return properties

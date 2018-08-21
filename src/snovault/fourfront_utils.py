@@ -1,4 +1,5 @@
 # Basic fourfront-specific utilities that seem to have a good home in snovault
+# Really, are these embed utils? Used with the embedded_list
 
 import sys
 from copy import deepcopy
@@ -18,7 +19,8 @@ def add_default_embeds(item_type, types, embeds, schema={}):
         schema = schema['properties']
     processed_embeds = set(embeds[:]) if len(embeds) > 0 else set()
     # add default embeds for items in the embedded_list
-    embeds_to_add, processed_embeds = expand_embedded_list(item_type, types, embeds, schema, processed_embeds)
+    embeds_to_add, processed_embeds = expand_embedded_list(item_type, types, embeds,
+                                                           schema, processed_embeds)
     # automatically embed top level linkTo's not already embedded
     # also find subobjects and embed those
     embeds_to_add.extend(find_default_embeds_for_schema('', schema))
@@ -158,13 +160,16 @@ def crawl_schemas_by_embeds(item_type, types, split_path, schema):
                     return error_message, embeds_to_add
                 linkTo_schema = linkTo_type.schema
                 schema_cursor = linkTo_schema['properties'] if 'properties' in linkTo_schema else linkTo_schema
+                if '@id' not in schema_cursor or 'display_title' not in schema_cursor:
+                    error_message = '{} has a bad embed: {} object does not have @id/display_title.'.format(item_type, linkTo_path)
+                    return error_message, embeds_to_add
                 # we found a terminal linkTo embed
                 if idx == len(split_path) - 1:
-                    if '@id' not in schema_cursor or 'display_title' not in schema_cursor:
-                        error_message = '{} has a bad embed: {}; terminal object does not have @id/display_title.'.format(item_type, linkTo_path)
-                    else:
-                        embeds_to_add.append(linkTo_path)
+                    embeds_to_add.append(linkTo_path)
                     return error_message, embeds_to_add
+                else:  # also add default embeds for each intermediate item in the path
+                    intermediate_path = '.'.join(split_path[:idx+1])
+                    embeds_to_add.append(intermediate_path)
             # not a linkTo. See if this is this is the terminal element
             else:
                 # check if this is the last element in path

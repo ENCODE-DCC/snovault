@@ -166,7 +166,7 @@ def test_delete_simple(session, storage):
     assert current.sid == propsheet.sid
     assert current.rid == resource.rid
 
-    storage.delete_by_uuid(str(resource.rid))
+    storage.purge_uuid(str(resource.rid))
     check_post = storage.get_by_uuid(str(resource.rid))
     assert not check_post
     assert session.query(Key).count() == 0
@@ -207,7 +207,7 @@ def test_delete_compound(session, storage):
     current = session.query(CurrentPropertySheet).one()
     assert current.sid
 
-    storage.delete_by_uuid(str(resource.rid))
+    storage.purge_uuid(str(resource.rid))
     check_post = storage.get_by_uuid(str(resource.rid))
     assert not check_post
     assert session.query(Key).count() == 0

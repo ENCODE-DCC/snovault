@@ -1,3 +1,4 @@
+
 from pyramid.httpexceptions import HTTPConflict
 from sqlalchemy import (
     Column,
@@ -66,6 +67,7 @@ baked_query_unique_key = bakery(
         ),
     ).filter(Key.name == bindparam('name'), Key.value == bindparam('value'))
 )
+
 
 class RDBStorage(object):
     batchsize = 1000
@@ -178,7 +180,7 @@ class RDBStorage(object):
         msg = 'Keys conflict: %r' % conflicts
         raise HTTPConflict(msg)
 
-    def delete_by_uuid(self, rid):
+    def purge_uuid(self, rid):
         # WARNING USE WITH CARE PERMANENTLY DELETES RESOURCES
         session = self.DBSession()
         sp = session.begin_nested()
@@ -514,9 +516,6 @@ class Resource(Base):
         """
         return self.data[''].sid
 
-    def invalidated(self):
-        return False
-
     def used_for(self, item):
         pass
 
@@ -594,7 +593,6 @@ notify_ddl = DDL("""
         RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
-
     CREATE TRIGGER snovault_transactions_insert AFTER INSERT ON %(table)s
     FOR EACH ROW EXECUTE PROCEDURE snovault_transaction_notify();
 """)
@@ -668,10 +666,8 @@ _set_transaction_snapshot = text(
 
 def set_transaction_isolation_level(session, sqla_txn, connection):
     ''' Set appropriate transaction isolation level.
-
     Doomed transactions can be read-only.
     ``transaction.doom()`` must be called before the connection is used.
-
     Othewise assume it is a write which must be REPEATABLE READ.
     '''
     if connection.engine.url.drivername != 'postgresql':

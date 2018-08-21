@@ -240,78 +240,10 @@ def test_put_object_editing_child(content_with_child, testapp):
             'status': 'released',
         }]
     }
-    testapp.put_json(content_with_child['@id'], edit, status=200)
-    res = testapp.get(content_with_child['child'] + '?frame=embedded')
-    assert res.json['status'] == 'released'
-
-
-def test_put_object_adding_child(content_with_child, testapp):
-    edit = {
-        'reverse': [
-            content_with_child['child'],
-            {
-                'status': 'released',
-            }
-        ]
-    }
-    testapp.put_json(content_with_child['@id'], edit, status=200)
-    res = testapp.get(content_with_child['@id'])
-    assert len(res.json['reverse']) == 2
-
-
-def test_put_object_removing_child(content_with_child, testapp):
-    edit = {
-        'reverse': [],
-    }
-    testapp.put_json(content_with_child['@id'], edit, status=200)
-    res = testapp.get(content_with_child['@id'] + '?frame=embedded')
-    assert len(res.json['reverse']) == 0
-    res = testapp.get(content_with_child['child'])
-    assert res.json['status'] == 'deleted'
-
-
-def test_put_object_child_validation(content_with_child, testapp):
-    edit = {
-        'reverse': [{
-            '@id': content_with_child['child'],
-            'target': 'BOGUS',
-        }]
-    }
+    # this is no longer allowed
     res = testapp.put_json(content_with_child['@id'], edit, status=422)
-    assert res.json['errors'][0]['name'] == [u'reverse', 0, u'target']
+    assert res.json['description'] == 'Failed validation'
 
-
-def test_put_object_validates_child_references(content_with_child, testapp):
-    # Try a child that doesn't exist
-    edit = {
-        'reverse': [
-            content_with_child['child'],
-            '/asdf',
-        ]
-    }
-    testapp.put_json(content_with_child['@id'], edit, status=422)
-
-    # Try a child that exists but is the wrong type
-    edit = {
-        'reverse': [
-            content_with_child['child'],
-            content_with_child['@id'],
-        ]
-    }
-    testapp.put_json(content_with_child['@id'], edit, status=422)
-
-
-def test_post_object_with_child(testapp):
-    edit = {
-        'reverse': [{
-            'status': 'released',
-        }]
-    }
-    res = testapp.post_json('/testing-link-targets-sno/', edit, status=201)
-    parent_id = res.json['@graph'][0]['uuid']
-    source = res.json['@graph'][0]['reverse'][0]
-    res = testapp.get(source)
-    assert res.json['target']['uuid'] == parent_id
 
 
 def test_retry(testapp):

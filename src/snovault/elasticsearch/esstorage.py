@@ -9,10 +9,16 @@ from pyramid.httpexceptions import (
 from zope.interface import alsoProvides
 from .interfaces import (
     ELASTIC_SEARCH,
+    INDEXER_QUEUE_MIRROR,
+    INDEXER,
     ICachedItem,
 )
 from ..storage import RDBStorage
 from .indexer_utils import find_uuids_for_indexing
+from dcicutils import ff_utils, es_utils
+import structlog
+
+log = structlog.getLogger(__name__)
 
 SEARCH_MAX = 99999  # OutOfMemoryError if too high. Previously: (2 ** 31) - 1
 
@@ -27,7 +33,9 @@ def includeme(config):
 
 
 def find_linking_property(our_dict, value_to_find):
-
+    """
+    Helper function used in PickStorage.find_uuids_linked_to_item
+    """
     def find_it(d, parent_key=None):
         if isinstance(d, list):
             for idx, v in enumerate(d):
@@ -37,7 +45,6 @@ def find_linking_property(our_dict, value_to_find):
                         return (parent_key if parent_key else '') + '[' + str(idx) + '].' + found
                 elif v == value_to_find:
                     return '[' + str(idx) + ']'
-
         elif isinstance(d, dict):
             for k, v in d.items():
                 if isinstance(v, dict) or isinstance(v, list):
@@ -49,6 +56,7 @@ def find_linking_property(our_dict, value_to_find):
         return None
 
     return find_it(our_dict)
+
 
 class CachedModel(object):
     def __init__(self, hit):
@@ -72,31 +80,8 @@ class CachedModel(object):
         return self.source['uuid']
 
     @property
-    def tid(self):
-        return self.source['tid']
-
-    @property
     def sid(self):
         return self.source.get('sid')
-
-    def invalidated(self):
-        request = get_root_request()
-        if request is None:
-            return False
-        edits = dict.get(request.session, 'edits', None)
-        if edits is None:
-            return False
-        version = self.meta['version']
-        linked_uuids = set(self.source['linked_uuids'])
-        embedded_uuids = set(self.source['embedded_uuids'])
-        for xid, updated, linked in edits:
-            if xid < version:
-                continue
-            if not embedded_uuids.isdisjoint(updated):
-                return True
-            if not linked_uuids.isdisjoint(linked):
-                return True
-        return False
 
     def used_for(self, item):
         alsoProvides(item, ICachedItem)
@@ -118,7 +103,7 @@ class PickStorage(object):
         storage = self.storage()
         model = storage.get_by_uuid(uuid)
         if storage is self.read:
-            if model is None or model.invalidated():
+            if model is None:
                 return self.write.get_by_uuid(uuid)
         return model
 
@@ -126,7 +111,7 @@ class PickStorage(object):
         storage = self.storage()
         model = storage.get_by_unique_key(unique_key, name)
         if storage is self.read:
-            if model is None or model.invalidated():
+            if model is None:
                 return self.write.get_by_unique_key(unique_key, name)
         return model
 
@@ -135,39 +120,57 @@ class PickStorage(object):
         storage = self.storage()
         model = storage.get_by_json(key, value, item_type)
         if storage is self.read:
-            if model is None or model.invalidated():
+            if model is None:
                 return self.write.get_by_json(key, value, item_type)
         return model
 
-    def delete_by_uuid(self, rid, item_type=None):
-        if not item_type: # ES deletion requires index & doc_type, which are both == item_type
-            model = self.get_by_uuid(rid)
-            item_type = model.item_type
-        uuids_linking_to_item = find_uuids_for_indexing(self.registry, set([rid])) - set([rid])
+
+    def find_uuids_linked_to_item(self, rid):
+        """
+        Given a resource id (rid), such as uuid, find all items in the DB
+        that have a linkTo to that item.
+        Returns some extra information about the fields/links that are
+        present
+        """
+        linked_info = []
+        # we only care about linkTos the item and not reverse links here
+        uuids_linking_to_item = find_uuids_for_indexing(self.registry, set([rid]))
+        # remove the item itself from the list
+        uuids_linking_to_item = uuids_linking_to_item - set([rid])
         if len(uuids_linking_to_item) > 0:
-            # Return list of { '@id', 'display_title', 'uuid' } in 'comment' property of HTTPException response to assist with any manual unlinking.
-            conflicts = []
+            # Return list of { '@id', 'display_title', 'uuid' } in 'comment'
+            # property of HTTPException response to assist with any manual unlinking.
             for linking_uuid in uuids_linking_to_item:
                 linking_dict = self.read.get_by_uuid(linking_uuid).source.get('embedded')
                 linking_property = find_linking_property(linking_dict, rid)
-                conflicts.append({
-                    '@id' : linking_dict['@id'],
-                    'display_title' : linking_dict['display_title'],
+                linked_info.append({
+                    '@id' : linking_dict.get('@id', linking_dict['uuid']),
+                    'display_title' : linking_dict.get('display_title', linking_dict['uuid']),
                     'uuid' : linking_uuid,
                     'field' : linking_property or "Not Embedded"
                 })
+        return linked_info
 
-            raise HTTPLocked(detail="Cannot delete an Item from the database if other Items are still linking to it.", comment=conflicts)
 
-        self.write.delete_by_uuid(rid)                  # Deletes from RDB
-        try:
-            self.read.delete_by_uuid(rid, item_type)    # Deletes from ES
-        except elasticsearch.exceptions.NotFoundError:
-            # Case: Not yet indexed
-            print('Couldn\'t find ' + rid + ' in ElasticSearch. Continuing.')
-        except elasticsearch.exceptions.UnknownItemTypeError:
-            # Case: Deleting in-database item for collection which no longer exists. Probably temporary.
-            print('Item type ' + str(item_type) + ' does not exist in ElasticSearch. Continuing.')
+    def purge_uuid(self, rid, item_type=None):
+        """
+        Attempt to purge an item by given resource id (rid), completely
+        removing it from ES and DB.
+        """
+        if not item_type: # ES deletion requires index & doc_type, which are both == item_type
+            model = self.get_by_uuid(rid)
+            item_type = model.item_type
+        uuids_linking_to_item = self.find_uuids_linked_to_item(rid)
+        if len(uuids_linking_to_item) > 0:
+            raise HTTPLocked(detail="Cannot purge item as other items still link to it",
+                             comment=uuids_linking_to_item)
+        log.error('PURGE: purging %s' % rid)
+        # delete the item from DB
+        self.write.purge_uuid(rid)
+        # delete the item from ES and also the mirrored ES if present
+        self.read.purge_uuid(rid, item_type, self.registry)
+        # queue related items for reindexing
+        self.registry[INDEXER].find_and_queue_secondary_items(set(rid), set())
 
     def get_rev_links(self, model, rel, *item_types):
         return self.storage().get_rev_links(model, rel, *item_types)
@@ -233,11 +236,47 @@ class ElasticSearchStorage(object):
         hits = search.execute()
         return [hit.to_dict().get('uuid', hit.to_dict().get('_id')) for hit in hits]
 
-    def delete_by_uuid(self, rid, item_type=None):
+    def purge_uuid(self, rid, item_type=None, registry=None):
+        """
+        Purge a uuid from the write storage (Elasticsearch)
+        If there is a mirror environment set up for the indexer, also attempt
+        to remove the uuid from the mirror Elasticsearch
+        """
         if not item_type:
             model = self.get_by_uuid(rid)
             item_type = model.item_type
-        self.es.delete(id=rid, index=item_type, doc_type=item_type)
+        try:
+            self.es.delete(id=rid, index=item_type, doc_type=item_type)
+        except elasticsearch.exceptions.NotFoundError:
+            # Case: Not yet indexed
+            log.error('PURGE: Couldn\'t find %s in ElasticSearch. Continuing.' % rid)
+        except Exception as exc:
+            log.error('PURGE: Cannot delete %s in ElasticSearch. Error: %s Continuing.' % (item_type, str(exc)))
+        if not registry:
+            log.error('PURGE: Registry not available for ESStorage purge_uuid')
+            return
+        # for data/staging, delete the item from the mirrored ES as well
+        if (registry[INDEXER_QUEUE_MIRROR] and
+            getattr(registry[INDEXER_QUEUE_MIRROR], 'env_name', None) != 'fourfront-backup'):
+            # get es information about the mirror env
+            mirror_env = registry[INDEXER_QUEUE_MIRROR].env_name
+            health_res = ff_utils.get_health_page(ff_env=mirror_env)
+            mirror_es = health_res.get('elasticsearch')
+            if not mirror_es:  # bail if we can't find elasticsearch address
+                log.error('PURGE: Couldn\'t read the health page for mirrored env %s' % mirror_env)
+                return
+            use_aws_auth = registry.settings.get('elasticsearch.aws_auth')
+            # make sure use_aws_auth is bool
+            if not isinstance(use_aws_auth, bool):
+                use_aws_auth = True if use_aws_auth == 'true' else False
+            mirror_client = es_utils.create_es_client(mirror_es, use_aws_auth=use_aws_auth)
+            try:
+                mirror_client.delete(id=rid, index=item_type, doc_type=item_type)
+            except elasticsearch.exceptions.NotFoundError:
+                # Case: Not yet indexed
+                log.error('PURGE: Couldn\'t find %s in mirrored ElasticSearch (%s). Continuing.' % (rid, mirror_env))
+            except Exception as exc:
+                log.error('PURGE: Cannot delete %s in mirrored ElasticSearch (%s). Error: %s Continuing.' % (item_type, mirror_env, str(exc)))
 
     def __iter__(self, *item_types):
         query = {'query': {

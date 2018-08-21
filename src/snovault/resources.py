@@ -24,6 +24,7 @@ from .validation import ValidationFailure
 from .util import (
     ensurelist,
     simple_path_ids,
+    uuid_to_path
 )
 
 from .fourfront_utils import add_default_embeds
@@ -248,10 +249,6 @@ class Item(Resource):
         return self.model.uuid
 
     @property
-    def tid(self):
-        return self.model.tid
-
-    @property
     def sid(self):
         return self.model.sid
 
@@ -261,11 +258,25 @@ class Item(Resource):
             for path in self.type_info.schema_links
         }
 
-    def get_rev_links(self, name):
+    def get_rev_links(self, request, name):
+        """
+        Return all rev links for this item under field with <name>
+        Requires a request; if request._indexing view, add these uuids
+        to request._rev_linked_uuids_by_item, which controls invalidation of
+        newly created rev links.
+        _rev_linked_uuids_by_item is a list of dictionaries in form:
+        {<item uuid originating rev link>: <item uuid that is rev linked to>}
+        """
         types = self.registry[TYPES]
         type_name, rel = self.rev[name]
         types = types[type_name].subtypes
-        return self.registry[CONNECTION].get_rev_links(self.model, rel, *types)
+        uuids = self.registry[CONNECTION].get_rev_links(self.model, rel, *types)
+        if getattr(request, '_indexing_view', False) is True:
+            if str(self.uuid) in request._rev_linked_uuids_by_item:
+                request._rev_linked_uuids_by_item[str(self.uuid)].update([str(id) for id in uuids])
+            else:
+                request._rev_linked_uuids_by_item[str(self.uuid)] = set([str(id) for id in uuids])
+        return uuids
 
     def unique_keys(self, properties):
         return {
@@ -297,26 +308,49 @@ class Item(Resource):
         return properties
 
     def __json__(self, request):
-        # Record embedding objects
-        request._embedded_uuids.add(str(self.uuid))
         return self.upgrade_properties()
 
+    def item_with_links(self, request):
+        # This works from the schema rather than the links table
+        # so that upgrade on GET can work.
+        ### context.__json__ CALLS THE UPGRADER ###
+        properties = self.__json__(request)
+        for path in self.type_info.schema_links:
+            uuid_to_path(request, properties, path)
+
+        # if indexing, add the uuid of this object to request._linked_uuids
+        if getattr(request, '_indexing_view', False) is True:
+            request._linked_uuids.add(str(self.uuid))
+        return properties
+
     def __resource_url__(self, request, info):
-        # Record linking objects
-        request._linked_uuids.add(str(self.uuid))
         return None
 
     @classmethod
     def create(cls, registry, uuid, properties, sheets=None):
+        '''
+        This class method is called in crud_views.py - `collection_add` (API endpoint) > `create_item` (method) > `type_info.factory.create` (this class method)
+
+        This method instantiates a new Item class instance from provided `uuid` and `properties`,
+        then runs the `_update` (instance method) to save the Item to the database.
+        '''
         model = registry[CONNECTION].create(cls.__name__, uuid)
-        self = cls(registry, model)
-        self._update(properties, sheets)
-        return self
+        item_instance = cls(registry, model)
+        item_instance._update(properties, sheets)
+        return item_instance
 
     def update(self, properties, sheets=None):
+        '''Alias of _update, called in crud_views.py - `update_item` (method)'''
         self._update(properties, sheets)
 
     def _update(self, properties, sheets=None):
+        '''
+        This instance method is called in Item.create (classmethod) as well as in crud_views.py - `item_edit` (API endpoint) > `update_item` (method) > `context.update` (instance method).
+
+        This method is used to assert lack of duplicate unique keys in database and then to perform database update of `properties` (dict).
+
+        Optionally define this method in inherited classes to extend `properties` on Item updates.
+        '''
         unique_keys = None
         links = None
         if properties is not None:

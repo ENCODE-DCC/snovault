@@ -9,6 +9,7 @@ from snovault import (
 )
 from snowflakes.types.base import paths_filtered_by_status
 from snovault.attachment import ItemWithAttachment
+from snovault.interfaces import CONNECTION
 
 
 def includeme(config):
@@ -89,6 +90,10 @@ class TestingLinkSourceSno(Item):
                 'type': 'string',
                 'linkTo': 'TestingLinkTargetSno',
             },
+            'ppp': {
+                'type': 'string',
+                'linkTo': 'TestingPostPutPatchSno',
+            },
             'status': {
                 'type': 'string',
             },
@@ -125,16 +130,21 @@ class TestingLinkTargetSno(Item):
         'reverse.*',
     ]
 
+    def rev_link_atids(self, request, rev_name):
+        conn = request.registry[CONNECTION]
+        return [request.resource_path(conn[uuid]) for uuid in
+                paths_filtered_by_status(request, self.get_rev_links(request, rev_name))]
+
     @calculated_property(schema={
         "title": "Sources",
         "type": "array",
         "items": {
             "type": ['string', 'object'],
-            "linkFrom": "TestingLinkSourceSno.target",
+            "linkTo": "TestingLinkSourceSno",
         },
     })
-    def reverse(self, request, reverse):
-        return paths_filtered_by_status(request, reverse)
+    def reverse(self, request):
+        return self.rev_link_atids(request, "reverse")
 
 
 # Renamed from TestingPostPutPatch to TestingPostPutPatchSno so that indices
