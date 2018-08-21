@@ -138,8 +138,8 @@ class MPIndexer(Indexer):
         chunkiness = int((uuid_count - 1) / workers) + 1
         if chunkiness > self.chunksize:
             chunkiness = self.chunksize
-        uuids = random.shuffle(uuids)
         tasks = [(uuid, xmin, snapshot_id, restart) for uuid in uuids]
+        random.shuffle(tasks)
         errors = []
         try:
             for i, error in enumerate(self.pool.imap_unordered(
