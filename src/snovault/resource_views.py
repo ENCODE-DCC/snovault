@@ -28,6 +28,15 @@ def includeme(config):
     config.scan(__name__)
 
 
+def remove_item_keys(item, request):
+    """Remove keys specified in query from item"""
+    removed_fields = request.params.getall('remove')
+    for field in removed_fields:
+        if field in item:
+            del item[field]
+    return item
+
+
 @view_config(context=AbstractCollection, permission='list', request_method='GET',
              name='listing')
 def collection_view_listing_db(context, request):
@@ -53,7 +62,7 @@ def collection_view_listing_db(context, request):
         items = islice(items, limit)
 
     result['@graph'] = [
-        request.embed(request.resource_path(item, '@@' + frame))
+        remove_item_keys(request.embed(request.resource_path(item, '@@' + frame)), request)
         for item in items
     ]
 
