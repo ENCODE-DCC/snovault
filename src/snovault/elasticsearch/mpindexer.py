@@ -116,7 +116,7 @@ class MPIndexer(Indexer):
     def __init__(self, registry, processes=None):
         super(MPIndexer, self).__init__(registry)
         self.processes = processes
-        self.chunksize = 512 #int(registry.settings.get('indexer.chunk_size', 1024))  # in production.ini (via buildout.cfg) as 1024
+        self.chunksize = int(registry.settings.get('indexer.chunk_size', 1024))  # in production.ini (via buildout.cfg) as 1024
         self.initargs = (registry[APP_FACTORY], registry.settings,)
 
     @reify
