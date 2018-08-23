@@ -610,7 +610,8 @@ def test_set_facets_type_exists():
 
 
 def test_format_facets():
-    from snovault.helpers.helper import format_facets
+    from base_view import BaseView
+
     es_result = {
         'aggregations': {
             'field1': {
@@ -637,7 +638,7 @@ def test_format_facets():
     schemas = []
     total = 42
     principals = []
-    result = format_facets(
+    result = BaseView.format_facets(
         es_result, facets, used_filters, schemas, total, principals)
 
     assert result == [{
@@ -659,13 +660,13 @@ def test_format_facets():
 
 
 def test_format_facets_no_aggregations():
-    from snovault.helpers.helper import format_facets
-    result = format_facets({}, [], [], [], 0, [])
+    from base_view import BaseView
+    result = BaseView.format_facets({}, [], [], [], 0, [])
     assert result == []
 
 
 def test_format_facets_skips_single_bucket_facets():
-    from snovault.helpers.helper import format_facets
+    from base_view import BaseView
     es_result = {
         'aggregations': {
             'field1': {
@@ -688,14 +689,14 @@ def test_format_facets_skips_single_bucket_facets():
     schemas = []
     total = 42
     principals = []
-    result = format_facets(
+    result = BaseView.format_facets(
         es_result, facets, used_filters, schemas, total, principals)
 
     assert result == []
 
 
 def test_format_facets_adds_pseudo_facet_for_extra_filters():
-    from snovault.helpers.helper import format_facets
+    from base_view import BaseView
     es_result = {
         'aggregations': {},
     }
@@ -712,7 +713,7 @@ def test_format_facets_adds_pseudo_facet_for_extra_filters():
     }]
     total = 42
     principals = []
-    result = format_facets(
+    result = BaseView.format_facets(
         es_result, facets, used_filters, schemas, total, principals)
 
     assert result == [{
