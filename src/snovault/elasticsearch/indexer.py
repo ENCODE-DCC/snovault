@@ -35,18 +35,32 @@ import copy
 import json
 import requests
 
+from .uuid_queue import (
+    UuidQueue,
+    UuidQueueTypes,
+    UuidQueueWorker,
+)
+
+
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
 log = logging.getLogger(__name__)
 MAX_CLAUSES_FOR_ES = 8192
+QUEUE_NAME = 'indexQ'
+QUEUE_TYPE = UuidQueueTypes.REDIS_LIST_PIPE
+BATCH_GET_SIZE = 1024
+REDIS_HOST = 'localhost'
+REDIS_HOST = '172.31.16.228'
+REDIS_PORT = '9250'
 
 def includeme(config):
     config.add_route('index', '/index')
+    config.add_route('index_worker', '/index_worker')
     config.scan(__name__)
     registry = config.registry
     do_log = False
     if asbool(registry.settings.get('indexer')):
-        do_log = True
+        do_log = False
         print('Set primary indexer in indexer.py')
     registry[INDEXER] = Indexer(registry, do_log=do_log)
 
@@ -117,48 +131,25 @@ def get_related_uuids(request, es, updated, renamed):
     return (related_set, False)
 
 
-
-@view_config(route_name='index', request_method='POST', permission="index")
-def index(request):
-    INDEX = request.registry.settings['snovault.elasticsearch.index']
-    # Setting request.datastore here only works because routed views are not traversed.
-    request.datastore = 'database'
-    record = request.json.get('record', False)
-    dry_run = request.json.get('dry_run', False)
-    recovery = request.json.get('recovery', False)
-    es = request.registry[ELASTIC_SEARCH]
-    indexer = request.registry[INDEXER]
-    session = request.registry[DBSESSION]()
-    connection = session.connection()
-    first_txn = None
-    snapshot_id = None
-    restart=False
-    invalidated = []
-    xmin = -1
-
-    # Currently 2 possible followup indexers (base.ini [set stage_for_followup = vis_indexer, region_indexer])
-    stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').replace(' ','').split(','))
-
-    # May have undone uuids from prior cycle
-    state = IndexerState(es, INDEX, followups=stage_for_followup)
-
-    (xmin, invalidated, restart) = state.priority_cycle(request)
-    # OPTIONAL: restart support
-    if restart:  # Currently not bothering with restart!!!
+# pylint: disable=too-many-arguments
+def indexer_stage_one(
+        request, elastic_search, index_str,
+        restart, state, xmin, invalidated
+    ):
+    '''First check in indexer'''
+    if restart:
         xmin = -1
         invalidated = []
-    # OPTIONAL: restart support
-
-    result = state.get_initial_state()  # get after checking priority!
-
-    if xmin == -1 or len(invalidated) == 0:
+    result = state.get_initial_state()
+    if xmin == -1 or not invalidated:
         xmin = get_current_xmin(request)
-
         last_xmin = None
         if 'last_xmin' in request.json:
             last_xmin = request.json['last_xmin']
         else:
-            status = es.get(index=INDEX, doc_type='meta', id='indexing', ignore=[400, 404])
+            status = elastic_search.get(
+                index=index_str, doc_type='meta', id='indexing', ignore=[400, 404]
+            )
             if status['found'] and 'xmin' in status['_source']:
                 last_xmin = status['_source']['xmin']
         if last_xmin is None:  # still!
@@ -166,115 +157,318 @@ def index(request):
                 last_xmin = result['last_xmin']
             elif 'xmin' in result and result['xmin'] < xmin:
                 last_xmin = result['state']
-
         result.update(
             xmin=xmin,
             last_xmin=last_xmin,
         )
+    return invalidated, result, last_xmin, xmin
 
-    if len(invalidated) > SEARCH_MAX:  # Priority cycle already set up
+
+# pylint: disable=too-many-locals, too-many-arguments
+def indexer_stage_two(
+        request, session, recovery, connection, last_xmin,
+        first_txn, result, invalidated, state, elastic_search,
+        dry_run, flush,
+):
+    '''Some second part to index'''
+    if last_xmin is None:
+        result['types'] = types = request.json.get('types', None)
+        invalidated = list(all_uuids(request.registry, types))
         flush = True
     else:
-
-        flush = False
-        if last_xmin is None:
-            result['types'] = types = request.json.get('types', None)
-            invalidated = list(all_uuids(request.registry, types))
+        txns = session.query(TransactionRecord).filter(
+            TransactionRecord.xid >= last_xmin,
+        )
+        invalidated = set(invalidated)
+        updated = set()
+        renamed = set()
+        max_xid = 0
+        txn_count = 0
+        for txn in txns.all():
+            txn_count += 1
+            max_xid = max(max_xid, txn.xid)
+            if first_txn is None:
+                first_txn = txn.timestamp
+            else:
+                first_txn = min(first_txn, txn.timestamp)
+            renamed.update(txn.data.get('renamed', ()))
+            updated.update(txn.data.get('updated', ()))
+        if invalidated:
+            updated |= invalidated
+        result['txn_count'] = txn_count
+        if txn_count == 0 and not invalidated:
+            state.send_notices()
+            return None, None, None, result
+        (related_set, full_reindex) = get_related_uuids(
+            request, elastic_search, updated, renamed
+        )
+        if full_reindex:
+            invalidated = related_set
             flush = True
         else:
-            txns = session.query(TransactionRecord).filter(
-                TransactionRecord.xid >= last_xmin,
+            invalidated = related_set | updated
+            result.update(
+                max_xid=max_xid,
+                renamed=renamed,
+                updated=updated,
+                referencing=len(related_set),
+                invalidated=len(invalidated),
+                txn_count=txn_count
             )
+            if first_txn is not None:
+                result['first_txn_timestamp'] = first_txn.isoformat()
+        if invalidated and not dry_run:
+            if not recovery:
+                snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
+        return invalidated, snapshot_id, flush, result
+    return invalidated, None, flush, result
 
-            invalidated = set(invalidated)  # not empty if API index request occurred
-            updated = set()
-            renamed = set()
-            max_xid = 0
-            txn_count = 0
-            for txn in txns.all():
-                txn_count += 1
-                max_xid = max(max_xid, txn.xid)
-                if first_txn is None:
-                    first_txn = txn.timestamp
-                else:
-                    first_txn = min(first_txn, txn.timestamp)
-                renamed.update(txn.data.get('renamed', ()))
-                updated.update(txn.data.get('updated', ()))
 
-            if invalidated:        # reindex requested, treat like updated
-                updated |= invalidated
+# pylint: disable=too-many-arguments
+def indexer_post_cycle(
+        errors, result, record, elastic_search,
+        index_str, flush,
+    ):
+    '''If a index cycle ran run this after'''
+    if errors:
+        result['errors'] = errors
+    if record:
+        try:
+            elastic_search.index(index=index_str, doc_type='meta', body=result, id='indexing')
+        except: # pylint: disable=bare-except
+            error_messages = copy.deepcopy(result['errors'])
+            del result['errors']
+            elastic_search.index(index=index_str, doc_type='meta', body=result, id='indexing')
+            for item in error_messages:
+                if 'error_message' in item:
+                    log.error(
+                        'Indexing error for %s, error message: %s',
+                        item['uuid'],
+                        item['error_message'],
+                    )
+                    item['error_message'] = "Error occured during indexing, check the logs"
+            result['errors'] = error_messages
+    elastic_search.indices.refresh('_all')
+    if flush:
+        try:
+            elastic_search.indices.flush_synced(index='_all')  # Faster recovery on ES restart
+        except ConflictError:
+            pass
+    return result
 
-            result['txn_count'] = txn_count
-            if txn_count == 0 and len(invalidated) == 0:
-                state.send_notices()
-                return result
 
-            (related_set, full_reindex) = get_related_uuids(request, es, updated, renamed)
-            if full_reindex:
-                invalidated = related_set
-                flush = True
-            else:
-                invalidated = related_set | updated
-                result.update(
-                    max_xid=max_xid,
-                    renamed=renamed,
-                    updated=updated,
-                    referencing=len(related_set),
-                    invalidated=len(invalidated),
-                    txn_count=txn_count
+def consume_uuids(request, batch_id, uuids, xmin, snapshot_id, restart):
+    '''generic run uuids'''
+    successes = []
+    errors = []
+    errors = request.registry[INDEXER].update_objects(
+        request,
+        uuids,
+        xmin,
+        snapshot_id,
+        restart,
+    )
+    return batch_id, len(uuids) - len(errors), errors
+
+
+@view_config(route_name='index_worker', request_method='POST', permission="index")
+def index_worker(request):
+    '''Run Worker, server must be started'''
+    skip_consume = 0
+    client_options = {
+        'host': REDIS_HOST,
+        'port': REDIS_PORT,
+    }
+    uuid_queue = UuidQueueWorker(
+        QUEUE_NAME,
+        QUEUE_TYPE,
+        client_options,
+    )
+    if uuid_queue.server_ready():
+        if uuid_queue.queue_running():
+            processed = 0
+            while uuid_queue.queue_running():
+                batch_id, uuids, _ = uuid_queue.get_uuids(
+                    get_count=BATCH_GET_SIZE
                 )
-                if first_txn is not None:
-                    result['first_txn_timestamp'] = first_txn.isoformat()
+                if batch_id and uuids:
+                    if skip_consume > 0:
+                        skip_consume -= 1
+                    else:
+                        batch_id, successes, errors = consume_uuids(
+                            request,
+                            batch_id, uuids,
+                            uuid_queue.xmin, uuid_queue.snapshot_id, uuid_queue.restart
+                        )
+                        processed += successes
+                        uuid_queue.add_finished(batch_id, successes, errors)
+                time.sleep(0.05)
+            print('run_worker done', processed)
+    return {}
 
-            if invalidated and not dry_run:
-                # Exporting a snapshot mints a new xid, so only do so when required.
-                # Not yet possible to export a snapshot on a standby server:
-                # http://www.postgresql.org/message-id/CAHGQGwEtJCeHUB6KzaiJ6ndvx6EFsidTGnuLwJ1itwVH0EJTOA@mail.gmail.com
-                if snapshot_id is None and not recovery:
-                    snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
 
-    if invalidated and not dry_run:
-        if len(stage_for_followup) > 0:
-            # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
+# pylint: disable=too-many-statements, too-many-branches, too-many-locals
+@view_config(route_name='index', request_method='POST', permission="index")
+def index(request):
+    '''index listener'''
+    print('index listener')
+    index_str = request.registry.settings['snovault.elasticsearch.index']
+    request.datastore = 'database'
+    record = request.json.get('record', False)
+    dry_run = request.json.get('dry_run', False)
+    recovery = request.json.get('recovery', False)
+    elastic_search = request.registry[ELASTIC_SEARCH]
+    session = request.registry[DBSESSION]()
+    connection = session.connection()
+    first_txn = None
+    restart = False
+    invalidated = []
+    xmin = -1
+    stage_for_followup = list(
+        request.registry.settings.get("stage_for_followup", '').replace(' ', '').split(',')
+    )
+    state = IndexerState(elastic_search, index_str, followups=stage_for_followup)
+    (xmin, invalidated, restart) = state.priority_cycle(request)
+    invalidated, result, last_xmin, xmin = indexer_stage_one(
+        request, elastic_search, index_str,
+        restart, state, xmin, invalidated,
+    )
+    client_options = {
+        'host': REDIS_HOST,
+        'port': REDIS_PORT,
+    }
+    uuid_queue = UuidQueue(
+        QUEUE_NAME,
+        QUEUE_TYPE,
+        client_options,
+    )
+    run_args = {
+        'batch_by': BATCH_GET_SIZE,
+        'uuid_len': 36,
+        'xmin': xmin,
+        'snapshot_id': None,
+        'restart': False,
+    }
+    if len(invalidated) > SEARCH_MAX:
+        flush = True
+    else:
+        flush = False
+        invalidated, snapshot_id, flush, result = indexer_stage_two(
+            request, session, recovery, connection, last_xmin,
+            first_txn, result, invalidated, state, elastic_search,
+            dry_run, flush,
+        )
+        if snapshot_id:
+            run_args['snapshot_id'] = snapshot_id
+        # indexer_stage_two has a return case.
+        # If invalidated comes back as
+        # none is how we catch it
+        if invalidated is None:
+            print('early No indexing', 'so reset queue')
+            uuid_queue.purge()
+            return result
+    if not invalidated:
+        print('No indexing', 'so reset queue')
+        uuid_queue.purge()
+    elif not dry_run:
+        if stage_for_followup:
             state.prep_for_followup(xmin, invalidated)
-
-        result = state.start_cycle(invalidated, result)
-
-        # Do the work...
-
-        errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
-
-        result = state.finish_cycle(result,errors)
-
-        if errors:
-            result['errors'] = errors
-
-        if record:
-            try:
-                es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
-            except:
-                error_messages = copy.deepcopy(result['errors'])
-                del result['errors']
-                es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
-                for item in error_messages:
-                    if 'error_message' in item:
-                        log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
-                        item['error_message'] = "Error occured during indexing, check the logs"
-                result['errors'] = error_messages
-
-
-        es.indices.refresh('_all')
-        if flush:
-            try:
-                es.indices.flush_synced(index='_all')  # Faster recovery on ES restart
-            except ConflictError:
-                pass
-
+        if uuid_queue.queue_running():
+            print(
+                'index listener',
+                'ALREADY RUNNING',
+                'do not know if process restart'
+            )
+            result = run_cycle(
+                uuid_queue, state, result, record,
+                elastic_search, index_str, flush,
+                run_args,
+                listener_restarted=True
+            )
+        else:
+            invalidated = short_indexer(invalidated, max_invalid=100)
+            result, did_fail = init_cycle(
+                uuid_queue,
+                invalidated,
+                state,
+                result,
+                run_args,
+            )
+            if not did_fail:
+                result = run_cycle(
+                    uuid_queue, state, result, record,
+                    elastic_search, index_str, flush, run_args
+                )
+            else:
+                print('index listener', 'FAILED INIT')
     if first_txn is not None:
         result['txn_lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
-
     state.send_notices()
     return result
+
+
+def init_cycle(uuid_queue, invalidated, state, result, run_args):
+    '''Starts an index cycle'''
+    did_pass = uuid_queue.initialize(run_args)
+    did_fail = True
+    if did_pass:
+        did_fail = False
+        _, success_cnt, _ = uuid_queue.load_uuids(invalidated)
+        if not success_cnt:
+            did_fail = True
+        else:
+            result = state.start_cycle(invalidated, result)
+    return result, did_fail
+
+
+def run_cycle(uuid_queue, state, result, record,
+              elastic_search, index_str, flush,
+              run_args,
+              listener_restarted=False
+             ):
+    '''Run the uuids index cycle after state has been started'''
+    errors = server_loop(uuid_queue, run_args, listener_restarted=listener_restarted)
+    result = state.finish_cycle(result, errors)
+    result = indexer_post_cycle(
+        errors, result, record,
+        elastic_search, index_str, flush)
+    return result
+
+
+def server_loop(uuid_queue, run_args, listener_restarted=False):
+    '''wait for workers to finish loop'''
+    max_age_secs = 7200
+    queue_done = False
+    errors = None
+    while not queue_done:
+        print('server loop done', queue_done)
+        readd_uuids, queue_done = uuid_queue.is_finished(
+            max_age_secs=max_age_secs, listener_restarted=listener_restarted,
+        )
+        if readd_uuids:
+            if listener_restarted:
+                if not uuid_queue.initialize(run_args):
+                    print('restart issue, not solved')
+            uuid_queue.load_uuids(
+                readd_uuids,
+                readded=True,
+            )
+        if queue_done:
+            errors = uuid_queue.get_errors()
+        time.sleep(1.00)
+    print('done, try readding errors?', len(errors))
+    uuid_queue.stop()
+    return errors
+
+
+def short_indexer(invalidated, max_invalid=None):
+    '''DEBUG limit invalidated uuids, make list too'''
+    invalid = []
+    for item in invalidated:
+        invalid.append(item)
+        if max_invalid and len(invalid) >= max_invalid:
+            break
+    return invalid
 
 
 def get_current_xmin(request):
@@ -298,6 +492,7 @@ def get_current_xmin(request):
     xmin = query.scalar()  # lowest xid that is still in progress
     return xmin
 
+
 class Indexer(object):
     def __init__(self, registry, do_log=False):
         self.es = registry[ELASTIC_SEARCH]
@@ -308,6 +503,7 @@ class Indexer(object):
     def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
         self._indexer_log.new_log(len(uuids), xmin, snapshot_id)
         errors = []
+        print('update objects')
         for i, uuid in enumerate(uuids):
             output = self.update_object(request, uuid, xmin)
             if output:
@@ -323,37 +519,11 @@ class Indexer(object):
 
         return errors
 
-    def update_object(self, request, uuid, xmin, restart=False):
-        request.datastore = 'database'  # required by 2-step indexer
-
-        # OPTIONAL: restart support
-        # If a restart occurred in the middle of indexing, this uuid might have already been indexd, so skip redoing it.
-        # if restart:
-        #     try:
-        #         #if self.es.exists(index=self.index, id=str(uuid), version=xmin, version_type='external_gte'):  # couldn't get exists to work.
-        #         result = self.es.get(index=self.index, id=str(uuid), _source_include='uuid', version=xmin, version_type='external_gte')
-        #         if result.get('_source') is not None:
-        #             return
-        #     except:
-        #         pass
-        # OPTIONAL: restart support
-
-        output = {
-            'doc_embedded': None,
-            'doc_linked': None,
-            'doc_path': None,
-            'doc_type': None,
-            'embed_ecp': None,
-            'embed_time': None,
-            'es_ecp': None,
-            'es_time': None,
-            'error_message': None,
-            'start_time': time.time(),
-            'timestamp': None,
-            'uuid': str(uuid),
-        }
+    def _get_embed_doc(self, request, uuid, output):
+        doc = None
         try:
             doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
+            print('doc', uuid, len(doc['embedded_uuids']))
         except StatementError:
             # Can't reconnect until invalid transaction is rolled back
             output['embed_ecp'] = 'Embed StatementError'
@@ -370,12 +540,31 @@ class Indexer(object):
             output['doc_embedded'] = len(doc.get('embedded_uuids', []))
             output['doc_linked'] = len(doc.get('linked_uuids', []))
         output['embed_time'] = time.time() - output['start_time']
+        return output, doc
 
-        if output['error_message'] is None:
+    def update_object(self, request, uuid, xmin, restart=False):
+        request.datastore = 'database'  # required by 2-step indexer
+        output = {
+            'doc_embedded': None,
+            'doc_linked': None,
+            'doc_path': None,
+            'doc_type': None,
+            'embed_ecp': None,
+            'embed_time': None,
+            'es_ecp': None,
+            'es_time': None,
+            'error_message': None,
+            'start_time': time.time(),
+            'timestamp': None,
+            'uuid': str(uuid),
+        }
+        output, doc = self._get_embed_doc(request, uuid, output)
+        if doc and output['error_message'] is None:
             for backoff in [0, 10, 20, 40, 80]:
                 time.sleep(backoff)
                 try:
                     es_start_time = time.time()
+                    print('es', uuid, doc['item_type'], xmin)
                     self.es.index(
                         index=doc['item_type'], doc_type=doc['item_type'], body=doc,
                         id=str(uuid), version=xmin, version_type='external_gte',
