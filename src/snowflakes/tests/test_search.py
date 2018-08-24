@@ -419,7 +419,7 @@ def test_set_facets():
                         'field': 'embedded.@type',
                         'exclude': ['Item'],
                         'min_doc_count': 0,
-                        'size': 100,
+                        'size': 200,
                     },
                 },
             },
@@ -441,7 +441,7 @@ def test_set_facets():
                     'terms': {
                         'field': 'audit.foo',
                         'min_doc_count': 0,
-                        'size': 100,
+                        'size': 200,
                     },
                 },
             },
@@ -462,7 +462,7 @@ def test_set_facets():
                     'terms': {
                         'field': 'embedded.facet1',
                         'min_doc_count': 0,
-                        'size': 100,
+                        'size': 200,
                     },
                 },
             },
@@ -501,7 +501,7 @@ def test_set_facets_negated_filter():
                     'terms': {
                         'field': 'embedded.facet1',
                         'min_doc_count': 0,
-                        'size': 100,
+                        'size': 200,
                     },
                 },
             },
@@ -517,7 +517,7 @@ def test_set_facets_negated_filter():
                 },
             },
         }
-    } == aggs
+    } 
 
 
 
