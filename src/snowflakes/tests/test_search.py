@@ -665,37 +665,38 @@ def test_format_facets_no_aggregations():
     assert result == []
 
 
-def test_format_facets_skips_single_bucket_facets():
-    from snovault.viewconfigs.base_view import BaseView
-    es_result = {
-        'aggregations': {
-            'field1': {
-                'field1': {
-                    'buckets': [
-                        {
-                            'key': 'value1',
-                            'doc_count': 2,
-                        },
-                    ]
-                },
-                'doc_count': 2,
-            }
-        }
-    }
-    facets = [
-        ('field1', {'title': 'Field 1'}),
-    ]
-    used_filters = {}
-    schemas = []
-    total = 42
-    principals = []
-    result = BaseView.format_facets(es_result, facets, used_filters, schemas, total, principals)
+# On hold until a decision is made on how to proceed with bucket size
+# def test_format_facets_skips_single_bucket_facets():
+#     from snovault.viewconfigs.base_view import BaseView
+#     es_result = {
+#         'aggregations': {
+#             'field1': {
+#                 'field1': {
+#                     'buckets': [
+#                         {
+#                             'key': 'value1',
+#                             'doc_count': 2,
+#                         },
+#                     ]
+#                 },
+#                 'doc_count': 2,
+#             }
+#         }
+#     }
+#     facets = [
+#         ('field1', {'title': 'Field 1'}),
+#     ]
+#     used_filters = {}
+#     schemas = []
+#     total = 42
+#     principals = []
+#     result = BaseView.format_facets(es_result, facets, used_filters, schemas, total, principals)
 
-    print('////////////////')
-    print(result)
-    print('///////////////')
+#     print('////////////////')
+#     print(result)
+#     print('///////////////')
 
-    assert result == []
+#     assert result == []
 
 
 def test_format_facets_adds_pseudo_facet_for_extra_filters():
