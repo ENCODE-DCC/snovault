@@ -12,7 +12,7 @@ from snovault.helpers.helper import (
     set_filters,
     set_facets,
     iter_long_json,
-    # search_result_actions,
+    search_result_actions,
     format_results,
     get_pagination,
     prepare_search_term,
@@ -232,7 +232,7 @@ class SearchView(BaseView):
         result['facets'] = self.format_facets(es_results, facets, used_filters, schemas, total, self.principals)
 
         # Add batch actions
-        # result.update(search_result_actions(self.request, doc_types, es_results))
+        result.update(search_result_actions(self.request, doc_types, es_results))
 
 
         # Add all link for collections
