@@ -154,11 +154,12 @@ class SearchView(BaseView):
             # Add special views like Report if search is a single type
             if len(doc_types) == 1:
                 result['views'] = views = []
-                views.append({
-                    'href': self.request.route_path('report', slash='/') + search_base,
-                    'title': 'View tabular report',
-                    'icon': 'table',
-                })
+                views.append(self.tabular_report)
+
+                if hasattr(ti.factory, 'matrix'):
+                    views.append(self.summary_matrix)
+                if hasattr(ti.factory, 'summary_data'):
+                    views.append(self.summary_report)
 
         search_fields, highlights = get_search_fields(self.request, doc_types)
 
