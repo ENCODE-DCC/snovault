@@ -12,7 +12,6 @@ from snovault.helpers.helper import (
     set_filters,
     set_facets,
     iter_long_json,
-    search_result_actions,
     format_results,
     get_pagination,
     prepare_search_term,
@@ -69,7 +68,7 @@ class SearchView(BaseView):
             self.result['@graph'] = []
         return total
 
-    def preprocess_view(self):
+    def preprocess_view(self, views=None, search_result_actions=None):
         """
         Search view connects to ElasticSearch and returns the results
         """
@@ -152,14 +151,17 @@ class SearchView(BaseView):
                 })
 
             # Add special views like Report if search is a single type
-            if len(doc_types) == 1:
-                result['views'] = views = []
-                views.append(self.tabular_report)
+            if views:
+                result['views'] = views
 
-                if hasattr(ti.factory, 'matrix'):
-                    views.append(self.summary_matrix)
-                if hasattr(ti.factory, 'summary_data'):
-                    views.append(self.summary_report)
+            # if len(doc_types) == 1:
+            #     result['views'] = views = []
+            #     views.append(self.tabular_report)
+
+            #     if hasattr(ti.factory, 'matrix'):
+            #         views.append(self.summary_matrix)
+            #     if hasattr(ti.factory, 'summary_data'):
+            #         views.append(self.summary_report)
 
         search_fields, highlights = get_search_fields(self.request, doc_types)
 
@@ -232,7 +234,8 @@ class SearchView(BaseView):
         result['facets'] = self.format_facets(es_results, facets, used_filters, schemas, total, self.principals)
 
         # Add batch actions
-        result.update(search_result_actions(self.request, doc_types, es_results))
+        if search_result_actions:
+            result.update(search_result_actions(self.request, doc_types, es_results))
 
 
         # Add all link for collections

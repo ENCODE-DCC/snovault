@@ -33,26 +33,6 @@ class BaseView(object):
         ]
         self.used_filters = None
         self.from_, self.size = get_pagination(self.request)
-        self.result_list = {
-            'href': self.request.route_path('search', slash='/') + self.search_base,
-            'title': 'View results as list',
-            'icon': 'list-alt',
-        }
-        self.tabular_report = {
-            'href': self.request.route_path('report', slash='/') + self.search_base,
-            'title': 'View tabular report',
-            'icon': 'table',
-        }
-        self.summary_report = {
-            'href': self.request.route_path('summary', slash='/') + self.search_base,
-            'title': 'View summary report',
-            'icon': 'summary',
-        }
-        self.summary_matrix = {
-            'href': self.request.route_path('matrix', slash='/') + self.search_base,
-            'title': 'View summary matrix',
-            'icon': 'th',
-        }
         
     @staticmethod
     def format_facets(es_results, facets, used_filters, schemas, total, principals):
