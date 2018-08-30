@@ -26,16 +26,13 @@ audit_facets = [
     ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
 ]
 
-DEFAULT_DOC_TYPES = [
-    'Lab'
-]
 
 class SearchView(BaseView):
     def __init__(self, context, request, search_type=None, return_generator=False, default_data_types=None):
         super(SearchView, self).__init__(context, request)
         self.search_type = search_type
         self.return_generator = return_generator
-        self.default_data_types = default_data_types or DEFAULT_DOC_TYPES
+        self.default_data_types = default_data_types or []
 
     def set_facets(self):
         if len(self.doc_types) == 1 and 'facets' in self.types[self.doc_types[0]].schema:

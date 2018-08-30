@@ -42,7 +42,7 @@ class BaseView(object):
             'href': self.request.route_path('report', slash='/') + self.search_base,
             'title': 'View tabular report',
             'icon': 'table',
-
+        }
 
     @staticmethod
     def format_facets(es_results, facets, used_filters, schemas, total, principals):
