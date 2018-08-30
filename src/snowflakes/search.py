@@ -32,48 +32,13 @@ from snovault.helpers.helper import (
 CHAR_COUNT = 32
 
 
-def includeme(config):
-    config.add_route('search', '/search{slash:/?}')
-    config.add_route('report', '/report{slash:/?}')
-    config.scan(__name__)
-
-
-SANITIZE_SEARCH_STRING_RE = re.compile(r'[\\\+\-\&\|\!\(\)\{\}\[\]\^\~\:\/\\\*\?]')
-
-AUDIT_FACETS = [
-    ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
-    ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
-    ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
-    ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
-]
-
-
-DEFAULT_DOC_TYPES = [
-    'Lab',
-    'Snowset',
-    'Snowball',
-    'Snowfort',
-    'Snowflake',
-]
-
 
 @view_config(route_name='search', request_method='GET', permission='search')
 def search(context, request, search_type=None, return_generator=False):
     search = SearchView(context, request, search_type, return_generator, DEFAULT_DOC_TYPES)
     return search.preprocess_view()
+=
 
-def iter_search_results(context, request):
-    return search(context, request, return_generator=True)
-
-
-@view_config(context=AbstractCollection, permission='list', request_method='GET',
-             name='listing')
-def collection_view_listing_es(context, request):
-    # Switch to change summary page loading options
-    if request.datastore != 'elasticsearch':
-        return collection_view_listing_db(context, request)
-
-    return search(context, request, context.type_info.name)
 
 
 @view_config(route_name='report', request_method='GET', permission='search')

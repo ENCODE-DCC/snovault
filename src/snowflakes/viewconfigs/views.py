@@ -9,10 +9,23 @@ def includeme(config):
     config.scan(__name__)
 
 
+def iter_search_results(context, request):
+    return search(context, request, return_generator=True)
+
+
 @view_config(route_name='search', request_method='GET', permission='search')
 def search(context, request, search_type=None, return_generator=False):
 
-    search = SearchView(context, request, search_type, return_generator)
+    default_doc_types = [
+        'Lab',
+        'Snowset',
+        'Snowball',
+        'Snowfort',
+        'Snowflake',
+    ]
+
+    search = SearchView(context, request, search_type, return_generator, default_doc_types)
+
     return search.preprocess_view()
 
 
