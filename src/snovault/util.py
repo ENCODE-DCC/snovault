@@ -78,9 +78,8 @@ def select_distinct_values(request, value_path, *from_paths):
     values = from_paths
     for name in value_path:
         calculated_properties = get_calculated_properties_from_paths(request, values)
-        name_is_calculated = name in calculated_properties
         # Don't waste time calculating properties if the field isn't calculated.
-        frame = '@@object' if name_is_calculated else '@@object?skip_calculated=true'
+        frame = '@@object' if name in calculated_properties else '@@object?skip_calculated=true'
         objs = (request.embed(member, frame) for member in values)
         value_lists = (ensurelist(obj.get(name, [])) for obj in objs)
         values = {value for value_list in value_lists for value in value_list}
