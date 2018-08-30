@@ -7,23 +7,6 @@ def includeme(config):
     config.scan(__name__)
 
 
-@view_config(route_name='search', request_method='GET', permission='search')
-def search(context, request, search_type=None, return_generator=False):
-
-    default_doc_types = [
-        'Lab',
-        'Snowset',
-        'Snowball',
-        'Snowfort',
-        'Snowflake',
-    ]
-
-    search = SearchView(context, request, search_type, return_generator, default_doc_types)
-
-    return search.preprocess_view()
-
-
-
 @view_config(route_name='report', request_method='GET', permission='search')
 def report(context, request):
 
