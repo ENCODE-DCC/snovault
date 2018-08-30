@@ -64,8 +64,6 @@ def get_calculated_properties_from_paths(request, paths):
         root.collections.get(p.split('/')[1]).type_info.item_type
         for p in paths
     }
-    import logging
-    logging.warn('Get calculated properties of {}'.format(', '.join(item_types)))
     for item_type in item_types:
         item_cls = request.registry['types'].by_item_type.get(item_type).factory
         calculated_fields.update(
