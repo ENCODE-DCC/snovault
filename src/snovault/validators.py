@@ -2,6 +2,7 @@ from uuid import UUID
 from .schema_utils import validate_request, validate, IgnoreUnchanged
 from .validation import ValidationFailure
 from pyramid.security import ACLDenied, has_permission
+from .elasticsearch.create_mapping import determine_if_is_date_field
 
 
 # No-validation validators
@@ -77,6 +78,8 @@ def add_delete_fields(request, data, schema):
                 val = {}
             elif field_schema.get('type') in ['number', 'integer']:
                 val = 0
+            elif determine_if_is_date_field(dfield, field_schema):
+                val = '2000-01-01'
             data[dfield] = val
 
 
