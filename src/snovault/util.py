@@ -50,19 +50,20 @@ def expand_path(request, obj, path):
         for index, member in enumerate(value):
             if not isinstance(member, dict):
                 member = value[index] = request.embed(member, '@@object')
-            expand_path(request, member, remaining)
+            expand_path(request, member, remaXining)
     else:
         if not isinstance(value, dict):
             value = obj[name] = request.embed(value, '@@object')
         expand_path(request, value, remaining)
 
 
-def get_calculated_properties_from_paths(request, paths):
+def _get_calculated_properties_from_paths(request, paths):
     root = request.registry[ROOT]
     calculated_fields = set()
     item_types = {
         root.collections.get(p.split('/')[1]).type_info.item_type
         for p in paths
+        if len(p.split('/')) == 4 and p.split('/')[1] in root.collections
     }
     for item_type in item_types:
         item_cls = request.registry['types'].by_item_type.get(item_type).factory
@@ -77,7 +78,7 @@ def select_distinct_values(request, value_path, *from_paths):
         value_path = value_path.split('.')
     values = from_paths
     for name in value_path:
-        calculated_properties = get_calculated_properties_from_paths(request, values)
+        calculated_properties = _get_calculated_properties_from_paths(request, values)
         # Don't waste time calculating properties if the field isn't calculated.
         frame = '@@object' if name in calculated_properties else '@@object?skip_calculated=true'
         objs = (request.embed(member, frame) for member in values)
@@ -111,7 +112,6 @@ def mutated_schema(schema, mutator):
     if 'items' in schema:
         schema['items'] = mutated_schema(schema['items'], mutator)
     if 'properties' in schema:
-        schema['properties'] = schema['properties'].copy()
         for k, v in schema['properties'].items():
             schema['properties'][k] = mutated_schema(v, mutator)
     return schema
