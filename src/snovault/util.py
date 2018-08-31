@@ -60,6 +60,7 @@ def expand_path(request, obj, path):
 def _get_calculated_properties_from_paths(request, paths):
     root = request.registry[ROOT]
     calculated_fields = set()
+    # Expect paths in form ['/item1/identifier/', '/item2/identifier/', ...].
     item_types = {
         root.collections.get(p.split('/')[1]).type_info.item_type
         for p in paths
