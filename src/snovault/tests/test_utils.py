@@ -5,7 +5,7 @@ from snovault.util import (
     _get_calculated_properties_from_paths,
 )
 
-
+# Test item with calculated property.
 COLLECTION_URL = '/testing-link-targets/'
 
 
