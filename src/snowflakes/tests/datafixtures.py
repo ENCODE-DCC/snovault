@@ -183,3 +183,43 @@ def snowflake(testapp, lab, award, snowball):
         'lab': lab['@id'],
     }
     return testapp.post_json('/snowflake', item).json['@graph'][0]
+
+
+@pytest.fixture
+def targets():
+    targets = [
+        {'name': 'one', 'uuid': '775795d3-4410-4114-836b-8eeecf1d0c2f'},
+        {'name': 'two', 'uuid': 'd6784f5e-48a1-4b40-9b11-c8aefb6e1377'},
+        {'name': 'quote:name', 'uuid': '0e627b3b-f5d2-41db-ac34-8e97bb8a028c'},
+    ]
+    return targets
+
+
+@pytest.fixture
+def sources():
+    sources = [
+        {
+            'name': 'A',
+            'target': 'one',
+            'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd',
+            'status': 'current',
+        },
+        {
+            'name': 'B',
+            'target': 'two',
+            'uuid': '1e152917-c5fd-4aec-b74f-b0533d0cc55c',
+            'status': 'deleted',
+        },
+    ]
+    return sources
+
+
+@pytest.fixture
+def posted_targets_and_sources(testapp, targets, sources):
+    url = '/testing-link-targets/'
+    for item in targets:
+        testapp.post_json(url, item, status=201)
+
+    url = '/testing-link-sources/'
+    for item in sources:
+        testapp.post_json(url, item, status=201)
