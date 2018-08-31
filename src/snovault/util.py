@@ -50,7 +50,7 @@ def expand_path(request, obj, path):
         for index, member in enumerate(value):
             if not isinstance(member, dict):
                 member = value[index] = request.embed(member, '@@object')
-            expand_path(request, member, remaXining)
+            expand_path(request, member, remaining)
     else:
         if not isinstance(value, dict):
             value = obj[name] = request.embed(value, '@@object')
