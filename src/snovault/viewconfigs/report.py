@@ -37,8 +37,18 @@ class ReportView(SearchView):
         if ('limit' in self.request.GET and self.request.__parent__ is None
                 and (size is None or size > 1000)):
             del self.request.GET['limit']
+        
+        # Add special views like Report and Matrix if search is a single type
+        views = []
+        if len(doc_types) == 1:
+            views.append({
+                'href': self.request.route_path('report', slash='/') + self.search_base,
+                'title': 'View tabular report',
+                'icon': 'table',
+            })
+
         # Reuse search view
-        res = SearchView(self.context, self.request).preprocess_view()
+        res = SearchView(self.context, self.request).preprocess_view(views=views)
         
         # change @id, @type, and views
         res['views'][0] = {

@@ -25,17 +25,14 @@ audit_facets = [
     ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
 ]
 
-DEFAULT_DOC_TYPES = [
-    'Lab'
-]
-
 class SearchView(BaseView):
     def __init__(self, context, request, search_type=None, return_generator=False, default_data_types=None):
         super(SearchView, self).__init__(context, request)
         self.search_type = search_type
         self.return_generator = return_generator
-        self.default_data_types = default_data_types or DEFAULT_DOC_TYPES
-
+        self.default_data_types = default_data_types or []
+        self.context = context
+        
     def set_facets(self):
         if len(self.doc_types) == 1 and 'facets' in self.types[self.doc_types[0]].schema:
             self.facets.extend(self.types[self.doc_types[0]].schema['facets'].items())
@@ -88,7 +85,6 @@ class SearchView(BaseView):
         es_index = '_all'
         search_audit = self.request.has_permission('search_audit')
 
-
         # extract from/size from query parameters
         from_, size = get_pagination(self.request)
 
@@ -96,13 +92,14 @@ class SearchView(BaseView):
         search_term = prepare_search_term(self.request)
 
         ## converts type= query parameters to list of doc_types to search, "*" becomes super class Item
-        if self.search_type is None:
+        if (hasattr(self.context, 'type_info') and
+            hasattr(self.context.type_info, 'name')
+            and self.context.type_info.name):
+            doc_types = [self.context.type_info.name]
+        else:
             doc_types = self.request.params.getall('type')
             if '*' in doc_types:
                 doc_types = ['Item']
-
-        else:
-            doc_types = [self.search_type]
 
         # Normalize to item_type
         try:
@@ -153,15 +150,6 @@ class SearchView(BaseView):
             # Add special views like Report if search is a single type
             if views:
                 result['views'] = views
-
-            # if len(doc_types) == 1:
-            #     result['views'] = views = []
-            #     views.append(self.tabular_report)
-
-            #     if hasattr(ti.factory, 'matrix'):
-            #         views.append(self.summary_matrix)
-            #     if hasattr(ti.factory, 'summary_data'):
-            #         views.append(self.summary_report)
 
         search_fields, highlights = get_search_fields(self.request, doc_types)
 
