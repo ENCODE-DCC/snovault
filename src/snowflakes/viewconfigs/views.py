@@ -5,8 +5,24 @@ from snovault.resource_views import collection_view_listing_db
 from snovault.viewconfigs.searchview import SearchView
 
 def includeme(config):
+    config.add_route('search', '/search{slash:/?}')
     config.add_route('report', '/report{slash:/?}')
     config.scan(__name__)
+
+
+@view_config(context=AbstractCollection, permission='list', request_method='GET', name='listing')
+def collection_view_listing_es(context, request):
+    # Switch to change summary page loading options
+    if request.datastore != 'elasticsearch':
+        return collection_view_listing_db(context, request)
+
+    return search(context, request)
+
+@view_config(route_name='search', request_method='GET', permission='search')
+def search(context, request, search_type=None, return_generator=False, default_doc_types=None, views=None, search_result_actions=None):
+
+    search = SearchView(context, request, search_type, return_generator, default_doc_types)
+    return search.preprocess_view(views=views, search_result_actions=search_result_actions)
 
 
 @view_config(route_name='report', request_method='GET', permission='search')
