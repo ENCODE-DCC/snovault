@@ -4,6 +4,7 @@ from multiprocessing import get_context
 from multiprocessing.pool import Pool
 from pyramid.decorator import reify
 from pyramid.request import apply_request_extensions
+from pyramid.settings import asbool
 from pyramid.threadlocal import (
     get_current_request,
     manager,
@@ -15,6 +16,7 @@ import transaction
 from .indexer import (
     INDEXER,
     Indexer,
+    get_processes,
 )
 from .interfaces import APP_FACTORY
 
@@ -22,14 +24,14 @@ log = logging.getLogger(__name__)
 
 
 def includeme(config):
-    if config.registry.settings.get('indexer_worker'):
+    registry = config.registry
+    if registry.settings.get('indexer_worker'):
         return
-    processes = config.registry.settings.get('indexer.processes')
-    try:
-        processes = int(processes)
-    except:
-        processes = None
-    config.registry[INDEXER] = MPIndexer(config.registry, processes=processes)
+    is_indexer = asbool(registry.settings.get(INDEXER, False))
+    processes = get_processes(registry)
+    if is_indexer and not registry.get(INDEXER):
+        log.warning('Initialized Multi %s', INDEXER)
+        registry[INDEXER] = MPIndexer(registry, processes=processes)
 
 
 # Running in subprocess

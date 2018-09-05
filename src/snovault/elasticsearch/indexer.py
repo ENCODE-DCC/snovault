@@ -4,6 +4,7 @@ from elasticsearch.exceptions import (
     NotFoundError,
     TransportError,
 )
+from pyramid.settings import asbool
 from pyramid.view import view_config
 from sqlalchemy.exc import StatementError
 from snovault import (
@@ -39,10 +40,25 @@ log = logging.getLogger(__name__)
 MAX_CLAUSES_FOR_ES = 8192
 
 def includeme(config):
+    registry = config.registry
+    is_indexer = asbool(config.registry.settings.get(INDEXER, False))
+    processes = get_processes(registry)
+    if is_indexer and processes == 1 and not registry.get(INDEXER):
+        log.warning('Initialized Single %s', INDEXER)
+        registry[INDEXER] = Indexer(registry)
     config.add_route('index', '/index')
     config.scan(__name__)
-    registry = config.registry
-    registry[INDEXER] = Indexer(registry)
+
+
+def get_processes(registry):
+    '''Get indexer processes as integer'''
+    processes = registry.settings.get('indexer.processes')
+    try:
+        processes = int(processes)
+    except [TypeError, ValueError]:
+        processes = None
+    return processes
+
 
 def get_related_uuids(request, es, updated, renamed):
     '''Returns (set of uuids, False) or (list of all uuids, True) if full reindex triggered'''
