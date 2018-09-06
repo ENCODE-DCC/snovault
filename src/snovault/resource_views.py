@@ -167,8 +167,9 @@ def item_view_object(context, request):
     3. Calculated properties (including reverse links.)
     """
     properties = item_links(context, request)
-    calculated = calculate_properties(context, request, properties)
-    properties.update(calculated)
+    if not asbool(request.params.get('skip_calculated')):
+        calculated = calculate_properties(context, request, properties)
+        properties.update(calculated)
     return properties
 
 

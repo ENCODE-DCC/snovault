@@ -1,5 +1,6 @@
 from past.builtins import basestring
 from pyramid.threadlocal import manager as threadlocal_manager
+from snovault.interfaces import ROOT
 
 
 def includeme(config):
@@ -56,16 +57,34 @@ def expand_path(request, obj, path):
         expand_path(request, value, remaining)
 
 
+def _get_calculated_properties_from_paths(request, paths):
+    root = request.registry[ROOT]
+    calculated_fields = set()
+    # Expect paths in form ['/item1/identifier/', '/item2/identifier/', ...].
+    item_types = {
+        root.collections.get(p.split('/')[1]).type_info.item_type
+        for p in paths
+        if len(p.split('/')) == 4 and p.split('/')[1] in root.collections
+    }
+    for item_type in item_types:
+        item_cls = request.registry['types'].by_item_type.get(item_type).factory
+        calculated_fields.update(
+            root.collections.get(item_type).type_info.calculated_properties.props_for(item_cls).keys()
+        )
+    return list(calculated_fields)
+
+
 def select_distinct_values(request, value_path, *from_paths):
     if isinstance(value_path, basestring):
         value_path = value_path.split('.')
-
     values = from_paths
     for name in value_path:
-        objs = (request.embed(member, '@@object') for member in values)
+        calculated_properties = _get_calculated_properties_from_paths(request, values)
+        # Don't waste time calculating properties if the field isn't calculated.
+        frame = '@@object' if name in calculated_properties else '@@object?skip_calculated=true'
+        objs = (request.embed(member, frame) for member in values)
         value_lists = (ensurelist(obj.get(name, [])) for obj in objs)
         values = {value for value_list in value_lists for value in value_list}
-
     return list(values)
 
 
@@ -94,7 +113,6 @@ def mutated_schema(schema, mutator):
     if 'items' in schema:
         schema['items'] = mutated_schema(schema['items'], mutator)
     if 'properties' in schema:
-        schema['properties'] = schema['properties'].copy()
         for k, v in schema['properties'].items():
             schema['properties'][k] = mutated_schema(v, mutator)
     return schema
