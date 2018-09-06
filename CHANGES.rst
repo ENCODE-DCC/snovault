@@ -1,3 +1,6 @@
+1.0.16
+1. SNO-52-alter-select-distinct-values (#131)
+
 1.0.15
 1. SNO-48-add-embed-cache-to-ini (#127)
 
