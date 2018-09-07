@@ -30,17 +30,10 @@ def includeme(config):
     if registry.settings.get('indexer_worker'):
         return
     is_indexer = asbool(registry.settings.get(INDEXER, False))
-    processes = get_processes(registry)
     if is_indexer and not registry.get(INDEXER):
         log.warning('Initialized Multi %s', INDEXER)
+        processes = get_processes(registry)
         registry[INDEXER] = MPIndexer(registry, processes=processes)
-    elif not is_regionindexer and not is_visindexer:
-        # The multiprocessing indexing applications need to add an indexer
-        # to each encoded process registry.  If not, request.registry[INDEXER]
-        # in update_object_in_snapshot will have a KeyError.
-        log.warning('Initialized ENCD Multi %s', INDEXER)
-        registry[INDEXER] = MPIndexer(registry, processes=processes)
-
 
 # Running in subprocess
 
