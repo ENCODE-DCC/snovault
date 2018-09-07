@@ -31,7 +31,7 @@ def includeme(config):
         return
     is_indexer = asbool(registry.settings.get(INDEXER, False))
     if is_indexer and not registry.get(INDEXER):
-        log.warning('Initialized Multi %s', INDEXER)
+        log.info('Initialized Multi %s', INDEXER)
         processes = get_processes(registry)
         registry[INDEXER] = MPIndexer(registry, processes=processes)
 
@@ -106,8 +106,7 @@ def update_object_in_snapshot(args):
     uuid, xmin, snapshot_id, restart = args
     with snapshot(xmin, snapshot_id):
         request = get_current_request()
-        indexer = request.registry[INDEXER]
-        return indexer.update_object(request, uuid, xmin, restart)
+        return Indexer.update_object(request, uuid, xmin, restart)
 
 
 # Running in main process

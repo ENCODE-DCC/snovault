@@ -19,8 +19,6 @@ from urllib3.exceptions import ReadTimeoutError
 from .interfaces import (
     ELASTIC_SEARCH,
     INDEXER,
-    REGION_INDEXER_NAME,
-    VIS_INDEXER_NAME,
 )
 from .indexer_state import (
     IndexerState,
@@ -44,20 +42,10 @@ MAX_CLAUSES_FOR_ES = 8192
 def includeme(config):
     registry = config.registry
     is_indexer = asbool(config.registry.settings.get(INDEXER, False))
-    is_regionindexer = asbool(registry.settings.get(REGION_INDEXER_NAME, False))
-    is_visindexer = asbool(registry.settings.get(VIS_INDEXER_NAME, False))
-    print(is_indexer, is_regionindexer, is_visindexer)
     processes = get_processes(registry)
     if is_indexer and processes == 1 and not registry.get(INDEXER):
-        log.warning('Initialized Single %s', INDEXER)
+        log.info('Initialized Single %s', INDEXER)
         registry[INDEXER] = Indexer(registry)
-    elif processes > 1:
-        # The multiprocessing indexing applications need to add an indexer
-        # to each encoded process registry.  If not, request.registry[INDEXER]
-        # in update_object_in_snapshot will have a KeyError.
-        if not is_regionindexer and not is_visindexer:
-            log.warning('Initialized ENCD Single %s', INDEXER)
-            registry[INDEXER] = Indexer(registry)
     config.add_route('index', '/index')
     config.scan(__name__)
 
@@ -336,9 +324,10 @@ class Indexer(object):
 
         return errors
 
-    def update_object(self, request, uuid, xmin, restart=False):
+    @staticmethod
+    def update_object(request, uuid, xmin, restart=False):
         request.datastore = 'database'  # required by 2-step indexer
-
+        es = request.registry[ELASTIC_SEARCH]
         # OPTIONAL: restart support
         # If a restart occurred in the middle of indexing, this uuid might have already been indexd, so skip redoing it.
         # if restart:
@@ -365,7 +354,7 @@ class Indexer(object):
             for backoff in [0, 10, 20, 40, 80]:
                 time.sleep(backoff)
                 try:
-                    self.es.index(
+                    es.index(
                         index=doc['item_type'], doc_type=doc['item_type'], body=doc,
                         id=str(uuid), version=xmin, version_type='external_gte',
                         request_timeout=30,
