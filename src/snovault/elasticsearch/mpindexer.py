@@ -20,8 +20,6 @@ from .indexer import (
 from .interfaces import (
     APP_FACTORY,
     INDEXER,
-    REGION_INDEXER_NAME,
-    VIS_INDEXER_NAME,
 )
 
 log = logging.getLogger(__name__)
@@ -32,8 +30,6 @@ def includeme(config):
     if registry.settings.get('indexer_worker'):
         return
     is_indexer = asbool(registry.settings.get(INDEXER, False))
-    is_regionindexer = asbool(registry.settings.get(REGION_INDEXER_NAME, False))
-    is_visindexer = asbool(registry.settings.get(VIS_INDEXER_NAME, False))
     processes = get_processes(registry)
     if is_indexer and not registry.get(INDEXER):
         log.warning('Initialized Multi %s', INDEXER)
