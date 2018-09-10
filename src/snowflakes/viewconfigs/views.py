@@ -10,6 +10,15 @@ def includeme(config):
     config.scan(__name__)
 
 
+DEFAULT_DOC_TYPES = [
+    'Lab',
+    'Snowset',
+    'Snowball',
+    'Snowfort',
+    'Snowflake',
+]
+
+
 @view_config(context=AbstractCollection, permission='list', request_method='GET', name='listing')
 def collection_view_listing_es(context, request):
     # Switch to change summary page loading options
@@ -19,9 +28,9 @@ def collection_view_listing_es(context, request):
     return search(context, request)
 
 @view_config(route_name='search', request_method='GET', permission='search')
-def search(context, request, search_type=None, return_generator=False, default_doc_types=None, views=None, search_result_actions=None):
+def search(context, request, search_type=None, views=None, return_generator=False, search_result_actions=None):
 
-    search = SearchView(context, request, search_type, return_generator, default_doc_types)
+    search = SearchView(context, request, search_type, return_generator, DEFAULT_DOC_TYPES)
     return search.preprocess_view(views=views, search_result_actions=search_result_actions)
 
 
