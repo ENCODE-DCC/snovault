@@ -58,7 +58,7 @@ META_MAPPING = {
 
 PATH_FIELDS = ['submitted_file_name']
 NON_SUBSTRING_FIELDS = ['uuid', '@id', 'submitted_by', 'md5sum', 'references', 'submitted_file_name']
-NUM_SHARDS = 3
+NUM_SHARDS = 1
 NUM_REPLICAS = 1
 
 

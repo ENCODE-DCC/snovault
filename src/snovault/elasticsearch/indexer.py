@@ -122,15 +122,16 @@ class Indexer(object):
         # (which is synchronous) OR uuids from the queue
         sync_uuids = request.json.get('uuids', None)
         # actually index
-        # TODO: these provides large speed increases... need to test with live data more to see
-        # if it produces correct resutls
-        # self.es.indices.put_settings(index='_all', body={'index' : {'refresh_interval': '-1'}})
+        # increase refresh interval while indexing is ongoing for performance
+        self.es.indices.put_settings(index='_all', body={'index' : {'refresh_interval': '30s'}})
+        # TODO: consider removing replicates during indexing for performance?
+        # index.number_of_replicas = 0
         if sync_uuids:
             errors = self.update_objects_sync(request, sync_uuids, counter)
         else:
             errors = self.update_objects_queue(request, counter)
-        # resets the refresh_interval to the default value 
-        self.es.indices.put_settings(index='_all', body={'index' : {'refresh_interval': None}})
+        # resets the refresh_interval to the default value
+        self.es.indices.put_settings(index='_all', body={'index' : {'refresh_interval': '1s'}})
 
     def get_messages_from_queue(self, skip_deferred=False):
         """
