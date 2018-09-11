@@ -137,6 +137,7 @@ def index(request):
     state = IndexerState(es, INDEX, followups=stage_for_followup)
 
     (xmin, invalidated, restart) = state.priority_cycle(request)
+    state.log_reindex_init_state()
     # OPTIONAL: restart support
     if restart:  # Currently not bothering with restart!!!
         xmin = -1
