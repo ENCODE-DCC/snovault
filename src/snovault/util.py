@@ -113,6 +113,7 @@ def mutated_schema(schema, mutator):
     if 'items' in schema:
         schema['items'] = mutated_schema(schema['items'], mutator)
     if 'properties' in schema:
+        schema['properties'] = schema['properties'].copy()
         for k, v in schema['properties'].items():
             schema['properties'][k] = mutated_schema(v, mutator)
     return schema
