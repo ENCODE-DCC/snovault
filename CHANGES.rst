@@ -1,3 +1,6 @@
+1.0.17
+1. [HOTFIX] SNO-54-fix-schema-copy-line (#136)
+
 1.0.16
 1. SNO-52-alter-select-distinct-values (#131)
 
