@@ -131,132 +131,6 @@ def get_related_uuids(request, es, updated, renamed):
     return (related_set, False)
 
 
-# pylint: disable=too-many-arguments
-def indexer_stage_one(
-        request, elastic_search, index_str,
-        restart, state, xmin, invalidated
-    ):
-    '''First check in indexer'''
-    if restart:
-        xmin = -1
-        invalidated = []
-    result = state.get_initial_state()
-    if xmin == -1 or not invalidated:
-        xmin = get_current_xmin(request)
-        last_xmin = None
-        if 'last_xmin' in request.json:
-            last_xmin = request.json['last_xmin']
-        else:
-            status = elastic_search.get(
-                index=index_str, doc_type='meta', id='indexing', ignore=[400, 404]
-            )
-            if status['found'] and 'xmin' in status['_source']:
-                last_xmin = status['_source']['xmin']
-        if last_xmin is None:  # still!
-            if 'last_xmin' in result:
-                last_xmin = result['last_xmin']
-            elif 'xmin' in result and result['xmin'] < xmin:
-                last_xmin = result['state']
-        result.update(
-            xmin=xmin,
-            last_xmin=last_xmin,
-        )
-    return invalidated, result, last_xmin, xmin
-
-
-# pylint: disable=too-many-locals, too-many-arguments
-def indexer_stage_two(
-        request, session, recovery, connection, last_xmin,
-        first_txn, result, invalidated, state, elastic_search,
-        dry_run, flush,
-):
-    '''Some second part to index'''
-    if last_xmin is None:
-        result['types'] = types = request.json.get('types', None)
-        invalidated = list(all_uuids(request.registry, types))
-        flush = True
-    else:
-        txns = session.query(TransactionRecord).filter(
-            TransactionRecord.xid >= last_xmin,
-        )
-        invalidated = set(invalidated)
-        updated = set()
-        renamed = set()
-        max_xid = 0
-        txn_count = 0
-        for txn in txns.all():
-            txn_count += 1
-            max_xid = max(max_xid, txn.xid)
-            if first_txn is None:
-                first_txn = txn.timestamp
-            else:
-                first_txn = min(first_txn, txn.timestamp)
-            renamed.update(txn.data.get('renamed', ()))
-            updated.update(txn.data.get('updated', ()))
-        if invalidated:
-            updated |= invalidated
-        result['txn_count'] = txn_count
-        if txn_count == 0 and not invalidated:
-            state.send_notices()
-            return None, None, None, result
-        (related_set, full_reindex) = get_related_uuids(
-            request, elastic_search, updated, renamed
-        )
-        if full_reindex:
-            invalidated = related_set
-            flush = True
-        else:
-            invalidated = related_set | updated
-            result.update(
-                max_xid=max_xid,
-                renamed=renamed,
-                updated=updated,
-                referencing=len(related_set),
-                invalidated=len(invalidated),
-                txn_count=txn_count
-            )
-            if first_txn is not None:
-                result['first_txn_timestamp'] = first_txn.isoformat()
-        if invalidated and not dry_run:
-            if not recovery:
-                snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
-        return invalidated, snapshot_id, flush, result
-    return invalidated, None, flush, result
-
-
-# pylint: disable=too-many-arguments
-def indexer_post_cycle(
-        errors, result, record, elastic_search,
-        index_str, flush,
-    ):
-    '''If a index cycle ran run this after'''
-    if errors:
-        result['errors'] = errors
-    if record:
-        try:
-            elastic_search.index(index=index_str, doc_type='meta', body=result, id='indexing')
-        except: # pylint: disable=bare-except
-            error_messages = copy.deepcopy(result['errors'])
-            del result['errors']
-            elastic_search.index(index=index_str, doc_type='meta', body=result, id='indexing')
-            for item in error_messages:
-                if 'error_message' in item:
-                    log.error(
-                        'Indexing error for %s, error message: %s',
-                        item['uuid'],
-                        item['error_message'],
-                    )
-                    item['error_message'] = "Error occured during indexing, check the logs"
-            result['errors'] = error_messages
-    elastic_search.indices.refresh('_all')
-    if flush:
-        try:
-            elastic_search.indices.flush_synced(index='_all')  # Faster recovery on ES restart
-        except ConflictError:
-            pass
-    return result
-
-
 def consume_uuids(request, batch_id, uuids, xmin, snapshot_id, restart):
     '''generic run uuids'''
     successes = []
@@ -310,29 +184,58 @@ def index_worker(request):
 # pylint: disable=too-many-statements, too-many-branches, too-many-locals
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
-    '''index listener'''
-    print('index listener')
-    index_str = request.registry.settings['snovault.elasticsearch.index']
+    INDEX = request.registry.settings['snovault.elasticsearch.index']
     request.datastore = 'database'
     record = request.json.get('record', False)
     dry_run = request.json.get('dry_run', False)
     recovery = request.json.get('recovery', False)
     elastic_search = request.registry[ELASTIC_SEARCH]
+    indexer = request.registry[INDEXER]
     session = request.registry[DBSESSION]()
     connection = session.connection()
     first_txn = None
+    snapshot_id = None
     restart = False
     invalidated = []
     xmin = -1
-    stage_for_followup = list(
-        request.registry.settings.get("stage_for_followup", '').replace(' ', '').split(',')
-    )
-    state = IndexerState(elastic_search, index_str, followups=stage_for_followup)
+
+    # Currently 2 possible followup indexers (base.ini [set stage_for_followup = vis_indexer, region_indexer])
+    stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').replace(' ','').split(','))
+    state = IndexerState(elastic_search, INDEX, followups=stage_for_followup)
+
+    # May have undone uuids from prior cycle
+    state = IndexerState(elastic_search, INDEX, followups=stage_for_followup)
+
     (xmin, invalidated, restart) = state.priority_cycle(request)
-    invalidated, result, last_xmin, xmin = indexer_stage_one(
-        request, elastic_search, index_str,
-        restart, state, xmin, invalidated,
-    )
+    # OPTIONAL: restart support
+    if restart:  # Currently not bothering with restart!!!
+        xmin = -1
+        invalidated = []
+    # OPTIONAL: restart support
+
+    result = state.get_initial_state()  # get after checking priority!
+
+    if xmin == -1 or len(invalidated) == 0:
+        xmin = get_current_xmin(request)
+
+        last_xmin = None
+        if 'last_xmin' in request.json:
+            last_xmin = request.json['last_xmin']
+        else:
+            status = elastic_search.get(index=INDEX, doc_type='meta', id='indexing', ignore=[400, 404])
+            if status['found'] and 'xmin' in status['_source']:
+                last_xmin = status['_source']['xmin']
+        if last_xmin is None:  # still!
+            if 'last_xmin' in result:
+                last_xmin = result['last_xmin']
+            elif 'xmin' in result and result['xmin'] < xmin:
+                last_xmin = result['state']
+
+        result.update(
+            xmin=xmin,
+            last_xmin=last_xmin,
+        )
+
     client_options = {
         'host': REDIS_HOST,
         'port': REDIS_PORT,
@@ -342,65 +245,105 @@ def index(request):
         QUEUE_TYPE,
         client_options,
     )
-    run_args = {
-        'batch_by': BATCH_GET_SIZE,
-        'uuid_len': 36,
-        'xmin': xmin,
-        'snapshot_id': None,
-        'restart': False,
-    }
-    if len(invalidated) > SEARCH_MAX:
+
+    if len(invalidated) > SEARCH_MAX:  # Priority cycle already set up
         flush = True
     else:
+
         flush = False
-        invalidated, snapshot_id, flush, result = indexer_stage_two(
-            request, session, recovery, connection, last_xmin,
-            first_txn, result, invalidated, state, elastic_search,
-            dry_run, flush,
-        )
-        if snapshot_id:
-            run_args['snapshot_id'] = snapshot_id
-        # indexer_stage_two has a return case.
-        # If invalidated comes back as
-        # none is how we catch it
-        if invalidated is None:
-            print('early No indexing', 'so reset queue')
-            uuid_queue.purge()
-            return result
+        if last_xmin is None:
+            result['types'] = types = request.json.get('types', None)
+            invalidated = list(all_uuids(request.registry, types))
+            flush = True
+        else:
+            txns = session.query(TransactionRecord).filter(
+                TransactionRecord.xid >= last_xmin,
+            )
+
+            invalidated = set(invalidated)  # not empty if API index request occurred
+            updated = set()
+            renamed = set()
+            max_xid = 0
+            txn_count = 0
+            for txn in txns.all():
+                txn_count += 1
+                max_xid = max(max_xid, txn.xid)
+                if first_txn is None:
+                    first_txn = txn.timestamp
+                else:
+                    first_txn = min(first_txn, txn.timestamp)
+                renamed.update(txn.data.get('renamed', ()))
+                updated.update(txn.data.get('updated', ()))
+
+            if invalidated:        # reindex requested, treat like updated
+                updated |= invalidated
+
+            result['txn_count'] = txn_count
+            if txn_count == 0 and len(invalidated) == 0:
+                state.send_notices()
+                uuid_queue.purge()
+                return result
+
+            (related_set, full_reindex) = get_related_uuids(request, elastic_search, updated, renamed)
+            if full_reindex:
+                invalidated = related_set
+                flush = True
+            else:
+                invalidated = related_set | updated
+                result.update(
+                    max_xid=max_xid,
+                    renamed=renamed,
+                    updated=updated,
+                    referencing=len(related_set),
+                    invalidated=len(invalidated),
+                    txn_count=txn_count
+                )
+                if first_txn is not None:
+                    result['first_txn_timestamp'] = first_txn.isoformat()
+
+            if invalidated and not dry_run:
+                # Exporting a snapshot mints a new xid, so only do so when required.
+                # Not yet possible to export a snapshot on a standby server:
+                # http://www.postgresql.org/message-id/CAHGQGwEtJCeHUB6KzaiJ6ndvx6EFsidTGnuLwJ1itwVH0EJTOA@mail.gmail.com
+                if snapshot_id is None and not recovery:
+                    snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
+
     if not invalidated:
-        print('No indexing', 'so reset queue')
         uuid_queue.purge()
     elif not dry_run:
-        if stage_for_followup:
+        if len(stage_for_followup) > 0:
+            # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
             state.prep_for_followup(xmin, invalidated)
+
+        uuid_queue_run_args = {
+            'batch_by': BATCH_GET_SIZE,
+            'uuid_len': 36,
+            'xmin': xmin,
+            'snapshot_id': snapshot_id,
+            'restart': False,
+        }
         if uuid_queue.queue_running():
-            print(
-                'index listener',
-                'ALREADY RUNNING',
-                'do not know if process restart'
-            )
             result = run_cycle(
                 uuid_queue, state, result, record,
-                elastic_search, index_str, flush,
-                run_args,
+                elastic_search, INDEX, flush,
+                uuid_queue_run_args,
                 listener_restarted=True
             )
         else:
-            invalidated = short_indexer(invalidated, max_invalid=100)
             result, did_fail = init_cycle(
                 uuid_queue,
                 invalidated,
                 state,
                 result,
-                run_args,
+                uuid_queue_run_args,
             )
             if not did_fail:
                 result = run_cycle(
                     uuid_queue, state, result, record,
-                    elastic_search, index_str, flush, run_args
+                    elastic_search, INDEX, flush, uuid_queue_run_args
                 )
             else:
-                print('index listener', 'FAILED INIT')
+                log.warn('Index initalization failed for %d uuids.', len(invalidated))
     if first_txn is not None:
         result['txn_lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
     state.send_notices()
@@ -429,9 +372,30 @@ def run_cycle(uuid_queue, state, result, record,
     '''Run the uuids index cycle after state has been started'''
     errors = server_loop(uuid_queue, run_args, listener_restarted=listener_restarted)
     result = state.finish_cycle(result, errors)
-    result = indexer_post_cycle(
-        errors, result, record,
-        elastic_search, index_str, flush)
+    if errors:
+        result['errors'] = errors
+    if record:
+        try:
+            elastic_search.index(index=index_str, doc_type='meta', body=result, id='indexing')
+        except: # pylint: disable=bare-except
+            error_messages = copy.deepcopy(result['errors'])
+            del result['errors']
+            elastic_search.index(index=index_str, doc_type='meta', body=result, id='indexing')
+            for item in error_messages:
+                if 'error_message' in item:
+                    log.error(
+                        'Indexing error for %s, error message: %s',
+                        item['uuid'],
+                        item['error_message'],
+                    )
+                    item['error_message'] = "Error occured during indexing, check the logs"
+            result['errors'] = error_messages
+    elastic_search.indices.refresh('_all')
+    if flush:
+        try:
+            elastic_search.indices.flush_synced(index='_all')  # Faster recovery on ES restart
+        except ConflictError:
+            pass
     return result
 
 
