@@ -1,3 +1,4 @@
+from os import getpid as os_getpid
 from elasticsearch.exceptions import (
     ConflictError,
     ConnectionError,
@@ -5,7 +6,6 @@ from elasticsearch.exceptions import (
     TransportError,
 )
 from pyramid.view import view_config
-from pyramid.settings import asbool
 from sqlalchemy.exc import StatementError
 from snovault import (
     COLLECTIONS,
@@ -20,7 +20,6 @@ from .interfaces import (
     ELASTIC_SEARCH,
     INDEXER
 )
-from .index_logger import IndexLogger
 from .indexer_state import (
     IndexerState,
     all_uuids,
@@ -35,6 +34,7 @@ import copy
 import json
 import requests
 
+from .indexer_data_dump import IndexDataDump
 from .uuid_queue import (
     UuidQueue,
     UuidQueueTypes,
@@ -58,11 +58,7 @@ def includeme(config):
     config.add_route('index_worker', '/index_worker')
     config.scan(__name__)
     registry = config.registry
-    do_log = False
-    if asbool(registry.settings.get('indexer')):
-        do_log = False
-        print('Set primary indexer in indexer.py')
-    registry[INDEXER] = Indexer(registry, do_log=do_log)
+    registry[INDEXER] = Indexer(registry)
 
 def get_related_uuids(request, es, updated, renamed):
     '''Returns (set of uuids, False) or (list of all uuids, True) if full reindex triggered'''
