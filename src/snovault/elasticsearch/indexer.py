@@ -326,6 +326,9 @@ def index(request):
                 listener_restarted=True
             )
         else:
+            # TODO: Remove debug indexer short
+            invalidated = short_indexer(invalidated, max_invalid=100)
+            # TODO: Remove debug indexer short
             result, did_fail = init_cycle(
                 uuid_queue,
                 invalidated,
@@ -344,6 +347,16 @@ def index(request):
         result['txn_lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
     state.send_notices()
     return result
+
+
+def short_indexer(invalidated, max_invalid=None):
+    '''DEBUG limit invalidated uuids, make list too'''
+    invalid = []
+    for item in invalidated:
+        invalid.append(item)
+        if max_invalid and len(invalid) >= max_invalid:
+            break
+    return invalid
 
 
 def init_cycle(uuid_queue, invalidated, state, result, run_args):
@@ -419,16 +432,6 @@ def server_loop(uuid_queue, run_args, listener_restarted=False):
     print('done, try readding errors?', len(errors))
     uuid_queue.stop()
     return errors
-
-
-def short_indexer(invalidated, max_invalid=None):
-    '''DEBUG limit invalidated uuids, make list too'''
-    invalid = []
-    for item in invalidated:
-        invalid.append(item)
-        if max_invalid and len(invalid) >= max_invalid:
-            break
-    return invalid
 
 
 def get_current_xmin(request):
