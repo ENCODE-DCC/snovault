@@ -116,7 +116,11 @@ def update_object_in_snapshot(args):
 # Running in main process
 
 class MPIndexer(Indexer):
-    maxtasks = 1  # pooled processes will exit and be replaced after this many tasks are completed.
+    '''Multiprocess Indexer'''
+    # pooled processes will exit and be replaced after
+    # this many tasks are completed.
+    maxtasks = 1
+    is_mp_indexer = True
 
     def __init__(self, registry, processes=None, do_log=False):
         super(MPIndexer, self).__init__(registry, do_log=do_log)
@@ -147,21 +151,36 @@ class MPIndexer(Indexer):
 
         tasks = [(uuid, xmin, snapshot_id, restart) for uuid in uuids]
         errors = []
+        outputs = []
+        updates = {
+            '_dump_size': 50000,
+            '_is_reindex': is_reindex,
+            'chunksize': self.chunksize,
+            'chunkiness': chunkiness,
+            'processes': self.processes,
+            'workers': workers,
+        }
+        run_info = self.indexer_data_dump.get_run_info(
+            os_getpid(),
+            uuid_count,
+            xmin,
+            self._snapshot_id,
+            **updates
+        )
         try:
             for i, output in enumerate(self.pool.imap_unordered(update_object_in_snapshot, tasks, chunkiness)):
-                self._indexer_log.append_output(output)
                 if output:
-                    if output['error_message'] is not None:
-                        errors.append({
-                            'error_message': output['error_message'],
-                            'timestamp': output['end_timestamp'],
-                            'uuid': output['uuid'],
-                        })
+                    outputs.append(output)
+                    error = output.get('error')
+                    if error is not None:
+                        errors.append(error)
                 if (i + 1) % 50 == 0:
                     log.info('Indexing %d', i + 1)
         except:
             self.shutdown()
             raise
+        run_info['end_time'] = time.time()
+        self._post_index_process(outputs, run_info)
         return errors
 
     def shutdown(self):
