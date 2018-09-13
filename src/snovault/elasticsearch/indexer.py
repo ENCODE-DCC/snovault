@@ -328,7 +328,7 @@ def index(request):
             )
         else:
             # TODO: Remove debug indexer short
-            invalidated = short_indexer(invalidated, max_invalid=100)
+            invalidated = IndexDataDump.debug_short_indexer(invalidated, 100)
             # TODO: Remove debug indexer short
             result, did_fail = init_cycle(
                 uuid_queue,
@@ -348,16 +348,6 @@ def index(request):
         result['txn_lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
     state.send_notices()
     return result
-
-
-def short_indexer(invalidated, max_invalid=None):
-    '''DEBUG limit invalidated uuids, make list too'''
-    invalid = []
-    for item in invalidated:
-        invalid.append(item)
-        if max_invalid and len(invalid) >= max_invalid:
-            break
-    return invalid
 
 
 def init_cycle(uuid_queue, invalidated, state, result, run_args):
