@@ -49,9 +49,7 @@ MAX_CLAUSES_FOR_ES = 8192
 QUEUE_NAME = 'indexQ'
 QUEUE_TYPE = UuidQueueTypes.REDIS_LIST_PIPE
 BATCH_GET_SIZE = 1024
-REDIS_HOST = 'localhost'
-REDIS_HOST = '172.31.16.228'
-REDIS_PORT = '9250'
+
 
 def includeme(config):
     config.add_route('index', '/index')
@@ -147,8 +145,8 @@ def index_worker(request):
     '''Run Worker, server must be started'''
     skip_consume = 0
     client_options = {
-        'host': REDIS_HOST,
-        'port': REDIS_PORT,
+        'host': request.registry.settings['redis_host'],
+        'port': request.registry.settings['redis_port'],
     }
     uuid_queue = UuidQueueWorker(
         QUEUE_NAME,
@@ -234,8 +232,8 @@ def index(request):
         )
 
     client_options = {
-        'host': REDIS_HOST,
-        'port': REDIS_PORT,
+        'host': request.registry.settings['redis_host'],
+        'port': request.registry.settings['redis_port'],
     }
     uuid_queue = UuidQueue(
         QUEUE_NAME,
