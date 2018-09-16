@@ -134,8 +134,7 @@ def consume_uuids(request, batch_id, uuids, xmin, snapshot_id, restart):
         request,
         uuids,
         xmin,
-        snapshot_id,
-        restart,
+        is_reindex=False,
     )
     return batch_id, len(uuids) - len(errors), errors
 
@@ -145,8 +144,8 @@ def index_worker(request):
     '''Run Worker, server must be started'''
     skip_consume = 0
     client_options = {
-        'host': request.registry.settings['redis_host'],
-        'port': request.registry.settings['redis_port'],
+        'host': request.registry.settings['redis-ip'],
+        'port': request.registry.settings['redis-port'],
     }
     uuid_queue = UuidQueueWorker(
         QUEUE_NAME,
@@ -232,8 +231,8 @@ def index(request):
         )
 
     client_options = {
-        'host': request.registry.settings['redis_host'],
-        'port': request.registry.settings['redis_port'],
+        'host': request.registry.settings['redis-ip'],
+        'port': request.registry.settings['redis-port'],
     }
     uuid_queue = UuidQueue(
         QUEUE_NAME,

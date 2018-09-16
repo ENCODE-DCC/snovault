@@ -195,6 +195,7 @@ class RedisQueueMeta(UuidBaseQueueMeta):
             # a bytes-like object or a number, not 'NoneType'
             # after es a0445f86-ba86-4c44-8637-dd6ab5bd7594 analysis_step_run 19551104
             # before crash
+            expired = 0
             try:
                 expired = int(self._client.get(bk_expired))
             except TypeError as ecp:

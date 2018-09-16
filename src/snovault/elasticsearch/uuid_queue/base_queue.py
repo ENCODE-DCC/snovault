@@ -53,13 +53,6 @@ class UuidBaseQueueMeta(object):
         self._errors[batch_id] = errors
         self._errors['meta']['total'] += len(errors)
 
-    def purge_meta(self):
-        '''Remove all meta data'''
-        self._errors = {'meta': {'total': 0}}
-        self._got_batches = {}
-        self._uuids_added = 0
-        self._successes = 0
-
     def add_batch(self, values):
         '''Add values as batch after getting from queue'''
         batch_id = str(self._base_id)
@@ -71,32 +64,36 @@ class UuidBaseQueueMeta(object):
         }
         return batch_id
 
-
     def add_finished(self, batch_id, successes, errors):
         '''Update with outcome consumed uuids'''
         batch = self._got_batches.get(batch_id, None)
+        did_finish = False
+        err_msg = None
         if batch is None:
-            print(
-                'MAKE A WARNING: add_finished.  '
-                'If id was corrupted the batch should expire and rerun.'
-            )
+            err_msg = 'Batch Id %s does not exist' % batch_id
         else:
-            did_check_out = (len(errors) + successes) == len(batch['uuids'])
+            batch_uuids_len = len(batch['uuids'])
+            errors_len = len(errors)
+            did_check_out = ((errors_len + successes) == batch_uuids_len)
             if batch['expired']:
-                print(
-                    'MAKE A WARNING: add_finished.  '
-                    'Batch expired and then finished.'
-                )
+                err_msg = 'Batch Id %s expired' % batch_id
             elif not did_check_out:
-                print(
-                    'MAKE A WARNING: add_finished.  '
-                    'Batch counts were off.  Let it expire.'
+                err_msg = (
+                    'Batch Id {} errors {} plus success {} '
+                    'does not equal batch uuids {}'.format(
+                        batch_id,
+                        errors_len,
+                        successes,
+                        batch_uuids_len,
+                    )
                 )
             else:
                 self._successes += successes
                 if errors:
                     self._add_errors(batch_id, errors)
                 del self._got_batches[batch_id]
+                did_finish = True
+        return did_finish, err_msg
 
     def get_errors(self):
         '''Get all errors from queue that were sent in add_finished'''
@@ -106,6 +103,7 @@ class UuidBaseQueueMeta(object):
                 errors.extend(batch_errors)
         return errors
 
+    # pylint: disable=unused-argument
     def is_finished(
             self,
             max_age_secs=5001,
@@ -116,14 +114,21 @@ class UuidBaseQueueMeta(object):
         did_finish = False
         if max_age_secs:
             for batch in self._got_batches.values():
-                age = time.time() - batch['timestamp']
+                age = time.time() - (batch['timestamp'] / 1000000)
                 if age >= max_age_secs:
+                    batch['expired'] = 1
                     readd_values.extend(batch['uuids'])
         if not readd_values:
             uuids_handled = self._successes + self._errors['meta']['total']
-            print(uuids_handled, self._uuids_added)
             did_finish = uuids_handled == self._uuids_added
         return readd_values, did_finish
+
+    def purge_meta(self):
+        '''Remove all meta data'''
+        self._errors = {'meta': {'total': 0}}
+        self._got_batches = {}
+        self._uuids_added = 0
+        self._successes = 0
 
     def values_added(self, len_values):
         '''
@@ -131,7 +136,6 @@ class UuidBaseQueueMeta(object):
 
         - Also used to remove readded uuids
         '''
-        print(len_values)
         self._uuids_added += len_values
 
 
