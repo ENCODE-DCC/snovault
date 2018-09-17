@@ -50,6 +50,9 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
     def setUpClass(cls):
         cls.qmeta = UuidBaseQueueMeta()
 
+    def setUp(self):
+        self.qmeta.purge_meta()
+
     def test_init(self):
         '''Test UuidBaseQueueMeta init'''
         expected_keys = [
@@ -94,7 +97,6 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         self.assertTrue(batch_id in self.qmeta._errors)
         self.assertEqual(2, len(list(self.qmeta._errors.keys())))
         self.assertEqual(2, self.qmeta._errors['meta']['total'])
-        self.qmeta.purge_meta()
 
     def test_add_batch(self):
         '''Test UuidBaseQueueMeta add_batch'''
@@ -115,7 +117,6 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         batch_uuids.sort()
         self.assertListEqual(batch_uuids, values)
         self.assertEqual(start_base + 1, self.qmeta._base_id)
-        self.qmeta.purge_meta()
 
     def test_add_finished(self):
         '''Test UuidBaseQueueMeta add_finished'''
@@ -132,7 +133,6 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         batch_errors.sort()
         self.assertListEqual(errors, batch_errors)
         self.assertFalse(batch_id in self.qmeta._got_batches)
-        self.qmeta.purge_meta()
 
     def test_add_finished_expired(self):
         '''
@@ -151,7 +151,6 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
             err_msg,
             'Batch Id %s expired' % batch_id
         )
-        self.qmeta.purge_meta()
 
     def test_add_finished_no_batch(self):
         '''Test UuidBaseQueueMeta add_finished with bad batch_id'''
@@ -164,7 +163,6 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
             err_msg,
             'Batch Id %s does not exist' % batch_id
         )
-        self.qmeta.purge_meta()
 
     def test_add_finished_no_checkout(self):
         '''Test UuidBaseQueueMeta add_finished with bad checkout'''
@@ -184,7 +182,6 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
                 len(values),
             )
         )
-        self.qmeta.purge_meta()
 
     def test_get_errors(self):
         '''Test UuidBaseQueueMeta get_errors'''
@@ -196,7 +193,6 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         batch_errors = self.qmeta.get_errors()
         batch_errors.sort()
         self.assertListEqual(errors, batch_errors)
-        self.qmeta.purge_meta()
 
     def test_get_errors_none(self):
         '''Test UuidBaseQueueMeta get_errors when no errors'''
@@ -208,7 +204,6 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         batch_errors = self.qmeta.get_errors()
         batch_errors.sort()
         self.assertListEqual(errors, batch_errors)
-        self.qmeta.purge_meta()
 
     def test_is_finished(self):
         '''Test UuidBaseQueueMeta is_finished'''
@@ -219,7 +214,6 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         readd_values, did_finish = self.qmeta.is_finished()
         self.assertTrue(did_finish)
         self.assertListEqual(readd_values, [])
-        self.qmeta.purge_meta()
 
     def test_is_finished_expired(self):
         '''Test UuidBaseQueueMeta is_finished with expired'''
@@ -233,7 +227,6 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         self.assertListEqual(readd_values, values)
         # pylint: disable=protected-access
         self.assertEqual(self.qmeta._got_batches[batch_id]['expired'], 1)
-        self.qmeta.purge_meta()
 
     def test_is_finished_not_expired(self):
         '''Test UuidBaseQueueMeta is_finished with not expired'''
@@ -246,7 +239,6 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         self.assertListEqual(readd_values, [])
         # pylint: disable=protected-access
         self.assertEqual(self.qmeta._got_batches[batch_id]['expired'], 0)
-        self.qmeta.purge_meta()
 
     def test_purge_meta(self):
         '''Test UuidBaseQueueMeta purge_meta'''
@@ -269,7 +261,6 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         self.assertDictEqual(self.qmeta._got_batches, init_got_batches)
         self.assertEqual(self.qmeta._uuids_added, init_uuids_added)
         self.assertEqual(self.qmeta._successes, init_successes)
-        self.qmeta.purge_meta()
 
     def test_values_added(self):
         '''Test UuidBaseQueueMeta values_added'''
@@ -279,12 +270,154 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         self.assertEqual(self.qmeta._uuids_added, values_added)
 
 
-# class TestUuidBaseQueue(unittest.TestCase):
-#     '''UuidBaseQueue is the base class for queue functionality'''
-#     @classmethod
-#     def setUpClass(cls):
-#         cls._connection = createExpensiveConnectionObject()
-#
-#     @classmethod
-#     def tearDownClass(cls):
-#         cls._connection.destroy()
+class TestUuidBaseQueue(unittest.TestCase):
+    '''UuidBaseQueue is the base class for queue functionality'''
+    @classmethod
+    def setUpClass(cls):
+        queue_name = 'testbaseQ'
+        cls.queue_name = queue_name
+        cls.queue = UuidBaseQueue(queue_name)
+
+    @classmethod
+    def tearDownClass(cls):
+        pass
+
+    def setUp(self):
+        self.queue.purge()
+
+    def test_init(self):
+        '''Test TestUuidBaseQueue init'''
+        expected_keys = [
+            '_add_value',
+            '_get_value',
+            'add_values',
+            'get_values',
+            'purge',
+            '_values',
+            'max_value_size',
+            'queue_name',
+            'queue_type',
+            'qmeta',
+        ]
+        keys = [
+            key
+            for key in dir(self.queue)
+            if key[0:2] != '__'
+        ]
+        keys.sort()
+        expected_keys.sort()
+        self.assertListEqual(keys, expected_keys)
+        self.assertTrue(hasattr(self.queue, 'max_value_size'))
+        self.assertEqual(getattr(self.queue, 'max_value_size'), 262144)
+        self.assertTrue(hasattr(self.queue, 'queue_name'))
+        self.assertEqual(getattr(self.queue, 'queue_name'), self.queue_name)
+        self.assertTrue(hasattr(self.queue, 'qmeta'))
+        self.assertIsInstance(getattr(self.queue, 'qmeta'), UuidBaseQueueMeta)
+        self.assertTrue(hasattr(self.queue, '_values'))
+        # pylint: disable=protected-access
+        self.assertListEqual(getattr(self.queue, '_values'), [])
+
+    def test_add_value(self):
+        '''Test TestUuidBaseQueue _add_value'''
+        value = 'some-value'
+        # pylint: disable=protected-access
+        result = self.queue._add_value(value)
+        self.assertTrue(result is True)
+        self.assertListEqual(self.queue._values, [value])
+
+    def test_add_value_none(self):
+        '''Test TestUuidBaseQueue _add_value with None'''
+        value = None
+        # pylint: disable=protected-access
+        result = self.queue._add_value(value)
+        self.assertTrue(result is False)
+        self.assertListEqual(self.queue._values, [])
+
+    def test_get_value(self):
+        '''Test TestUuidBaseQueue _get_value'''
+        value = 'some-value'
+        # pylint: disable=protected-access
+        self.queue._add_value(value)
+        result_value = self.queue._get_value()
+        self.assertEqual(result_value, value)
+        self.assertListEqual(self.queue._values, [])
+
+    def test_get_value_empty(self):
+        '''Test TestUuidBaseQueue _get_value when empty'''
+        # pylint: disable=protected-access
+        result_value = self.queue._get_value()
+        self.assertIsNone(result_value)
+        self.assertListEqual(self.queue._values, [])
+
+    def test_add_values(self):
+        '''Test TestUuidBaseQueue add_values'''
+        values = ['value1', 'value2', 'value3']
+        failed, bytes_added, call_cnt = self.queue.add_values(values)
+        self.assertListEqual(failed, [])
+        self.assertEqual(bytes_added, len(''.join(values)))
+        self.assertEqual(call_cnt, len(values))
+        # pylint: disable=protected-access
+        self.queue._values.sort()
+        self.assertListEqual(self.queue._values, values)
+
+    def test_add_values_fail(self):
+        '''Test TestUuidBaseQueue add_values with bad value'''
+        good_values = ['value1', 'value2', 'value3']
+        bad_values = [None, 0, '']
+        values = good_values + bad_values
+        failed, bytes_added, call_cnt = self.queue.add_values(values)
+        self.assertEqual(len(bad_values), len(failed))
+        for bad_value in bad_values:
+            self.assertTrue(bad_value in failed)
+        self.assertEqual(bytes_added, len(''.join(good_values)))
+        self.assertEqual(call_cnt, len(good_values))
+        # pylint: disable=protected-access
+        self.queue._values.sort()
+        good_values.sort()
+        self.assertListEqual(self.queue._values, good_values)
+
+    def test_get_values(self):
+        '''Test TestUuidBaseQueue get_values'''
+        values = ['value1', 'value2', 'value3']
+        get_count = len(values)
+        self.queue.add_values(values)
+        result_values, call_cnt = self.queue.get_values(get_count)
+        result_values.sort()
+        self.assertListEqual(values, result_values)
+        self.assertEqual(call_cnt, get_count)
+
+    def test_get_values_greater_cnt(self):
+        '''Test TestUuidBaseQueue get_values with count greater than values'''
+        values = ['value1', 'value2', 'value3']
+        get_count = len(values) + 1
+        self.queue.add_values(values)
+        result_values, call_cnt = self.queue.get_values(get_count)
+        result_values.sort()
+        self.assertListEqual(values, result_values)
+        self.assertEqual(call_cnt, len(values))
+
+    def test_get_values_less_cnt(self):
+        '''Test TestUuidBaseQueue get_values with count less than values'''
+        values = ['value1', 'value2', 'value3']
+        get_count = len(values) - 1
+        self.queue.add_values(values)
+        result_values, call_cnt = self.queue.get_values(get_count)
+        result_values.sort()
+        for res_val in result_values:
+            self.assertTrue(res_val in values)
+        self.assertEqual(call_cnt, get_count)
+
+    def test_get_values_zero(self):
+        '''Test TestUuidBaseQueue get_values with no values'''
+        get_count = 100
+        result_values, call_cnt = self.queue.get_values(get_count)
+        self.assertListEqual(result_values, [])
+        self.assertEqual(call_cnt, 0)
+
+    def test_purge(self):
+        '''Test TestUuidBaseQueue purge'''
+        values = ['value1', 'value2', 'value3']
+        self.queue.add_values(values)
+        self.queue.purge()
+        # pylint: disable=protected-access
+        self.assertListEqual(self.queue._values, [])
