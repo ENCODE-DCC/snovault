@@ -59,6 +59,7 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
             '_add_errors',
             '_base_id',
             '_errors',
+            '_errors_count',
             '_got_batches',
             '_successes',
             '_uuids_added',
@@ -81,6 +82,8 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         self.assertIsInstance(getattr(self.qmeta, '_base_id'), int)
         self.assertTrue(hasattr(self.qmeta, '_errors'))
         self.assertIsInstance(getattr(self.qmeta, '_errors'), dict)
+        self.assertTrue(hasattr(self.qmeta, '_errors_count'))
+        self.assertIsInstance(getattr(self.qmeta, '_errors_count'), int)
         self.assertTrue(hasattr(self.qmeta, '_got_batches'))
         self.assertIsInstance(getattr(self.qmeta, '_got_batches'), dict)
         self.assertTrue(hasattr(self.qmeta, '_uuids_added'))
@@ -90,13 +93,17 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
 
     def test_add_errors(self):
         '''Test UuidBaseQueueMeta add_errors'''
-        batch_id = 'some-batch-id'
-        errors = ['some-error-1', 'some-error-2']
+        errors = [
+            {'uuid': str(index), 'msg': 'error' + str(index)}
+            for index in range(3)
+        ]
         # pylint: disable=protected-access
-        self.qmeta._add_errors(batch_id, errors)
-        self.assertTrue(batch_id in self.qmeta._errors)
-        self.assertEqual(2, len(list(self.qmeta._errors.keys())))
-        self.assertEqual(2, self.qmeta._errors['meta']['total'])
+        self.qmeta._add_errors(errors)
+        for error in errors:
+            for uuid, batch_error in self.qmeta._errors.items():
+                if error['uuid'] == uuid:
+                    self.assertDictEqual(error, batch_error)
+        self.assertEqual(3, self.qmeta._errors_count)
 
     def test_add_batch(self):
         '''Test UuidBaseQueueMeta add_batch'''
@@ -122,16 +129,21 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         '''Test UuidBaseQueueMeta add_finished'''
         values = ['uuid1', 'uuid2', 'uuid3']
         batch_id = self.qmeta.add_batch(values)
-        errors = ['error1', 'error2']
+        errors = [
+            {'uuid': uuid, 'msg': 'error' + uuid}
+            for uuid in values[0:2]
+        ]
         successes = len(values) - len(errors)
         did_finish, err_msg = self.qmeta.add_finished(batch_id, successes, errors)
         self.assertTrue(did_finish)
         self.assertIsNone(err_msg)
         # pylint: disable=protected-access
         self.assertEqual(successes, self.qmeta._successes)
-        batch_errors = self.qmeta._errors[batch_id]
-        batch_errors.sort()
-        self.assertListEqual(errors, batch_errors)
+        batch_errors = self.qmeta.get_errors()
+        for error in errors:
+            for uuid, batch_error in batch_errors.items():
+                if error['uuid'] == uuid:
+                    self.assertDictEqual(error, batch_error)
         self.assertFalse(batch_id in self.qmeta._got_batches)
 
     def test_add_finished_expired(self):
@@ -144,7 +156,10 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         # pylint: disable=protected-access
         self.qmeta._got_batches[batch_id]['expired'] = 1
         successes = len(values)
-        errors = ['error1']
+        errors = [
+            {'uuid': str(index), 'msg': 'error' + str(index)}
+            for index in range(1)
+        ]
         did_finish, err_msg = self.qmeta.add_finished(batch_id, successes, errors)
         self.assertFalse(did_finish)
         self.assertEqual(
@@ -156,7 +171,10 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         '''Test UuidBaseQueueMeta add_finished with bad batch_id'''
         batch_id = 'bad-batch-id'
         successes = 10
-        errors = ['error1']
+        errors = [
+            {'uuid': str(index), 'msg': 'error' + str(index)}
+            for index in range(1)
+        ]
         did_finish, err_msg = self.qmeta.add_finished(batch_id, successes, errors)
         self.assertFalse(did_finish)
         self.assertEqual(
@@ -169,7 +187,10 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         values = ['uuid1', 'uuid2', 'uuid3']
         batch_id = self.qmeta.add_batch(values)
         successes = len(values)
-        errors = ['error1']
+        errors = [
+            {'uuid': str(index), 'msg': 'error' + str(index)}
+            for index in range(1)
+        ]
         did_finish, err_msg = self.qmeta.add_finished(batch_id, successes, errors)
         self.assertFalse(did_finish)
         self.assertEqual(
@@ -187,30 +208,37 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
         '''Test UuidBaseQueueMeta get_errors'''
         values = ['uuid1', 'uuid2', 'uuid3']
         batch_id = self.qmeta.add_batch(values)
-        errors = ['error1', 'error2']
+        errors = [
+            {'uuid': str(index), 'msg': 'error' + str(index)}
+            for index in range(2)
+        ]
         successes = len(values) - len(errors)
         self.qmeta.add_finished(batch_id, successes, errors)
         batch_errors = self.qmeta.get_errors()
-        batch_errors.sort()
-        self.assertListEqual(errors, batch_errors)
+        print(batch_errors)
+        self.assertEqual(len(batch_errors), len(errors))
+        for error in errors:
+            for uuid, batch_error in batch_errors.items():
+                if error['uuid'] == uuid:
+                    self.assertDictEqual(error, batch_error)
 
     def test_get_errors_none(self):
         '''Test UuidBaseQueueMeta get_errors when no errors'''
         values = ['uuid1', 'uuid2', 'uuid3']
         batch_id = self.qmeta.add_batch(values)
-        errors = []
+        errors = {}
         successes = len(values) - len(errors)
         self.qmeta.add_finished(batch_id, successes, errors)
         batch_errors = self.qmeta.get_errors()
-        batch_errors.sort()
-        self.assertListEqual(errors, batch_errors)
+        self.assertEqual(len(batch_errors), len(errors))
+        self.assertDictEqual(errors, batch_errors)
 
     def test_is_finished(self):
         '''Test UuidBaseQueueMeta is_finished'''
         self.qmeta.values_added(3)
         # pylint: disable=protected-access
         self.qmeta._successes = 2
-        self.qmeta._errors['meta']['total'] = 1
+        self.qmeta._errors_count = 1
         readd_values, did_finish = self.qmeta.is_finished()
         self.assertTrue(did_finish)
         self.assertListEqual(readd_values, [])
@@ -243,14 +271,14 @@ class TestUuidBaseQueueMeta(unittest.TestCase):
     def test_purge_meta(self):
         '''Test UuidBaseQueueMeta purge_meta'''
         # pylint: disable=protected-access
-        init_errors = {'meta': {'total': 0}}
+        init_errors = {}
         init_got_batches = {}
         init_uuids_added = 0
         init_successes = 0
         batch_id = 'some-batch-id'
         errors = ['some-error-1', 'some-error-2']
         self.qmeta._errors = copy.deepcopy(init_errors)
-        self.qmeta._errors['meta']['total'] = len(errors)
+        self.qmeta._errors_count = len(errors)
         self.qmeta._errors[batch_id] = errors
         self.qmeta._got_batches = copy.copy(init_got_batches)
         self.qmeta._got_batches[batch_id] = {'test': 'junk'}

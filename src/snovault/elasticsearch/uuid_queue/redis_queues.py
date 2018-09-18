@@ -22,7 +22,7 @@ class RedisClient(StrictRedis):
         super().__init__(
             charset="utf-8",
             decode_responses=True,
-            db=0,
+            db=args.get('db', 0),
             host=args['host'],
             port=args['port'],
             socket_timeout=5,
@@ -56,91 +56,66 @@ class RedisQueueMeta(UuidBaseQueueMeta):
         self._queue_name = queue_name
         self._client = client
         self._base_id = int(time.time() * 1000000)
-        self._meta_base_key = queue_name + ':bm'  # bm for base meta
-        self._run_args_key = self._meta_base_key + ':ra'  # ra for run args
-        self._added_cnt_key = self._meta_base_key + ':ca'  # ca for count added
-        self._successes_cnt_key = self._meta_base_key + ':cs'  # cs for count successes
-        self._errors_key = self._meta_base_key + ':be'  # be for base errors
-        self._errors_cnt_key = self._meta_base_key + ':ce' # ce for count errors
-        self._is_running_key = self._meta_base_key + ':running'
         self._exceptions = []
+        # mb for base meta, ra for run args, etc...
+        self._key_metabase = queue_name + ':mb'
+        self._key_runargs = self._key_metabase + ':ra'
+        self._key_addedcount = self._key_metabase + ':ca'
+        self._key_successescount = self._key_metabase + ':cs'
+        self._key_errors = self._key_metabase + ':be'
+        self._key_errorscount = self._key_metabase + ':ce'
+        self._key_isrunning = self._key_metabase + ':running'
 
     def set_args(self):
         '''Initial args'''
-        self._client.set(self._added_cnt_key, 0)
-        self._client.set(self._is_running_key, 'true')
-        self._client.set(self._errors_cnt_key, 0)
-        self._client.set(self._successes_cnt_key, 0)
+        self._client.set(self._key_addedcount, 0)
+        self._client.set(self._key_isrunning, 'true')
+        self._client.set(self._key_errorscount, 0)
+        self._client.set(self._key_successescount, 0)
 
-    def _add_errors(self, batch_id, errors):
+    def _add_errors(self, errors):
         '''Add errors as batch after consumed'''
         uuid_errors = []
         for error in errors:
-            error_key = self._errors_key + ':' + error['uuid']
+            error_key = self._key_errors + ':' + error['uuid']
             uuid_errors.append(error['uuid'])
             self._client.hmset(error_key, error)
-        self._client.incrby(self._errors_cnt_key, len(errors))
+        self._client.incrby(self._key_errorscount, len(errors))
 
     def _get_batch_keys(self, batch_id):
         '''Return base keys for uuids'''
-        bk_expired = self._meta_base_key + ':' + batch_id + ':ex'  # ex for values
-        bk_timestamp = self._meta_base_key + ':' + batch_id + ':ts'  # ts for timestamp
-        bk_values = self._meta_base_key + ':' + batch_id + ':vs'  # vs for values
+        # ex for expired, ts for timestamp, vs for values
+        bk_expired = self._key_metabase + ':' + batch_id + ':ex'
+        bk_timestamp = self._key_metabase + ':' + batch_id + ':ts'
+        bk_values = self._key_metabase + ':' + batch_id + ':vs'
         return bk_expired, bk_timestamp, bk_values
 
+    def _get_batch_id_from_key(self, key_str):
+        '''Extracts the batch_id from any batch_keys'''
+        return key_str[len(self._key_metabase) + 1:-3]
+
     def _get_readds(self, max_age_secs, listener_restarted=False):
-        '''Checks for expired batches, deletes, and returns values'''
+        '''
+        Checks for expired batches, deletes, and returns values
+        * if listener_restarted then all batches will be considered expired
+        '''
         readd_values = []
         _, timestamp_match, _ = self._get_batch_keys('*')
         for timestamp_key in self._client.keys(timestamp_match):
-            error_readd = False
-            expire_readd = False
-            batch_id = timestamp_key[len(self._meta_base_key) + 1:-3]
+            batch_id = self._get_batch_id_from_key(timestamp_key)
             bk_expired, bk_timestamp, bk_values = self._get_batch_keys(str(batch_id))
-            # TODO: Do more than catch
-            # TypeError: int() argument must be a string,
-            # a bytes-like object or a number, no      t 'NoneType'
-            # after es 906f58f3-153c-4430-9bc8-6331c7e6dc67 analysis_step_run 19551104
-            # before doc 2e24f230-f301-4527-821c-625221e5c826 20
-            try:
-                timestamp = int(self._client.get(timestamp_key))
-            except TypeError as ecp:
-                print(
-                    'MAKE A WARNING: '
-                    'redis_queues meta _get_readds TypeError READD',
-                    timestamp_key,
-                )
-                self._exceptions = [repr(ecp)]
-                error_readd = True
-            if not error_readd:
-                timestamp = timestamp / 1000000
-                age = time.time() - timestamp
-                if age >= max_age_secs:
-                    expire_readd = True
-                    print(
-                        'MAKE A WARNING: '
-                        'redis_queues meta _get_readds EXPIRE READD',
-                        timestamp_key,
-                    )
-            if not error_readd or not expire_readd or listener_restarted:
+            timestamp = int(self._client.get(bk_timestamp)) // 1000000
+            age = time.time() - timestamp
+            if age >= max_age_secs or listener_restarted:
                 batch_uuids = self._client.lrange(bk_values, 0, -1)
-                if not batch_uuids:
-                    print(
-                        'MAKE A WARNING: '
-                        'redis_queues meta _get_readds NO UUIDS CANNOT READD',
-                        timestamp_key,
-                    )
-                else:
-                    readd_values.extend(batch_uuids)
-                    self._client.delete(bk_expired)
-                    self._client.delete(bk_timestamp)
-                    self._client.delete(bk_values)
+                readd_values.extend(batch_uuids)
+                self._client.set(bk_expired, 1)
         return readd_values
 
     def is_server_running(self):
         '''Return boolean for server running flag'''
-        if self._client.exists(self._is_running_key):
-            str_val = self._client.get(self._is_running_key)
+        if self._client.exists(self._key_isrunning):
+            str_val = self._client.get(self._key_isrunning)
             if str_val == 'true':
                 return True
         return False
@@ -151,11 +126,11 @@ class RedisQueueMeta(UuidBaseQueueMeta):
 
         - Tells the workers to stop
         '''
-        self._client.set(self._is_running_key, 'false')
+        self._client.set(self._key_isrunning, 'false')
 
     def purge_meta(self):
         '''Remove all keys with queue_name:meta'''
-        for key in self._client.keys(self._meta_base_key + '*'):
+        for key in self._client.keys(self._key_metabase + '*'):
             self._client.delete(key)
 
     def add_batch(self, values):
@@ -166,21 +141,22 @@ class RedisQueueMeta(UuidBaseQueueMeta):
         -A timestamp is added for expiration.
         -Expiration handled in is_finished.
         '''
-        batch_id = str(self._base_id)
-        self._base_id += 1
-        bk_expired, bk_timestamp, bk_values = self._get_batch_keys(str(batch_id))
-        self._client.set(bk_timestamp, int(time.time() * 1000000))
-        self._client.set(bk_expired, 0)
-        self._client.lpush(bk_values, *values)
-        return batch_id
+        if values:
+            batch_id = str(self._base_id)
+            self._base_id += 1
+            bk_expired, bk_timestamp, bk_values = self._get_batch_keys(str(batch_id))
+            self._client.set(bk_timestamp, int(time.time() * 1000000))
+            self._client.set(bk_expired, 0)
+            self._client.lpush(bk_values, *values)
+            return batch_id
+        return None
 
     def add_finished(self, batch_id, successes, errors):
         '''
-        Update batch after values are consumed
+        Update batch after values are consumed, Called from workers
 
-        - If any checks fail the batch is not removed, so it will
-        expire. Expired batches will be readded in is_finished and
-        eventaully reindexed.
+        - If any checks fail the batch is expired.   Expired batches are
+        handled in is_finished by the server
         '''
         bk_expired, bk_timestamp, bk_values = self._get_batch_keys(str(batch_id))
         len_batch_uuids = self._client.llen(bk_values)
@@ -214,7 +190,7 @@ class RedisQueueMeta(UuidBaseQueueMeta):
                 )
             else:
                 # The one location to update success counter
-                self._client.incrby(self._successes_cnt_key, successes)
+                self._client.incrby(self._key_successescount, successes)
                 if errors:
                     self._add_errors(batch_id, errors)
                 self._client.delete(bk_expired)
@@ -223,7 +199,7 @@ class RedisQueueMeta(UuidBaseQueueMeta):
 
     def get_run_args(self):
         '''Return run args needed for workers'''
-        run_args = self._client.hgetall(self._run_args_key)
+        run_args = self._client.hgetall(self._key_runargs)
         return run_args
 
     def set_run_args(self, run_args):
@@ -235,13 +211,13 @@ class RedisQueueMeta(UuidBaseQueueMeta):
             'uuid_len': run_args['uuid_len'],
             'xmin': run_args['xmin'],
         }
-        self._client.hmset(self._run_args_key, set_args)
+        self._client.hmset(self._key_runargs, set_args)
 
     def get_errors(self):
         '''Get all errors from queue that were sent in add_finished'''
         errors = []
-        errors_cnt = int(self._client.get(self._errors_cnt_key))
-        for error_key in self._client.keys(self._errors_key + ':*'):
+        errors_cnt = int(self._client.get(self._key_errorscount))
+        for error_key in self._client.keys(self._key_errors + ':*'):
             err_dict = self._client.hgetall(error_key)
             errors.append(err_dict)
         if errors_cnt != len(errors):
@@ -254,7 +230,7 @@ class RedisQueueMeta(UuidBaseQueueMeta):
         return errors
 
     def is_finished(self, max_age_secs=5002, listener_restarted=False):
-        '''Check if queue has been consumed'''
+        '''Check if queue has been consumed, Called from server'''
         readd_values = []
         did_finish = False
         if max_age_secs:
@@ -265,9 +241,9 @@ class RedisQueueMeta(UuidBaseQueueMeta):
             for index, item in enumerate(self._exceptions):
                 print('MAKE A WARNING: redis_queues meta is_finished _get_readds excptions:', index, item)
         if not readd_values:
-            errors_cnt = int(self._client.get(self._errors_cnt_key))
-            successes_cnt = int(self._client.get(self._successes_cnt_key))
-            uuids_added = int(self._client.get(self._added_cnt_key))
+            errors_cnt = int(self._client.get(self._key_errorscount))
+            successes_cnt = int(self._client.get(self._key_successescount))
+            uuids_added = int(self._client.get(self._key_addedcount))
             uuids_handled = successes_cnt + errors_cnt
             did_finish = uuids_handled == uuids_added
         return readd_values, did_finish
@@ -278,7 +254,7 @@ class RedisQueueMeta(UuidBaseQueueMeta):
 
         - Also used to remove readded values so could be negative
         '''
-        self._client.incrby(self._added_cnt_key, len_values)
+        self._client.incrby(self._key_addedcount, len_values)
 
     def is_useable(self):
         '''
@@ -286,31 +262,31 @@ class RedisQueueMeta(UuidBaseQueueMeta):
 
         * Useful when queue crashes and needs a restart
         '''
-        # self._run_args_key = self._meta_base_key + ':ra'  # ra for run args
+        # self._key_runargs = self._key_metabase + ':ra'  # ra for run args
         added_cnt = 0
         errors_cnt = 0
         errors_len = 0
         successes_cnt = 0
         queue_len = 0
-        if self._client.exists(self._added_cnt_key):
-            added_cnt = int(self._client.get(self._added_cnt_key))
+        if self._client.exists(self._key_addedcount):
+            added_cnt = int(self._client.get(self._key_addedcount))
         else:
-            self._client.set(self._added_cnt_key, added_cnt)
-        if self._client.exists(self._errors_cnt_key):
-            errors_cnt = int(self._client.get(self._errors_cnt_key))
+            self._client.set(self._key_addedcount, added_cnt)
+        if self._client.exists(self._key_errorscount):
+            errors_cnt = int(self._client.get(self._key_errorscount))
         else:
-            self._client.set(self._errors_cnt_key, errors_cnt)
-        if self._client.exists(self._errors_key):
-            errors_len = self._client.llen(self._errors_key)
-        if self._client.exists(self._run_args_key):
+            self._client.set(self._key_errorscount, errors_cnt)
+        if self._client.exists(self._key_errors):
+            errors_len = self._client.llen(self._key_errors)
+        if self._client.exists(self._key_runargs):
             try:
                 self.get_run_args()
             except KeyError:
                 return False
-        if self._client.exists(self._successes_cnt_key):
-            successes_cnt = int(self._client.get(self._successes_cnt_key))
+        if self._client.exists(self._key_successescount):
+            successes_cnt = int(self._client.get(self._key_successescount))
         else:
-            self._client.set(self._successes_cnt_key, successes_cnt)
+            self._client.set(self._key_successescount, successes_cnt)
         if self._client.exists(self._queue_name):
             queue_len = self._client.llen(self._queue_name)
         if added_cnt != (errors_cnt + successes_cnt + queue_len):
@@ -372,7 +348,9 @@ class RedisQueue(UuidBaseQueue):
 
         * Redis exists should return as boolean
         '''
-        return self._client.exists(self.queue_name)
+        if int(self._client.exists(self.queue_name)):
+            return True
+        return False
 
     def has_values(self):
         '''Check queue for values'''
@@ -388,6 +366,10 @@ class RedisQueue(UuidBaseQueue):
         if self.len_str:
             return self._call_func(self.len_str)
         return None
+
+    def is_queue_empty(self):
+        '''Checks if queue is empty'''
+        return self.does_exist()
 
 
 class RedisPipeQueue(RedisQueue):

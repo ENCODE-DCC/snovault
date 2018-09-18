@@ -43,15 +43,17 @@ class UuidBaseQueueMeta(object):
 
     def __init__(self):
         self._base_id = int(time.time() * 1000000)
-        self._errors = {'meta': {'total': 0}}
+        self._errors = {}
+        self._errors_count = 0
         self._got_batches = {}
         self._uuids_added = 0
         self._successes = 0
 
-    def _add_errors(self, batch_id, errors):
+    def _add_errors(self, errors):
         '''Add errors as batch after consumed'''
-        self._errors[batch_id] = errors
-        self._errors['meta']['total'] += len(errors)
+        for error in errors:
+            self._errors[error['uuid']] = error
+            self._errors_count += 1
 
     def add_batch(self, values):
         '''Add values as batch after getting from queue'''
@@ -90,18 +92,14 @@ class UuidBaseQueueMeta(object):
             else:
                 self._successes += successes
                 if errors:
-                    self._add_errors(batch_id, errors)
+                    self._add_errors(errors)
                 del self._got_batches[batch_id]
                 did_finish = True
         return did_finish, err_msg
 
     def get_errors(self):
         '''Get all errors from queue that were sent in add_finished'''
-        errors = []
-        for key, batch_errors in self._errors.items():
-            if key != 'meta':
-                errors.extend(batch_errors)
-        return errors
+        return self._errors
 
     # pylint: disable=unused-argument
     def is_finished(
@@ -119,13 +117,13 @@ class UuidBaseQueueMeta(object):
                     batch['expired'] = 1
                     readd_values.extend(batch['uuids'])
         if not readd_values:
-            uuids_handled = self._successes + self._errors['meta']['total']
+            uuids_handled = self._successes + self._errors_count
             did_finish = uuids_handled == self._uuids_added
         return readd_values, did_finish
 
     def purge_meta(self):
         '''Remove all meta data'''
-        self._errors = {'meta': {'total': 0}}
+        self._errors = {}
         self._got_batches = {}
         self._uuids_added = 0
         self._successes = 0
