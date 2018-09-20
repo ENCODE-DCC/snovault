@@ -191,12 +191,22 @@ class RedisQueueMeta(UuidBaseQueueMeta):
             )
 
     def get_run_args(self):
-        '''Return run args needed for workers'''
+        '''
+        Return run args needed for workers
+        '''
         run_args = self._client.hgetall(self._key_runargs)
+        run_args['batch_by'] = int(run_args['batch_by'])
+        run_args['restart'] = False if run_args['restart'] == 'False' else True
+        run_args['uuid_len'] = int(run_args['uuid_len'])
+        run_args['xmin'] = int(run_args['xmin'])
         return run_args
 
     def set_run_args(self, run_args):
-        '''Add run args needed for workers'''
+        '''
+        Add run args needed for workers
+        * Only defined values are added
+        * Type checks when getting run args
+        '''
         set_args = {
             'batch_by': run_args['batch_by'],
             'restart': run_args['restart'],
@@ -211,6 +221,7 @@ class RedisQueueMeta(UuidBaseQueueMeta):
         errors = []
         errors_cnt = int(self._client.get(self._key_errorscount))
         for error_key in self._client.keys(self._key_errors + ':*'):
+            print(error_key)
             err_dict = self._client.hgetall(error_key)
             errors.append(err_dict)
         if errors_cnt != len(errors):

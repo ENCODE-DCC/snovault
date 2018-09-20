@@ -14,6 +14,8 @@ classes
 import time
 import unittest
 
+from ddt import ddt, data, unpack
+
 from snovault.elasticsearch.uuid_queue.uuid_queue_adapter import UuidQueueTypes
 from snovault.elasticsearch.uuid_queue.redis_queues import (
     RedisClient,
@@ -98,7 +100,7 @@ class TestRedisClient(unittest.TestCase):
         else:
             self.fail('Should fail with ValueError')
 
-
+@ddt
 class TestRedisQueueMeta(unittest.TestCase):
     '''RedisQueueMeta is used in all Redis Queue for meta data'''
     @classmethod
@@ -495,3 +497,127 @@ class TestRedisQueueMeta(unittest.TestCase):
                     found = True
                     break
             self.assertTrue(found)
+
+    def test_remove_batch_with_expired(self):
+        '''
+        Test RedisQueueMeta remove_batch with expired
+        * This also tests _remove_batch
+        '''
+        batch_values = [str(index) for index in range(0, 3)]
+        batch_id = self.queue.qmeta.add_batch(batch_values)
+        # pylint: disable=protected-access
+        bk_expired, bk_timestamp, bk_values = self.queue.qmeta._get_batch_keys_for_id(
+            batch_id
+        )
+        self.queue._client.set(bk_expired, 1)
+        successes = len(batch_values)
+        errors = []
+        self.queue.qmeta.remove_batch(batch_id, successes, errors)
+        qmeta_successes = int(
+            self.queue.qmeta._client.get(self.queue.qmeta._key_successescount)
+        )
+        self.assertEqual(qmeta_successes, 0)
+        self.assertTrue(self.queue._client.exists(bk_expired))
+        self.assertTrue(self.queue._client.exists(bk_timestamp))
+        self.assertTrue(self.queue._client.exists(bk_values))
+
+    @data(
+        # value_cnt, successes, error_cnt
+        (3, 2, 0),
+        (3, 0, 2),
+        (3, 3, 1),
+        (3, 1, 3),
+    )
+    @unpack
+    def test_remove_batch_with_checkout(self, value_cnt, successes, error_cnt):
+        '''
+        Test RedisQueueMeta remove_batch with not did_check_out
+        * This also tests _remove_batch
+        '''
+        batch_values = [str(index) for index in range(0, value_cnt)]
+        batch_id = self.queue.qmeta.add_batch(batch_values)
+        # pylint: disable=protected-access
+        bk_expired, bk_timestamp, bk_values = self.queue.qmeta._get_batch_keys_for_id(
+            batch_id
+        )
+        errors = [
+            {'uuid': str(index), 'msg': 'error' + str(index)}
+            for index in range(0, error_cnt)
+        ]
+        self.queue.qmeta.remove_batch(batch_id, successes, errors)
+        qmeta_successes = int(
+            self.queue.qmeta._client.get(self.queue.qmeta._key_successescount)
+        )
+        self.assertEqual(qmeta_successes, 0)
+        self.assertTrue(self.queue._client.exists(bk_expired))
+        self.assertTrue(self.queue._client.exists(bk_timestamp))
+        self.assertTrue(self.queue._client.exists(bk_values))
+
+    @data(
+        # batch_by, restart, snapshot_id, uuid_len, xmin
+        (4, False, 'some-str', 14, 1234567),
+        (4, True, 'some-str', 14, 1234567),
+    )
+    def test_get_run_args(self, set_args_tuple):
+        '''Test RedisQueueMeta get_run_args'''
+        set_args = {
+            'batch_by': set_args_tuple[0],
+            'restart': set_args_tuple[1],
+            'snapshot_id': set_args_tuple[2],
+            'uuid_len': set_args_tuple[3],
+            'xmin': set_args_tuple[4],
+        }
+        # pylint: disable=protected-access
+        key_runargs = self.queue.qmeta._key_runargs
+        self.queue._client.hmset(key_runargs, set_args)
+        run_args = self.queue.qmeta.get_run_args()
+        self.assertDictEqual(set_args, run_args)
+
+    @data(
+        # batch_by, restart, snapshot_id, uuid_len, xmin, extra
+        (4, False, 'some-str', 14, 1234567, None),
+        (4, True, 'some-str', 14, 1234567, 'extra'),
+    )
+    def test_set_run_args(self, set_args_tuple):
+        '''Test RedisQueueMeta set_run_args'''
+        run_args = {
+            'batch_by': set_args_tuple[0],
+            'restart': set_args_tuple[1],
+            'snapshot_id': set_args_tuple[2],
+            'uuid_len': set_args_tuple[3],
+            'xmin': set_args_tuple[4],
+        }
+        if set_args_tuple[5]:
+            run_args['extra'] = set_args_tuple[5]
+        self.queue.qmeta.set_run_args(run_args)
+        if set_args_tuple[5]:
+            del run_args['extra']
+        got_run_args = self.queue.qmeta.get_run_args()
+        self.assertDictEqual(got_run_args, run_args)
+
+    @data(
+        # error_cnt
+        (0), (3)
+    )
+    def test_get_errors(self, error_cnt):
+        '''Test RedisQueueMeta get_errors'''
+        errors = [
+            {'uuid': str(value), 'msg': 'error' + str(value)}
+            for value in range(error_cnt)
+        ]
+        # pylint: disable=protected-access
+        error_key_base = self.queue.qmeta._key_errors
+        for error in errors:
+            error_key = error_key_base + ':' + error['uuid']
+            self.queue._client.hmset(error_key, error)
+        self.queue._client.set(self.queue.qmeta._key_errorscount, len(errors))
+        got_errors = self.queue.qmeta.get_errors()
+        for got_error in got_errors:
+            found = False
+            for error in errors:
+                if got_error['uuid'] == error['uuid']:
+                    self.assertDictEqual(error, got_error)
+                    found = True
+                    break
+            self.assertTrue(found)
+        self.assertEqual(len(got_errors), len(errors))
