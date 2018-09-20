@@ -82,35 +82,41 @@ class RedisQueueMeta(UuidBaseQueueMeta):
             self._client.hmset(error_key, error)
         self._client.incrby(self._key_errorscount, len(errors))
 
-    def _get_batch_keys(self, batch_id):
-        '''Return base keys for uuids'''
+    def _get_batch_keys_for_id(self, batch_id):
+        '''Return batch keys for uuids'''
         # ex for expired, ts for timestamp, vs for values
-        bk_expired = self._key_metabase + ':' + batch_id + ':ex'
-        bk_timestamp = self._key_metabase + ':' + batch_id + ':ts'
-        bk_values = self._key_metabase + ':' + batch_id + ':vs'
-        return bk_expired, bk_timestamp, bk_values
+        expired = self._key_metabase + ':' + batch_id + ':ex'
+        timestamp = self._key_metabase + ':' + batch_id + ':ts'
+        values = self._key_metabase + ':' + batch_id + ':vs'
+        return expired, timestamp, values
 
     def _get_batch_id_from_key(self, key_str):
         '''Extracts the batch_id from any batch_keys'''
         return key_str[len(self._key_metabase) + 1:-3]
 
-    def _get_readds(self, max_age_secs, listener_restarted=False):
+    def _expire_batch(self, bk_expired):
+        '''This will expire a batch'''
+        self._client.set(bk_expired, 1)
+
+    def _check_expired(self, max_age_secs, listener_restarted=False):
         '''
         Checks for expired batches, deletes, and returns values
         * if listener_restarted then all batches will be considered expired
         '''
-        readd_values = []
-        _, timestamp_match, _ = self._get_batch_keys('*')
-        for timestamp_key in self._client.keys(timestamp_match):
-            batch_id = self._get_batch_id_from_key(timestamp_key)
-            bk_expired, bk_timestamp, bk_values = self._get_batch_keys(str(batch_id))
+        expired_values = []
+        # bk_timestamp all key
+        _, bk_timestamp_all, _ = self._get_batch_keys_for_id('*')
+        for bk_timestamp in self._client.keys(bk_timestamp_all):
+            batch_id = self._get_batch_id_from_key(bk_timestamp)
+            bk_expired, bk_timestamp, bk_values = self._get_batch_keys_for_id(str(batch_id))
             timestamp = int(self._client.get(bk_timestamp)) // 1000000
             age = time.time() - timestamp
-            if age >= max_age_secs or listener_restarted:
+            int_expired = int(self._client.get(bk_expired))
+            if age >= max_age_secs or listener_restarted or int_expired == 1:
                 batch_uuids = self._client.lrange(bk_values, 0, -1)
-                readd_values.extend(batch_uuids)
-                self._client.set(bk_expired, 1)
-        return readd_values
+                expired_values.extend(batch_uuids)
+                self._expire_batch(bk_expired)
+        return expired_values
 
     def is_server_running(self):
         '''Return boolean for server running flag'''
@@ -136,7 +142,7 @@ class RedisQueueMeta(UuidBaseQueueMeta):
     def add_batch(self, values):
         '''
         Values removed from queue are stored in batch as a list for values
-        until consumed and add_finished is called with the batch_id.
+        until consumed and remove_batch is called with the batch_id.
 
         -A timestamp is added for expiration.
         -Expiration handled in is_finished.
@@ -144,58 +150,45 @@ class RedisQueueMeta(UuidBaseQueueMeta):
         if values:
             batch_id = str(self._base_id)
             self._base_id += 1
-            bk_expired, bk_timestamp, bk_values = self._get_batch_keys(str(batch_id))
+            bk_expired, bk_timestamp, bk_values = self._get_batch_keys_for_id(str(batch_id))
             self._client.set(bk_timestamp, int(time.time() * 1000000))
             self._client.set(bk_expired, 0)
             self._client.lpush(bk_values, *values)
             return batch_id
         return None
 
-    def add_finished(self, batch_id, successes, errors):
-        '''
-        Update batch after values are consumed, Called from workers
+    def _remove_batch(self, batch_id, successes, errors, bk_expired, bk_timestamp, bk_values):
+        '''Method for removing a batch'''
+        self._client.incrby(self._key_successescount, successes)
+        if errors:
+            self._add_errors(errors)
+        self._client.delete(bk_expired)
+        self._client.delete(bk_timestamp)
+        self._client.delete(bk_values)
 
-        - If any checks fail the batch is expired.   Expired batches are
-        handled in is_finished by the server
+    def remove_batch(self, batch_id, successes, errors):
         '''
-        bk_expired, bk_timestamp, bk_values = self._get_batch_keys(str(batch_id))
-        len_batch_uuids = self._client.llen(bk_values)
-        if len_batch_uuids is None:
-            print(
-                'MAKE A WARNING: add_finished.  '
-                'If id was corrupted the batch should expire and rerun.'
-            )
+        Updates queue server after a batch is consumed by a queue worker.
+        - If any checks fail the batch is set as expired. Expired batches are
+          handled by the queue server as it loops through is_finished.
+
+        Results:
+            batch passes and batch_keys for batch_id are removed OR batch is
+            expired. Expired batches are handled by the queue server as it
+            loops through is_finished.
+        '''
+        # TODO: Maybe try to hide this method from the server queue.
+        bk_expired, bk_timestamp, bk_values = self._get_batch_keys_for_id(str(batch_id))
+        len_batch_values = self._client.llen(bk_values)
+        did_check_out = (len(errors) + successes) == len_batch_values
+        if int(self._client.get(bk_expired)) != 0 or not did_check_out:
+            # TODO: Warn about expiring batches here, or have a message
+            # somewhere.
+            self._expire_batch(bk_expired)
         else:
-            # TODO: Do more than catch
-            # TypeError: int() argument must be a string,
-            # a bytes-like object or a number, not 'NoneType'
-            # after es a0445f86-ba86-4c44-8637-dd6ab5bd7594 analysis_step_run 19551104
-            # before crash
-            expired = 0
-            try:
-                expired = int(self._client.get(bk_expired))
-            except TypeError as ecp:
-                print('MAKE A WARNING: redis_queues meta add_finished', bk_expired, repr(ecp))
-                self._exceptions = [repr(ecp)]
-            did_check_out = (len(errors) + successes) == len_batch_uuids
-            if expired != 0:
-                print(
-                    'MAKE A WARNING: add_finished.  '
-                    'Batch expired and then finished.'
-                )
-            elif not did_check_out:
-                print(
-                    'MAKE A WARNING: add_finished.  '
-                    'Batch counts were off.  Let it expire.'
-                )
-            else:
-                # The one location to update success counter
-                self._client.incrby(self._key_successescount, successes)
-                if errors:
-                    self._add_errors(batch_id, errors)
-                self._client.delete(bk_expired)
-                self._client.delete(bk_timestamp)
-                self._client.delete(bk_values)
+            self._remove_batch(
+                batch_id, successes, errors, bk_expired, bk_timestamp, bk_values
+            )
 
     def get_run_args(self):
         '''Return run args needed for workers'''
@@ -214,7 +207,7 @@ class RedisQueueMeta(UuidBaseQueueMeta):
         self._client.hmset(self._key_runargs, set_args)
 
     def get_errors(self):
-        '''Get all errors from queue that were sent in add_finished'''
+        '''Get all errors from queue that were sent in remove_batch'''
         errors = []
         errors_cnt = int(self._client.get(self._key_errorscount))
         for error_key in self._client.keys(self._key_errors + ':*'):
@@ -230,23 +223,36 @@ class RedisQueueMeta(UuidBaseQueueMeta):
         return errors
 
     def is_finished(self, max_age_secs=5002, listener_restarted=False):
-        '''Check if queue has been consumed, Called from server'''
-        readd_values = []
+        '''
+        Looped in server queue to check if queue has been consumed.
+
+        args:
+            - max_age_secs: Used by _check_expired to expire batches
+            older than value.
+            - listener_restarted: Used by _check_expired to
+            expire all batches now.  For Example, due to a server restart during an
+            indexing process.
+
+        returns:
+            - expired_values: values from expired batches.
+            - did_finish: True if no expred_values and consumed values is equal
+              the values added.
+        '''
+        # TODO: Maybe try to hide this method from the worker queue.
+        expired_values = []
         did_finish = False
         if max_age_secs:
-            readd_values = self._get_readds(
+            expired_values = self._check_expired(
                 max_age_secs,
                 listener_restarted=listener_restarted,
             )
-            for index, item in enumerate(self._exceptions):
-                print('MAKE A WARNING: redis_queues meta is_finished _get_readds excptions:', index, item)
-        if not readd_values:
+        if not expired_values:
             errors_cnt = int(self._client.get(self._key_errorscount))
             successes_cnt = int(self._client.get(self._key_successescount))
             uuids_added = int(self._client.get(self._key_addedcount))
             uuids_handled = successes_cnt + errors_cnt
             did_finish = uuids_handled == uuids_added
-        return readd_values, did_finish
+        return expired_values, did_finish
 
     def values_added(self, len_values):
         '''

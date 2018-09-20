@@ -56,14 +56,14 @@ class TestRedisClient(unittest.TestCase):
         if not _check_redis_conn(self.client):
             self.fail('Redis Connection Failed')
 
-    def _test_init(self):
+    def test_init(self):
         '''Test BaseClient init'''
         try:
             RedisClient(self.args)
         except Exception: # pylint: disable=broad-except
             self.fail('Could not create redis client')
 
-    def _test_init_missing_args(self):
+    def test_init_missing_args(self):
         '''Test BaseClient missing host'''
         args_list = [
             {'host': 'localhost'},
@@ -77,7 +77,7 @@ class TestRedisClient(unittest.TestCase):
             else:
                 self.fail('Should fail with ValueError')
 
-    def _test_get_queue(self):
+    def test_get_queue(self):
         '''Test BaseClient get_queue'''
         for queue_type in UuidQueueTypes.get_all():
             if 'REDIS' in queue_type:
@@ -88,7 +88,7 @@ class TestRedisClient(unittest.TestCase):
                         'Could not create redis clinet type %s' % queue_type
                     )
 
-    def _test_get_queue_bad_type(self):
+    def test_get_queue_bad_type(self):
         '''Test BaseClient get_queue with bad type'''
         queue_type = 'bad-queue-type'
         try:
@@ -121,7 +121,7 @@ class TestRedisQueueMeta(unittest.TestCase):
     def tearDown(self):
         self.queue.qmeta.purge_meta()
 
-    def _test_init_keys(self):
+    def test_init_keys(self):
         '''Test RedisQueueMeta init redis db keys'''
         expected_redis_keys = [
             self.queue_name + ':mb:' + key
@@ -139,7 +139,7 @@ class TestRedisQueueMeta(unittest.TestCase):
         set_found_list.sort()
         self.assertListEqual(set_found_list, found_redis_keys)
 
-    def _test_set_args(self):
+    def test_set_args(self):
         '''Test RedisQueueMeta set_args'''
         self.queue.qmeta.set_args()
         # pylint: disable=protected-access
@@ -153,7 +153,7 @@ class TestRedisQueueMeta(unittest.TestCase):
             got_val = self.queue._client.get(key)
             self.assertEqual(got_val, value)
 
-    def _test_add_errors(self):
+    def test_add_errors(self):
         '''Test RedisQueueMeta _add_errors'''
         errors = [
             {'uuid': str(index), 'msg': 'error' + str(index)}
@@ -174,20 +174,20 @@ class TestRedisQueueMeta(unittest.TestCase):
             self.assertEqual(err_hash['msg'], error['msg'])
             self.assertEqual(err_hash['uuid'], error['uuid'])
 
-    def _test_get_batch_keys(self):
-        '''Test RedisQueueMeta _get_batch_keys'''
+    def test_get_batch_keys_for_id(self):
+        '''Test RedisQueueMeta _get_batch_keys_for_id'''
         batch_id = 'some-batch-id'
         # pylint: disable=protected-access
         res_bk_expired = self.queue.qmeta._key_metabase + ':' + batch_id + ':ex'
         res_bk_timestamp = self.queue.qmeta._key_metabase + ':' + batch_id + ':ts'
         res_bk_values = self.queue.qmeta._key_metabase + ':' + batch_id + ':vs'
         (bk_expired, bk_timestamp,
-         bk_values) = self.queue.qmeta._get_batch_keys(batch_id)
+         bk_values) = self.queue.qmeta._get_batch_keys_for_id(batch_id)
         self.assertEqual(bk_expired, res_bk_expired)
         self.assertEqual(bk_timestamp, res_bk_timestamp)
         self.assertEqual(bk_values, res_bk_values)
 
-    def _test_get_batch_id_from_key(self):
+    def test_get_batch_id_from_key(self):
         '''Test RedisQueueMeta _get_batch_id_from_key'''
         batch_id = 'some-batch-id'
         # pylint: disable=protected-access
@@ -204,13 +204,12 @@ class TestRedisQueueMeta(unittest.TestCase):
             self.queue.qmeta._get_batch_id_from_key(res_bk_values), batch_id
         )
 
-    def _test_get_readds_expired(self):
+    def _test_check_expired_all_expired(self):
         '''
-        Test RedisQueueMeta _get_readds with all expired batches
-
-        TIME DEPENDENT TEST! Can fix by seperating check timestamp into
-        function and mocking the output
+        Test RedisQueueMeta _check_expired with all expired batches
         '''
+        # TODO: TIME DEPENDENT TEST! Can fix by seperating check timestamp into
+        # function and mocking the output
         max_age_secs = 0.01
         batches = []
         batches.append([str(index) for index in range(0, 3)])
@@ -224,17 +223,21 @@ class TestRedisQueueMeta(unittest.TestCase):
             all_values.extend(values)
         time.sleep(max_age_secs * 2)
         # pylint: disable=protected-access
-        res_readd_values = self.queue.qmeta._get_readds(max_age_secs)
+        res_readd_values = self.queue.qmeta._check_expired(
+            max_age_secs,
+        )
         res_readd_values.sort()
         all_values.sort()
         self.assertListEqual(res_readd_values, all_values)
         for batch_id in batch_ids:
-            bk_expired, *_ = self.queue.qmeta._get_batch_keys(batch_id)
+            bk_expired, *_ = self.queue.qmeta._get_batch_keys_for_id(batch_id)
             expired_int = int(self.queue._client.get(bk_expired))
             self.assertEqual(1, expired_int)
 
-    def _test_get_readds_no_expired(self):
-        '''Test RedisQueueMeta _get_readds with no expired batches'''
+    def test_check_expired_no_expired(self):
+        '''
+        Test RedisQueueMeta _check_expired with no expired batches
+        '''
         max_age_secs = 1000
         batches = []
         batches.append([str(index) for index in range(0, 3)])
@@ -245,59 +248,111 @@ class TestRedisQueueMeta(unittest.TestCase):
             batch_id = self.queue.qmeta.add_batch(values)
             batch_ids.append(batch_id)
         # pylint: disable=protected-access
-        res_readd_values = self.queue.qmeta._get_readds(max_age_secs)
+        res_readd_values = self.queue.qmeta._check_expired(max_age_secs)
         res_readd_values.sort()
         self.assertListEqual(res_readd_values, [])
         for batch_id in batch_ids:
-            bk_expired, *_ = self.queue.qmeta._get_batch_keys(batch_id)
+            bk_expired, *_ = self.queue.qmeta._get_batch_keys_for_id(batch_id)
             expired_int = int(self.queue._client.get(bk_expired))
             self.assertEqual(0, expired_int)
 
-    def _test_get_readds_some_expired(self):
+    def _test_check_expired_some_expired(self):
         '''
-        Test RedisQueueMeta _get_readds with some expired batches
-
-        TIME DEPENDENT TEST! Can fix by seperating check timestamp into
-        function and mocking the output
+        Test RedisQueueMeta _check_expired with some expired batches
         '''
+        # TODO: TIME DEPENDENT TEST! Can fix by seperating check timestamp into
+        # function and mocking the output
         max_age_secs = 1
         batch_1 = [str(index) for index in range(0, 3)]
         batch_2 = [str(index) for index in range(3, 6)]
         batch_3 = [str(index) for index in range(6, 9)]
         batch_id_1 = self.queue.qmeta.add_batch(batch_1)
-        time.sleep(max_age_secs * 5)
+        time.sleep(max_age_secs * 10)
         batch_id_2 = self.queue.qmeta.add_batch(batch_2)
         batch_id_3 = self.queue.qmeta.add_batch(batch_3)
         # pylint: disable=protected-access
-        res_readd_values = self.queue.qmeta._get_readds(max_age_secs)
+        res_readd_values = self.queue.qmeta._check_expired(max_age_secs)
         res_readd_values.sort()
         batch_1.sort()
         self.assertListEqual(res_readd_values, batch_1)
-        bk_expired, *_ = self.queue.qmeta._get_batch_keys(batch_id_1)
+        bk_expired, *_ = self.queue.qmeta._get_batch_keys_for_id(batch_id_1)
         expired_int = int(self.queue._client.get(bk_expired))
         self.assertEqual(1, expired_int)
-        bk_expired, *_ = self.queue.qmeta._get_batch_keys(batch_id_2)
+        bk_expired, *_ = self.queue.qmeta._get_batch_keys_for_id(batch_id_2)
         expired_int = int(self.queue._client.get(bk_expired))
         self.assertEqual(0, expired_int)
-        bk_expired, *_ = self.queue.qmeta._get_batch_keys(batch_id_3)
+        bk_expired, *_ = self.queue.qmeta._get_batch_keys_for_id(batch_id_3)
         expired_int = int(self.queue._client.get(bk_expired))
         self.assertEqual(0, expired_int)
 
-    def _test_get_readds_none(self):
-        '''Test RedisQueueMeta _get_readds when no batches'''
+    def test_check_expired_already_expired(self):
+        '''
+        Test RedisQueueMeta _check_expired when already expired
+        For Example, when remove_batch fails, the batch is expired immediatley.
+        '''
+        max_age_secs = 10
+        batches = []
+        batches.append([str(index) for index in range(0, 3)])
+        batches.append([str(index) for index in range(3, 6)])
+        batches.append([str(index) for index in range(6, 9)])
+        all_values = []
+        batch_ids = []
+        # pylint: disable=protected-access
+        for values in batches:
+            batch_id = self.queue.qmeta.add_batch(values)
+            batch_ids.append(batch_id)
+            all_values.extend(values)
+            bk_expired, *_ = self.queue.qmeta._get_batch_keys_for_id(batch_id)
+            self.queue.qmeta._client.set(bk_expired, 1)
+        res_readd_values = self.queue.qmeta._check_expired(
+            max_age_secs,
+        )
+        res_readd_values.sort()
+        all_values.sort()
+        self.assertListEqual(res_readd_values, all_values)
+
+    def test_check_expired_restart(self):
+        '''
+        Test RedisQueueMeta _check_expired when restarting
+        For Example, when remove_batch fails, the batch is expired immediatley.
+        '''
+        max_age_secs = 10
+        batches = []
+        batches.append([str(index) for index in range(0, 3)])
+        batches.append([str(index) for index in range(3, 6)])
+        batches.append([str(index) for index in range(6, 9)])
+        all_values = []
+        batch_ids = []
+        # pylint: disable=protected-access
+        for values in batches:
+            batch_id = self.queue.qmeta.add_batch(values)
+            batch_ids.append(batch_id)
+            all_values.extend(values)
+            bk_expired, *_ = self.queue.qmeta._get_batch_keys_for_id(batch_id)
+            self.queue.qmeta._client.set(bk_expired, 1)
+        res_readd_values = self.queue.qmeta._check_expired(
+            max_age_secs,
+            listener_restarted=True,
+        )
+        res_readd_values.sort()
+        all_values.sort()
+        self.assertListEqual(res_readd_values, all_values)
+
+    def test_check_expired_none(self):
+        '''Test RedisQueueMeta _check_expired when no batches'''
         max_age_secs = 10
         # pylint: disable=protected-access
-        res_readd_values = self.queue.qmeta._get_readds(max_age_secs)
+        res_readd_values = self.queue.qmeta._check_expired(max_age_secs)
         self.assertListEqual(res_readd_values, [])
 
-    def _test_is_server_running(self):
+    def test_is_server_running(self):
         '''Test RedisQueueMeta is_server_running'''
         # pylint: disable=protected-access
         key = self.queue.qmeta._key_isrunning
         self.queue._client.set(key, 'true')
         self.assertTrue(self.queue.qmeta.is_server_running())
 
-    def _test_is_server_not_running(self):
+    def test_is_server_not_running(self):
         '''Test RedisQueueMeta is_server_running when not running'''
         # pylint: disable=protected-access
         key = self.queue.qmeta._key_isrunning
@@ -308,7 +363,7 @@ class TestRedisQueueMeta(unittest.TestCase):
         self.queue._client.delete(key)
         self.assertFalse(self.queue.qmeta.is_server_running())
 
-    def _test_set_to_not_running(self):
+    def test_set_to_not_running(self):
         '''Test RedisQueueMeta set_to_not_running'''
         # pylint: disable=protected-access
         key = self.queue.qmeta._key_isrunning
@@ -319,7 +374,7 @@ class TestRedisQueueMeta(unittest.TestCase):
             self.queue._client.get(key)
         )
 
-    def _test_purge_meta(self):
+    def test_purge_meta(self):
         '''Test RedisQueueMeta purge_meta'''
         # pylint: disable=protected-access
         key = self.queue.qmeta._key_metabase + '*'
@@ -351,7 +406,7 @@ class TestRedisQueueMeta(unittest.TestCase):
             batch_id = batch['batch_id']
             values = batch['values']
             (bk_expired, bk_timestamp,
-             bk_values) = self.queue.qmeta._get_batch_keys(batch_id)
+             bk_values) = self.queue.qmeta._get_batch_keys_for_id(batch_id)
             print(batch_id, bk_expired, bk_timestamp, bk_values)
             self.assertEqual(int(self.queue._client.get(bk_expired)), 0)
             self.assertTrue(int(self.queue._client.get(bk_timestamp)))
@@ -365,12 +420,78 @@ class TestRedisQueueMeta(unittest.TestCase):
         self.assertIsNone(self.queue.qmeta.add_batch(None))
         self.assertIsNone(self.queue.qmeta.add_batch([]))
 
-    def test_add_finished(self):
-        '''Test RedisQueueMeta add_finished'''
+    def test_remove_batch_successes(self):
+        '''Test RedisQueueMeta remove_batch with all successes'''
         batches = [
             [str(index) for index in range(0, 3)],
             [str(index) for index in range(3, 6)],
             [str(index) for index in range(6, 9)],
         ]
-        batch_ids = []
+        batch_ids_values = []
+        all_values = []
+        for values in batches:
+            batch_id = self.queue.qmeta.add_batch(values)
+            batch_ids_values.append((batch_id, values))
+            all_values.extend(values)
+        errors = []
+        for batch_id, values in batch_ids_values:
+            successes = len(values)
+            self.queue.qmeta.remove_batch(batch_id, successes, errors)
         # pylint: disable=protected-access
+        qmeta_successes = int(
+            self.queue.qmeta._client.get(self.queue.qmeta._key_successescount)
+        )
+        self.assertEqual(len(all_values), qmeta_successes)
+        for batch_id, values in batch_ids_values:
+            bk_keys_tuple = self.queue.qmeta._get_batch_keys_for_id(str(batch_id))
+            for bk_key in bk_keys_tuple:
+                self.assertFalse(
+                    self.queue._client.exists(bk_key)
+                )
+        self.assertListEqual(self.queue.qmeta.get_errors(), [])
+
+    def test_remove_batch_with_errors(self):
+        '''
+        Test RedisQueueMeta remove_batch with errors
+        * This also tests _remove_batch
+        '''
+        batches = [
+            [str(index) for index in range(0, 3)],
+            [str(index) for index in range(3, 6)],
+            [str(index) for index in range(6, 9)],
+        ]
+        batch_ids_values = []
+        all_values = []
+        for values in batches:
+            batch_id = self.queue.qmeta.add_batch(values)
+            batch_ids_values.append((batch_id, values))
+            all_values.extend(values)
+        errors = [
+            {'uuid': value, 'msg': 'error' + str(value)}
+            for value in batches[0]
+        ]
+        batch_id, values = batch_ids_values.pop()
+        successes = len(values)
+        self.queue.qmeta.remove_batch(batch_id, successes, errors)
+        for batch_id, values in batch_ids_values:
+            successes = len(values)
+            self.queue.qmeta.remove_batch(batch_id, successes, [])
+        # pylint: disable=protected-access
+        qmeta_successes = int(
+            self.queue.qmeta._client.get(self.queue.qmeta._key_successescount)
+        )
+        self.assertEqual(len(all_values) - len(errors), qmeta_successes)
+        for batch_id, values in batch_ids_values:
+            bk_keys_tuple = self.queue.qmeta._get_batch_keys_for_id(str(batch_id))
+            for bk_key in bk_keys_tuple:
+                self.assertFalse(
+                    self.queue._client.exists(bk_key)
+                )
+        res_errors = self.queue.qmeta.get_errors()
+        for res_error in res_errors:
+            found = False
+            for error in errors:
+                if error['uuid'] == res_error['uuid']:
+                    found = True
+                    break
+            self.assertTrue(found)
