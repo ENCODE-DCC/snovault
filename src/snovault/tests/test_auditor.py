@@ -165,7 +165,6 @@ def test_audit_inherit_no_error(testapp):
 
     res = testapp.get('/%s/@@index-data' % target['uuid']).maybe_follow()
     errors_dict = res.json['audit']
-    errors_list = []
     for error_type in errors_dict:
         assert not errors_dict[error_type]['name'] == 'checker1'
 
