@@ -167,4 +167,3 @@ def test_audit_inherit_no_error(testapp):
     errors_dict = res.json['audit']
     for error_type in errors_dict:
         assert not errors_dict[error_type]['name'] == 'checker1'
-

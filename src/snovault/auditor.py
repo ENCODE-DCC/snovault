@@ -19,6 +19,7 @@ from .resources import Item
 logger = logging.getLogger("__name__")
 logger.setLevel(logging.ERROR)
 
+
 def includeme(config):
     config.include('.calculated')
     config.include('.typeinfo')
