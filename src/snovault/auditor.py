@@ -242,8 +242,9 @@ def item_view_audit_self(context, request):
 def item_view_audit(context, request):
     path = request.resource_path(context)
     properties = request.embed(path, '@@object')
-    if context.audit_inherit and '*' in context.audit_inherit:
-        inherit = context.embedded or []
+    inherit = context.audit_inherit
+    if context.embedded and '*' in context.audit_inherit:
+        inherit = context.embedded
     else:
         inherit = context.audit_inherit or []
     audit = inherit_audits(request, properties, inherit)

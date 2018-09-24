@@ -207,7 +207,7 @@ class Item(Resource):
     name_key = None
     rev = {}
     embedded = ()
-    audit_inherit = None
+    audit_inherit = []
     schema = None
     AbstractCollection = AbstractCollection
     Collection = Collection

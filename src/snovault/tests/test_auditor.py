@@ -141,7 +141,7 @@ def test_audit_inherit_error(testapp):
     source = {'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd', 'target': target['uuid'], 'condition1': True}
     # condition1 - auto fails the audit on source
     testapp.post_json('/testing_link_source', source, status=201)
-    
+
     res = testapp.get('/%s/@@index-data' % target['uuid']).maybe_follow()
     # index TARGET
     errors_dict = res.json['audit']
@@ -149,7 +149,8 @@ def test_audit_inherit_error(testapp):
     for error_type in errors_dict:
         errors_list.extend(errors_dict[error_type])
     errors = [e for e in errors_list if e['name'] == 'checker1']
-    error, = errors
+    assert len(errors) == 1
+    error = errors[0]
     assert error['detail'] == 'Missing checker1'
     assert error['category'] == 'testchecker'
     assert error['level'] == 0
@@ -161,12 +162,10 @@ def test_audit_inherit_no_error(testapp):
     testapp.post_json('/testing_link_target', target, status=201)
     source = {'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd', 'target': target['uuid'], 'condition1': False}
     testapp.post_json('/testing_link_source', source, status=201)
-    
+
     res = testapp.get('/%s/@@index-data' % target['uuid']).maybe_follow()
     errors_dict = res.json['audit']
     errors_list = []
     for error_type in errors_dict:
-        errors_list.extend(errors_dict[error_type])
-    errors = [e for e in errors_list if e['name'] == 'checker1']
-    assert errors == []
+        assert not errors_dict[error_type]['name'] == 'checker1'
 
