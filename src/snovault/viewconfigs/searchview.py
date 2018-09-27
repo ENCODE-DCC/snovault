@@ -26,11 +26,11 @@ audit_facets = [
 ]
 
 class SearchView(BaseView):
-    def __init__(self, context, request, search_type=None, return_generator=False, default_data_types=None):
+    def __init__(self, context, request, search_type=None, return_generator=False, default_doc_types=None):
         super(SearchView, self).__init__(context, request)
         self.search_type = search_type
         self.return_generator = return_generator
-        self.default_data_types = default_data_types or []
+        self.default_doc_types = default_doc_types or []
         self.context = context
         
     def set_facets(self):
@@ -130,7 +130,7 @@ class SearchView(BaseView):
                 doc_types = ['Item']
             # For /search/ with no type= use defalts
             else:
-                doc_types = self.default_data_types
+                doc_types = self.default_doc_types
         else:
             # TYPE filters that were set by UI for labeling, only seen with >1 types
             # Probably this is why filtering Items with subclasses doesn't work right
