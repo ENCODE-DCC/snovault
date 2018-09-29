@@ -37,14 +37,28 @@ class ReportView(SearchView):
         if ('limit' in self.request.GET and self.request.__parent__ is None
                 and (size is None or size > 1000)):
             del self.request.GET['limit']
+
         
         # Add special views like Report and Matrix if search is a single type
         views = []
-        if len(doc_types) == 1:
+        ti = self.types[doc_types[0]] 
+        views.append({
+            'href': self.request.route_path('report', slash='/') + self.search_base,
+            'title': 'View tabular report',
+            'icon': 'table',
+        })
+        # matrix is encoded in schema for type
+        if hasattr(ti.factory, 'matrix'):
             views.append({
-                'href': self.request.route_path('report', slash='/') + self.search_base,
-                'title': 'View tabular report',
-                'icon': 'table',
+                'href': self.request.route_path('matrix', slash='/') + self.search_base,
+                'title': 'View summary matrix',
+                'icon': 'th',
+            })
+        if hasattr(ti.factory, 'summary_data'):
+            views.append({
+                'href': self.request.route_path('summary', slash='/') + self.search_base,
+                'title': 'View summary report',
+                'icon': 'summary',
             })
 
         # Reuse search view
