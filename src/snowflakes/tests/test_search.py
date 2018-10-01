@@ -23,6 +23,7 @@ def test_report_view(workbook, testapp):
     assert res['@type'] == ['Report']
     assert res['@id'] == '/report/?type=Lab'
     assert res['@context'] == '/terms/'
+    assert res['download_tsv'] == '/report.tsv/?type=Lab'
     assert res['notification'] == 'Success'
     assert res['title'] == 'Report'
     assert res['total'] > 0
