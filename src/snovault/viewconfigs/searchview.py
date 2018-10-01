@@ -18,43 +18,22 @@ from snovault.helpers.helper import (
     normalize_query,
 )
 
-audit_facets = [
-    ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
-    ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
-    ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
-    ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
-]
 
 class SearchView(BaseView):
-    def __init__(self, context, request, search_type=None, return_generator=False, default_data_types=None):
+    def __init__(self, context, request, search_type=None, return_generator=False, default_doc_types=None):
         super(SearchView, self).__init__(context, request)
         self.search_type = search_type
         self.return_generator = return_generator
-        self.default_data_types = default_data_types or []
+        self.default_doc_types = default_doc_types or []
         self.context = context
-        
+
     def set_facets(self):
         if len(self.doc_types) == 1 and 'facets' in self.types[self.doc_types[0]].schema:
             self.facets.extend(self.types[self.doc_types[0]].schema['facets'].items())
         # Display all audits if logged in, or all but INTERNAL_ACTION if logged out
-        for audit_facet in audit_facets:
+        for audit_facet in self.audit_facets:
             if self.search_audit and 'group.submitter' in self.principals or 'INTERNAL_ACTION' not in audit_facet[0]:
                 self.facets.append(audit_facet)
-
-    def query_elastic_search(self, query, es_index, from_=None, size=None):
-
-        # Execute the query
-        if size is None or size > 1000:
-            es_results = self.elastic_search.search(body=query,
-                                                    index=es_index,
-                                                    search_type='query_then_fetch')
-        else:
-            es_results = self.elastic_search.search(body=query,
-                                                    index=es_index,
-                                                    from_=from_,
-                                                    size=size,
-                                                    request_cache=True)
-        return es_results
 
     def get_total_results(self, es_results):
         total = es_results['hits']['total']
@@ -130,7 +109,7 @@ class SearchView(BaseView):
                 doc_types = ['Item']
             # For /search/ with no type= use defalts
             else:
-                doc_types = self.default_data_types
+                doc_types = self.default_doc_types
         else:
             # TYPE filters that were set by UI for labeling, only seen with >1 types
             # Probably this is why filtering Items with subclasses doesn't work right
@@ -191,7 +170,7 @@ class SearchView(BaseView):
             facets.extend(types[doc_types[0]].schema['facets'].items())
 
         # Display all audits if logged in, or all but INTERNAL_ACTION if logged out
-        for audit_facet in audit_facets:
+        for audit_facet in self.audit_facets:
             if search_audit and 'group.submitter' in self.principals or 'INTERNAL_ACTION' not in audit_facet[0]:
                 facets.append(audit_facet)
 

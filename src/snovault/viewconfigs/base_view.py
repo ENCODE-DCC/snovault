@@ -9,31 +9,35 @@ from snovault.helpers.helper import (
 
 
 class BaseView(object):
-    # Override it in child classes
+    audit_facets = [
+        ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
+        ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
+        ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
+        ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
+    ]
     routename = None
-
     def __init__(self, context, request):
         self.request = request
         self.context = context
         self.types = self.request.registry[TYPES]
-        self.search_base = normalize_query(self.request)
+        self.search_base = normalize_query(request)
         self.result = {
             '@context': self.request.route_path('jsonld_context'),
             'filters': [],
         }
         self.doc_types = self.request.params.getall('type')
-        self.principals = effective_principals(self.request)
+        self.principals = effective_principals(request)
         self.elastic_search = self.request.registry[ELASTIC_SEARCH]
         self.es_index = '_all'
         self.search_audit = self.request.has_permission('search_audit')
-        self.search_term = prepare_search_term(self.request)
+        self.search_term = prepare_search_term(request)
         self.request_cache = None
         self.facets = [
             ('type', {'title': 'Data Type'}),
         ]
         self.used_filters = None
-        self.from_, self.size = get_pagination(self.request)
-        
+        self.from_, self.size = get_pagination(request)
+
     @staticmethod
     def format_facets(es_results, facets, used_filters, schemas, total, principals):
         result = []
