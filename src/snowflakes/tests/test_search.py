@@ -518,7 +518,7 @@ def test_set_facets_negated_filter():
                 },
             },
         }
-    } 
+    }
 
 
 
@@ -639,7 +639,7 @@ def test_format_facets():
     schemas = []
     total = 42
     principals = []
-    result = BaseView.format_facets(
+    result = BaseView._format_facets(
         es_result, facets, used_filters, schemas, total, principals)
 
     assert result == [{
@@ -662,7 +662,7 @@ def test_format_facets():
 
 def test_format_facets_no_aggregations():
     from snovault.viewconfigs.base_view import BaseView
-    result = BaseView.format_facets({}, [], [], [], 0, [])
+    result = BaseView._format_facets({}, [], [], [], 0, [])
     assert result == []
 
 
@@ -691,7 +691,7 @@ def test_format_facets_no_aggregations():
 #     schemas = []
 #     total = 42
 #     principals = []
-#     result = BaseView.format_facets(es_result, facets, used_filters, schemas, total, principals)
+#     result = BaseView._format_facets(es_result, facets, used_filters, schemas, total, principals)
 
 #     print('////////////////')
 #     print(result)
@@ -718,7 +718,7 @@ def test_format_facets_adds_pseudo_facet_for_extra_filters():
     }]
     total = 42
     principals = []
-    result = BaseView.format_facets(
+    result = BaseView._format_facets(
         es_result, facets, used_filters, schemas, total, principals)
 
     assert result == [{

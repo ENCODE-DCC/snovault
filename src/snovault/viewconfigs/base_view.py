@@ -1,4 +1,9 @@
-from pyramid.security import effective_principals
+"""
+# Base View
+Some Desc
+"""
+from pyramid.security import effective_principals  # pylint: disable=import-error
+
 from snovault import TYPES
 from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.helpers.helper import (
@@ -8,40 +13,50 @@ from snovault.helpers.helper import (
 )
 
 
-class BaseView(object):
-    audit_facets = [
+class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-instance-attributes
+    '''Base View for all search based endpoints'''
+    _audit_facets = [
         ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
         ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
         ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
         ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
     ]
-    routename = None
     def __init__(self, context, request):
-        self.request = request
-        self.context = context
-        self.types = self.request.registry[TYPES]
-        self.search_base = normalize_query(request)
-        self.result = {
-            '@context': self.request.route_path('jsonld_context'),
+        self._request = request
+        self._context = context
+        self._types = request.registry[TYPES]
+        self._search_base = normalize_query(request)
+        self._result = {
+            '@context': request.route_path('jsonld_context'),
             'filters': [],
         }
-        self.doc_types = self.request.params.getall('type')
-        self.principals = effective_principals(request)
-        self.elastic_search = self.request.registry[ELASTIC_SEARCH]
-        self.es_index = '_all'
-        self.search_audit = self.request.has_permission('search_audit')
-        self.search_term = prepare_search_term(request)
-        self.request_cache = None
-        self.facets = [
+        self._doc_types = request.params.getall('type')
+        self._principals = effective_principals(request)
+        self._elastic_search = request.registry[ELASTIC_SEARCH]
+        self._es_index = '_all'
+        self._search_audit = request.has_permission('search_audit')
+        self._search_term = prepare_search_term(request)
+        self._request_cache = None
+        self._facets = [
             ('type', {'title': 'Data Type'}),
         ]
-        self.used_filters = None
         self.from_, self.size = get_pagination(request)
+        from_, page_size = get_pagination(request)
+        self._from_ = from_
+        self._size = page_size
 
     @staticmethod
-    def format_facets(es_results, facets, used_filters, schemas, total, principals):
+    def _format_facets(
+            es_results,
+            facets,
+            used_filters,
+            schemas,
+            total,
+            principals
+        ):
+        '''Helper function for child classes'''
+        # pylint: disable=too-many-locals, too-many-arguments
         result = []
-        # Loading facets in to the results
         if 'aggregations' not in es_results:
             return result
         aggregations = es_results['aggregations']
@@ -66,15 +81,15 @@ class BaseView(object):
                     {'key': 'no', 'doc_count': terms['no']['doc_count']},
                 ]
                 exists_facets.add(field)
-            result.append({
-                'type': facet_type,
-                'field': field,
-                'title': options.get('title', field),
-                'terms': terms,
-                'total': all_buckets_total
-            })
-        # Show any filters that aren't facets as a fake facet with one entry,
-        # so that the filter can be viewed and removed
+            result.append(
+                {
+                    'type': facet_type,
+                    'field': field,
+                    'title': options.get('title', field),
+                    'terms': terms,
+                    'total': all_buckets_total
+                }
+            )
         for field, values in used_filters.items():
             if field not in used_facets and field.rstrip('!') not in exists_facets:
                 title = field
