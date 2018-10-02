@@ -218,20 +218,18 @@ class RedisQueueMeta(UuidBaseQueueMeta):
 
     def get_errors(self):
         '''Get all errors from queue that were sent in remove_batch'''
+        warn_msg = None
         errors = []
         errors_cnt = int(self._client.get(self._key_errorscount))
         for error_key in self._client.keys(self._key_errors + ':*'):
-            print(error_key)
             err_dict = self._client.hgetall(error_key)
             errors.append(err_dict)
         if errors_cnt != len(errors):
-            print(
-                'MAKE A WARNING: error count is off: %d != %d' % (
-                    errors_cnt,
-                    len(errors),
-                )
+            warn_msg = 'Redis Meta get_errors count is off: %d != %d' % (
+                errors_cnt,
+                len(errors),
             )
-        return errors
+        return errors, warn_msg
 
     def is_finished(self, max_age_secs=5002, listener_restarted=False):
         '''
@@ -262,7 +260,7 @@ class RedisQueueMeta(UuidBaseQueueMeta):
             successes_cnt = int(self._client.get(self._key_successescount))
             uuids_added = int(self._client.get(self._key_addedcount))
             uuids_handled = successes_cnt + errors_cnt
-            did_finish = uuids_handled == uuids_added
+            did_finish = (uuids_handled == uuids_added)
         return expired_values, did_finish
 
     def values_added(self, len_values):
@@ -276,10 +274,12 @@ class RedisQueueMeta(UuidBaseQueueMeta):
     def is_useable(self):
         '''
         Check the consistency of the meta data values
-
         * Useful when queue crashes and needs a restart
         '''
+        # TODO: Function not implemented
+        raise NotImplementedError
         # self._key_runargs = self._key_metabase + ':ra'  # ra for run args
+        # pylint: disable=unreachable
         added_cnt = 0
         errors_cnt = 0
         errors_len = 0
@@ -386,7 +386,9 @@ class RedisQueue(UuidBaseQueue):
 
     def is_queue_empty(self):
         '''Checks if queue is empty'''
-        return self.does_exist()
+        if self.does_exist():
+            return False
+        return True
 
 
 class RedisPipeQueue(RedisQueue):
@@ -401,7 +403,7 @@ class RedisPipeQueue(RedisQueue):
     @staticmethod
     def _call_pipe(pipe):
         try:
-            # At the time of writting pipe return a list of length
+            # At the time of writting pipe returns a list of length
             # Each item is the length of the queue when it was added.
             ret_list = pipe.execute()
             return ret_list
