@@ -7,9 +7,11 @@ from pyramid.httpexceptions import HTTPBadRequest
 from lucenequery import dialects
 from lucenequery.prefixfields import prefixfields
 
-default_filter_exclusion = ['type', 'limit', 'mode', 'annotation',
-                     'format', 'frame', 'datastore', 'field', 'region', 'genome',
-                     'sort', 'from', 'referrer']
+default_filter_exclusion = [
+    'type', 'limit', 'mode', 'annotation', 'format', 'frame', 'datastore',
+    'field', 'region', 'genome', 'sort', 'from', 'referrer', 'filterresponse',
+    'remove', 'cart',
+]
 
 def sort_query(unsorted_query):
     sorted_query = OrderedDict()
@@ -298,7 +300,8 @@ def set_filters(request, query, result, static_items=None, filter_exclusion=None
             continue
 
         # Add filter to result
-        if field in qs_fields:
+        filterresponse = request.params.get('filterresponse', 'on')
+        if field in qs_fields and filterresponse == 'on':
             for term in terms:
                 query_string = urlencode([
                     (k.encode('utf-8'), v.encode('utf-8'))
