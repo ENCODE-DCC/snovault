@@ -431,7 +431,7 @@ def server_loop(uuid_queue, run_args, listener_restarted=False):
                 readded=True,
             )
         if queue_done:
-            errors = uuid_queue.get_errors()
+            errors, warn_msg = uuid_queue.get_errors()
         time.sleep(1.00)
     print('done, try readding errors?', len(errors))
     uuid_queue.stop()
