@@ -47,14 +47,6 @@ class ReportView(SearchView):  # pylint: disable=too-few-public-methods
         if ('limit' in self._request.GET and self._request.__parent__ is None
                 and (size is None or size > 1000)):
             del self._request.GET['limit']
-        views = []
-        report_route = self._request.route_path('report', slash='/')
-        if len(doc_types) == 1:
-            views.append({
-                'href': report_route + self._search_base,
-                'title': 'View tabular report',
-                'icon': 'table',
-            })
         # TODO: Fix creating a new instance a SearchView
         # We already do this in __init__
         res = SearchView(self._context, self._request).preprocess_view(

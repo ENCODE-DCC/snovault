@@ -38,4 +38,4 @@ def search(context, request, search_type=None, views=None, return_generator=Fals
 @view_config(route_name='report', request_method='GET', permission='search')
 def report(context, request):
     report = ReportView(context, request)
-    return report.preprocess_view()
+    return report.preprocess_view(views=[])
