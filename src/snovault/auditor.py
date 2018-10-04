@@ -16,7 +16,8 @@ from .interfaces import (
 )
 from .resources import Item
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("__name__")
+logger.setLevel(logging.ERROR)
 
 
 def includeme(config):
@@ -242,7 +243,12 @@ def item_view_audit_self(context, request):
 def item_view_audit(context, request):
     path = request.resource_path(context)
     properties = request.embed(path, '@@object')
-    audit = inherit_audits(request, properties, context.audit_inherit or context.embedded)
+    inherit = context.audit_inherit
+    if context.embedded and '*' in context.audit_inherit:
+        inherit = context.embedded
+    else:
+        inherit = context.audit_inherit or []
+    audit = inherit_audits(request, properties, inherit)
     return {
         '@id': path,
         'audit': audit,
