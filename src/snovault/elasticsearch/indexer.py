@@ -1,3 +1,4 @@
+from pyramid.settings import asbool
 from os import getpid as os_getpid
 from elasticsearch.exceptions import (
     ConflictError,
@@ -49,7 +50,7 @@ MAX_CLAUSES_FOR_ES = 8192
 QUEUE_NAME = 'indexQ'
 QUEUE_TYPE = UuidQueueTypes.REDIS_LIST_PIPE
 BATCH_GET_SIZE = 1
-DEBUG_RESET_QUEUE = True
+
 
 def includeme(config):
     config.add_route('index', '/index')
@@ -57,6 +58,7 @@ def includeme(config):
     config.scan(__name__)
     registry = config.registry
     registry[INDEXER] = Indexer(registry)
+    registry['DEBUG_RESET_QUEUE'] = True
 
 def get_related_uuids(request, es, updated, renamed):
     '''Returns (set of uuids, False) or (list of all uuids, True) if full reindex triggered'''
@@ -242,10 +244,10 @@ def index(request):
         QUEUE_TYPE,
         client_options,
     )
-    if DEBUG_RESET_QUEUE:
+    if asbool(request.registry['DEBUG_RESET_QUEUE']):
         print('purging')
         uuid_queue.purge()
-        DEBUG_RESET_QUEUE = False
+        request.registry['DEBUG_RESET_QUEUE'] = False
         return result
     if len(invalidated) > SEARCH_MAX:  # Priority cycle already set up
         flush = True
