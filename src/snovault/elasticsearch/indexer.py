@@ -132,6 +132,7 @@ def consume_uuids(request, batch_id, uuids, xmin, snapshot_id, restart):
     successes = []
     errors = []
     request.registry[INDEXER].set_snapshot_id(snapshot_id)
+    print('index worker consume_uuids', len(uuids), batch_id)
     errors = request.registry[INDEXER].update_objects(
         request,
         uuids,
@@ -144,7 +145,6 @@ def consume_uuids(request, batch_id, uuids, xmin, snapshot_id, restart):
 @view_config(route_name='index_worker', request_method='POST', permission="index")
 def index_worker(request):
     print('skipping worker')
-    return {}
     '''Run Worker, server must be started'''
     skip_consume = 0
     client_options = {
@@ -157,12 +157,16 @@ def index_worker(request):
         client_options,
     )
     if uuid_queue.server_ready():
+        print('index worker uuid_queue.server_ready')
         if uuid_queue.queue_running():
+            print('index worker uuid_queue.queue_running')
             processed = 0
             while uuid_queue.queue_running():
+                print('index worker uuid_queue.queue_running loop')
                 batch_id, uuids, _ = uuid_queue.get_uuids(
                     get_count=BATCH_GET_SIZE
                 )
+                print('index worker uuid_queue.queue_running loop uuids', len(uuids), batch_id)
                 if batch_id and uuids:
                     if skip_consume > 0:
                         skip_consume -= 1
