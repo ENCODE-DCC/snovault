@@ -49,7 +49,7 @@ MAX_CLAUSES_FOR_ES = 8192
 QUEUE_NAME = 'indexQ'
 QUEUE_TYPE = UuidQueueTypes.REDIS_LIST_PIPE
 BATCH_GET_SIZE = 1
-
+DEBUG_RESET_QUEUE = True
 
 def includeme(config):
     config.add_route('index', '/index')
@@ -141,6 +141,8 @@ def consume_uuids(request, batch_id, uuids, xmin, snapshot_id, restart):
 
 @view_config(route_name='index_worker', request_method='POST', permission="index")
 def index_worker(request):
+    print('skipping worker')
+    return {}
     '''Run Worker, server must be started'''
     skip_consume = 0
     client_options = {
@@ -178,6 +180,7 @@ def index_worker(request):
 # pylint: disable=too-many-statements, too-many-branches, too-many-locals
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
+    print('index')
     INDEX = request.registry.settings['snovault.elasticsearch.index']
     request.datastore = 'database'
     record = request.json.get('record', False)
@@ -239,7 +242,11 @@ def index(request):
         QUEUE_TYPE,
         client_options,
     )
-
+    if DEBUG_RESET_QUEUE:
+        print('purging')
+        uuid_queue.purge()
+        DEBUG_RESET_QUEUE = False
+        return result
     if len(invalidated) > SEARCH_MAX:  # Priority cycle already set up
         flush = True
     else:
@@ -317,6 +324,7 @@ def index(request):
             'restart': False,
         }
         if uuid_queue.queue_running():
+            print('indexer uuid_queue.queue_running')
             result = run_cycle(
                 uuid_queue, state, result, record,
                 elastic_search, INDEX, flush,
@@ -324,6 +332,7 @@ def index(request):
                 listener_restarted=True
             )
         else:
+            print('indexer short')
             # TODO: Remove debug indexer short
             invalidated = IndexDataDump.debug_short_indexer(invalidated, 100)
             # TODO: Remove debug indexer short
@@ -353,7 +362,8 @@ def init_cycle(uuid_queue, invalidated, state, result, run_args):
     did_fail = True
     if did_pass:
         did_fail = False
-        _, success_cnt, _ = uuid_queue.load_uuids(invalidated)
+        failed, success_cnt, call_cnt = uuid_queue.load_uuids(invalidated)
+        print('indexer init_cycle load_uuids', failed, success_cnt, call_cnt)
         if not success_cnt:
             did_fail = True
         else:
@@ -401,10 +411,6 @@ def server_loop(uuid_queue, run_args, listener_restarted=False):
     max_age_secs = 7200
     queue_done = False
     errors = None
-    debug_reset = True
-    if debug_reset:
-        print('purging')
-        uuid_queue.purge()
     while not queue_done:
         print('server loop done', queue_done)
         readd_uuids, queue_done = uuid_queue.is_finished(
