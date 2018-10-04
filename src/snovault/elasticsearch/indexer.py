@@ -144,8 +144,8 @@ def index_worker(request):
     '''Run Worker, server must be started'''
     skip_consume = 0
     client_options = {
-        'host': request.registry.settings['redis-ip'],
-        'port': request.registry.settings['redis-port'],
+        'host': request.registry.settings['redis_ip'],
+        'port': request.registry.settings['redis_port'],
     }
     uuid_queue = UuidQueueWorker(
         QUEUE_NAME,
@@ -231,8 +231,8 @@ def index(request):
         )
 
     client_options = {
-        'host': request.registry.settings['redis-ip'],
-        'port': request.registry.settings['redis-port'],
+        'host': request.registry.settings['redis_ip'],
+        'port': request.registry.settings['redis_port'],
     }
     uuid_queue = UuidQueue(
         QUEUE_NAME,
