@@ -144,7 +144,7 @@ def consume_uuids(request, batch_id, uuids, xmin, snapshot_id, restart):
 
 @view_config(route_name='index_worker', request_method='POST', permission="index")
 def index_worker(request):
-    print('skipping worker')
+    print('worker')
     '''Run Worker, server must be started'''
     skip_consume = 0
     client_options = {
@@ -157,16 +157,13 @@ def index_worker(request):
         client_options,
     )
     if uuid_queue.server_ready():
-        print('index worker uuid_queue.server_ready')
         if uuid_queue.queue_running():
-            print('index worker uuid_queue.queue_running')
+            print('index worker uuid_queue.queue_running looping')
             processed = 0
             while uuid_queue.queue_running():
-                print('index worker uuid_queue.queue_running loop')
                 batch_id, uuids, _ = uuid_queue.get_uuids(
                     get_count=BATCH_GET_SIZE
                 )
-                print('index worker uuid_queue.queue_running loop uuids', len(uuids), batch_id)
                 if batch_id and uuids:
                     if skip_consume > 0:
                         skip_consume -= 1
@@ -417,8 +414,8 @@ def server_loop(uuid_queue, run_args, listener_restarted=False):
     max_age_secs = 7200
     queue_done = False
     errors = None
+    print('server looping')
     while not queue_done:
-        print('server loop done', queue_done)
         readd_uuids, queue_done = uuid_queue.is_finished(
             max_age_secs=max_age_secs, listener_restarted=listener_restarted,
         )

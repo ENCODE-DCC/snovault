@@ -106,6 +106,7 @@ class RedisQueueMeta(UuidBaseQueueMeta):
         expired_values = []
         # bk_timestamp all key
         _, bk_timestamp_all, _ = self._get_batch_keys_for_id('*')
+        print(self._client.keys(bk_timestamp_all))
         for bk_timestamp in self._client.keys(bk_timestamp_all):
             batch_id = self._get_batch_id_from_key(bk_timestamp)
             bk_expired, bk_timestamp, bk_values = self._get_batch_keys_for_id(str(batch_id))
