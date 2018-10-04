@@ -422,15 +422,18 @@ class RedisPipeQueue(RedisQueue):
         bytes_added = 0
         call_cnt = 0
         for value in values:
-            value_len = len(value) # currently all values should be same length
+            if value is not None:
+                value_len = len(value)
             pipe_func(self.queue_name, value)
             bytes_added += value_len
             call_cnt += 1
         ret_val = self._call_pipe(pipe)
-        # ret_val is a list of the redis queue count after insertion of pipe item
+        #   ret_val is a list of the redis queue
+        # count after insertion of pipe item
         if ret_val is False:
             ret_val = []
             failed = values
+            bytes_added = 0
         else:
             diff = call_cnt - len(ret_val)
             bytes_added -= value_len * diff

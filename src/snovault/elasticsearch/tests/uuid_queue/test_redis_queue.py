@@ -56,7 +56,7 @@ class TestRedisQueue(unittest.TestCase):
     def tearDown(self):
         self.queue.qmeta.purge_meta()
 
-    def test_init(self):
+    def _test_init(self):
         '''Test RedisQueue initialization'''
         self.assertIsNone(self.queue.add_str)
         self.assertIsNone(self.queue.get_str)
@@ -68,7 +68,7 @@ class TestRedisQueue(unittest.TestCase):
         self.assertIsNone(self.queue._values)
         self.assertIsInstance(self.queue._client, RedisClient)
 
-    def test_call_func_bad(self):
+    def _test_call_func_bad(self):
         '''
         Test RedisQueue _call_func bad func_str
         - Good function strings are tested in children
@@ -82,7 +82,7 @@ class TestRedisQueue(unittest.TestCase):
         else:
             self.fail('Should fail with ValueError')
 
-    def test_add_value(self):
+    def _test_add_value(self):
         '''Test RedisQueue _add_value'''
         some_value = 'some-value'
         try:
@@ -93,7 +93,7 @@ class TestRedisQueue(unittest.TestCase):
         else:
             self.fail('Should fail with TypeError')
 
-    def test_get_value(self):
+    def _test_get_value(self):
         '''Test RedisQueue _get_value'''
         try:
             # pylint: disable=protected-access
@@ -103,15 +103,15 @@ class TestRedisQueue(unittest.TestCase):
         else:
             self.fail('Should fail with TypeError')
 
-    def test_does_exist(self):
+    def _test_does_exist(self):
         '''Test RedisQueue does_exist'''
         self.assertFalse(self.queue.does_exist())
 
-    def test_has_values(self):
+    def _test_has_values(self):
         '''Test RedisQueue has_values'''
         self.assertFalse(self.queue.has_values())
 
-    def test_purge(self):
+    def _test_purge(self):
         '''
         Test RedisQueue purge
         - Cannot be tested on base class
@@ -119,11 +119,11 @@ class TestRedisQueue(unittest.TestCase):
         self.queue.purge()
         self.assertTrue(True)  # pylint: disable=redundant-unittest-assert
 
-    def test_queue_length(self):
+    def _test_queue_length(self):
         '''Test RedisQueue queue_length'''
         self.assertIsNone(self.queue.queue_length())
 
-    def test_is_queue_empty(self):
+    def _test_is_queue_empty(self):
         '''Test RedisQueue is_queue_empty'''
         self.assertTrue(self.queue.is_queue_empty())
 
@@ -152,7 +152,7 @@ class TestRedisPipeQueue(unittest.TestCase):
     def tearDown(self):
         self.queue.qmeta.purge_meta()
 
-    def test_call_pipe(self):
+    def _test_call_pipe(self):
         '''
         Test RedisPipeQueue _call_pipe'''
         try:
@@ -164,7 +164,7 @@ class TestRedisPipeQueue(unittest.TestCase):
         else:
             self.fail('Should fail with AttributeError')
 
-    def test_get_pipe(self):
+    def _test_get_pipe(self):
         '''Test RedisPipeQueue _get_pipe'''
         try:
             func_str = None
@@ -175,7 +175,7 @@ class TestRedisPipeQueue(unittest.TestCase):
         else:
             self.fail('Should fail with TypeError')
 
-    def test_add_values(self):
+    def _test_add_values(self):
         '''
         Test RedisPipeQueue add_values
         - Fails like _get_pipe
@@ -188,7 +188,7 @@ class TestRedisPipeQueue(unittest.TestCase):
         else:
             self.fail('Should fail with TypeError')
 
-    def test_get_values(self):
+    def _test_get_values(self):
         '''
         Test RedisPipeQueue get_values
         - Fails like _get_pipe
@@ -231,7 +231,7 @@ class TestRedisListQueue(unittest.TestCase):
         '''Helper function to get all items in queue'''
         return self.client.lrange(self.queue_name, 0, -1)
 
-    def test_add_values(self):
+    def _test_add_values(self):
         '''Test RedisListQueue add_values through UuidBaseQueue'''
         values = [
             'id_' + str(val)
@@ -254,7 +254,7 @@ class TestRedisListQueue(unittest.TestCase):
         # get_count
         (4), (40)
     )
-    def test_get_values(self, get_count):
+    def _test_get_values(self, get_count):
         '''
         Test RedisListQueue get_values through UuidBaseQueue
         - Greater than or equal added values
@@ -273,7 +273,7 @@ class TestRedisListQueue(unittest.TestCase):
         values.sort()
         self.assertListEqual(got_values, values)
 
-    def test_get_values_less(self):
+    def _test_get_values_less(self):
         '''
         Test RedisListQueue get_values through UuidBaseQueue
         - Ask for less than added values
@@ -294,7 +294,7 @@ class TestRedisListQueue(unittest.TestCase):
         self.assertEqual(len(all_values), len(values) - get_count)
         self.assertEqual(len(got_values), get_count)
 
-    def test_does_exist(self):
+    def _test_does_exist(self):
         '''Test RedisListQueue does_exist'''
         values = [
             'id_' + str(val)
@@ -303,11 +303,11 @@ class TestRedisListQueue(unittest.TestCase):
         self.queue.add_values(values)
         self.assertTrue(self.queue.does_exist())
 
-    def test_does_exist_empty(self):
+    def _test_does_exist_empty(self):
         '''Test RedisListQueue does_exist when no values'''
         self.assertFalse(self.queue.does_exist())
 
-    def test_has_values(self):
+    def _test_has_values(self):
         '''Test RedisListQueue has_values'''
         values = [
             'id_' + str(val)
@@ -316,11 +316,11 @@ class TestRedisListQueue(unittest.TestCase):
         self.queue.add_values(values)
         self.assertTrue(self.queue.has_values())
 
-    def test_has_values_empty(self):
+    def _test_has_values_empty(self):
         '''Test RedisListQueue has_values when no values'''
         self.assertFalse(self.queue.has_values())
 
-    def test_purge(self):
+    def _test_purge(self):
         '''Test RedisListQueue purge'''
         values = [
             'id_' + str(val)
@@ -330,7 +330,7 @@ class TestRedisListQueue(unittest.TestCase):
         self.queue.purge()
         self.assertFalse(self.queue.does_exist())
 
-    def test_queue_length(self):
+    def _test_queue_length(self):
         '''Test RedisListQueue queue_length'''
         values = [
             'id_' + str(val)
@@ -339,7 +339,7 @@ class TestRedisListQueue(unittest.TestCase):
         self.queue.add_values(values)
         self.assertEqual(self.queue.queue_length(), len(values))
 
-    def test_is_queue_empty(self):
+    def _test_is_queue_empty(self):
         '''Test RedisListQueue is_queue_empty'''
         values = [
             'id_' + str(val)
@@ -363,34 +363,78 @@ class TestRedisSetQueue(TestRedisListQueue):
         return list(self.client.smembers(self.queue_name))
 
 
-class TestRedisListPipeQueue(TestRedisListQueue):
+@ddt
+class TestRedisListPipeQueue(unittest.TestCase):
     '''
     Test RedisListPipeQueue, child of RedisPipeQueue<-RedisQueue
-    - All tests in TestRedisListQueue are run using set function strings
+    - This will test add_values and get_values methods only
+    since the base classes have already tested much of the functionality.
     '''
     queue_name = 'testredissetQ'
     queue_type = UuidQueueTypes.REDIS_LIST_PIPE
+    @classmethod
+    def setUpClass(cls):
+        cls.args = {
+            'host': 'localhost',
+            'port': 6379,
+            'db': REDIS_TEST_DB,
+        }
+        cls.client = RedisClient(cls.args)
+        cls.queue = cls.client.get_queue(cls.queue_name, cls.queue_type)
+
+    def setUp(self):
+        if not _check_redis_conn(self.client):
+            self.fail('Redis Connection Failed')
+        self.queue.qmeta.set_args()
+        self.queue.purge()
+
+    def tearDown(self):
+        self.queue.qmeta.purge_meta()
+        self.queue.purge()
+
+    def _get_all(self):
+        '''Helper function to get all items in queue'''
+        return self.client.lrange(self.queue_name, 0, -1)
 
     @data(
-        # get_count
-        (4) #, (40)
+        # add_count
+        (4), (40)
     )
-    def test_get_values(self, get_count):
+    def test_add_values(self, add_count):
         '''
-        Test RedisListQueue get_values through UuidBaseQueue
-        - Greater than or equal added values
+        Test RedisListPipeQueue add_values
         '''
         values = [
-            'id_' + str(val)
-            for val in range(1, 4)
+            'id_' + str(val + 1)
+            for val in range(add_count)
         ]
-        assert False
-        self.queue.add_values(values)
-        got_values, call_cnt = self.queue.get_values(get_count)
+        values.append(['pizza'])
+        exp_bytes_added = 0
+        for value in values:
+            if value is not None:
+                exp_bytes_added += len(value)
+        failed, bytes_added, call_cnt = self.queue.add_values(values)
+        self.assertListEqual(failed, [])
+        self.assertEqual(bytes_added, exp_bytes_added)
         self.assertEqual(call_cnt, len(values))
-        self.assertEqual(self.queue.queue_length(), 0)
-        all_values = self._get_all()
-        self.assertListEqual(all_values, [])
-        got_values.sort()
+
+    def test_add_values_pipe_fail(self):
+        '''
+        Test RedisListPipeQueue add_values
+        '''
+        # pylint: disable=protected-access
+        self.queue._call_pipe = unittest.mock.MagicMock()
+        self.queue._call_pipe.return_value = False
+        values = [
+            'id_' + str(val)
+            for val in range(1, 5)
+        ]
+        exp_bytes_added = 0
+        for value in values:
+            exp_bytes_added += len(value)
+        failed, bytes_added, call_cnt = self.queue.add_values(values)
+        failed.sort()
         values.sort()
-        self.assertListEqual(got_values, values)
+        self.assertListEqual(failed, values)
+        self.assertEqual(bytes_added, 0)
+        self.assertEqual(call_cnt, len(values))
