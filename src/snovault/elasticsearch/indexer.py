@@ -401,6 +401,10 @@ def server_loop(uuid_queue, run_args, listener_restarted=False):
     max_age_secs = 7200
     queue_done = False
     errors = None
+    debug_reset = True
+    if debug_reset:
+        print('purging')
+        uuid_queue.purge()
     while not queue_done:
         print('server loop done', queue_done)
         readd_uuids, queue_done = uuid_queue.is_finished(
