@@ -66,7 +66,7 @@ class UuidBaseQueueMeta(object):
         }
         return batch_id
 
-    def add_finished(self, batch_id, successes, errors):
+    def remove_batch(self, batch_id, successes, errors):
         '''Update with outcome consumed uuids'''
         batch = self._got_batches.get(batch_id, None)
         did_finish = False
@@ -98,7 +98,7 @@ class UuidBaseQueueMeta(object):
         return did_finish, err_msg
 
     def get_errors(self):
-        '''Get all errors from queue that were sent in add_finished'''
+        '''Get all errors from queue that were sent in remove_batch'''
         return self._errors
 
     # pylint: disable=unused-argument

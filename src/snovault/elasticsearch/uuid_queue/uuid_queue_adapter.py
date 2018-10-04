@@ -160,7 +160,7 @@ class UuidQueueWorker(object):
 
     def add_finished(self, batch_id, successes, errors):
         '''Update queue with consumed uuids'''
-        self._queue.qmeta.add_finished(batch_id, successes, errors)
+        self._queue.qmeta.remove_batch(batch_id, successes, errors)
 
     def get_errors(self):
         '''Get all errors from queue that were sent in add_finished'''
