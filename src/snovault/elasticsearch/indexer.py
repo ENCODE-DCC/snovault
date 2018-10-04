@@ -48,7 +48,7 @@ log = logging.getLogger(__name__)
 MAX_CLAUSES_FOR_ES = 8192
 QUEUE_NAME = 'indexQ'
 QUEUE_TYPE = UuidQueueTypes.REDIS_LIST_PIPE
-BATCH_GET_SIZE = 1024
+BATCH_GET_SIZE = 1
 
 
 def includeme(config):

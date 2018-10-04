@@ -195,10 +195,11 @@ class RedisQueueMeta(UuidBaseQueueMeta):
         Return run args needed for workers
         '''
         run_args = self._client.hgetall(self._key_runargs)
-        run_args['batch_by'] = int(run_args['batch_by'])
-        run_args['restart'] = False if run_args['restart'] == 'False' else True
-        run_args['uuid_len'] = int(run_args['uuid_len'])
-        run_args['xmin'] = int(run_args['xmin'])
+        if run_args:
+            run_args['batch_by'] = int(run_args['batch_by'])
+            run_args['restart'] = False if run_args['restart'] == 'False' else True
+            run_args['uuid_len'] = int(run_args['uuid_len'])
+            run_args['xmin'] = int(run_args['xmin'])
         return run_args
 
     def set_run_args(self, run_args):
@@ -207,14 +208,14 @@ class RedisQueueMeta(UuidBaseQueueMeta):
         * Only defined values are added
         * Type checks when getting run args
         '''
-        set_args = {
+        set_run_args = {
             'batch_by': run_args['batch_by'],
             'restart': run_args['restart'],
             'snapshot_id': run_args['snapshot_id'],
             'uuid_len': run_args['uuid_len'],
             'xmin': run_args['xmin'],
         }
-        self._client.hmset(self._key_runargs, set_args)
+        self._client.hmset(self._key_runargs, set_run_args)
 
     def get_errors(self):
         '''Get all errors from queue that were sent in remove_batch'''
