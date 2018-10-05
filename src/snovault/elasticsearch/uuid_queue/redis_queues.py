@@ -106,13 +106,15 @@ class RedisQueueMeta(UuidBaseQueueMeta):
         expired_values = []
         # bk_timestamp all key
         _, bk_timestamp_all, _ = self._get_batch_keys_for_id('*')
-        print(self._client.keys(bk_timestamp_all))
         for bk_timestamp in self._client.keys(bk_timestamp_all):
             batch_id = self._get_batch_id_from_key(bk_timestamp)
             bk_expired, bk_timestamp, bk_values = self._get_batch_keys_for_id(str(batch_id))
             timestamp = int(self._client.get(bk_timestamp)) // 1000000
             age = time.time() - timestamp
-            int_expired = int(self._client.get(bk_expired))
+            expired = self._client.get(bk_expired)
+            int_expired = 0
+            if expired:
+                int_expired = int(expired)
             if age >= max_age_secs or listener_restarted or int_expired == 1:
                 batch_uuids = self._client.lrange(bk_values, 0, -1)
                 expired_values.extend(batch_uuids)

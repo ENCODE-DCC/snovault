@@ -71,6 +71,7 @@ class IndexDataDump(object):
                 return None
             return INITIAL_WRITE_DIR
         return None
+
     def _dump_reindex(self, is_reindex):
         '''
         Returns dump directory if we should dump

@@ -132,7 +132,6 @@ def consume_uuids(request, batch_id, uuids, xmin, snapshot_id, restart):
     successes = []
     errors = []
     request.registry[INDEXER].set_snapshot_id(snapshot_id)
-    print('index worker consume_uuids', len(uuids), batch_id)
     errors = request.registry[INDEXER].update_objects(
         request,
         uuids,
@@ -144,7 +143,6 @@ def consume_uuids(request, batch_id, uuids, xmin, snapshot_id, restart):
 
 @view_config(route_name='index_worker', request_method='POST', permission="index")
 def index_worker(request):
-    print('worker')
     '''Run Worker, server must be started'''
     skip_consume = 0
     client_options = {
@@ -183,7 +181,6 @@ def index_worker(request):
 # pylint: disable=too-many-statements, too-many-branches, too-many-locals
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
-    print('index')
     INDEX = request.registry.settings['snovault.elasticsearch.index']
     request.datastore = 'database'
     record = request.json.get('record', False)
@@ -337,7 +334,7 @@ def index(request):
         else:
             print('indexer short')
             # TODO: Remove debug indexer short
-            invalidated = IndexDataDump.debug_short_indexer(invalidated, 100)
+            invalidated = IndexDataDump.debug_short_indexer(invalidated, 1000)
             # TODO: Remove debug indexer short
             result, did_fail = init_cycle(
                 uuid_queue,
@@ -470,7 +467,7 @@ class Indexer(object):
         self.indexer_name = self._get_name(registry)
         do_log = False
         if self.indexer_name in ['primaryindexer', 'mp-primaryindexer']:
-            do_log = True
+            do_log = False
         self.indexer_data_dump = IndexDataDump(
             self.indexer_name,
             registry,
@@ -585,6 +582,7 @@ class Indexer(object):
         '''
         Handles any post processing needed for finished indexing processes
         '''
+        return
         dump_path = self.indexer_data_dump.handle_outputs(outputs, run_info)
         # Change to info or warn after deugging
         log.error('Indexing data dump directory %s.', dump_path)
