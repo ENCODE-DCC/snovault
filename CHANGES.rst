@@ -1,3 +1,11 @@
+Changes
+=======
+
+Snovault 1.0.18 (released) encoded v76.0
+-----------------
+1. SNO-49 Change audit inherit default (#132)
+2. SNO-31 Refactor search related views (#141) (#143)
+
 1.0.17
 1. [HOTFIX] SNO-54-fix-schema-copy-line (#136)
 
