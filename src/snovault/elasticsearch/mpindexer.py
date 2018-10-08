@@ -4,6 +4,7 @@ from multiprocessing import get_context
 from multiprocessing.pool import Pool
 from pyramid.decorator import reify
 from pyramid.request import apply_request_extensions
+from pyramid.settings import asbool
 from pyramid.threadlocal import (
     get_current_request,
     manager,
@@ -13,24 +14,26 @@ import logging
 import time
 import transaction
 from .indexer import (
-    INDEXER,
     Indexer,
+    get_processes,
 )
-from .interfaces import APP_FACTORY
+from .interfaces import (
+    APP_FACTORY,
+    INDEXER,
+)
 
 log = logging.getLogger(__name__)
 
 
 def includeme(config):
-    if config.registry.settings.get('indexer_worker'):
+    registry = config.registry
+    if registry.settings.get('indexer_worker'):
         return
-    processes = config.registry.settings.get('indexer.processes')
-    try:
-        processes = int(processes)
-    except:
-        processes = None
-    config.registry[INDEXER] = MPIndexer(config.registry, processes=processes)
-
+    is_indexer = asbool(registry.settings.get(INDEXER, False))
+    if is_indexer and not registry.get(INDEXER):
+        log.info('Initialized Multi %s', INDEXER)
+        processes = get_processes(registry)
+        registry[INDEXER] = MPIndexer(registry, processes=processes)
 
 # Running in subprocess
 
@@ -103,8 +106,7 @@ def update_object_in_snapshot(args):
     uuid, xmin, snapshot_id, restart = args
     with snapshot(xmin, snapshot_id):
         request = get_current_request()
-        indexer = request.registry[INDEXER]
-        return indexer.update_object(request, uuid, xmin, restart)
+        return Indexer.update_object(request, uuid, xmin, restart)
 
 
 # Running in main process

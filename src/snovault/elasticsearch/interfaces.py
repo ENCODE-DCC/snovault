@@ -7,7 +7,6 @@ SNP_SEARCH_ES = 'snp_search'
 INDEXER = 'indexer'
 RESOURCES_INDEX = 'snovault-resources'
 
-
 class ICachedItem(Interface):
     """ Marker for cached Item
     """
