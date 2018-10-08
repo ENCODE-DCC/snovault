@@ -14,9 +14,10 @@ import time
 import transaction
 from .indexer import (
     INDEXER,
-    Indexer,
 )
 from .interfaces import APP_FACTORY
+
+from .primary_indexer import PrimaryIndexer
 
 log = logging.getLogger(__name__)
 
@@ -109,7 +110,7 @@ def update_object_in_snapshot(args):
 
 # Running in main process
 
-class MPIndexer(Indexer):
+class MPIndexer(PrimaryIndexer):
     maxtasks = 1  # pooled processes will exit and be replaced after this many tasks are completed.
 
     def __init__(self, registry, processes=None):

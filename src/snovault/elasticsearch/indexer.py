@@ -33,6 +33,8 @@ import copy
 import json
 import requests
 
+from .primary_indexer import PrimaryIndexer
+
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
 log = logging.getLogger(__name__)
@@ -42,7 +44,7 @@ def includeme(config):
     config.add_route('index', '/index')
     config.scan(__name__)
     registry = config.registry
-    registry[INDEXER] = Indexer(registry)
+    registry[INDEXER] = PrimaryIndexer(registry)
 
 def get_related_uuids(request, es, updated, renamed):
     '''Returns (set of uuids, False) or (list of all uuids, True) if full reindex triggered'''
@@ -292,77 +294,3 @@ def get_current_xmin(request):
     # which is not available in recovery.
     xmin = query.scalar()  # lowest xid that is still in progress
     return xmin
-
-class Indexer(object):
-    def __init__(self, registry):
-        self.es = registry[ELASTIC_SEARCH]
-        self.esstorage = registry[STORAGE]
-        self.index = registry.settings['snovault.elasticsearch.index']
-
-    def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
-        errors = []
-        for i, uuid in enumerate(uuids):
-            error = self.update_object(request, uuid, xmin)
-            if error is not None:
-                errors.append(error)
-            if (i + 1) % 50 == 0:
-                log.info('Indexing %d', i + 1)
-
-        return errors
-
-    def update_object(self, request, uuid, xmin, restart=False):
-        request.datastore = 'database'  # required by 2-step indexer
-
-        # OPTIONAL: restart support
-        # If a restart occurred in the middle of indexing, this uuid might have already been indexd, so skip redoing it.
-        # if restart:
-        #     try:
-        #         #if self.es.exists(index=self.index, id=str(uuid), version=xmin, version_type='external_gte'):  # couldn't get exists to work.
-        #         result = self.es.get(index=self.index, id=str(uuid), _source_include='uuid', version=xmin, version_type='external_gte')
-        #         if result.get('_source') is not None:
-        #             return
-        #     except:
-        #         pass
-        # OPTIONAL: restart support
-
-        last_exc = None
-        try:
-            doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
-        except StatementError:
-            # Can't reconnect until invalid transaction is rolled back
-            raise
-        except Exception as e:
-            log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
-            last_exc = repr(e)
-
-        if last_exc is None:
-            for backoff in [0, 10, 20, 40, 80]:
-                time.sleep(backoff)
-                try:
-                    self.es.index(
-                        index=doc['item_type'], doc_type=doc['item_type'], body=doc,
-                        id=str(uuid), version=xmin, version_type='external_gte',
-                        request_timeout=30,
-                    )
-                except StatementError:
-                    # Can't reconnect until invalid transaction is rolled back
-                    raise
-                except ConflictError:
-                    log.warning('Conflict indexing %s at version %d', uuid, xmin)
-                    return
-                except (ConnectionError, ReadTimeoutError, TransportError) as e:
-                    log.warning('Retryable error indexing %s: %r', uuid, e)
-                    last_exc = repr(e)
-                except Exception as e:
-                    log.error('Error indexing %s', uuid, exc_info=True)
-                    last_exc = repr(e)
-                    break
-                else:
-                    # Get here on success and outside of try
-                    return
-
-        timestamp = datetime.datetime.now().isoformat()
-        return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
-
-    def shutdown(self):
-        pass
