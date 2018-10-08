@@ -33,10 +33,28 @@ import copy
 import json
 import requests
 
+global es_time_log
+
+
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
 log = logging.getLogger(__name__)
+es_time_lag = None
 MAX_CLAUSES_FOR_ES = 8192
+LOG_ES_TIME = True
+
+
+def get_es_log_handler(tag=None):
+    if not tag:
+        tag = str(int(time.time()*1000000))
+    es_log_name = '/srv/encoded/indexing-{tag}.log'.format(
+        tag=tag,
+    )
+    return open(es_log_name, 'a')
+
+if LOG_ES_TIME:
+    es_time_log = get_es_log_handler(tag='initial')
+
 
 def includeme(config):
     config.add_route('index', '/index')
@@ -228,6 +246,7 @@ def index(request):
                     snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
 
     if invalidated and not dry_run:
+        invalidated = invalidated[:100]
         if len(stage_for_followup) > 0:
             # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
             state.prep_for_followup(xmin, invalidated)
@@ -235,9 +254,12 @@ def index(request):
         result = state.start_cycle(invalidated, result)
 
         # Do the work...
-
+        global es_time_log
+        if LOG_ES_TIME and not es_time_log:
+            es_time_log = get_es_log_handler()
         errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
-
+        es_time_log.close()
+        es_time_log = None
         result = state.finish_cycle(result,errors)
 
         if errors:
@@ -246,16 +268,15 @@ def index(request):
         if record:
             try:
                 es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
-            except:
+            except Exception as exc:
                 error_messages = copy.deepcopy(result['errors'])
                 del result['errors']
                 es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
                 for item in error_messages:
                     if 'error_message' in item:
-                        log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
+                        log.error('{}: Indexing error for {}, error message: {}'.format(exc, item['uuid'], item['error_message']))
                         item['error_message'] = "Error occured during indexing, check the logs"
                 result['errors'] = error_messages
-
 
         es.indices.refresh('_all')
         if flush:
@@ -325,6 +346,7 @@ class Indexer(object):
         # OPTIONAL: restart support
 
         last_exc = None
+        start = time.time()
         try:
             doc = request.embed('/%s/@@index-data/' % uuid, as_user='INDEXER')
         except StatementError:
@@ -334,31 +356,44 @@ class Indexer(object):
             log.error('Error rendering /%s/@@index-data', uuid, exc_info=True)
             last_exc = repr(e)
 
-        if last_exc is None:
-            for backoff in [0, 10, 20, 40, 80]:
-                time.sleep(backoff)
-                try:
-                    self.es.index(
-                        index=doc['item_type'], doc_type=doc['item_type'], body=doc,
-                        id=str(uuid), version=xmin, version_type='external_gte',
-                        request_timeout=30,
-                    )
-                except StatementError:
-                    # Can't reconnect until invalid transaction is rolled back
-                    raise
-                except ConflictError:
-                    log.warning('Conflict indexing %s at version %d', uuid, xmin)
-                    return
-                except (ConnectionError, ReadTimeoutError, TransportError) as e:
-                    log.warning('Retryable error indexing %s: %r', uuid, e)
-                    last_exc = repr(e)
-                except Exception as e:
-                    log.error('Error indexing %s', uuid, exc_info=True)
-                    last_exc = repr(e)
-                    break
-                else:
-                    # Get here on success and outside of try
-                    return
+        es_start = time.time()
+        py_elapsed = es_start - start
+
+        last_exc = None
+        for backoff in [0, 10, 20, 40, 80]:
+            time.sleep(backoff)
+            try:
+                self.es.index(
+                    index=doc['item_type'], doc_type=doc['item_type'], body=doc,
+                    id=str(uuid), version=xmin, version_type='external_gte',
+                    request_timeout=30,
+                )
+            except StatementError:
+                # Can't reconnect until invalid transaction is rolled back
+                raise
+            except ConflictError:
+                log.warning('Conflict indexing %s at version %d', uuid, xmin)
+                return
+            except (ConnectionError, ReadTimeoutError, TransportError) as e:
+                log.warning('Retryable error indexing %s: %r', uuid, e)
+                last_exc = repr(e)
+            except Exception as e:
+                log.error('Error indexing %s', uuid, exc_info=True)
+                last_exc = repr(e)
+                break
+            else:
+                es_elapsed = time.time() - es_start
+                es_time_log.write('Indexed {} {} {} {} {} {} {}\n'.format(
+                    doc['paths'][0],
+                    doc['item_type'],
+                    start,
+                    py_elapsed,
+                    es_elapsed,
+                    len(doc['embedded_uuids']),
+                    len(doc['linked_uuids']),
+                ))
+                es_time_log.flush()
+                return
 
         timestamp = datetime.datetime.now().isoformat()
         return {'error_message': last_exc, 'timestamp': timestamp, 'uuid': str(uuid)}
