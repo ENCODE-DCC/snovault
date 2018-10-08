@@ -17,7 +17,10 @@ from .indexer import (
 )
 from .interfaces import APP_FACTORY
 
-from .primary_indexer import PrimaryIndexer
+from .primary_indexer import (
+    PrimaryIndexer,
+    IndexItem,
+)
 
 log = logging.getLogger(__name__)
 
@@ -104,8 +107,10 @@ def update_object_in_snapshot(args):
     uuid, xmin, snapshot_id, restart = args
     with snapshot(xmin, snapshot_id):
         request = get_current_request()
+        index_item = IndexItem(request, uuid, xmin)
         indexer = request.registry[INDEXER]
-        return indexer.update_object(request, uuid, xmin, restart)
+        indexer.update_object(index_item, restart)
+        return index_item.error
 
 
 # Running in main process
