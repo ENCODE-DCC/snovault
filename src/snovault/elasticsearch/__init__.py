@@ -3,10 +3,7 @@ from snovault.util import get_root_request
 from elasticsearch import Elasticsearch
 from elasticsearch.connection import Urllib3HttpConnection
 from elasticsearch.serializer import SerializationError
-from pyramid.settings import (
-    asbool,
-    aslist,
-)
+from pyramid.settings import aslist
 from .interfaces import (
     APP_FACTORY,
     ELASTIC_SEARCH,
@@ -37,8 +34,6 @@ def includeme(config):
 
     config.include('.indexer')
     config.include('.indexer_state')
-    if asbool(settings.get('indexer')) and not PY2:
-        config.include('.mpindexer')
 
 
 def datastore(request):
