@@ -1,285 +1,96 @@
-from elasticsearch.exceptions import (
-    ConflictError,
-    ConnectionError,
-    NotFoundError,
-    TransportError,
-)
+'''Indexer Listener Callback'''
+import datetime
+import logging
+import copy
+import pytz
+
+from elasticsearch.exceptions import ConflictError as ESConflictError
 from pyramid.view import view_config
-from sqlalchemy.exc import StatementError
-from snovault import (
-    COLLECTIONS,
-    DBSESSION,
-    STORAGE
+
+from snovault import DBSESSION
+from snovault.storage import TransactionRecord
+
+from .indexer_state import (
+    IndexerState,
+    all_uuids,
+    SEARCH_MAX
 )
-from snovault.storage import (
-    TransactionRecord,
-)
-from urllib3.exceptions import ReadTimeoutError
 from .interfaces import (
     ELASTIC_SEARCH,
     INDEXER
 )
-from .indexer_state import (
-    IndexerState,
-    all_uuids,
-    all_types,
-    SEARCH_MAX
-)
-import datetime
-import logging
-import pytz
-import time
-import copy
-import json
-import requests
-
 from .primary_indexer import PrimaryIndexer
 
-es_logger = logging.getLogger("elasticsearch")
-es_logger.setLevel(logging.ERROR)
-log = logging.getLogger(__name__)
+
+log = logging.getLogger(__name__)  # pylint: disable=invalid-name
 MAX_CLAUSES_FOR_ES = 8192
 
+
 def includeme(config):
+    '''Initialize ES Indexers'''
     config.add_route('index', '/index')
     config.scan(__name__)
-    registry = config.registry
-    registry[INDEXER] = PrimaryIndexer(registry)
-
-def get_related_uuids(request, es, updated, renamed):
-    '''Returns (set of uuids, False) or (list of all uuids, True) if full reindex triggered'''
-
-    updated_count = len(updated)
-    renamed_count = len(renamed)
-    if (updated_count + renamed_count) > MAX_CLAUSES_FOR_ES:
-        return (list(all_uuids(request.registry)), True)  # guaranteed unique
-    elif (updated_count + renamed_count) == 0:
-        return (set(), False)
-
-    es.indices.refresh('_all')
-
-    # TODO: batching may allow us to drive a partial reindexing much greater than 99999
-    #BATCH_COUNT = 100  # NOTE: 100 random uuids returned > 99999 results!
-    #beg = 0
-    #end = BATCH_COUNT
-    #related_set = set()
-    #updated_list = list(updated)  # Must be lists
-    #renamed_list = list(renamed)
-    #while updated_count > beg or renamed_count > beg:
-    #    if updated_count > end or beg > 0:
-    #        log.error('Indexer looking for related uuids by BATCH[%d,%d]' % (beg, end))
-    #
-    #    updated = []
-    #    if updated_count > beg:
-    #        updated = updated_list[beg:end]
-    #    renamed = []
-    #    if renamed_count > beg:
-    #        renamed = renamed_list[beg:end]
-    #
-    #     search ...
-    #     accumulate...
-    #
-    #    beg += BATCH_COUNT
-    #    end += BATCH_COUNT
+    config.registry[INDEXER] = PrimaryIndexer(config.registry)
 
 
-    res = es.search(index='_all', size=SEARCH_MAX, request_timeout=60, body={
-        'query': {
-            'bool': {
-                'should': [
-                    {
-                        'terms': {
-                            'embedded_uuids': updated,
-                            '_cache': False,
-                        },
-                    },
-                    {
-                        'terms': {
-                            'linked_uuids': renamed,
-                            '_cache': False,
-                        },
-                    },
-                ],
-            },
-        },
-        '_source': False,
-    })
-
-    if res['hits']['total'] > SEARCH_MAX:
-        return (list(all_uuids(request.registry)), True)  # guaranteed unique
-
-    related_set = {hit['_id'] for hit in res['hits']['hits']}
-
-    return (related_set, False)
+def _run_index(index_listener, indexer_state, result, restart, snapshot_id):
+    '''
+    Helper for index view_config function
+    Runs the indexing processes for index listener
+    '''
+    if indexer_state.followups:
+        indexer_state.prep_for_followup(index_listener.xmin, index_listener.invalidated)
+    result = indexer_state.start_cycle(index_listener.invalidated, result)
+    errors = index_listener.request.registry[INDEXER].update_objects(
+        index_listener.request,
+        index_listener.invalidated,
+        index_listener.xmin,
+        snapshot_id,
+        restart
+    )
+    result = indexer_state.finish_cycle(result, errors)
+    if errors:
+        result['errors'] = errors
 
 
-
-@view_config(route_name='index', request_method='POST', permission="index")
-def index(request):
-    INDEX = request.registry.settings['snovault.elasticsearch.index']
-    # Setting request.datastore here only works because routed views are not traversed.
-    request.datastore = 'database'
-    record = request.json.get('record', False)
-    dry_run = request.json.get('dry_run', False)
-    recovery = request.json.get('recovery', False)
-    es = request.registry[ELASTIC_SEARCH]
-    indexer = request.registry[INDEXER]
-    session = request.registry[DBSESSION]()
-    connection = session.connection()
-    first_txn = None
-    snapshot_id = None
-    restart=False
-    invalidated = []
-    xmin = -1
-
-    # Currently 2 possible followup indexers (base.ini [set stage_for_followup = vis_indexer, region_indexer])
-    stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').replace(' ','').split(','))
-
-    # May have undone uuids from prior cycle
-    state = IndexerState(es, INDEX, followups=stage_for_followup)
-
-    (xmin, invalidated, restart) = state.priority_cycle(request)
-    state.log_reindex_init_state()
-    # OPTIONAL: restart support
-    if restart:  # Currently not bothering with restart!!!
-        xmin = -1
-        invalidated = []
-    # OPTIONAL: restart support
-
-    result = state.get_initial_state()  # get after checking priority!
-
-    if xmin == -1 or len(invalidated) == 0:
-        xmin = get_current_xmin(request)
-
-        last_xmin = None
-        if 'last_xmin' in request.json:
-            last_xmin = request.json['last_xmin']
-        else:
-            status = es.get(index=INDEX, doc_type='meta', id='indexing', ignore=[400, 404])
-            if status['found'] and 'xmin' in status['_source']:
-                last_xmin = status['_source']['xmin']
-        if last_xmin is None:  # still!
-            if 'last_xmin' in result:
-                last_xmin = result['last_xmin']
-            elif 'xmin' in result and result['xmin'] < xmin:
-                last_xmin = result['state']
-
-        result.update(
-            xmin=xmin,
-            last_xmin=last_xmin,
+def _do_record(index_listener, result):
+    '''
+    Helper for index view_config function
+    Runs after _run_index if record parameter was in request
+    '''
+    try:
+        index_listener.registry_es.index(
+            index=index_listener.index_registry_key,
+            doc_type='meta',
+            body=result,
+            id='indexing'
         )
-
-    if len(invalidated) > SEARCH_MAX:  # Priority cycle already set up
-        flush = True
-    else:
-
-        flush = False
-        if last_xmin is None:
-            result['types'] = types = request.json.get('types', None)
-            invalidated = list(all_uuids(request.registry, types))
-            flush = True
-        else:
-            txns = session.query(TransactionRecord).filter(
-                TransactionRecord.xid >= last_xmin,
-            )
-
-            invalidated = set(invalidated)  # not empty if API index request occurred
-            updated = set()
-            renamed = set()
-            max_xid = 0
-            txn_count = 0
-            for txn in txns.all():
-                txn_count += 1
-                max_xid = max(max_xid, txn.xid)
-                if first_txn is None:
-                    first_txn = txn.timestamp
-                else:
-                    first_txn = min(first_txn, txn.timestamp)
-                renamed.update(txn.data.get('renamed', ()))
-                updated.update(txn.data.get('updated', ()))
-
-            if invalidated:        # reindex requested, treat like updated
-                updated |= invalidated
-
-            result['txn_count'] = txn_count
-            if txn_count == 0 and len(invalidated) == 0:
-                state.send_notices()
-                return result
-
-            (related_set, full_reindex) = get_related_uuids(request, es, updated, renamed)
-            if full_reindex:
-                invalidated = related_set
-                flush = True
-            else:
-                invalidated = related_set | updated
-                result.update(
-                    max_xid=max_xid,
-                    renamed=renamed,
-                    updated=updated,
-                    referencing=len(related_set),
-                    invalidated=len(invalidated),
-                    txn_count=txn_count
+    except Exception as ecp:  # pylint: disable=broad-except
+        log.warning('Index listener: %r', ecp)
+        error_messages = copy.deepcopy(result['errors'])
+        del result['errors']
+        index_listener.registry_es.index(
+            index=index_listener.index_registry_key,
+            doc_type='meta',
+            body=result,
+            id='indexing'
+        )
+        for item in error_messages:
+            if 'error_message' in item:
+                log.error(
+                    'Indexing error for %s, error message: %s',
+                    item['uuid'],
+                    item['error_message']
                 )
-                if first_txn is not None:
-                    result['first_txn_timestamp'] = first_txn.isoformat()
-
-            if invalidated and not dry_run:
-                # Exporting a snapshot mints a new xid, so only do so when required.
-                # Not yet possible to export a snapshot on a standby server:
-                # http://www.postgresql.org/message-id/CAHGQGwEtJCeHUB6KzaiJ6ndvx6EFsidTGnuLwJ1itwVH0EJTOA@mail.gmail.com
-                if snapshot_id is None and not recovery:
-                    snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
-
-    if invalidated and not dry_run:
-        if len(stage_for_followup) > 0:
-            # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
-            state.prep_for_followup(xmin, invalidated)
-
-        result = state.start_cycle(invalidated, result)
-
-        # Do the work...
-
-        errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
-
-        result = state.finish_cycle(result,errors)
-
-        if errors:
-            result['errors'] = errors
-
-        if record:
-            try:
-                es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
-            except:
-                error_messages = copy.deepcopy(result['errors'])
-                del result['errors']
-                es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
-                for item in error_messages:
-                    if 'error_message' in item:
-                        log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
-                        item['error_message'] = "Error occured during indexing, check the logs"
-                result['errors'] = error_messages
-
-
-        es.indices.refresh('_all')
-        if flush:
-            try:
-                es.indices.flush_synced(index='_all')  # Faster recovery on ES restart
-            except ConflictError:
-                pass
-
-    if first_txn is not None:
-        result['txn_lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
-
-    state.send_notices()
-    return result
+                item['error_message'] = "Error occured during indexing, check the logs"
+        result['errors'] = error_messages
 
 
 def get_current_xmin(request):
+    '''Determine Postgres minimum transaction'''
     session = request.registry[DBSESSION]()
     connection = session.connection()
     recovery = request.json.get('recovery', False)
-
-    # http://www.postgresql.org/docs/9.3/static/functions-info.html#FUNCTIONS-TXID-SNAPSHOT
     if recovery:
         query = connection.execute(
             "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY;"
@@ -290,7 +101,220 @@ def get_current_xmin(request):
             "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE;"
             "SELECT txid_snapshot_xmin(txid_current_snapshot());"
         )
-    # DEFERRABLE prevents query cancelling due to conflicts but requires SERIALIZABLE mode
-    # which is not available in recovery.
     xmin = query.scalar()  # lowest xid that is still in progress
     return xmin
+
+
+def get_related_uuids(request, registry_es, updated, renamed):
+    '''
+    Returns (set of uuids, False) or
+    (list of all uuids, True) if full reindex triggered
+    '''
+    updated_count = len(updated)
+    renamed_count = len(renamed)
+    if (updated_count + renamed_count) > MAX_CLAUSES_FOR_ES:
+        return (list(all_uuids(request.registry)), True)
+    elif (updated_count + renamed_count) == 0:
+        return (set(), False)
+    registry_es.indices.refresh('_all')
+    res = registry_es.search(
+        index='_all',
+        size=SEARCH_MAX,
+        request_timeout=60,
+        body={
+            'query': {
+                'bool': {
+                    'should': [
+                        {
+                            'terms': {
+                                'embedded_uuids': updated,
+                                '_cache': False,
+                            },
+                        },
+                        {
+                            'terms': {
+                                'linked_uuids': renamed,
+                                '_cache': False,
+                            },
+                        },
+                    ],
+                },
+            },
+            '_source': False,
+        }
+    )
+    if res['hits']['total'] > SEARCH_MAX:
+        return (list(all_uuids(request.registry)), True)
+    related_set = {hit['_id'] for hit in res['hits']['hits']}
+    return (related_set, False)
+
+
+class IndexListener(object):
+    '''Encapsulated index view config functionality'''
+    def __init__(self, request):
+        self.session = request.registry[DBSESSION]()
+        self.dry_run = request.json.get('dry_run', False)
+        self.index_registry_key = request.registry.settings['snovault.elasticsearch.index']
+        self.invalidated = []
+        self.registry_es = request.registry[ELASTIC_SEARCH]
+        self.request = request
+        self.xmin = -1
+
+    def _get_transactions(self, last_xmin, first_txn=None):
+        'Check postgres transaction with last xmin'''
+        txns = self.session.query(TransactionRecord).filter(
+            TransactionRecord.xid >= last_xmin,
+        )
+        self.invalidated = set(self.invalidated)
+        updated = set()
+        renamed = set()
+        max_xid = 0
+        txn_count = 0
+        for txn in txns.all():
+            txn_count += 1
+            max_xid = max(max_xid, txn.xid)
+            if not first_txn:
+                first_txn = txn.timestamp
+            else:
+                first_txn = min(first_txn, txn.timestamp)
+            renamed.update(txn.data.get('renamed', ()))
+            updated.update(txn.data.get('updated', ()))
+        return renamed, updated, txn_count, max_xid, first_txn
+
+    def get_current_last_xmin(self, result):
+        '''Handle xmin and last_xmin'''
+        xmin = get_current_xmin(self.request)
+        last_xmin = None
+        if 'last_xmin' in self.request.json:
+            last_xmin = self.request.json['last_xmin']
+        else:
+            status = self.registry_es.get(
+                index=self.index_registry_key,
+                doc_type='meta',
+                id='indexing',
+                ignore=[400, 404]
+            )
+            if status['found'] and 'xmin' in status['_source']:
+                last_xmin = status['_source']['xmin']
+        if last_xmin is None:
+            if 'last_xmin' in result:
+                last_xmin = result['last_xmin']
+            elif 'xmin' in result and result['xmin'] < xmin:
+                last_xmin = result['state']
+        return xmin, last_xmin
+
+    def get_txns_and_update(self, last_xmin, result):
+        '''Get PG Transaction and check again invalidated'''
+        (renamed, updated, txn_count,
+         max_xid, first_txn) = self._get_transactions(last_xmin)
+        result['txn_count'] = txn_count
+        if txn_count == 0 and not self.invalidated:
+            return None, txn_count
+        flush = None
+        if self.invalidated:
+            updated |= self.invalidated
+        related_set, full_reindex = get_related_uuids(
+            self.request,
+            self.registry_es,
+            updated,
+            renamed
+        )
+        if full_reindex:
+            self.invalidated = related_set
+            flush = True
+        else:
+            self.invalidated = related_set | updated
+            result.update(
+                max_xid=max_xid,
+                renamed=renamed,
+                updated=updated,
+                referencing=len(related_set),
+                invalidated=len(self.invalidated),
+            )
+            if first_txn is not None:
+                result['first_txn_timestamp'] = first_txn.isoformat()
+        return flush, txn_count
+
+    def set_priority_cycle(self, indexer_state):
+        '''Call priority cycle and update self'''
+        (xmin, invalidated, restart) = indexer_state.priority_cycle(self.request)
+        indexer_state.log_reindex_init_state()
+        # Currently not bothering with restart!!!
+        if restart:
+            xmin = -1
+            invalidated = []
+        self.invalidated = invalidated
+        self.xmin = xmin
+        return restart
+
+    def try_set_snapshot_id(self, recovery, snapshot_id):
+        '''Check for snapshot_id in postgres under certain conditions'''
+        if self.invalidated and not self.dry_run:
+            if snapshot_id is None and not recovery:
+                connection = self.session.connection()
+                snapshot_id = connection.execute(
+                    'SELECT pg_export_snapshot();'
+                ).scalar()
+        return snapshot_id
+
+
+@view_config(route_name='index', request_method='POST', permission="index")
+def index(request):
+    '''Index listener for main indexer'''
+    request.datastore = 'database'
+    followups = list(
+        request.registry.settings.get(
+            "stage_for_followup",
+            ''
+        ).replace(' ', '').split(',')
+    )
+    index_listener = IndexListener(request)
+    indexer_state = IndexerState(
+        index_listener.registry_es,
+        index_listener.index_registry_key,
+        followups=followups
+    )
+    restart = index_listener.set_priority_cycle(indexer_state)
+    result = indexer_state.get_initial_state()
+    snapshot_id = None
+    first_txn = None
+    last_xmin = None
+    if index_listener.xmin == -1 or not index_listener.invalidated:
+        tmp_xmin, last_xmin = index_listener.get_current_last_xmin(result)
+        result.update(
+            xmin=tmp_xmin,
+            last_xmin=last_xmin,
+        )
+        index_listener.xmin = tmp_xmin
+    flush = False
+    if len(index_listener.invalidated) > SEARCH_MAX:
+        flush = True
+    elif last_xmin is None:
+        result['types'] = types = request.json.get('types', None)
+        index_listener.invalidated = list(all_uuids(request.registry, types))
+        flush = True
+    else:
+        tmp_flush, txn_count = index_listener.get_txns_and_update(last_xmin, result)
+        if txn_count == 0 and not index_listener.invalidated:
+            indexer_state.send_notices()
+            return result
+        if tmp_flush:
+            flush = tmp_flush
+        snapshot_id = index_listener.try_set_snapshot_id(
+            request.json.get('recovery', False),
+            snapshot_id
+        )
+    if index_listener.invalidated and not index_listener.dry_run:
+        _run_index(index_listener, indexer_state, result, restart, snapshot_id)
+        if request.json.get('record', False):
+            _do_record(index_listener, result)
+        index_listener.registry_es.indices.refresh('_all')
+        if flush:
+            try:
+                index_listener.registry_es.indices.flush_synced(index='_all')
+            except ESConflictError as ecp:
+                log.warning('Index listener ESConflictError: %r', ecp)
+    if first_txn is not None:
+        result['txn_lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
+    indexer_state.send_notices()
+    return result

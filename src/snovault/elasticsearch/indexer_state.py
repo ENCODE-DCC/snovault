@@ -60,6 +60,7 @@ class IndexerState(object):
         self.followup_prep_list      = 'primary_followup_prep_list' # Setting up the uuids to be handled by a followup process
         self.staged_for_vis_list     = 'staged_for_vis_indexer' # Followup list is added to here to pass baton
         self.staged_for_regions_list = 'staged_for_region_indexer'     # Followup list is added to here to pass baton
+        self.followups = followups
         self.followup_lists = []                                     # filled dynamically
         for name in followups:
             if name != '':
