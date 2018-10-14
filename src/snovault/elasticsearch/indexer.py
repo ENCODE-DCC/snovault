@@ -27,6 +27,7 @@ from .primary_indexer import PrimaryIndexer
 log = logging.getLogger(__name__)  # pylint: disable=invalid-name
 MAX_CLAUSES_FOR_ES = 8192
 SHORT_INDEXING = None  # Falsey value will turn off short
+SHORT_INDEXING = 1000  # Falsey value will turn off short
 
 
 def includeme(config):
