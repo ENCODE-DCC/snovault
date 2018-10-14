@@ -2,6 +2,8 @@
 import datetime
 import logging
 import copy
+import itertools
+
 import pytz
 
 from elasticsearch.exceptions import ConflictError as ESConflictError
@@ -24,6 +26,7 @@ from .primary_indexer import PrimaryIndexer
 
 log = logging.getLogger(__name__)  # pylint: disable=invalid-name
 MAX_CLAUSES_FOR_ES = 8192
+SHORT_INDEXING = None  # Falsey value will turn off short
 
 
 def includeme(config):
@@ -247,6 +250,16 @@ class IndexListener(object):
         self.xmin = xmin
         return restart
 
+    def short_uuids(self, short_to=100):
+        '''
+        Limit uuids to index for debugging
+        '''
+        if short_to <= 0:
+            short_to = 100
+        self.invalidated = set(
+            itertools.islice(self.invalidated, short_to)
+        )
+
     def try_set_snapshot_id(self, recovery, snapshot_id):
         '''Check for snapshot_id in postgres under certain conditions'''
         if self.invalidated and not self.dry_run:
@@ -305,6 +318,9 @@ def index(request):
             snapshot_id
         )
     if index_listener.invalidated and not index_listener.dry_run:
+        if SHORT_INDEXING:
+            # If value is truthly then uuids will be limited.
+            index_listener.short_uuids(SHORT_INDEXING)
         _run_index(index_listener, indexer_state, result, restart, snapshot_id)
         if request.json.get('record', False):
             _do_record(index_listener, result)
