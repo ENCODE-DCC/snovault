@@ -35,7 +35,7 @@ import requests
 
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
-log = logging.getLogger(__name__)
+log = logging.getLogger('snovault.elasticsearch.es_index_listener')
 MAX_CLAUSES_FOR_ES = 8192
 
 def includeme(config):
@@ -305,7 +305,7 @@ class Indexer(object):
             error = self.update_object(request, uuid, xmin)
             if error is not None:
                 errors.append(error)
-            if (i + 1) % 50 == 0:
+            if (i + 1) % 1000 == 0:
                 log.info('Indexing %d', i + 1)
 
         return errors

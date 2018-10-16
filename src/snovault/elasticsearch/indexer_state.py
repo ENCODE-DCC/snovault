@@ -32,7 +32,7 @@ SEARCH_MAX = 99999  # OutOfMemoryError if too high
 
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
-log = logging.getLogger(__name__)
+log = logging.getLogger('snovault.elasticsearch.es_index_listener')
 
 def includeme(config):
     config.add_route('_indexer_state', '/_indexer_state')
