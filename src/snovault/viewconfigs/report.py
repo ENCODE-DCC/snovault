@@ -53,12 +53,14 @@ class ReportView(SearchView):  # pylint: disable=too-few-public-methods
             views=views,
             search_result_actions=search_result_actions,
         )
-        if 'view' in res:
-            res['views'][0] = {
-                'href': res['@id'],
-                'title': 'View results as list',
-                'icon': 'list-alt',
-            }
+        #TODO: Investigate res['views'] is not always set
+        if 'views' not in res:
+            res['views'] = [{}]
+        res['views'][0] = {
+            'href': res['@id'],
+            'title': 'View results as list',
+            'icon': 'list-alt',
+        }
         search_base = normalize_query(self._request)
         res['@id'] = '/report/' + search_base
         res['title'] = 'Report'
