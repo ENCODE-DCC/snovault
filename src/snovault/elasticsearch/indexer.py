@@ -69,6 +69,11 @@ def _run_index(index_listener, indexer_state, result, restart, snapshot_id):
     '''
     if indexer_state.followups:
         indexer_state.prep_for_followup(index_listener.xmin, index_listener.invalidated)
+    indexer = index_listener.request.registry[INDEXER]
+    indexer.set_state(
+        indexer_state.is_initial_indexing,
+        indexer_state.is_reindexing,
+    )
     result = indexer_state.start_cycle(index_listener.invalidated, result)
     errors = index_listener.request.registry[INDEXER].update_objects(
         index_listener.request,
@@ -78,6 +83,7 @@ def _run_index(index_listener, indexer_state, result, restart, snapshot_id):
         restart
     )
     result = indexer_state.finish_cycle(result, errors)
+    indexer.clear_state()
     if errors:
         result['errors'] = errors
 
@@ -346,6 +352,11 @@ def index(request):
     if index_listener.invalidated and not index_listener.dry_run:
         if SHORT_INDEXING:
             # If value is truthly then uuids will be limited.
+            log.warning(
+                'Shorting UUIDS from %d to %d',
+                len(index_listener.uuid_store.get_uuids()),
+                SHORT_INDEXING,
+            )
             index_listener.short_uuids(SHORT_INDEXING)
         _run_index(index_listener, indexer_state, result, restart, snapshot_id)
         if request.json.get('record', False):

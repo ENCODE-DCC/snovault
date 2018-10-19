@@ -151,17 +151,14 @@ class MPIndexer(PrimaryIndexer):
         tasks = [(uuid, xmin, snapshot_id, restart) for uuid in uuids]
         errors = []
         try:
-            for i, error in enumerate(
-                    self.pool.imap_unordered(
-                        update_object_in_snapshot,
-                        tasks,
-                        chunkiness
-                    )
+            for index_item in self.pool.imap_unordered(
+                    update_object_in_snapshot,
+                    tasks,
+                    chunkiness
                 ):
-                if error is not None:
-                    errors.append(error)
-                if (i + 1) % 1000 == 0:
-                    log.info('Indexing %d', i + 1)
+                if index_item.error is not None:
+                    errors.append(index_item.error)
+                self._log_index_item(index_item)
         except:
             self.shutdown()
             raise
