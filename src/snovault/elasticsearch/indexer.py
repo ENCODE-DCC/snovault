@@ -35,7 +35,7 @@ import requests
 
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
-log = logging.getLogger(__name__)
+log = logging.getLogger('snovault.elasticsearch.es_index_listener')
 MAX_CLAUSES_FOR_ES = 8192
 
 def includeme(config):
@@ -137,6 +137,7 @@ def index(request):
     state = IndexerState(es, INDEX, followups=stage_for_followup)
 
     (xmin, invalidated, restart) = state.priority_cycle(request)
+    state.log_reindex_init_state()
     # OPTIONAL: restart support
     if restart:  # Currently not bothering with restart!!!
         xmin = -1
@@ -304,7 +305,7 @@ class Indexer(object):
             error = self.update_object(request, uuid, xmin)
             if error is not None:
                 errors.append(error)
-            if (i + 1) % 50 == 0:
+            if (i + 1) % 1000 == 0:
                 log.info('Indexing %d', i + 1)
 
         return errors

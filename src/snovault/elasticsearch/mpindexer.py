@@ -18,7 +18,7 @@ from .indexer import (
 )
 from .interfaces import APP_FACTORY
 
-log = logging.getLogger(__name__)
+log = logging.getLogger('snovault.elasticsearch.es_index_listener')
 
 
 def includeme(config):
@@ -145,7 +145,7 @@ class MPIndexer(Indexer):
                     update_object_in_snapshot, tasks, chunkiness)):
                 if error is not None:
                     errors.append(error)
-                if (i + 1) % 50 == 0:
+                if (i + 1) % 1000 == 0:
                     log.info('Indexing %d', i + 1)
         except:
             self.shutdown()

@@ -32,13 +32,14 @@ SEARCH_MAX = 99999  # OutOfMemoryError if too high
 
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
-log = logging.getLogger(__name__)
+log = logging.getLogger('snovault.elasticsearch.es_index_listener')
 
 def includeme(config):
     config.add_route('_indexer_state', '/_indexer_state')
     config.scan(__name__)
 
 class IndexerState(object):
+    _is_reindex_base = '_is_reindex'
     # Keeps track of uuids and indexer state by cycle.  Also handles handoff of uuids to followup indexer
     def __init__(self, es, index, title='primary', followups=[]):
         self.es = es
@@ -66,9 +67,34 @@ class IndexerState(object):
                 assert list_id == self.staged_for_vis_list or list_id == self.staged_for_regions_list
                 self.followup_lists.append(list_id)
         self.clock = {}
+        self._is_reindex_key = self.title + self._is_reindex_base
+        self.is_reindexing = False
+        # Initial indexing will also be true if the indexing has been reset
+        self.is_initial_indexing = False
         # some goals:
         # 1) Detect and recover from interrupted cycle - working but ignored for now
         # 2) Record (double?) failures and consider blacklisting them - not tried, could do.
+
+    def _del_is_reindex(self):
+        # Flag should not be cleared until finish_cycle function is called
+        return self.delete_objs([self._is_reindex_key])
+
+    def _get_is_reindex(self):
+        obj = self.get_obj(self._is_reindex_key)
+        return obj.get('is_reindex') is True
+
+    def _set_is_reindex(self):
+        # Flag should be set in request_reindex funciton
+        self.put_obj(self._is_reindex_key, {'is_reindex': True})
+
+    def log_reindex_init_state(self):
+        # Must call after priority cycle
+        if self.is_reindexing and self.is_initial_indexing:
+            log.info('%s is reindexing all', self.title)
+        elif self.is_reindexing:
+            log.info('%s is reindexing', self.title)
+        elif self.is_initial_indexing:
+            log.info('%s is initially indexing', self.title)
 
     # Private-ish primitives...
     def get_obj(self, id, doc_type='meta'):
@@ -151,6 +177,7 @@ class IndexerState(object):
     def request_reindex(self,requested):
         '''Requests full reindexing on next cycle'''
         if requested == 'all':
+            self._set_is_reindex()
             if self.title == 'primary':  # If primary indexer delete the original master obj
                 self.delete_objs(["indexing"])  # http://localhost:9201/snovault/meta/indexing
             else:
@@ -171,6 +198,7 @@ class IndexerState(object):
             else:
                 uuids |= set(override_obj['uuids'])
                 override_obj['uuids'] = list(uuids)
+            self._set_is_reindex()
             self.put_obj(self.override, override_obj)
         return None
 
@@ -226,7 +254,9 @@ class IndexerState(object):
            returns (discovered xmin, uuids, whether previous cycle was interupted).'''
         # Not yet started?
         initialized = self.get_obj("indexing")  # http://localhost:9201/snovault/meta/indexing
+        self.is_reindexing = self._get_is_reindex()
         if not initialized:
+            self.is_initial_indexing = True
             self.delete_objs([self.override] + self.followup_lists)
             state = self.get()
             state['status'] = 'uninitialized'
@@ -335,7 +365,7 @@ class IndexerState(object):
         state['cycle_took'] = self.elapsed('cycle')
 
         self.put(state)
-
+        self._del_is_reindex()
         return state
 
     def get_notice_user(self, user, bot_token):
