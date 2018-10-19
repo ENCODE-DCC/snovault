@@ -1,6 +1,13 @@
 Changes
 =======
 
+Snovault 1.0.19 (released) encoded v77.0
+-----------------
+1. SNO-60-check-report-res-has-view (#147)
+2. SNO-50 Initial shopping cart (#142)
+3. SNO-59-fix-index-logger-name (#137)
+4. SNO-53 Add index flags to indexers (#137)
+
 Snovault 1.0.18 (released) encoded v76.0
 -----------------
 1. SNO-49 Change audit inherit default (#132)
