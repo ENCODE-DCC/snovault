@@ -8,6 +8,7 @@ from elasticsearch.exceptions import (
     ConnectionError as ESConnectionError,
     TransportError as ESTransportError,
 )
+from pyramid.settings import asbool
 from sqlalchemy.exc import StatementError as SQLStatementError
 from urllib3.exceptions import ReadTimeoutError
 

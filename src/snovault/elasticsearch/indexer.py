@@ -3,14 +3,18 @@ import datetime
 import logging
 import copy
 import itertools
+import sys
 
 import pytz
 
 from elasticsearch.exceptions import ConflictError as ESConflictError
 from pyramid.view import view_config
+from pyramid.settings import asbool
 
 from snovault import DBSESSION
 from snovault.storage import TransactionRecord
+from snovault.elasticsearch.primary_indexer import PrimaryIndexer
+from snovault.elasticsearch.mpindexer import MPIndexer
 
 from .indexer_state import (
     IndexerState,
@@ -21,7 +25,6 @@ from .interfaces import (
     ELASTIC_SEARCH,
     INDEXER
 )
-from .primary_indexer import PrimaryIndexer
 
 log = logging.getLogger('snovault.elasticsearch.es_index_listener')  # pylint: disable=invalid-name
 MAX_CLAUSES_FOR_ES = 8192
