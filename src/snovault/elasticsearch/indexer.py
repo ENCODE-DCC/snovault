@@ -68,16 +68,19 @@ def _run_index(index_listener, indexer_state, result, restart, snapshot_id):
     Runs the indexing processes for index listener
     '''
     if indexer_state.followups:
-        indexer_state.prep_for_followup(index_listener.xmin, index_listener.invalidated)
+        indexer_state.prep_for_followup(
+            index_listener.xmin,
+            index_listener.uuid_store.uuids
+        )
     indexer = index_listener.request.registry[INDEXER]
     indexer.set_state(
         indexer_state.is_initial_indexing,
         indexer_state.is_reindexing,
     )
-    result = indexer_state.start_cycle(index_listener.invalidated, result)
+    result = indexer_state.start_cycle(index_listener.uuid_store.uuids, result)
     errors = index_listener.request.registry[INDEXER].update_objects(
         index_listener.request,
-        index_listener.invalidated,
+        index_listener.uuid_store.uuids,
         index_listener.xmin,
         snapshot_id,
         restart
@@ -148,7 +151,7 @@ def get_related_uuids(request, registry_es, updated, renamed):
     updated_count = len(updated)
     renamed_count = len(renamed)
     if (updated_count + renamed_count) > MAX_CLAUSES_FOR_ES:
-        return (list(all_uuids(request.registry)), True)
+        return (set(all_uuids(request.registry)), True)
     elif (updated_count + renamed_count) == 0:
         return (set(), False)
     registry_es.indices.refresh('_all')
@@ -179,9 +182,30 @@ def get_related_uuids(request, registry_es, updated, renamed):
         }
     )
     if res['hits']['total'] > SEARCH_MAX:
-        return (list(all_uuids(request.registry)), True)
+        return (set(all_uuids(request.registry)), True)
     related_set = {hit['_id'] for hit in res['hits']['hits']}
     return (related_set, False)
+
+
+class UuidStore(object):
+    '''
+    Consumable holder for uuids
+    - Previously called 'invalidated'
+    '''
+    def __init__(self):
+        self.uuids = set()
+
+    def is_empty(self):
+        '''Returns true if store has uuids'''
+        if self.uuids:
+            return False
+        return True
+
+    def over_threshold(self, threshold):
+        '''Returns true if store is greater than threshold'''
+        if len(self.uuids) > threshold:
+            return True
+        return False
 
 
 class IndexListener(object):
@@ -190,7 +214,7 @@ class IndexListener(object):
         self.session = request.registry[DBSESSION]()
         self.dry_run = request.json.get('dry_run', False)
         self.index_registry_key = request.registry.settings['snovault.elasticsearch.index']
-        self.invalidated = []
+        self.uuid_store = UuidStore()
         self.registry_es = request.registry[ELASTIC_SEARCH]
         self.request = request
         self.xmin = -1
@@ -200,7 +224,6 @@ class IndexListener(object):
         txns = self.session.query(TransactionRecord).filter(
             TransactionRecord.xid >= last_xmin,
         )
-        self.invalidated = set(self.invalidated)
         updated = set()
         renamed = set()
         max_xid = 0
@@ -239,15 +262,15 @@ class IndexListener(object):
         return xmin, last_xmin
 
     def get_txns_and_update(self, last_xmin, result):
-        '''Get PG Transaction and check again invalidated'''
+        '''Get PG Transaction and check against uuid_store'''
         (renamed, updated, txn_count,
          max_xid, first_txn) = self._get_transactions(last_xmin)
         result['txn_count'] = txn_count
-        if txn_count == 0 and not self.invalidated:
+        if txn_count == 0 and self.uuid_store.is_empty():
             return None, txn_count
         flush = None
-        if self.invalidated:
-            updated |= self.invalidated
+        if not self.uuid_store.is_empty():
+            updated |= self.uuid_store.uuids
         related_set, full_reindex = get_related_uuids(
             self.request,
             self.registry_es,
@@ -255,16 +278,16 @@ class IndexListener(object):
             renamed
         )
         if full_reindex:
-            self.invalidated = related_set
+            self.uuid_store.uuids = related_set
             flush = True
         else:
-            self.invalidated = related_set | updated
+            self.uuid_store.uuids = related_set | updated
             result.update(
                 max_xid=max_xid,
                 renamed=renamed,
                 updated=updated,
                 referencing=len(related_set),
-                invalidated=len(self.invalidated),
+                invalidated=len(self.uuid_store.uuids),
             )
             if first_txn is not None:
                 result['first_txn_timestamp'] = first_txn.isoformat()
@@ -272,13 +295,13 @@ class IndexListener(object):
 
     def set_priority_cycle(self, indexer_state):
         '''Call priority cycle and update self'''
-        (xmin, invalidated, restart) = indexer_state.priority_cycle(self.request)
+        (xmin, uuids_set, restart) = indexer_state.priority_cycle(self.request)
         indexer_state.log_reindex_init_state()
         # Currently not bothering with restart!!!
         if restart:
             xmin = -1
-            invalidated = []
-        self.invalidated = invalidated
+            uuids_set = set()
+        self.uuid_store.uuids = uuids_set
         self.xmin = xmin
         return restart
 
@@ -288,13 +311,13 @@ class IndexListener(object):
         '''
         if short_to <= 0:
             short_to = 100
-        self.invalidated = set(
-            itertools.islice(self.invalidated, short_to)
-        )
+        self.uuid_store.uuids = set(itertools.islice(
+            self.uuid_store.uuids, short_to
+        ))
 
     def try_set_snapshot_id(self, recovery, snapshot_id):
         '''Check for snapshot_id in postgres under certain conditions'''
-        if self.invalidated and not self.dry_run:
+        if not self.uuid_store.is_empty() and not self.dry_run:
             if snapshot_id is None and not recovery:
                 connection = self.session.connection()
                 snapshot_id = connection.execute(
@@ -324,7 +347,7 @@ def index(request):
     snapshot_id = None
     first_txn = None
     last_xmin = None
-    if index_listener.xmin == -1 or not index_listener.invalidated:
+    if index_listener.xmin == -1 or index_listener.uuid_store.is_empty():
         tmp_xmin, last_xmin = index_listener.get_current_last_xmin(result)
         result.update(
             xmin=tmp_xmin,
@@ -332,15 +355,17 @@ def index(request):
         )
         index_listener.xmin = tmp_xmin
     flush = False
-    if len(index_listener.invalidated) > SEARCH_MAX:
+    if index_listener.uuid_store.over_threshold(SEARCH_MAX):
         flush = True
     elif last_xmin is None:
         result['types'] = types = request.json.get('types', None)
-        index_listener.invalidated = list(all_uuids(request.registry, types))
+        index_listener.uuid_store.uuids = set(
+            all_uuids(request.registry, types)
+        )
         flush = True
     else:
         tmp_flush, txn_count = index_listener.get_txns_and_update(last_xmin, result)
-        if txn_count == 0 and not index_listener.invalidated:
+        if txn_count == 0 and index_listener.uuid_store.is_empty():
             indexer_state.send_notices()
             return result
         if tmp_flush:
@@ -349,12 +374,12 @@ def index(request):
             request.json.get('recovery', False),
             snapshot_id
         )
-    if index_listener.invalidated and not index_listener.dry_run:
+    if not index_listener.uuid_store.is_empty() and not index_listener.dry_run:
         if SHORT_INDEXING:
             # If value is truthly then uuids will be limited.
             log.warning(
                 'Shorting UUIDS from %d to %d',
-                len(index_listener.uuid_store.get_uuids()),
+                len(index_listener.uuid_store.uuids),
                 SHORT_INDEXING,
             )
             index_listener.short_uuids(SHORT_INDEXING)

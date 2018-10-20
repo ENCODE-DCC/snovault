@@ -195,36 +195,31 @@ class IndexerState(object):
                     return "Requesting reindex of at least one uninterpretable uuid: '%s'" % (uuid)
             override_obj = self.get_obj(self.override)
             if 'uuids' not in override_obj.keys():
-                override_obj['uuids'] = list(uuids)
+                override_obj['uuids'] = uuids
             else:
-                uuids |= set(override_obj['uuids'])
-                override_obj['uuids'] = list(uuids)
+                uuids |= override_obj['uuids']
+                override_obj['uuids'] = uuids
             self._set_is_reindex()
             self.put_obj(self.override, override_obj)
         return None
 
-    def all_indexable_uuids(self, request):
-        '''returns list of uuids pertinant to this indexer.'''
-        return list(all_uuids(request.registry))
-
     def reindex_requested(self, request):
         '''returns list of uuids if a reindex was requested.'''
         override = self.get_obj(self.override)
+        uuids = set()
         if override:
             if override.get('all_uuids', False):
                 self.delete_objs([self.override] + self.followup_lists)
-                return self.all_indexable_uuids(request)
+                uuids = set(all_uuids(request.registry))
             else:
-                uuids =  override.get('uuids',[])
+                uuids = override.get('uuids', set())
                 uuid_count = len(uuids)
                 if uuid_count > 0:
                     if uuid_count > SEARCH_MAX:
                         self.delete_objs([self.override] + self.followup_lists)
                     else:
                         self.delete_objs([self.override])
-                    return uuids
-        return None
-
+        return uuids
 
     def get_initial_state(self):
         '''Useful to initialize at idle cycle'''
@@ -262,24 +257,24 @@ class IndexerState(object):
             state = self.get()
             state['status'] = 'uninitialized'
             self.put(state)
-            return (-1, [], False)  # primary indexer will know what to do and secondary indexer should do nothing yet
+            return (-1, set(), False)  # primary indexer will know what to do and secondary indexer should do nothing yet
 
         state = self.get()
 
         # Rare call for reindexing...
         reindex_uuids = self.reindex_requested(request)
-        if reindex_uuids is not None and reindex_uuids != []:
+        if reindex_uuids:
             uuids_count = len(reindex_uuids)
             log.warn('%s reindex of %d uuids requested' % (self.state_id, uuids_count))
             return (-1, reindex_uuids, False)
 
         if state.get('status', '') != 'indexing':
-            return (-1, [], False)
+            return (-1, set(), False)
 
         xmin = state.get('xmin', -1)
         #snapshot = state.get('snapshot', None)
         if xmin == -1:  # or snapshot is None:
-            return (-1, [], False)
+            return (-1, set(), False)
 
         #assert(self.get_count(self.done_set) == 0)  # Valid for cycle-level accounting only
         #undone_uuids = self.get_diff(self.todo_set, [self.done_set])  # works for any accountingu
