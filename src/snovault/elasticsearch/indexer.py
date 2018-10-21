@@ -78,9 +78,10 @@ def _run_index(index_listener, indexer_state, result, restart, snapshot_id):
         indexer_state.is_reindexing,
     )
     result = indexer_state.start_cycle(index_listener.uuid_store.uuids, result)
+    uuids_list = list(index_listener.uuid_store.uuids)
     errors = index_listener.request.registry[INDEXER].update_objects(
         index_listener.request,
-        index_listener.uuid_store.uuids,
+        uuids_list,
         index_listener.xmin,
         snapshot_id,
         restart
