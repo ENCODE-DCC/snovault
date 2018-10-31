@@ -29,6 +29,12 @@ def app_settings(wsgi_server_host_port, elasticsearch_server, postgresql_server)
     settings['snovault.elasticsearch.index'] = 'snovault'
     settings['indexer'] = True
     settings['indexer.processes'] = 2
+    settings['queue_type'] = 'Simple'
+    settings['queue_server'] = True
+    settings['queue_client'] = True
+    settings['queue_client_processes'] = 2
+    settings['queue_client_chunk_size'] = 1024
+    settings['queue_client_batch_size'] = 2000
     return settings
 
 
