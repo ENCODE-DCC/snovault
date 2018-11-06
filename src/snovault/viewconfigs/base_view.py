@@ -3,6 +3,7 @@
 Some Desc
 """
 from pyramid.security import effective_principals  # pylint: disable=import-error
+from pyramid.httpexceptions import HTTPBadRequest  # pylint: disable=import-error
 
 from snovault import TYPES
 from snovault.elasticsearch import ELASTIC_SEARCH
@@ -44,6 +45,28 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
         from_, page_size = get_pagination(request)
         self._from_ = from_
         self._size = page_size
+        self._view_name = '' # should be set by view
+        self._factory_name = ''  # view should set this
+
+
+    def _validate_items(self, type_info=None):
+        msg = None
+        if len(self._doc_types) != 1:
+            msg = (
+                'Search result {} currently requires specifying a '
+                'single type.'.format(
+                    self._view_name,
+                )
+            )
+        elif self._doc_types[0] not in self._types:
+            msg = 'Invalid type: {}'.format(self._doc_types[0])
+        elif type_info and self._factory_name and not hasattr(type_info.factory, self._factory_name):
+            msg = 'No {} configured for type: {}'.format(
+                self._view_name,
+                self._doc_types[0],
+            )
+        if msg:
+            raise HTTPBadRequest(explanation=msg)
 
     @staticmethod
     def _format_facets(

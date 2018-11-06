@@ -9,8 +9,6 @@ ReportView<-SearchView<-BaseView
 ### BaseView function dependencies
 - _format_facets
 """
-from pyramid.httpexceptions import HTTPBadRequest  # pylint: disable=import-error
-
 from snovault.elasticsearch.create_mapping import TEXT_FIELDS
 from snovault.helpers.helper import (
     get_pagination,
@@ -21,29 +19,19 @@ from snovault.viewconfigs.searchview import SearchView
 
 class ReportView(SearchView):  # pylint: disable=too-few-public-methods
     '''Report View'''
-    view_name = 'report'
-    _factory_name = None
+
     def __init__(self, context, request):
         super(ReportView, self).__init__(context, request)
+        self._view_name = 'report'
+        self._factory_name = None
+
 
     def preprocess_view(self, views=None, search_result_actions=None):
         '''
         Main function to construct query and build view results json
         * Only publicly accessible function
         '''
-        doc_types = self._request.params.getall('type')
-        if len(doc_types) != 1:
-            msg = 'Report view requires specifying a single type.'
-            raise HTTPBadRequest(explanation=msg)
-        try:
-            sub_types = self._types[doc_types[0]].subtypes
-        except KeyError:
-            msg = "Invalid type: " + doc_types[0]
-            raise HTTPBadRequest(explanation=msg)
-        if len(sub_types) > 1:
-            msg = 'Report view requires a type with no child types.'
-            raise HTTPBadRequest(explanation=msg)
-        _, size = get_pagination(self._request)
+        self._validate_items()
         if ('limit' in self._request.GET and self._request.__parent__ is None
                 and (size is None or size > 1000)):
             del self._request.GET['limit']
