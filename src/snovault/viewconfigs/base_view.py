@@ -15,14 +15,22 @@ from snovault.helpers.helper import (
 
 
 class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-instance-attributes
-    '''Base View for all search based endpoints'''
+    """Base View for all search based endpoints."""
+
     _audit_facets = [
         ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
         ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
         ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
         ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
     ]
+
     def __init__(self, context, request):
+        """
+        Initialize.
+
+            :param context: Pyramid context object
+            :param request: Pyramid request object
+        """
         self._request = request
         self._context = context
         self._types = request.registry[TYPES]
@@ -50,6 +58,12 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
 
 
     def _validate_items(self, type_info=None):
+        """
+        Ensure query string parameters are valid and throws a custom HTTP-500 error if not.
+
+            :param type_info=None: type information
+            :error: Custom HTTP-500 if query string parameters are invalid
+        """
         msg = None
         if len(self._doc_types) != 1:
             msg = (

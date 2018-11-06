@@ -18,19 +18,30 @@ from snovault.viewconfigs.searchview import SearchView
 
 
 class ReportView(SearchView):  # pylint: disable=too-few-public-methods
-    '''Report View'''
+    """
+    Report View.
+
+        :param SearchView: SeachView-parent
+    """
 
     def __init__(self, context, request):
+        """
+        Initialize.
+
+            :param context: Pyramid context object
+            :param request: yramid request object
+        """
         super(ReportView, self).__init__(context, request)
         self._view_name = 'report'
         self._factory_name = None
 
-
     def preprocess_view(self, views=None, search_result_actions=None):
-        '''
-        Main function to construct query and build view results json
-        * Only publicly accessible function
-        '''
+        """
+        Build construct query and build view results json.self.
+
+            :param views=None: List of views
+            :param search_result_actions=None: Search result actions
+        """
         self._validate_items()
         if ('limit' in self._request.GET and self._request.__parent__ is None
                 and (size is None or size > 1000)):
