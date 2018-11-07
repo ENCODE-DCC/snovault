@@ -53,8 +53,8 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
         from_, page_size = get_pagination(request)
         self._from_ = from_
         self._size = page_size
-        self._view_name = '' # should be set by view
-        self._factory_name = ''  # view should set this
+        self._view_name = None  # should be set by view
+        self._factory_name = None  # view should set this
 
 
     def _validate_items(self, type_info=None):
