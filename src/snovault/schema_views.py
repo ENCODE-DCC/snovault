@@ -86,12 +86,13 @@ def schemas_map(context, request):
 
 @view_config(route_name='schemas_titles', request_method='GET',
              decorator=etag_app_version_effective_principals)
-def schemas_titles(context, request): # pylint: disable=unused-argument
+def schemas_titles(context, request):  # pylint: disable=unused-argument
     '''Return mapping of all schema @types and their corresponding titles'''
     types = request.registry[TYPES]
-    profiles_titles = {}
-    for type_info in types.by_item_type.values():
-        if 'title' in type_info.schema:
-            profiles_titles[type_info.name] = type_info.schema['title']
+    profiles_titles = {
+        type_info.name: type_info.schema['title']
+        for type_info in types.by_item_type.values()
+        if 'title' in type_info.schema
+    }
     profiles_titles['@type'] = ['JSONSchemas']
     return profiles_titles
