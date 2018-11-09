@@ -13,6 +13,7 @@ def includeme(config):
     config.add_route('schema', '/profiles/{type_name}.json')
     config.add_route('schemap', '/profiles/{type_name}')
     config.add_route('schemas_map', '/profiles-map/')
+    config.add_route('schemas_titles', '/profiles-titles/')
     config.scan(__name__)
 
 
@@ -81,3 +82,17 @@ def schemas_map(context, request):
             profiles_map[type_info.name] = type_info.schema['id']
     profiles_map['@type'] = ['JSONSchemas']
     return profiles_map
+
+
+@view_config(route_name='schemas_titles', request_method='GET',
+             decorator=etag_app_version_effective_principals)
+def schemas_titles(context, request):  # pylint: disable=unused-argument
+    '''Return mapping of all schema @types and their corresponding titles'''
+    types = request.registry[TYPES]
+    profiles_titles = {
+        type_info.name: type_info.schema['title']
+        for type_info in types.by_item_type.values()
+        if 'title' in type_info.schema
+    }
+    profiles_titles['@type'] = ['JSONSchemas']
+    return profiles_titles
