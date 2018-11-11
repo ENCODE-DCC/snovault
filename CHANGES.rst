@@ -1,6 +1,11 @@
 Changes
 =======
 
+Snovault 1.0.20 (released) encoded v78.0
+-----------------
+1. SNO-63 Update pip requests and remove wal-e reqs (#150)
+2. SNO-66 Add new endpoint to map schema to schema titles (#152)
+
 Snovault 1.0.19 (released) encoded v77.0
 -----------------
 1. SNO-60-check-report-res-has-view (#147)
