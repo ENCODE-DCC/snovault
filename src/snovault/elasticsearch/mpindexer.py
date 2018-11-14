@@ -114,31 +114,39 @@ class MPIndexer(Indexer):
 
     def __init__(self, registry, processes=None):
         super(MPIndexer, self).__init__(registry)
-        self.processes = processes
-        self.chunksize = int(registry.settings.get('indexer.chunk_size',1024))  # in production.ini (via buildout.cfg) as 1024
         self.initargs = (registry[APP_FACTORY], registry.settings,)
 
     @reify
     def pool(self):
         return Pool(
-            processes=self.processes,
+            processes=self.queue_client.processes,
             initializer=initializer,
             initargs=self.initargs,
             maxtasksperchild=self.maxtasks,
             context=get_context('forkserver'),
         )
 
-    def update_objects(self, request, uuids, xmin, snapshot_id, restart):
+    def update_objects(
+            self,
+            request,
+            uuids,
+            xmin,
+            snapshot_id=None,
+            restart=False,
+        ):
+        # pylint: disable=too-many-arguments, unused-argument
+        '''Run multiprocess indexing process on uuids'''
         # Ensure that we iterate over uuids in this thread not the pool task handler.
+        processes = self.queue_client.processes
+        chunk_size = self.queue_client.chunk_size
         uuid_count = len(uuids)
-        workers = 1
-        if self.processes is not None and self.processes > 0:
-            workers = self.processes
-        chunkiness = int((uuid_count - 1) / workers) + 1
-        if chunkiness > self.chunksize:
-            chunkiness = self.chunksize
-
-        tasks = [(uuid, xmin, snapshot_id, restart) for uuid in uuids]
+        chunkiness = int((uuid_count - 1) / processes) + 1
+        if chunkiness > chunk_size:
+            chunkiness = chunk_size
+        tasks = [
+            (uuid, xmin, snapshot_id, restart)
+            for uuid in uuids
+        ]
         errors = []
         try:
             for i, error in enumerate(self.pool.imap_unordered(

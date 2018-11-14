@@ -5,6 +5,7 @@ from elasticsearch.exceptions import (
     TransportError,
 )
 from pyramid.view import view_config
+from pyramid.settings import asbool
 from sqlalchemy.exc import StatementError
 from snovault import (
     COLLECTIONS,
@@ -25,6 +26,11 @@ from .indexer_state import (
     all_types,
     SEARCH_MAX
 )
+from .simple_queue import (
+   SimpleUuidServer,
+   SimpleUuidClient,
+)
+
 import datetime
 import logging
 import pytz
@@ -237,7 +243,13 @@ def index(request):
 
         # Do the work...
 
-        errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
+        errors = indexer.serve_objects(
+            request,
+            invalidated,
+            xmin,
+            snapshot_id=snapshot_id,
+            restart=restart,
+        )
 
         result = state.finish_cycle(result,errors)
 
@@ -293,13 +305,93 @@ def get_current_xmin(request):
     xmin = query.scalar()  # lowest xid that is still in progress
     return xmin
 
+
 class Indexer(object):
     def __init__(self, registry):
         self.es = registry[ELASTIC_SEARCH]
         self.esstorage = registry[STORAGE]
         self.index = registry.settings['snovault.elasticsearch.index']
+        self.queue_server = None
+        self.queue_client = None
+        queue_type = registry.settings.get('queue_type', None)
+        is_queue_server = asbool(registry.settings.get('queue_server'))
+        is_queue_client = asbool(registry.settings.get('queue_client'))
+        queue_client_processes = int(
+            registry.settings.get('queue_client_processes', 1)
 
-    def update_objects(self, request, uuids, xmin, snapshot_id=None, restart=False):
+        )
+        queue_client_chunk_size = int(
+            registry.settings.get('queue_client_chunk_size', 1024)
+        )
+        queue_client_batch_size = int(
+            registry.settings.get('queue_client_batch_size', 1024)
+        )
+        if is_queue_server:
+            if not queue_type or queue_type == 'Simple':
+                self.queue_server = SimpleUuidServer()
+                if is_queue_client:
+                    self.queue_client = SimpleUuidClient(
+                        queue_client_processes,
+                        queue_client_chunk_size,
+                        queue_client_batch_size,
+                        self.queue_server,
+                    )
+
+    def serve_objects(
+            self,
+            request,
+            uuids,
+            xmin,
+            snapshot_id=None,
+            restart=False,
+        ):
+        '''Run indexing process with queue server and optional worker'''
+        # pylint: disable=too-many-arguments
+        errors = []
+        self.queue_server.load_uuids(uuids)
+        while self.queue_server.is_indexing():
+            if self.queue_client:
+                # Server Worker
+                self.run_worker(request, xmin, snapshot_id, restart)
+            while self.queue_server.errors:
+                # Handling Errors
+                error = self.queue_server.errors.pop()
+                log.warning(error)
+                errors.append(error)
+            time.sleep(0.05)
+        return errors
+
+    def run_worker(self, request, xmin, snapshot_id, restart):
+        '''Run the uuid queue worker'''
+        if not self.queue_client.is_running:
+            batch_uuids = self.queue_client.get_uuids()
+            if batch_uuids:
+                self.queue_client.is_running = True
+                if batch_uuids:
+                    batch_errors = self.update_objects(
+                        request,
+                        batch_uuids,
+                        xmin,
+                        snapshot_id=snapshot_id,
+                        restart=restart,
+                    )
+                    batch_results = {
+                        'errors': batch_errors,
+                        'successes': len(batch_uuids) - len(batch_errors),
+                    }
+                self.queue_client.update_finished(batch_results)
+                self.queue_client.is_running = False
+
+    def update_objects(
+            self,
+            request,
+            uuids,
+            xmin,
+            snapshot_id=None,
+            restart=False,
+        ):
+        # pylint: disable=too-many-arguments, unused-argument
+        '''Run indexing process on uuids'''
         errors = []
         for i, uuid in enumerate(uuids):
             error = self.update_object(request, uuid, xmin)
