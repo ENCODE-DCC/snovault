@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.21 (released) encoded v78.0 also
+-----------------
+1. SNO-65 Refactor indexer uuids as server client (#151)
+
 Snovault 1.0.20 (released) encoded v78.0
 -----------------
 1. SNO-63 Update pip requests and remove wal-e reqs (#150)
