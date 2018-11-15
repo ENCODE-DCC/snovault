@@ -18,7 +18,8 @@ from snovault.storage import (
 from urllib3.exceptions import ReadTimeoutError
 from .interfaces import (
     ELASTIC_SEARCH,
-    INDEXER
+    INDEXER,
+    RESOURCES_INDEX,
 )
 from .indexer_state import (
     IndexerState,
@@ -60,7 +61,7 @@ def get_related_uuids(request, es, updated, renamed):
     elif (updated_count + renamed_count) == 0:
         return (set(), False)
 
-    es.indices.refresh('_all')
+    es.indices.refresh(RESOURCES_INDEX)
 
     # TODO: batching may allow us to drive a partial reindexing much greater than 99999
     #BATCH_COUNT = 100  # NOTE: 100 random uuids returned > 99999 results!
@@ -87,7 +88,7 @@ def get_related_uuids(request, es, updated, renamed):
     #    end += BATCH_COUNT
 
 
-    res = es.search(index='_all', size=SEARCH_MAX, request_timeout=60, body={
+    res = es.search(index=RESOURCES_INDEX, size=SEARCH_MAX, request_timeout=60, body={
         'query': {
             'bool': {
                 'should': [
@@ -270,10 +271,10 @@ def index(request):
                 result['errors'] = error_messages
 
 
-        es.indices.refresh('_all')
+        es.indices.refresh(RESOURCES_INDEX)
         if flush:
             try:
-                es.indices.flush_synced(index='_all')  # Faster recovery on ES restart
+                es.indices.flush_synced(index=RESOURCES_INDEX)  # Faster recovery on ES restart
             except ConflictError:
                 pass
 

@@ -13,6 +13,7 @@ from pyramid.httpexceptions import HTTPBadRequest  # pylint: disable=import-erro
 
 from elasticsearch.helpers import scan  # pylint: disable=import-error
 
+from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.helpers.helper import (
     sort_query,
     get_filtered_query,
@@ -63,7 +64,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             'title': 'Search',
             'filters': [],
         }
-        es_index = '_all'
+        es_index = RESOURCES_INDEX
         search_audit = self._request.has_permission('search_audit')
         from_, size = get_pagination(self._request)
         search_term = prepare_search_term(self._request)
@@ -138,7 +139,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             del query['query']['query_string']
         else:
             query['query']['query_string']['fields'].extend(
-                ['_all', '*.uuid', '*.md5sum', '*.submitted_file_name']
+                [RESOURCES_INDEX, '*.uuid', '*.md5sum', '*.submitted_file_name']
             )
         set_sort_order(self._request, search_term, types, doc_types, query, result)
         used_filters = set_filters(self._request, query, result)
@@ -158,7 +159,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
         query = sort_query(query)
         do_scan = size is None or size > 1000
         if not self._request.params.get('type') or 'Item' in doc_types:
-            es_index = '_all'
+            es_index = RESOURCES_INDEX
         else:
             es_index = [
                 types[type_name].item_type
