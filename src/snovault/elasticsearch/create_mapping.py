@@ -431,17 +431,19 @@ def type_mapping(types, item_type, embed=True):
             for prop_name in ['@id', 'title']
             if prop_name in mapping['properties']
         }
+    # Code reviewer: Fail code review if you see this line! 
+    # Commented out code is POC as part of ENCD-4329
     for name, boost in boost_values.items():
         props = name.split('.')
         last = props.pop()
         new_mapping = mapping['properties']
         for prop in props:
             new_mapping = new_mapping[prop]['properties']
-        new_mapping[last]['boost'] = boost
+        #new_mapping[last]['boost'] =  boost
         if last in NON_SUBSTRING_FIELDS:
             new_mapping[last]['include_in_all'] = False
-        else:
-            new_mapping[last]['include_in_all'] = True
+        # else:
+            # new_mapping[last]['include_in_all'] = True
     return mapping
 
 
