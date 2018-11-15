@@ -56,6 +56,18 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
         self._view_name = None  # should be set by view
         self._factory_name = None  # view should set this
 
+    def _type_info(self, doc_types, types):
+        """
+        Get type infrmation.
+
+            :param doc_types: document types
+            :param types: types
+        """
+        if doc_types and types and len(doc_types) == 1 and doc_types[0] in types:
+            type_info = types[doc_types[0]]
+            schema = type_info.schema
+            return type_info, schema
+        return None, None
 
     def _validate_items(self, type_info=None):
         """
