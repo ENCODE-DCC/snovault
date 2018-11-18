@@ -18,7 +18,9 @@ from .indexer import (
 )
 from .interfaces import APP_FACTORY
 
-log = logging.getLogger('snovault.elasticsearch.es_index_listener')
+# Hack to stop logging
+# log = logging.getLogger('snovault.elasticsearch.es_index_listener')
+log = logging.getLogger(__name__)
 
 
 def includeme(config):

@@ -41,7 +41,9 @@ import requests
 
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
-log = logging.getLogger('snovault.elasticsearch.es_index_listener')
+# Hack to stop logging
+# log = logging.getLogger('snovault.elasticsearch.es_index_listener')
+log = logging.getLogger(__name__)
 MAX_CLAUSES_FOR_ES = 8192
 
 def includeme(config):
