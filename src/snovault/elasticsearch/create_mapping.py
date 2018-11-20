@@ -439,11 +439,11 @@ def type_mapping(types, item_type, embed=True):
         new_mapping = mapping['properties']
         for prop in props:
             new_mapping = new_mapping[prop]['properties']
-        #new_mapping[last]['boost'] =  boost
+        # new_mapping[last]['boost'] =  boost
         if last in NON_SUBSTRING_FIELDS:
             new_mapping[last]['include_in_all'] = False
-        # else:
-            # new_mapping[last]['include_in_all'] = True
+        else:
+            new_mapping[last]['include_in_all'] = True
     return mapping
 
 
