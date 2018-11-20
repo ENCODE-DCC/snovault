@@ -268,18 +268,16 @@ def build_terms_filter(query_filters, field, terms):
         query_filters['must'].append(filter_condition)
 
 
-def set_filters(request, query, result, static_items=None, filter_exclusion=None):
-    """
-    Sets filters in the query
-    """
+def set_filters(request, query, static_items=None, filter_exclusion=None):
+    """Set filters in the query."""
+    # pylint: disable=too-many-local-variables
     query_filters = query['post_filter']['bool']
     used_filters = {}
-    if static_items is None:
-        static_items = []
+    result_filters = []
 
     # Get query string items plus any static items, then extract all the fields
     qs_items = list(request.params.items())
-    total_items = qs_items + static_items
+    total_items = qs_items + (static_items or [])
     qs_fields = [item[0] for item in qs_items]
     fields = [item[0] for item in total_items]
 
@@ -308,7 +306,7 @@ def set_filters(request, query, result, static_items=None, filter_exclusion=None
                     for k, v in qs_items
                     if '{}={}'.format(k, v) != '{}={}'.format(field, term)
                 ])
-                result['filters'].append({
+                result_filters.append({
                     'field': field,
                     'term': term,
                     'remove': '{}?{}'.format(request.path, query_string)
@@ -323,7 +321,7 @@ def set_filters(request, query, result, static_items=None, filter_exclusion=None
         # Add filter to query
         build_terms_filter(query_filters, field, terms)
 
-    return used_filters
+    return used_filters, result_filters
 
 
 def build_aggregation(facet_name, facet_options, min_doc_count=0):
