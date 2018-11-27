@@ -161,10 +161,7 @@ def test_set_filters_reserved_params(param):
             }
         }
     }
-    assert result_filters == [
-        {
-        }
-    ]
+    assert result_filters == []
 
 def test_set_filters_multivalued():
     from snovault.helpers.helper import set_filters
