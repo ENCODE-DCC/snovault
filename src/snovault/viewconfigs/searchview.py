@@ -169,7 +169,6 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 for type_name in doc_types
                 if hasattr(types[type_name], 'item_type')
             ]
-        log.error("%s Search Logging: %s" % (log.name, log.getEffectiveLevel()))
         log.debug("search ES index: %s" % es_index)
         log.debug(json.dumps(query, indent=4, sort_keys=True))
         if do_scan:
