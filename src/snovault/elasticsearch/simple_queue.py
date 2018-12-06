@@ -3,10 +3,11 @@ Simple uuid queue for indexing process
 - Can be overridden by another script, class, module as long as it exposes
 the proper functions used in the indexer classes.
 '''
+import logging
 import time
 
 
-class SimpleUuidServer(object):
+class SimpleUuidServer(object):    #pylint: disable=too-many-instance-attributes
     '''Simple uuid queue as a list'''
     def __init__(self, queue_options):
         self._queue_options = queue_options
@@ -168,9 +169,8 @@ class SimpleUuidServer(object):
         return msg
 
 
-class SimpleUuidWorker(object):
+class SimpleUuidWorker(object):  #pylint: disable=too-many-instance-attributes
     '''Basic uuid worker to get uuids for indexing'''
-
     def __init__(self, queue_options, worker_id, queue):
         self.queue_options = queue_options
         self.worker_id = worker_id
@@ -204,6 +204,5 @@ class SimpleUuidWorker(object):
         msg = self._queue.update_finished(self.worker_id, results)
         if msg == 'Okay':
             self.uuid_cnt = 0
-        else:
-            # TODO: Make log
-            print('Update finished could not reset worker: %s' % msg)
+            return None
+        return 'Update finished could not reset worker: {}'.format(msg)
