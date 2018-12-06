@@ -46,7 +46,6 @@ def includeme(config):
     config.add_route('index', '/index')
     config.scan(__name__)
     registry = config.registry
-    registry[INDEXER] = Indexer(registry)
     available_queues = ['Simple']
     try:
         import snovault.elasticsearch.uuid_queue as queue_adapter
@@ -57,6 +56,7 @@ def includeme(config):
         available_queues.extend(queue_adapter.UuidQueueTypes.get_all())
     registry['available_queues'] = available_queues
     log.info('Indexer Queues Available: %s' % ','.join(available_queues))
+    registry[INDEXER] = Indexer(registry)
 
 def get_related_uuids(request, es, updated, renamed):
     '''Returns (set of uuids, False) or (list of all uuids, True) if full reindex triggered'''
