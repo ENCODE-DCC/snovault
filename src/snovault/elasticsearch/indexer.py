@@ -47,13 +47,6 @@ def includeme(config):
     config.scan(__name__)
     registry = config.registry
     available_queues = ['Simple']
-    try:
-        import snovault.elasticsearch.uuid_queue as queue_adapter
-    except ImportError as ecp:
-        log.info('No uuid_queue package in elasticsearch module')
-    else:
-        registry['UuidQueue'] = queue_adapter.UuidQueue
-        available_queues.extend(queue_adapter.UuidQueueTypes.get_all())
     registry['available_queues'] = available_queues
     log.info('Indexer Queues Available: %s' % ','.join(available_queues))
     registry[INDEXER] = Indexer(registry)

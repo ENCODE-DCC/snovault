@@ -126,7 +126,7 @@ def small_index_objs():
 
 
 # pylint: disable=redefined-outer-name
-def _test_smsimp_indexinit(small_index_objs):
+def test_smsimp_indexinit(small_index_objs):
     """Test simple indexer init with small vars"""
     indexer, _, invalidated = small_index_objs
     assert isinstance(indexer.queue_server, SimpleUuidServer)
@@ -134,7 +134,7 @@ def _test_smsimp_indexinit(small_index_objs):
     assert len(invalidated) == SMALL_UUIDS_CNT
 
 
-def _test_smsimp_indexserve(small_index_objs):
+def test_smsimp_indexserve(small_index_objs):
     """Test simple indexer serve with small vars"""
     indexer, request, invalidated = small_index_objs
     errors = indexer.serve_objects(
@@ -150,7 +150,7 @@ def _test_smsimp_indexserve(small_index_objs):
     assert len(request.embeded_uuids) == len(invalidated)
 
 
-def _test_smsimp_indextimeout(small_index_objs):
+def test_smsimp_indextimeout(small_index_objs):
     """test simple indexer serve timeout with small vars"""
     indexer, request, invalidated = small_index_objs
     errors = indexer.serve_objects(
@@ -165,12 +165,59 @@ def _test_smsimp_indextimeout(small_index_objs):
     assert errors[0] == 'Indexer sleep timeout'
 
 
-def _test_smsimp_indexrun(small_index_objs):
+def test_smsimp_indexrun(small_index_objs):
     """test simple indexer run  with small vars"""
     indexer, request, invalidated = small_index_objs
     worker_runs_expected = SMALL_BATCH_DIV
     if SMALL_UUIDS_CNT % SMALL_BATCH_DIV:
         worker_runs_expected += 1
+    errors = indexer.serve_objects(
+        request,
+        invalidated,
+        None,  # xmin
+        snapshot_id=None,
+        restart=False,
+        timeout=SMALL_SERVE_TIMEOUT,
+    )
+    assert not errors
+    list_invalidated = list(invalidated)
+    list_invalidated.sort()
+    request.embeded_uuids.sort()
+    assert request.embeded_uuids == list_invalidated
+    assert len(indexer.worker_runs) == worker_runs_expected
+    uuids_ran = 0
+    for worker_run in indexer.worker_runs:
+        uuids_ran += worker_run['uuids']
+    assert uuids_ran == SMALL_UUIDS_CNT
+
+
+def test_smsimp_indexrun_double(small_index_objs):
+    """test 2 simple indexer runs with small vars"""
+    indexer, request, invalidated = small_index_objs
+    worker_runs_expected = SMALL_BATCH_DIV
+    if SMALL_UUIDS_CNT % SMALL_BATCH_DIV:
+        worker_runs_expected += 1
+    # First Run
+    errors = indexer.serve_objects(
+        request,
+        invalidated,
+        None,  # xmin
+        snapshot_id=None,
+        restart=False,
+        timeout=SMALL_SERVE_TIMEOUT,
+    )
+    assert not errors
+    list_invalidated = list(invalidated)
+    list_invalidated.sort()
+    request.embeded_uuids.sort()
+    assert request.embeded_uuids == list_invalidated
+    assert len(indexer.worker_runs) == worker_runs_expected
+    uuids_ran = 0
+    for worker_run in indexer.worker_runs:
+        uuids_ran += worker_run['uuids']
+    assert uuids_ran == SMALL_UUIDS_CNT
+    # Second Run
+    request.embeded_uuids = []
     errors = indexer.serve_objects(
         request,
         invalidated,
