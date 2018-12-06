@@ -6,6 +6,7 @@ from pyramid.security import effective_principals  # pylint: disable=import-erro
 
 from snovault import TYPES
 from snovault.elasticsearch import ELASTIC_SEARCH
+from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.helpers.helper import (
     get_pagination,
     prepare_search_term,
@@ -33,7 +34,7 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
         self._doc_types = request.params.getall('type')
         self._principals = effective_principals(request)
         self._elastic_search = request.registry[ELASTIC_SEARCH]
-        self._es_index = '_all'
+        self._es_index = RESOURCES_INDEX
         self._search_audit = request.has_permission('search_audit')
         self._search_term = prepare_search_term(request)
         self._request_cache = None
