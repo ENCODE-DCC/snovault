@@ -27,10 +27,7 @@ from .indexer_state import (
     all_types,
     SEARCH_MAX
 )
-from .simple_queue import (
-   SimpleUuidServer,
-   SimpleUuidClient,
-)
+from .simple_queue import SimpleUuidServer
 
 import datetime
 import logging
@@ -50,6 +47,16 @@ def includeme(config):
     config.scan(__name__)
     registry = config.registry
     registry[INDEXER] = Indexer(registry)
+    available_queues = ['Simple']
+    try:
+        import snovault.elasticsearch.uuid_queue as queue_adapter
+    except ImportError as ecp:
+        log.info('No uuid_queue package in elasticsearch module')
+    else:
+        registry['UuidQueue'] = queue_adapter.UuidQueue
+        available_queues.extend(queue_adapter.UuidQueueTypes.get_all())
+    registry['available_queues'] = available_queues
+    log.info('Indexer Queues Available: %s' % ','.join(available_queues))
 
 def get_related_uuids(request, es, updated, renamed):
     '''Returns (set of uuids, False) or (list of all uuids, True) if full reindex triggered'''
@@ -313,30 +320,33 @@ class Indexer(object):
         self.esstorage = registry[STORAGE]
         self.index = registry.settings['snovault.elasticsearch.index']
         self.queue_server = None
-        self.queue_client = None
+        self.queue_worker = None
+        self.worker_runs = []
+        available_queues = registry['available_queues']
         queue_type = registry.settings.get('queue_type', None)
         is_queue_server = asbool(registry.settings.get('queue_server'))
-        is_queue_client = asbool(registry.settings.get('queue_client'))
-        queue_client_processes = int(
-            registry.settings.get('queue_client_processes', 1)
-
+        is_queue_worker = asbool(registry.settings.get('queue_worker'))
+        queue_worker_processes = int(
+            registry.settings.get('queue_worker_processes', 1)
         )
-        queue_client_chunk_size = int(
-            registry.settings.get('queue_client_chunk_size', 1024)
+        queue_worker_chunk_size = int(
+            registry.settings.get('queue_worker_chunk_size', 1024)
         )
-        queue_client_batch_size = int(
-            registry.settings.get('queue_client_batch_size', 1024)
+        queue_worker_batch_size = int(
+            registry.settings.get('queue_worker_batch_size', 1024)
         )
-        if is_queue_server:
+        queue_options = {
+            'processes': queue_worker_processes,
+            'chunk_size': queue_worker_chunk_size,
+            'batch_size': queue_worker_batch_size,
+        }
+        if is_queue_server and queue_type in available_queues:
             if not queue_type or queue_type == 'Simple':
-                self.queue_server = SimpleUuidServer()
-                if is_queue_client:
-                    self.queue_client = SimpleUuidClient(
-                        queue_client_processes,
-                        queue_client_chunk_size,
-                        queue_client_batch_size,
-                        self.queue_server,
-                    )
+                self.queue_server = SimpleUuidServer(queue_options)
+            else:
+                log.error('No queue available for Indexer')
+            if self.queue_server and is_queue_worker:
+                self.queue_worker = self.queue_server.get_worker()
 
     def serve_objects(
             self,
@@ -345,29 +355,48 @@ class Indexer(object):
             xmin,
             snapshot_id=None,
             restart=False,
+            timeout=None,
         ):
         '''Run indexing process with queue server and optional worker'''
         # pylint: disable=too-many-arguments
+        init_msg = None
+        if not uuids:
+            init_msg = 'No uuids given to Indexer.serve_objects'
+        uuids_loaded_len = self.queue_server.load_uuids(uuids)
+        if not uuids_loaded_len:
+            init_msg = 'Uuids given to Indexer.serve_objects failed to load'
+        if uuids_loaded_len != len(uuids):
+            init_msg = 'Uuids given to Indexer.serve_objects failed to all load'
+        if init_msg:
+            log.warning(init_msg)
+            return [init_msg]
         errors = []
-        self.queue_server.load_uuids(uuids)
+        start_time = time.time()
+        self.worker_runs = []
         while self.queue_server.is_indexing():
-            if self.queue_client:
+            if self.queue_worker:
                 # Server Worker
-                self.run_worker(request, xmin, snapshot_id, restart)
-            while self.queue_server.errors:
-                # Handling Errors
-                error = self.queue_server.errors.pop()
+                uuids_ran = self.run_worker(request, xmin, snapshot_id, restart)
+                self.worker_runs.append({'uuids': uuids_ran, 'time_id': time.time()})
+            # Handling Errors must happen or queue will not stop
+            errors = self.queue_server.pop_errors()
+            for error in errors:
                 log.warning(error)
                 errors.append(error)
-            time.sleep(0.05)
+            time.sleep(0.01)
+            if timeout and time.time() - start_time > timeout:
+                msg = 'Indexer sleep timeout'
+                log.warning(msg)
+                errors.append(msg)
+                break
         return errors
 
     def run_worker(self, request, xmin, snapshot_id, restart):
         '''Run the uuid queue worker'''
-        if not self.queue_client.is_running:
-            batch_uuids = self.queue_client.get_uuids()
+        if not self.queue_worker.is_running:
+            batch_uuids = self.queue_worker.get_uuids()
             if batch_uuids:
-                self.queue_client.is_running = True
+                self.queue_worker.is_running = True
                 if batch_uuids:
                     batch_errors = self.update_objects(
                         request,
@@ -380,8 +409,10 @@ class Indexer(object):
                         'errors': batch_errors,
                         'successes': len(batch_uuids) - len(batch_errors),
                     }
-                self.queue_client.update_finished(batch_results)
-                self.queue_client.is_running = False
+                self.queue_worker.update_finished(batch_results)
+                self.queue_worker.is_running = False
+                return len(batch_uuids)
+        return None
 
     def update_objects(
             self,
