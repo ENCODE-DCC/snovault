@@ -274,10 +274,12 @@ def set_filters(request, query, static_items=None, filter_exclusion=None):
     query_filters = query['post_filter']['bool']
     used_filters = {}
     result_filters = []
+    if static_items is None:
+        static_items = []
 
     # Get query string items plus any static items, then extract all the fields
     qs_items = list(request.params.items())
-    total_items = qs_items + (static_items or [])
+    total_items = qs_items + static_items
     qs_fields = [item[0] for item in qs_items]
     fields = [item[0] for item in total_items]
 
