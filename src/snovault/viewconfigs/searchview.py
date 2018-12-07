@@ -143,7 +143,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             )
         set_sort_order(self._request, search_term, types, doc_types, query, result)
         used_filters, result_filters = set_filters(self._request, query)
-        result['filters'] = result_filters
+        result['filters'].extend(result_filters)
         facets = [
             ('type', {'title': 'Data Type'}),
         ]
