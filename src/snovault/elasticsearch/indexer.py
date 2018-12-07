@@ -244,14 +244,15 @@ def index(request):
 
         # Do the work...
 
-        errors = indexer.serve_objects(
+        errors, err_msg = indexer.serve_objects(
             request,
             invalidated,
             xmin,
             snapshot_id=snapshot_id,
             restart=restart,
         )
-
+        if err_msg:
+            log.warning('Could not start indexing: %s', err_msg)
         result = state.finish_cycle(result,errors)
 
         if errors:
@@ -352,76 +353,74 @@ class Indexer(object):
         ):
         '''Run indexing process with queue server and optional worker'''
         # pylint: disable=too-many-arguments
-        init_msg = None
-        if not uuids:
-            init_msg = 'No uuids given to Indexer.serve_objects'
-        uuids_loaded_len = self.queue_server.load_uuids(uuids)
-        if not uuids_loaded_len:
-            init_msg = 'Uuids given to Indexer.serve_objects failed to load'
-        elif uuids_loaded_len != len(uuids):
-            init_msg = (
-                'Uuids given to Indexer.serve_objects '
-                'failed to all load. {} of {} only'.format(
-                    uuids_loaded_len,
-                    len(uuids),
-                )
-            )
-        if init_msg:
-            log.warning(init_msg)
-            return []
         errors = []
-        start_time = time.time()
-        self.worker_runs = []
-        while self.queue_server.is_indexing():
-            if self.queue_worker:
-                # Server Worker
-                uuids_ran = self.run_worker(request, xmin, snapshot_id, restart)
-                self.worker_runs.append({
-                    'worker_id':self.queue_worker,
-                    'uuids': uuids_ran,
-                })
-            # Handling Errors must happen or queue will not stop
-            batch_errors = self.queue_server.pop_errors()
-            for error in batch_errors:
-                errors.append(error)
-            time.sleep(0.01)
-            if timeout and time.time() - start_time > timeout:
-                msg = 'Indexer sleep timeout'
-                log.warning(msg)
-                errors.append(msg)
-                break
-        return errors
+        err_msg = None
+        if self.queue_server.is_indexing():
+            err_msg = 'Already Indexing'
+        elif not uuids:
+            err_msg = 'No uuids given to Indexer.serve_objects'
+        else:
+            uuids_loaded_len = self.queue_server.load_uuids(uuids)
+            if not uuids_loaded_len:
+                err_msg = 'Uuids given to Indexer.serve_objects failed to load'
+            elif uuids_loaded_len != len(uuids):
+                err_msg = (
+                    'Uuids given to Indexer.serve_objects '
+                    'failed to all load. {} of {} only'.format(
+                        uuids_loaded_len,
+                        len(uuids),
+                    )
+                )
+        if err_msg is None:
+            start_time = time.time()
+            self.worker_runs = []
+            while self.queue_server.is_indexing():
+                if self.queue_worker and not self.queue_worker.is_running:
+                    # Server Worker
+                    uuids_ran = self.run_worker(request, xmin, snapshot_id, restart)
+                    self.worker_runs.append({
+                        'worker_id':self.queue_worker,
+                        'uuids': uuids_ran,
+                    })
+                # Handling Errors must happen or queue will not stop
+                batch_errors = self.queue_server.pop_errors()
+                for error in batch_errors:
+                    errors.append(error)
+                time.sleep(0.01)
+                if timeout and time.time() - start_time > timeout:
+                    err_msg = 'Indexer sleep timeout'
+                    break
+        return errors, err_msg
 
     def run_worker(self, request, xmin, snapshot_id, restart):
         '''Run the uuid queue worker'''
-        if not self.queue_worker.is_running:
-            batch_uuids = self.queue_worker.get_uuids()
-            log.warning(
-                'running %s with %d',
-                self.queue_worker.worker_id,
-                len(batch_uuids),
-            )
+        batch_uuids = self.queue_worker.get_uuids()
+        log.warning(
+            'running %s with %d',
+            self.queue_worker.worker_id,
+            len(batch_uuids),
+        )
+        if batch_uuids:
+            self.queue_worker.is_running = True
             if batch_uuids:
-                self.queue_worker.is_running = True
-                if batch_uuids:
-                    batch_errors = self.update_objects(
-                        request,
-                        batch_uuids,
-                        xmin,
-                        snapshot_id=snapshot_id,
-                        restart=restart,
-                    )
-                    batch_results = {
-                        'errors': batch_errors,
-                        'successes': len(batch_uuids) - len(batch_errors),
-                    }
-                err_msg = self.queue_worker.update_finished(batch_results)
-                if err_msg:
-                    log.warning('Issue closing worker: %s', err_msg)
-                self.queue_worker.is_running = False
-                return len(batch_uuids)
-            else:
-                log.warning('No uudis to run %d', self.queue_worker.get_cnt)
+                batch_errors = self.update_objects(
+                    request,
+                    batch_uuids,
+                    xmin,
+                    snapshot_id=snapshot_id,
+                    restart=restart,
+                )
+                batch_results = {
+                    'errors': batch_errors,
+                    'successes': len(batch_uuids) - len(batch_errors),
+                }
+            err_msg = self.queue_worker.update_finished(batch_results)
+            if err_msg:
+                log.warning('Issue closing worker: %s', err_msg)
+            self.queue_worker.is_running = False
+            return len(batch_uuids)
+        else:
+            log.warning('No uudis to run %d', self.queue_worker.get_cnt)
         return None
 
     def update_objects(
