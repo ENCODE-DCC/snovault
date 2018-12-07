@@ -1,13 +1,13 @@
 """Tests the simple queue with a mocked indexer"""
-import random
-import string
 import time
-import pytest
+import uuid
 
 from unittest import (
     TestCase,
     mock,
 )
+
+import pytest
 
 from snovault import STORAGE
 from snovault.app import main
@@ -17,7 +17,6 @@ from snovault.elasticsearch.interfaces import (
     APP_FACTORY,
     ELASTIC_SEARCH,
 )
-
 from snovault.elasticsearch.simple_queue import (
     SimpleUuidServer,
     SimpleUuidWorker,
@@ -33,18 +32,9 @@ def _get_uuids(cnt):
     """
     Return things like this 75659c39-eaea-47b7-ba26-92e9ff183e6c
     """
-    char_pool = string.ascii_lowercase + string.digits
     uuids = set()
     while len(uuids) < cnt:
-        uuids.add(
-            "{}-{}-{}-{}-{}".format(
-                ''.join([random.choice(char_pool) for _ in range(8)]),
-                ''.join([random.choice(char_pool) for _ in range(4)]),
-                ''.join([random.choice(char_pool) for _ in range(4)]),
-                ''.join([random.choice(char_pool) for _ in range(4)]),
-                ''.join([random.choice(char_pool) for _ in range(12)]),
-            )
-        )
+        uuids.add(str(uuid.uuid4()))
     return uuids
 
 
@@ -148,7 +138,7 @@ def test_smsimp_indexinit(small_index_objs):
 def test_smsimp_indexserve(small_index_objs):
     """Test simple indexer serve with small vars"""
     indexer, request, invalidated = small_index_objs
-    errors = indexer.serve_objects(
+    errors, err_msg = indexer.serve_objects(
         request,
         invalidated,
         None,  # xmin
@@ -156,6 +146,7 @@ def test_smsimp_indexserve(small_index_objs):
         restart=False,
         timeout=SMALL_SERVE_TIMEOUT,
     )
+    assert err_msg is None
     assert isinstance(errors, list)
     assert not errors
     assert len(request.embeded_uuids) == len(invalidated)
@@ -164,7 +155,7 @@ def test_smsimp_indexserve(small_index_objs):
 def test_smsimp_indextimeout(small_index_objs):
     """test simple indexer serve timeout with small vars"""
     indexer, request, invalidated = small_index_objs
-    errors = indexer.serve_objects(
+    errors, err_msg = indexer.serve_objects(
         request,
         invalidated,
         None,  # xmin
@@ -172,8 +163,8 @@ def test_smsimp_indextimeout(small_index_objs):
         restart=False,
         timeout=0.01,
     )
-    assert len(errors) == 1
-    assert errors[0] == 'Indexer sleep timeout'
+    assert err_msg == 'Indexer sleep timeout'
+    assert not errors
 
 
 def test_smsimp_indexrun(small_index_objs):
@@ -183,7 +174,7 @@ def test_smsimp_indexrun(small_index_objs):
     worker_runs_expected = SMALL_BATCH_DIV
     if SMALL_UUIDS_CNT % SMALL_BATCH_DIV:
         worker_runs_expected += 1
-    errors = indexer.serve_objects(
+    errors, err_msg = indexer.serve_objects(
         request,
         invalidated,
         None,  # xmin
@@ -191,6 +182,7 @@ def test_smsimp_indexrun(small_index_objs):
         restart=False,
         timeout=SMALL_SERVE_TIMEOUT,
     )
+    assert err_msg is None
     assert not errors
     list_invalidated = list(invalidated)
     list_invalidated.sort()
@@ -210,7 +202,7 @@ def test_smsimp_indexrun_emberr(small_index_objs):
     worker_runs_expected = SMALL_BATCH_DIV
     if SMALL_UUIDS_CNT % SMALL_BATCH_DIV:
         worker_runs_expected += 1
-    errors = indexer.serve_objects(
+    errors, err_msg = indexer.serve_objects(
         request,
         invalidated,
         None,  # xmin
@@ -218,58 +210,11 @@ def test_smsimp_indexrun_emberr(small_index_objs):
         restart=False,
         timeout=SMALL_SERVE_TIMEOUT,
     )
+    assert err_msg is None
     assert len(errors) == embed_errors
     list_invalidated = list(invalidated)
     list_invalidated.sort()
     request.embeded_uuids.sort()
-    assert len(indexer.worker_runs) == worker_runs_expected
-    uuids_ran = 0
-    for worker_run in indexer.worker_runs:
-        uuids_ran += worker_run['uuids']
-    assert uuids_ran == SMALL_UUIDS_CNT
-
-def test_smsimp_indexrun_doubleerrs(small_index_objs):
-    """test 2 simple indexer runs with small vars"""
-    indexer, request, invalidated = small_index_objs
-    embed_errors = 3
-    request.set_embed_errors(embed_errors)
-    worker_runs_expected = SMALL_BATCH_DIV
-    if SMALL_UUIDS_CNT % SMALL_BATCH_DIV:
-        worker_runs_expected += 1
-    # First Run
-    errors = indexer.serve_objects(
-        request,
-        invalidated,
-        None,  # xmin
-        snapshot_id=None,
-        restart=False,
-        timeout=SMALL_SERVE_TIMEOUT,
-    )
-    assert len(errors) == embed_errors
-    list_invalidated = list(invalidated)
-    list_invalidated.sort()
-    request.embeded_uuids.sort()
-    assert len(indexer.worker_runs) == worker_runs_expected
-    uuids_ran = 0
-    for worker_run in indexer.worker_runs:
-        uuids_ran += worker_run['uuids']
-    assert uuids_ran == SMALL_UUIDS_CNT
-    # Second Run
-    request.embeded_uuids = []
-    request.set_embed_errors(0)
-    errors = indexer.serve_objects(
-        request,
-        invalidated,
-        None,  # xmin
-        snapshot_id=None,
-        restart=False,
-        timeout=SMALL_SERVE_TIMEOUT,
-    )
-    assert not errors
-    list_invalidated = list(invalidated)
-    list_invalidated.sort()
-    request.embeded_uuids.sort()
-    assert request.embeded_uuids == list_invalidated
     assert len(indexer.worker_runs) == worker_runs_expected
     uuids_ran = 0
     for worker_run in indexer.worker_runs:
@@ -313,10 +258,10 @@ class TestIndexer(TestCase):
 
     def test_serve_objects_no_uuids(self):
         """Test serve objects with no_uuids"""
-        expected_init_msg = 'No uuids given to Indexer.serve_objects'
+        expected_err_msg = 'No uuids given to Indexer.serve_objects'
         request = MockRequest(embed_wait=self.embed_wait)
         uuids = []
-        errors, init_msg = self.indexer.serve_objects(
+        errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -324,7 +269,7 @@ class TestIndexer(TestCase):
             restart=self.restart,
             timeout=100,
         )
-        self.assertEqual(init_msg, expected_init_msg)
+        self.assertEqual(err_msg, expected_err_msg)
         self.assertListEqual(errors, [])
 
     def test_serve_objects_noload(self):
@@ -332,9 +277,9 @@ class TestIndexer(TestCase):
         uuids = self.invalidated
         org_load_uuids = self.indexer.queue_server.load_uuids
         self.indexer.queue_server.load_uuids = mock.MagicMock(return_value=None)
-        expected_init_msg = 'Uuids given to Indexer.serve_objects failed to load'
+        expected_err_msg = 'Uuids given to Indexer.serve_objects failed to load'
         request = MockRequest(embed_wait=self.embed_wait)
-        errors, init_msg = self.indexer.serve_objects(
+        errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -342,7 +287,7 @@ class TestIndexer(TestCase):
             restart=self.restart,
             timeout=100,
         )
-        self.assertEqual(init_msg, expected_init_msg)
+        self.assertEqual(err_msg, expected_err_msg)
         self.assertListEqual(errors, [])
         self.indexer.queue_server.load_uuids = org_load_uuids
 
@@ -352,7 +297,7 @@ class TestIndexer(TestCase):
         uuids = self.invalidated
         org_load_uuids = self.indexer.queue_server.load_uuids
         self.indexer.queue_server.load_uuids = mock.MagicMock(return_value=uuids_loaded_cnt)
-        expected_init_msg = (
+        expected_err_msg = (
             'Uuids given to Indexer.serve_objects '
             'failed to all load. {} of {} only'.format(
                 uuids_loaded_cnt,
@@ -360,7 +305,7 @@ class TestIndexer(TestCase):
             )
         )
         request = MockRequest(embed_wait=self.embed_wait)
-        errors, init_msg = self.indexer.serve_objects(
+        errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -368,7 +313,7 @@ class TestIndexer(TestCase):
             restart=self.restart,
             timeout=100,
         )
-        self.assertEqual(init_msg, expected_init_msg)
+        self.assertEqual(err_msg, expected_err_msg)
         self.assertListEqual(errors, [])
         self.indexer.queue_server.load_uuids = org_load_uuids
 
@@ -377,9 +322,9 @@ class TestIndexer(TestCase):
         uuids = self.invalidated
         org_is_indexing = self.indexer.queue_server.is_indexing
         self.indexer.queue_server.is_indexing = mock.MagicMock(return_value=True)
-        expected_init_msg = 'Already Indexing'
+        expected_err_msg = 'Already Indexing'
         request = MockRequest(embed_wait=self.embed_wait)
-        errors, init_msg = self.indexer.serve_objects(
+        errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -387,7 +332,7 @@ class TestIndexer(TestCase):
             restart=self.restart,
             timeout=100,
         )
-        self.assertEqual(init_msg, expected_init_msg)
+        self.assertEqual(err_msg, expected_err_msg)
         self.assertListEqual(errors, [])
         self.indexer.queue_server.is_indexing = org_is_indexing
 
@@ -401,9 +346,9 @@ class TestIndexer(TestCase):
         uuids = self.invalidated
         org_queue_worker = self.indexer.queue_worker
         self.indexer.queue_worker = None
-        expected_init_msg = 'Indexer sleep timeout'
+        expected_err_msg = 'Indexer sleep timeout'
         request = MockRequest(embed_wait=self.embed_wait)
-        errors, init_msg = self.indexer.serve_objects(
+        errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -413,7 +358,7 @@ class TestIndexer(TestCase):
         )
         # pylint: disable=protected-access
         self.indexer.queue_server._uuids = []
-        self.assertEqual(init_msg, expected_init_msg)
+        self.assertEqual(err_msg, expected_err_msg)
         self.assertListEqual(errors, [])
         self.indexer.queue_worker = org_queue_worker
 
@@ -427,9 +372,9 @@ class TestIndexer(TestCase):
         """
         uuids = self.invalidated
         embed_wait = 0.01
-        expected_init_msg = 'Indexer sleep timeout'
+        expected_err_msg = 'Indexer sleep timeout'
         request = MockRequest(embed_wait=embed_wait)
-        errors, init_msg = self.indexer.serve_objects(
+        errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -439,7 +384,7 @@ class TestIndexer(TestCase):
         )
         # pylint: disable=protected-access
         self.indexer.queue_server._uuids = []
-        self.assertEqual(init_msg, expected_init_msg)
+        self.assertEqual(err_msg, expected_err_msg)
         self.assertListEqual(errors, [])
 
     def test_serve_objects_batcherrs(self):
@@ -452,7 +397,7 @@ class TestIndexer(TestCase):
         org_pop_errors = self.indexer.queue_server.pop_errors
         self.indexer.queue_server.pop_errors = mock.MagicMock(return_value=return_errors)
         request = MockRequest(embed_wait=embed_wait)
-        errors, init_msg = self.indexer.serve_objects(
+        errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -463,7 +408,7 @@ class TestIndexer(TestCase):
         self.indexer.queue_server.pop_errors = org_pop_errors
         # pylint: disable=protected-access
         self.indexer.queue_server._uuids = []
-        self.assertIsNone(init_msg)
+        self.assertIsNone(err_msg)
         errors.sort()
         return_errors.sort()
         self.assertListEqual(errors, return_errors)
@@ -477,7 +422,7 @@ class TestIndexer(TestCase):
         batch_size = 1024
         self.indexer.queue_worker.queue_options['batch_size'] = batch_size
         request = MockRequest(embed_wait=embed_wait)
-        errors, init_msg = self.indexer.serve_objects(
+        errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -486,7 +431,7 @@ class TestIndexer(TestCase):
             timeout=100,
         )
         self.assertListEqual(errors, [])
-        self.assertIsNone(init_msg)
+        self.assertIsNone(err_msg)
 
     def test_serve_objects_runerrs(self):
         """
@@ -498,7 +443,7 @@ class TestIndexer(TestCase):
         self.indexer.queue_worker.queue_options['batch_size'] = batch_size
         request = MockRequest(embed_wait=embed_wait)
         request.set_embed_errors(10)
-        errors, init_msg = self.indexer.serve_objects(
+        errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -507,7 +452,7 @@ class TestIndexer(TestCase):
             timeout=100,
         )
         self.assertEqual(len(errors), 10)
-        self.assertIsNone(init_msg)
+        self.assertIsNone(err_msg)
 
     def test_serve_objects_twiceerrs(self):
         """
@@ -520,7 +465,7 @@ class TestIndexer(TestCase):
         # Error Run
         request = MockRequest(embed_wait=embed_wait)
         request.set_embed_errors(10)
-        errors, init_msg = self.indexer.serve_objects(
+        errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -529,10 +474,10 @@ class TestIndexer(TestCase):
             timeout=100,
         )
         self.assertEqual(len(errors), 10)
-        self.assertIsNone(init_msg)
+        self.assertIsNone(err_msg)
         # Clean Run
         request = MockRequest(embed_wait=embed_wait)
-        errors, init_msg = self.indexer.serve_objects(
+        errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -541,4 +486,4 @@ class TestIndexer(TestCase):
             timeout=100,
         )
         self.assertListEqual(errors, [])
-        self.assertIsNone(init_msg)
+        self.assertIsNone(err_msg)
