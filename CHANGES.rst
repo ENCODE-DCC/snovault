@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.23 (released) encoded v79.0 also
+-----------------
+1. SNO-72 Update simple for uuid module (#158)
+
 Snovault 1.0.22 (released) encoded v79.0 also
 -----------------
 1. SNO-68 Stop using _all for indexing (#155)
