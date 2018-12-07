@@ -3,155 +3,206 @@ Simple uuid queue for indexing process
 - Can be overridden by another script, class, module as long as it exposes
 the proper functions used in the indexer classes.
 '''
+import logging
 import time
-from os import getpid
 
 
-class SimpleUuidServer(object):
+class SimpleUuidServer(object):    #pylint: disable=too-many-instance-attributes
     '''Simple uuid queue as a list'''
-    def __init__(self):
+    def __init__(self, queue_options):
+        self._queue_options = queue_options
+        self._start_us = int(time.time() * 1000000)
+        self.queue_id = str(self._start_us)
         self._uuids = []
-        self._client_conns = {}
-        self.errors = []
+        self._uuid_count = 0
+        self._worker_conns = {}
+        self._worker_results = {}
+        self._errors = []
 
-    def _get_uuid(self):
-        if self._uuids:
-            return self._uuids.pop()
-        return None
+    # Errors
+    def add_errors(self, worker_id, errors):
+        """Add errors after worker finishes"""
+        errors_added = 0
+        for batch_error in errors:
+            batch_error['worker_id'] = worker_id
+            errors_added += 1
+            self._errors.append(batch_error)
+        return errors_added
 
-    def _load_uuid(self, uuid):
-        '''
-        Load uuid into queue
-        - Uuid ordering impacts indexing time, list is reversed due to
-        pop being used in get uuid
-        '''
-        self._uuids.insert(0, uuid)
+    def _has_errors(self):
+        """Check if queue has errors"""
+        if self._errors:
+            return True
+        return False
 
-    def get_uuids(self, client_id, cnt):
-        '''The only way to get uuids from queue'''
-        uuids = []
-        if client_id not in self._client_conns:
-            self._client_conns[client_id] = {
-                'uuid_cnt': 0,
-                'get_cnt': 0,
-                'results': None,
-            }
-        client_conn = self._client_conns[client_id]
-        client_conn['get_cnt'] += 1
-        if cnt == -1:
-            cnt = len(self._uuids)
-        if cnt and not client_conn['uuid_cnt']:
-            # There are uuids on the server and the worker is not working
-            while cnt > 0:
-                uuid = self._get_uuid()
-                if not uuid:
-                    break
-                uuids.append(uuid)
-                cnt -= 1
-            client_conn['uuid_cnt'] = len(uuids)
-        return uuids
+    def pop_errors(self):
+        """Get and remove errors, they are expected to be handled after this"""
+        errors = self._errors.copy()
+        self._errors = []
+        return errors
 
+    # Worker
+    @staticmethod
+    def _get_blank_worker():
+        return {
+            'uuid_cnt': 0,
+            'get_cnt': 0,
+        }
+
+    def _add_worker_conn(self, worker_id):
+        """Add worker connection"""
+        self._worker_results[worker_id] = []
+        self._worker_conns[worker_id] = self._get_blank_worker()
+
+    def get_worker_conns(self):
+        """Return worker connection dicts"""
+        return self._worker_conns
+
+    def get_worker_conn_count(self):
+        """Return number of worker conns"""
+        return len(self._worker_conns)
+
+    def _get_worker_id(self):
+        time_id = self._start_us + self.get_worker_conn_count() + 1
+        return str(time_id)
+
+    def _get_worker_queue(self):
+        """Queue to create workers with"""
+        return self
+
+    def get_worker(self):
+        """Return the associated worker"""
+        worker_id = self._get_worker_id()
+        self._add_worker_conn(worker_id)
+        worker_queue = self._get_worker_queue()
+        return SimpleUuidWorker(
+            self._queue_options,
+            worker_id,
+            worker_queue,
+        )
+
+    def update_worker_conn(self, worker_id, uuid_cnt, get_cnt):
+        """Set worker conn info"""
+        worker_conn = self._worker_conns[worker_id]
+        worker_conn['uuid_cnt'] = uuid_cnt
+        worker_conn['get_cnt'] = get_cnt
+
+    def save_work_results(self, worker_id, results):
+        """Save work results"""
+        self._worker_results[worker_id].append(results)
+
+    # Uuids
     def has_uuids(self):
         '''Are there uuids in the queue'''
         if self._uuids:
             return True
         return False
 
-    def is_indexing(self):
-        '''Is an indexing process currently running'''
-        if self.has_uuids() or self.errors:
-            return True
-        for client_info in self._client_conns.values():
-            if client_info['uuid_cnt']:
-                return True
-            elif client_info['results'] is None:
-                return True
-        return False
+    def _get_uuid(self):
+        if self._uuids:
+            return self._uuids.pop()
+        return None
+
+    def get_uuids(self, cnt):
+        '''The only way to get uuids from queue'''
+        uuids = []
+        if cnt == -1:
+            cnt = len(self._uuids)
+        if cnt:
+            while cnt > 0:
+                uuid = self._get_uuid()
+                if not uuid:
+                    break
+                uuids.append(uuid)
+                cnt -= 1
+        return uuids
+
+    def _load_uuid(self, uuid):
+        '''
+        Load uuid into queue
+        - Uuid ordering impacts indexing time,
+        list is reversed due to pop being used in
+        get uuid
+        '''
+        self._uuids.insert(0, uuid)
 
     def load_uuids(self, uuids):
         '''
         The only way to load uuids in queue
         - Uuids are to be loaded once per indexing session
         '''
-        if self.has_uuids():
+        if self.is_indexing():
             return None
         for uuid in uuids:
             self._load_uuid(uuid)
         return len(self._uuids)
 
-    def reset(self, force=False):
-        '''
-        Reset the queue so a new indexing process can begin
-        - There cannot be any uuids remaining
-        - The errors from the last indexing session must be removed
-        - There cannot be any pending client connections
-        '''
-        msg = 'Okay'
-        can_reset = True
-        if self.has_uuids():
-            can_reset = False
-            msg = 'Queue Server cannot reset. Uuids=%d' % (
-                len(self._uuids),
-            )
-        if self.errors:
-            can_reset = False
-            msg = 'Queue Server cannot reset. Errors=%d' % (
-                len(self.errors),
-            )
-        for client_id, client_info in self._client_conns.items():
-            if client_info['uuid_cnt']:
-                can_reset = False
-                msg = 'Queue Server cannot reset. Client Pending(%s)' % (
-                    client_id,
+    # Run
+    def is_indexing(self):
+        '''Is an indexing process currently running'''
+        if self.has_uuids() or self._has_errors():
+            return True
+        for worker_conn in self._worker_conns.values():
+            if worker_conn['uuid_cnt']:
+                return True
+        return False
+
+    def update_finished(self, given_worker_id, given_results):
+        '''The way a worker finishes a batch of uuids'''
+        msg = 'Worker id(%s) DNE.' % given_worker_id
+        worker_conns = self.get_worker_conns()
+        for worker_id, worker_conn in worker_conns.items():
+            if worker_id == given_worker_id:
+                errors_added = self.add_errors(worker_id, given_results['errors'])
+                uuid_cnt = worker_conn['uuid_cnt'] - given_results['successes'] - errors_added
+                self.update_worker_conn(
+                    worker_id,
+                    uuid_cnt,
+                    worker_conn['get_cnt'],
                 )
-        if can_reset or force:
-            self._uuids = []
-            self._client_conns = {}
-            self.errors = []
-        return msg
-
-    def update_finished(self, client_id, results):
-        '''The way a client finishes a batch of uuids'''
-        msg = 'Client id(%s) DNE.' % client_id
-        if client_id in self._client_conns:
-            client_conn = self._client_conns[client_id]
-            client_conn['results'] = results
-            batch_errors = []
-            for error in results['errors']:
-                error['client_id'] = client_id
-                batch_errors.append(error)
-            self.errors.extend(batch_errors)
-            client_conn['uuid_cnt'] -= results['successes']
-            client_conn['uuid_cnt'] -= len(batch_errors)
-            if results['successes'] < 0 or client_conn['uuid_cnt']:
-                msg = 'Queue Server cannot close client(%s)' % client_id
-            else:
-                msg = 'Okay'
+                self.save_work_results(worker_id, given_results)
+                if uuid_cnt != 0:
+                    msg = 'Queue Server cannot close worker (%s)' % worker_id
+                else:
+                    msg = 'Okay'
+                break
         return msg
 
 
-class SimpleUuidClient(object):
-    '''Basic uuid client to get uuids for indexing'''
-
-    def __init__(self, processes, chunk_size, batch_size, server_conn):
-        self.server_conn = server_conn
-        self.processes = processes
-        self.chunk_size = chunk_size
-        self.batch_size = batch_size
-        self.client_id = self._get_client_id()
+class SimpleUuidWorker(object):  #pylint: disable=too-many-instance-attributes
+    '''Basic uuid worker to get uuids for indexing'''
+    def __init__(self, queue_options, worker_id, queue):
+        self.queue_options = queue_options
+        self.worker_id = worker_id
+        self._queue = queue
         self.is_running = False
+        # Worker conn info
+        self.get_cnt = 0
+        self.uuid_cnt = 0
+        # MPIndexer
+        self.processes = self.queue_options['processes']
+        self.chunk_size = self.queue_options['chunk_size']
 
-    @staticmethod
-    def _get_client_id():
-        return '{}-{}'.format(
-            getpid(),
-            int(time.time() * 1000000),
-        )
-
+    # Uuids
     def get_uuids(self):
         '''Get all or some of uuids'''
-        return self.server_conn.get_uuids(self.client_id, cnt=self.batch_size)
+        self.get_cnt += 1
+        uuids = []
+        if self.uuid_cnt == 0:
+            uuids = self._queue.get_uuids(self.queue_options['batch_size'])
+            self.uuid_cnt = len(uuids)
+        self._queue.update_worker_conn(
+            self.worker_id,
+            self.uuid_cnt,
+            self.get_cnt,
+        )
+        return uuids
 
+    # Run
     def update_finished(self, results):
         '''Update server with batch results'''
-        return self.server_conn.update_finished(self.client_id, results)
+        msg = self._queue.update_finished(self.worker_id, results)
+        if msg == 'Okay':
+            self.uuid_cnt = 0
+            return None
+        return 'Update finished could not reset worker: {}'.format(msg)

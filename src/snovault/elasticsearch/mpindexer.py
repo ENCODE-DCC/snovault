@@ -119,7 +119,7 @@ class MPIndexer(Indexer):
     @reify
     def pool(self):
         return Pool(
-            processes=self.queue_client.processes,
+            processes=self.queue_worker.processes,
             initializer=initializer,
             initargs=self.initargs,
             maxtasksperchild=self.maxtasks,
@@ -137,8 +137,8 @@ class MPIndexer(Indexer):
         # pylint: disable=too-many-arguments, unused-argument
         '''Run multiprocess indexing process on uuids'''
         # Ensure that we iterate over uuids in this thread not the pool task handler.
-        processes = self.queue_client.processes
-        chunk_size = self.queue_client.chunk_size
+        processes = self.queue_worker.processes
+        chunk_size = self.queue_worker.chunk_size
         uuid_count = len(uuids)
         chunkiness = int((uuid_count - 1) / processes) + 1
         if chunkiness > chunk_size:
