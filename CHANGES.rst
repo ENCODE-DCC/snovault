@@ -1,6 +1,11 @@
 Changes
 =======
 
+Snovault 1.0.22 (released) encoded v79.0 also
+-----------------
+1. SNO-68 Stop using _all for indexing (#155)
+2. SNO-74 Remove npm shrinkwrap json (#157)
+
 Snovault 1.0.21 (released) encoded v78.0 also
 -----------------
 1. SNO-65 Refactor indexer uuids as server client (#151)
