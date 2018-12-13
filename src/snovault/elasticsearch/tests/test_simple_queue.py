@@ -54,6 +54,7 @@ class TestSimpleServer(TestCase):
         # Run
         'is_indexing',
         'update_finished',
+        'close_indexing',
     ]
 
     @classmethod
@@ -478,7 +479,7 @@ class TestSimpleServer(TestCase):
         )
 
 
-class TestSimpleUuidworker(TestCase):
+class TestSimpleUuidWorker(TestCase):
     '''Test Simple Uuid worker'''
     members = [
         ('queue_options', dict),
@@ -567,6 +568,7 @@ class TestSimpleUuidworker(TestCase):
         self.assertEqual(1, self.mock_server.get_uuids.call_count)
         self.mock_server.get_uuids.assert_called_with(
             self.queue_options['batch_size'],
+            get_all=False,
         )
         self.assertListEqual(
             self.mock_return_uuids,
