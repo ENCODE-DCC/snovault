@@ -16,6 +16,29 @@ import json
 import sys
 PY2 = sys.version_info.major == 2
 
+class ElasticSearchHelper:
+    _config = None
+    _settings = None
+    _client = None
+
+    def __init__(self, config, settings):
+        ElasticSearchHelper._config = config
+        ElasticSearchHelper._settings = settings
+
+    @classmethod
+    def get_client(cls):
+        if cls._client:
+            return cls._client
+        cls._settings.setdefault('snovault.elasticsearch.index', 'snovault')
+        addresses = aslist(cls._settings['elasticsearch.server'])
+        cls._client = Elasticsearch(
+            addresses,
+            serializer=PyramidJSONSerializer(json_renderer),
+            connection_class=TimedUrllib3HttpConnection,
+            retry_on_timeout=True,
+            # maxsize=50
+        )
+        return cls._client
 
 def includeme(config):
     settings = config.registry.settings
@@ -24,13 +47,16 @@ def includeme(config):
     config.add_request_method(datastore, 'datastore', reify=True)
 
     addresses = aslist(settings['elasticsearch.server'])
-    config.registry[ELASTIC_SEARCH] = Elasticsearch(
-        addresses,
-        serializer=PyramidJSONSerializer(json_renderer),
-        connection_class=TimedUrllib3HttpConnection,
-        retry_on_timeout=True,
-        # maxsize=50
-    )
+    elastic_search_helper = ElasticSearchHelper(config, settings)
+    config.registry[ELASTIC_SEARCH] = elastic_search_helper.get_client()
+    # config.registry[ELASTIC_SEARCH] = Elasticsearch(
+    #     addresses,
+    #     serializer=PyramidJSONSerializer(json_renderer),
+    #     connection_class=TimedUrllib3HttpConnection,
+    #     retry_on_timeout=True,
+    #     # maxsize=50
+    # )
+
 
     config.include('.cached_views')
     config.include('.esstorage')
