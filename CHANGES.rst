@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.24 (released) encoded v80.0
+-----------------
+1. SNO-75-fix-linux-travis-option (#163)
+
 Snovault 1.0.23 (released) encoded v79.0 also
 -----------------
 1. SNO-72 Update simple for uuid module (#158)
