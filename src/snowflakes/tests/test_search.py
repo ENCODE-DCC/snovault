@@ -156,10 +156,8 @@ def test_set_filters_reserved_params(param):
             }
         }
     }
-    result = {'filters': []}
     used_filters, result_filters = set_filters(request, query)
-    result['filters'] = result_filters
-
+  
     assert used_filters == {}
     assert query == {
         'query': {
@@ -172,10 +170,7 @@ def test_set_filters_reserved_params(param):
             }
         }
     }
-    assert result == {
-        'filters': [],
-    }
-
+   
 
 def test_set_filters_multivalued():
     from snovault.helpers.helper import set_filters
@@ -196,7 +191,7 @@ def test_set_filters_multivalued():
         }
     }
     result = {'filters': []}
-    used_filters, result_filters = set_filters(request, query, result)
+    used_filters, result_filters = set_filters(request, query)
     result['filters'] = result_filters
 
     assert used_filters == {'field1': ['value1', 'value2']}
@@ -251,7 +246,7 @@ def test_set_filters_negated():
         }
     }
     result = {'filters': []}
-    used_filters, result_filters = set_filters(request, query, result)
+    used_filters, result_filters = set_filters(request, query)
     result['filters'] = result_filters
 
     assert used_filters == {'field1!': ['value1']}
@@ -353,7 +348,7 @@ def test_set_filters_exists_missing():
         }
     }
     result = {'filters': []}
-    used_filters, result_filters = set_filters(request, query, result)
+    used_filters, result_filters = set_filters(request, query)
     result['filters'] = result_filters
 
     assert used_filters == {
