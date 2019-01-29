@@ -59,7 +59,8 @@ def test_set_filters():
         }
     }
     result = {'filters': []}
-    used_filters = set_filters(request, query, result)
+    used_filters, result_filters = set_filters(request, query)
+    result['filters'] = result_filters
 
     assert used_filters == {'field1': ['value1']}
     assert query == {
@@ -108,7 +109,8 @@ def test_set_filters_searchTerm():
         }
     }
     result = {'filters': []}
-    used_filters = set_filters(request, query, result)
+    used_filters, result_filters = set_filters(request, query)
+    result['filters'] = result_filters
 
     assert used_filters == {}
     assert query == {
@@ -155,7 +157,8 @@ def test_set_filters_reserved_params(param):
         }
     }
     result = {'filters': []}
-    used_filters = set_filters(request, query, result)
+    used_filters, result_filters = set_filters(request, query)
+    result['filters'] = result_filters
 
     assert used_filters == {}
     assert query == {
@@ -193,7 +196,8 @@ def test_set_filters_multivalued():
         }
     }
     result = {'filters': []}
-    used_filters = set_filters(request, query, result)
+    used_filters, result_filters = set_filters(request, query, result)
+    result['filters'] = result_filters
 
     assert used_filters == {'field1': ['value1', 'value2']}
     assert query == {
@@ -247,7 +251,8 @@ def test_set_filters_negated():
         }
     }
     result = {'filters': []}
-    used_filters = set_filters(request, query, result)
+    used_filters, result_filters = set_filters(request, query, result)
+    result['filters'] = result_filters
 
     assert used_filters == {'field1!': ['value1']}
     assert query == {
@@ -296,7 +301,8 @@ def test_set_filters_audit():
         }
     }
     result = {'filters': []}
-    used_filters = set_filters(request, query, result)
+    used_filters, result_filters = set_filters(request, query)
+    result['filters'] = result_filters
 
     assert used_filters == {'audit.foo': ['value1']}
     assert query == {
@@ -347,7 +353,8 @@ def test_set_filters_exists_missing():
         }
     }
     result = {'filters': []}
-    used_filters = set_filters(request, query, result)
+    used_filters, result_filters = set_filters(request, query, result)
+    result['filters'] = result_filters
 
     assert used_filters == {
         'field1': ['*'],

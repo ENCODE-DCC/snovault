@@ -268,7 +268,7 @@ def build_terms_filter(query_filters, field, terms):
         query_filters['must'].append(filter_condition)
 
 
-def set_filters(request, query, result, static_items=None, filter_exclusion=None):
+def set_filters(request, query, static_items=None, filter_exclusion=None):
     """
     Sets filters in the query
     """
@@ -291,6 +291,8 @@ def set_filters(request, query, result, static_items=None, filter_exclusion=None
         else:
             all_terms[item[0]] = [item[1]]
 
+    result_filters = []
+
     for field in fields:
         if field in used_filters:
             continue
@@ -308,7 +310,7 @@ def set_filters(request, query, result, static_items=None, filter_exclusion=None
                     for k, v in qs_items
                     if '{}={}'.format(k, v) != '{}={}'.format(field, term)
                 ])
-                result['filters'].append({
+                result_filters.append({
                     'field': field,
                     'term': term,
                     'remove': '{}?{}'.format(request.path, query_string)
@@ -323,7 +325,7 @@ def set_filters(request, query, result, static_items=None, filter_exclusion=None
         # Add filter to query
         build_terms_filter(query_filters, field, terms)
 
-    return used_filters
+    return used_filters, result_filters
 
 
 def build_aggregation(facet_name, facet_options, min_doc_count=0):
