@@ -30,6 +30,7 @@ from snovault.helpers.helper import (
     normalize_query,
 )
 from snovault.viewconfigs.base_view import BaseView
+import time
 
 
 class SearchView(BaseView):  # pylint: disable=too-few-public-methods
@@ -167,18 +168,35 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 if hasattr(types[type_name], 'item_type')
             ]
         if do_scan:
+            print('----------------------------------------------------------------------------------------------------')
+            print('time for do_scan')
+            t0 = time.time()
+            print('-----------------------------------------------------------------------------------------------------')
             es_results = self._elastic_search.search(
                 body=query,
                 index=es_index,
                 search_type='query_then_fetch'
             )
+            print('-----------------------------------------------------------------------------------------------------')
+            print('end of do_scan')
+            print(time.time() - t0)
+            print('-----------------------------------------------------------------------------------------------------')
         else:
+            print('-----------------------------------------------------------------------------------------------------')
+            t0 = time.time()
+            print('non do_scan')
+            print(time.time() - t0)
+            print('-----------------------------------------------------------------------------------------------------')
             es_results = self._elastic_search.search(
                 body=query,
                 index=es_index,
                 from_=from_, size=size,
                 request_cache=True
             )
+            print('-----------------------------------------------------------------------------------------------------')
+            print('end of non do_scan')
+            print(time.time() - t0)
+            print('-----------------------------------------------------------------------------------------------------')
         total = es_results['hits']['total']
         result['total'] = total
         schemas = (types[item_type].schema for item_type in doc_types)
@@ -221,13 +239,25 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             return result
         del query['aggs']
         if size is None:
+            print('-----------------------------------------------------------------------------------------------------')
+            print('size is none')
+            t0 = time.time()
+            print('-----------------------------------------------------------------------------------------------------')
             hits = scan(
                 self._elastic_search,
                 query=query,
                 index=es_index,
                 preserve_order=False
             )
+            print('-----------------------------------------------------------------------------------------------------')
+            print('end of size is none')
+            print(time.time() - t0)
+            print('-----------------------------------------------------------------------------------------------------')
         else:
+            print('-----------------------------------------------------------------------------------------------------')
+            print('size not none')
+            t0 = time.time()
+            print('-----------------------------------------------------------------------------------------------------')            
             hits = scan(
                 self._elastic_search,
                 query=query,
@@ -236,6 +266,10 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 size=size,
                 preserve_order=False
             )
+            print('-----------------------------------------------------------------------------------------------------')
+            print('end of size not none')
+            print(time.time() - t0)
+            print('-----------------------------------------------------------------------------------------------------')
         graph = format_results(self._request, hits, result)
         if self._request.__parent__ is not None or self._return_generator:
             if self._return_generator:
