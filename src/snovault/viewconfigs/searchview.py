@@ -31,7 +31,7 @@ from snovault.helpers.helper import (
 )
 from snovault.viewconfigs.base_view import BaseView
 import time
-
+import logging
 
 class SearchView(BaseView):  # pylint: disable=too-few-public-methods
     '''Search View'''
@@ -44,6 +44,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             return_generator=False,
             default_doc_types=None
         ):
+        logging.basicConfig(filename='search_test_1.log', format='%(asctime)s %(message)s' ,level=logging.DEBUG)
         # pylint: disable=too-many-arguments
         super(SearchView, self).__init__(context, request)
         self._search_type = search_type
@@ -169,7 +170,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             ]
         if do_scan:
             print('----------------------------------------------------------------------------------------------------')
-            print('time for do_scan')
+            logging.info('time for do_scan')
             t0 = time.time()
             print('-----------------------------------------------------------------------------------------------------')
             es_results = self._elastic_search.search(
@@ -179,12 +180,12 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             )
             print('-----------------------------------------------------------------------------------------------------')
             print('end of do_scan')
-            print(time.time() - t0)
+            logging.info(time.time() - t0)
             print('-----------------------------------------------------------------------------------------------------')
         else:
             print('-----------------------------------------------------------------------------------------------------')
             t0 = time.time()
-            print('non do_scan')
+            logging.info('non do_scan')
             print(time.time() - t0)
             print('-----------------------------------------------------------------------------------------------------')
             es_results = self._elastic_search.search(
@@ -194,7 +195,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 request_cache=True
             )
             print('-----------------------------------------------------------------------------------------------------')
-            print('end of non do_scan')
+            logging.info('end of non do_scan')
             print(time.time() - t0)
             print('-----------------------------------------------------------------------------------------------------')
         total = es_results['hits']['total']
@@ -240,7 +241,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
         del query['aggs']
         if size is None:
             print('-----------------------------------------------------------------------------------------------------')
-            print('size is none')
+            logging.info('size is none')
             t0 = time.time()
             print('-----------------------------------------------------------------------------------------------------')
             hits = scan(
@@ -251,11 +252,11 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             )
             print('-----------------------------------------------------------------------------------------------------')
             print('end of size is none')
-            print(time.time() - t0)
+            logging.info(time.time() - t0)
             print('-----------------------------------------------------------------------------------------------------')
         else:
             print('-----------------------------------------------------------------------------------------------------')
-            print('size not none')
+            logging.info('size not none')
             t0 = time.time()
             print('-----------------------------------------------------------------------------------------------------')            
             hits = scan(
@@ -268,7 +269,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             )
             print('-----------------------------------------------------------------------------------------------------')
             print('end of size not none')
-            print(time.time() - t0)
+            logging.info(time.time() - t0)
             print('-----------------------------------------------------------------------------------------------------')
         graph = format_results(self._request, hits, result)
         if self._request.__parent__ is not None or self._return_generator:
