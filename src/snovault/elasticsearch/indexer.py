@@ -38,7 +38,7 @@ log = logging.getLogger('snovault.elasticsearch.es_index_listener')
 MAX_CLAUSES_FOR_ES = 8192
 
 
-f = open('/srv/encoded/indexing.log', 'a')
+f = open('./indexing.log', 'a')
 
 
 def includeme(config):
@@ -49,6 +49,7 @@ def includeme(config):
     registry['available_queues'] = available_queues
     log.info('Indexer Queues Available: %s' % ','.join(available_queues))
     registry[INDEXER] = Indexer(registry)
+
 
 def get_related_uuids(request, es, updated, renamed):
     '''Returns (set of uuids, False) or (list of all uuids, True) if full reindex triggered'''
@@ -86,7 +87,6 @@ def get_related_uuids(request, es, updated, renamed):
     #    beg += BATCH_COUNT
     #    end += BATCH_COUNT
 
-
     res = es.search(index=RESOURCES_INDEX, size=SEARCH_MAX, request_timeout=60, body={
         'query': {
             'bool': {
@@ -117,7 +117,6 @@ def get_related_uuids(request, es, updated, renamed):
     return (related_set, False)
 
 
-
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
     INDEX = request.registry.settings['snovault.elasticsearch.index']
@@ -132,12 +131,12 @@ def index(request):
     connection = session.connection()
     first_txn = None
     snapshot_id = None
-    restart=False
+    restart = False
     invalidated = []
     xmin = -1
 
     # Currently 2 possible followup indexers (base.ini [set stage_for_followup = vis_indexer, region_indexer])
-    stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').replace(' ','').split(','))
+    stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').replace(' ', '').split(','))
 
     # May have undone uuids from prior cycle
     state = IndexerState(es, INDEX, followups=stage_for_followup)
@@ -245,7 +244,7 @@ def index(request):
 
         errors = indexer.update_objects(request, invalidated, xmin, snapshot_id, restart)
 
-        result = state.finish_cycle(result,errors)
+        result = state.finish_cycle(result, errors)
 
         if errors:
             result['errors'] = errors
@@ -262,7 +261,6 @@ def index(request):
                         log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
                         item['error_message'] = "Error occured during indexing, check the logs"
                 result['errors'] = error_messages
-
 
         es.indices.refresh(RESOURCES_INDEX)
         if flush:
@@ -371,7 +369,7 @@ class Indexer(object):
                     # Server Worker
                     uuids_ran = self.run_worker(request, xmin, snapshot_id, restart)
                     self.worker_runs.append({
-                        'worker_id':self.queue_worker,
+                        'worker_id': self.queue_worker,
                         'uuids': uuids_ran,
                     })
                 # Handling Errors must happen or queue will not stop
@@ -490,15 +488,15 @@ class Indexer(object):
                 else:
                     es_elapsed = time.time() - es_start
                     f.write('Indexed {} {} {} {} {} {} {}\n'.format(
-                        result['paths'][0],
-                        result['item_type'],
+                        doc['paths'][0],
+                        doc['item_type'],
                         start,
                         py_elapsed,
                         es_elapsed,
-                        len(result['embedded_uuids']),
-                        len(result['linked_uuids']),
+                        len(doc['embedded_uuids']),
+                        len(doc['linked_uuids']),
                     ))
-                    f.sync()
+                    f.flush()
                     # Get here on success and outside of try
                     return
 
