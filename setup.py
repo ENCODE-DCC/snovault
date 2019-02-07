@@ -28,6 +28,7 @@ requires = [
     'pyramid',
     'pyramid_localroles',
     'pyramid_multiauth',
+    'pyramid_retry',
     'pyramid_tm',
     'python-magic',
     'pytz',
