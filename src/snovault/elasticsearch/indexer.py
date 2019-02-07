@@ -118,13 +118,11 @@ def get_related_uuids(request, es, updated, renamed):
                     {
                         'terms': {
                             'embedded_uuids': updated,
-                            '_cache': False,
                         },
                     },
                     {
                         'terms': {
                             'linked_uuids': renamed,
-                            '_cache': False,
                         },
                     },
                 ],
