@@ -2,8 +2,6 @@
 # Base View
 Some Desc
 """
-from pyramid.security import effective_principals  # pylint: disable=import-error
-
 from snovault import TYPES
 from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
@@ -32,7 +30,7 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
             'filters': [],
         }
         self._doc_types = request.params.getall('type')
-        self._principals = effective_principals(request)
+        self._principals = request.effective_principals
         self._elastic_search = request.registry[ELASTIC_SEARCH]
         self._es_index = RESOURCES_INDEX
         self._search_audit = request.has_permission('search_audit')

@@ -2,7 +2,6 @@ from pyramid.path import (
     AssetResolver,
     caller_package,
 )
-from pyramid.security import has_permission
 from pyramid.threadlocal import get_current_request
 from pyramid.traversal import find_resource
 import json
@@ -246,7 +245,7 @@ def permission(validator, permission, instance, schema):
 
     request = get_current_request()
     context = request.context
-    if not has_permission(permission, context, request):
+    if not request.has_permission(permission, context):
         error = "permission %r required" % permission
         yield IgnoreUnchanged(error)
 

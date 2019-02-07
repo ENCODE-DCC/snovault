@@ -1,6 +1,3 @@
-from pyramid.security import has_permission
-
-
 def includeme(config):
     config.add_view_predicate('subpath_segments', SubpathSegmentsPredicate)
     config.add_view_predicate('additional_permission', AdditionalPermissionPredicate)
@@ -31,4 +28,4 @@ class AdditionalPermissionPredicate(object):
     phash = text
 
     def __call__(self, context, request):
-        return has_permission(self.val, context, request)
+        return request.has_permission(self.val, context)
