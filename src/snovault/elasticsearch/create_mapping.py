@@ -73,14 +73,12 @@ def schema_mapping(name, schema):
                 properties[k] = mapping
         return {
             'type': 'object',
-            'include_in_all': False,
             'properties': properties,
         }
 
     if type_ == ["number", "string"]:
         return {
             'type': 'keyword',
-            'copy_to': [],
             'fields': {
                 'value': {
                     'type': 'float',
@@ -116,8 +114,8 @@ def schema_mapping(name, schema):
 
         # these fields are unintentially partially matching some small search
         # keywords because fields are analyzed by nGram analyzer
-        if name in NON_SUBSTRING_FIELDS:
-            sub_mapping['include_in_all'] = False
+        if name not in NON_SUBSTRING_FIELDS:
+            sub_mapping['copy_to'] = 'full_text'
         return sub_mapping
 
     if type_ == 'number':
@@ -225,11 +223,6 @@ def audit_mapping():
 
 def es_mapping(mapping):
     return {
-        '_all': {
-            'enabled': True,
-            'analyzer': 'snovault_index_analyzer',
-            'search_analyzer': 'snovault_search_analyzer'
-        },
         'dynamic_templates': [
             {
                 'template_principals_allowed': {
@@ -281,48 +274,45 @@ def es_mapping(mapping):
             }
         ],
         'properties': {
+            'full_text': {
+                'type': 'text',
+                'analyzer': 'snovault_index_analyzer',
+                'search_analyzer': 'snovault_search_analyzer'
+            },
             'uuid': {
                 'type': 'keyword',
-                'include_in_all': False,
             },
             'tid': {
                 'type': 'keyword',
-                'include_in_all': False,
             },
             'item_type': {
                 'type': 'keyword',
+                'copy_to': 'full_text'
             },
             'embedded': mapping,
             'object': {
                 'type': 'object',
                 'enabled': False,
-                'include_in_all': False,
             },
             'properties': {
                 'type': 'object',
                 'enabled': False,
-                'include_in_all': False,
             },
             'propsheets': {
                 'type': 'object',
                 'enabled': False,
-                'include_in_all': False,
             },
             'embedded_uuids': {
                 'type': 'keyword',
-                'include_in_all': False,
             },
             'linked_uuids': {
                 'type': 'keyword',
-                'include_in_all': False,
             },
             'paths': {
                 'type': 'keyword',
-                'include_in_all': False,
             },
             'audit': {
                 'type': 'object',
-                'include_in_all': False,
                 'properties': {
                     'ERROR': {
                         'type': 'object',
@@ -418,10 +408,8 @@ def type_mapping(types, item_type, embed=True):
         for prop in props:
             new_mapping = new_mapping[prop]['properties']
         new_mapping[last]['boost'] = boost
-        if last in NON_SUBSTRING_FIELDS:
-            new_mapping[last]['include_in_all'] = False
-        else:
-            new_mapping[last]['include_in_all'] = True
+        if last not in NON_SUBSTRING_FIELDS:
+            new_mapping[last]['copy_to'] = 'full_text'
     return mapping
 
 
