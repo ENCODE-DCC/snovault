@@ -678,10 +678,8 @@ def record_transaction_data(session):
     if txn.description:
         data['description'] = txn.description
 
-    # txn.setUser(user_name, path='/') -> '/ user_name'
-    # Set by pyramid_tm as (userid, '')
-    if txn.user:
-        user_path, userid = txn.user.split(' ', 1)
+    userid = txn.user
+    if userid:
         data['userid'] = userid
 
     record.data = {k: v for k, v in data.items() if not k.startswith('_')}
