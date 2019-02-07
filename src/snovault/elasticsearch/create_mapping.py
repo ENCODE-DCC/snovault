@@ -38,9 +38,6 @@ META_MAPPING = {
 PATH_FIELDS = ['submitted_file_name']
 NON_SUBSTRING_FIELDS = ['uuid', '@id', 'submitted_by', 'md5sum',
                         'references', 'submitted_file_name']
-KEYWORD_FIELDS = ['schema_version', 'uuid', 'accession', 'alternate_accessions',
-                  'aliases', 'status', 'date_created', 'submitted_by',
-                  'internal_status', 'target', 'biosample_type']
 TEXT_FIELDS = ['pipeline_error_detail', 'description', 'notes']
 
 
@@ -108,9 +105,7 @@ def schema_mapping(name, schema):
 
     if type_ == 'string':
 
-        if name in KEYWORD_FIELDS:
-            field_type = 'keyword'
-        elif name in TEXT_FIELDS:
+        if name in TEXT_FIELDS:
             field_type = 'text'
         else:
             field_type = 'keyword'
