@@ -31,22 +31,7 @@ log = logging.getLogger(__name__)
 
 # An index to store non-content metadata
 META_MAPPING = {
-    '_all': {
-        'enabled': False,
-        'analyzer': 'snovault_index_analyzer',
-        'search_analyzer': 'snovault_search_analyzer'
-    },
-    'dynamic_templates': [
-        {
-            'store_generic': {
-                'match': '*',
-                'mapping': {
-                    'index': False,
-                    'store': True,
-                },
-            },
-        },
-    ],
+    'enabled': False
 }
 
 
