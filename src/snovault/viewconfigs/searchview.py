@@ -166,6 +166,8 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 for type_name in doc_types
                 if hasattr(types[type_name], 'item_type')
             ]
+        if not query['query']:
+            del query['query']
         if do_scan:
             es_results = self._elastic_search.search(
                 body=query,
