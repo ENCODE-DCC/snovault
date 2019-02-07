@@ -43,6 +43,7 @@ from .app import (
 
 
 def includeme(config):
+    config.include('pyramid_retry')
     config.include('pyramid_tm')
     config.include('.util')
     config.include('.stats')
