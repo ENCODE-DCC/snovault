@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.25 (released) encoded v81.0
+-----------------
+1. SNO-77 Add review to submit_for validation (#166)
+
 Snovault 1.0.24 (released) encoded v80.0
 -----------------
 1. SNO-75-fix-linux-travis-option (#163)
