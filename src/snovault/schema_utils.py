@@ -118,6 +118,7 @@ def linkTo(validator, linkTo, instance, schema):
             submits_for = user.upgrade_properties().get('submits_for')
             if (submits_for is not None and
                     not any(UUID(uuid) == item.uuid for uuid in submits_for) and
+                    not request.has_permission('review') and
                     not request.has_permission('submit_for_any')):
                 error = "%r is not in user submits_for" % instance
                 yield ValidationError(error)
