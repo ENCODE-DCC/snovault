@@ -340,7 +340,7 @@ def build_aggregation(facet_name, facet_options, min_doc_count=0):
     agg_name = facet_name.replace('.', '-')
 
     facet_type = facet_options.get('type', 'terms')
-    if facet_type == 'terms':
+    if facet_type in ['terms', 'typeahead']:
         agg = {
             'terms': {
                 'field': field,
