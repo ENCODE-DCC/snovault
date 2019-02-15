@@ -7,6 +7,9 @@ SearchView<-BaseView
 ### BaseView function dependencies
 - _format_facets
 """
+import time
+import logging
+import datetime
 from urllib.parse import urlencode
 
 from pyramid.httpexceptions import HTTPBadRequest  # pylint: disable=import-error
@@ -30,8 +33,7 @@ from snovault.helpers.helper import (
     normalize_query,
 )
 from snovault.viewconfigs.base_view import BaseView
-import time
-import logging
+
 
 class SearchView(BaseView):  # pylint: disable=too-few-public-methods
     '''Search View'''
@@ -44,8 +46,8 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             return_generator=False,
             default_doc_types=None
         ):
-        logging.basicConfig(filename='search_test_1.log', format='%(asctime)s %(message)s' ,level=logging.DEBUG)
         # pylint: disable=too-many-arguments
+        logging.basicConfig(filename='search_test_1.log', format='%(asctime)s %(message)s' ,level=logging.DEBUG)
         super(SearchView, self).__init__(context, request)
         self._search_type = search_type
         self._return_generator = return_generator
@@ -74,6 +76,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
         Main function to construct query and build view results json
         * Only publicly accessible function
         '''
+        t_start = time.time()
         types = self._types
         search_base = normalize_query(self._request)
         result = {
@@ -120,6 +123,11 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
         search_route = self._request.route_path('search', slash='/')
         clear_route = '?' + clear_qs if clear_qs else ''
         result['clear_filters'] = search_route + clear_route
+        t_end = time.time()
+        self.logger.debug('{} time: {:.20f}'.format(
+            'SNOVAULT Searchview preprocess_view _a_',
+            (t_end - t_start)*1000
+        ))
         if not doc_types:
             if self._request.params.get('mode') == 'picker':
                 doc_types = ['Item']
@@ -143,6 +151,11 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             if views:
                 result['views'] = views
         search_fields, _ = get_search_fields(self._request, doc_types)
+        t_end = time.time()
+        self.logger.debug('{} time: {:.20f}'.format(
+            'SNOVAULT Searchview preprocess_view _b_',
+            (t_end - t_start)*1000
+        ))
         query = get_filtered_query(
             search_term,
             search_fields,
@@ -176,6 +189,11 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 facets.append(audit_facet)
         query['aggs'] = set_facets(facets, used_filters, self._principals, doc_types)
         query = sort_query(query)
+        t_end = time.time()
+        self.logger.debug('{} time: {:.20f}'.format(
+            'SNOVAULT Searchview preprocess_view _c_',
+            (t_end - t_start)*1000
+        ))
         do_scan = size is None or size > 1000
         if not self._request.params.get('type') or 'Item' in doc_types:
             es_index = RESOURCES_INDEX
@@ -185,35 +203,29 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 for type_name in doc_types
                 if hasattr(types[type_name], 'item_type')
             ]
-        if do_scan:
-            print('----------------------------------------------------------------------------------------------------')
-            #logging.info('time for do_scan')
-            t0 = time.time()
-            print('-----------------------------------------------------------------------------------------------------')
+        if do_scan:             
             es_results = self._elastic_search.search(
                 body=query,
                 index=es_index,
                 search_type='query_then_fetch'
             )
-            print('-----------------------------------------------------------------------------------------------------')
-            self.logger.debug('do_scan time:')
-            self.logger.debug(time.time() - t0)
-            print('-----------------------------------------------------------------------------------------------------')
+            t_end = time.time()
+            self.logger.debug('{} time: {:.20f}'.format(
+                'SNOVAULT Searchview preprocess_view _d_',
+                (t_end - t_start)*1000
+            ))
         else:
-            print('-----------------------------------------------------------------------------------------------------')
-            t0 = time.time()
-            print(time.time() - t0)
-            print('-----------------------------------------------------------------------------------------------------')
             es_results = self._elastic_search.search(
                 body=query,
                 index=es_index,
                 from_=from_, size=size,
                 request_cache=True
             )
-            print('-----------------------------------------------------------------------------------------------------')
-            self.logger.debug('non do_scan time')
-            self.logger.debug(time.time() - t0)
-            print('-----------------------------------------------------------------------------------------------------')
+            t_end = time.time()
+            self.logger.debug('{} time: {:.20f}'.format(
+                'SNOVAULT Searchview preprocess_view _e_',
+                (t_end - t_start)*1000
+            ))
         total = es_results['hits']['total']
         result['total'] = total
         schemas = (types[item_type].schema for item_type in doc_types)
@@ -231,6 +243,11 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                     self._request, doc_types, es_results
                 )
             )
+        t_end = time.time()
+        self.logger.debug('{} time: {:.20f}'.format(
+            'SNOVAULT Searchview preprocess_view _f_',
+            (t_end - t_start)*1000
+        ))
         if size is not None and size < result['total']:
             params = [(k, v) for k, v in self._request.params.items() if k != 'limit']
             params.append(('limit', 'all'))
@@ -256,23 +273,18 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             return result
         del query['aggs']
         if size is None:
-            print('-----------------------------------------------------------------------------------------------------')
-            t0 = time.time()
-            print('-----------------------------------------------------------------------------------------------------')
             hits = scan(
                 self._elastic_search,
                 query=query,
                 index=es_index,
                 preserve_order=False
             )
-            print('-----------------------------------------------------------------------------------------------------')
-            print('size is none time')
-            self.logger.debug(time.time() - t0)
-            print('-----------------------------------------------------------------------------------------------------')
+            t_end = time.time()
+            self.logger.debug('{} time: {:.20f}'.format(
+                'SNOVAULT Searchview preprocess_view _f_',
+                (t_end - t_start)*1000
+            ))
         else:
-            print('-----------------------------------------------------------------------------------------------------')
-            t0 = time.time()
-            print('-----------------------------------------------------------------------------------------------------')            
             hits = scan(
                 self._elastic_search,
                 query=query,
@@ -281,10 +293,11 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 size=size,
                 preserve_order=False
             )
-            print('-----------------------------------------------------------------------------------------------------')
-            print('end of size not none')
-            self.logger.debug(time.time() - t0)
-            print('-----------------------------------------------------------------------------------------------------')
+            t_end = time.time()
+            self.logger.debug('{} time: {:.20f}'.format(
+                'SNOVAULT Searchview preprocess_view _h_',
+                (t_end - t_start)*1000
+            ))
         graph = format_results(self._request, hits, result)
         if self._request.__parent__ is not None or self._return_generator:
             if self._return_generator:
@@ -299,4 +312,9 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             self._request.response.app_iter = (
                 item.encode('utf-8') for item in app_iter
             )
+        t_end = time.time()
+        self.logger.debug('{} time: {:.20f}'.format(
+            'SNOVAULT Searchview preprocess_view TOTAL',
+            (t_end - t_start)*1000
+        ))
         return self._request.response
