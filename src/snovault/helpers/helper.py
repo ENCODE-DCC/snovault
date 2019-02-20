@@ -340,12 +340,15 @@ def build_aggregation(facet_name, facet_options, min_doc_count=0):
     agg_name = facet_name.replace('.', '-')
 
     facet_type = facet_options.get('type', 'terms')
+    facet_length = 200
+    if facet_options.get('length') == 'long':
+        facet_length = 3000
     if facet_type in ['terms', 'typeahead']:
         agg = {
             'terms': {
                 'field': field,
                 'min_doc_count': min_doc_count,
-                'size': 200,
+                'size': facet_length,
             },
         }
         if exclude:
