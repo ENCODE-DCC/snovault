@@ -8,4 +8,5 @@ pytestmark = [
 
 scenarios(
     'search.feature',
+    strict_gherkin=False
 )

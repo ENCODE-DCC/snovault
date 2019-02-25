@@ -10,4 +10,5 @@
 
 # scenarios(
 #     'user.feature',
+#     strict_gherkin=False
 # )
