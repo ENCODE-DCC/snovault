@@ -1,3 +1,4 @@
+import os
 from snovault import DBSESSION
 from contextlib import contextmanager
 from multiprocessing import get_context
@@ -16,7 +17,10 @@ from .indexer import (
     INDEXER,
     Indexer,
 )
-from .interfaces import APP_FACTORY
+from .interfaces import (
+    APP_FACTORY,
+    ELASTIC_SEARCH,
+)
 
 log = logging.getLogger('snovault.elasticsearch.es_index_listener')
 
@@ -29,7 +33,8 @@ def includeme(config):
         processes = int(processes)
     except:
         processes = None
-    config.registry[INDEXER] = MPIndexer(config.registry, processes=processes)
+    if INDEXER not in config.registry:
+        config.registry[INDEXER] = MPIndexer(config.registry, processes=processes)
 
 
 # Running in subprocess
@@ -103,8 +108,25 @@ def update_object_in_snapshot(args):
     uuid, xmin, snapshot_id, restart = args
     with snapshot(xmin, snapshot_id):
         request = get_current_request()
-        indexer = request.registry[INDEXER]
-        return indexer.update_object(request, uuid, xmin, restart)
+        encoded_es = request.registry[ELASTIC_SEARCH]
+        map_info = {
+            'start_time': time.time(),
+            'end_time': None,
+            'run_time': None,
+            'pid':os.getpid(),
+        }
+        update_info = Indexer.update_object(
+            encoded_es,
+            request,
+            uuid,
+            xmin,
+            restart=restart,
+        )
+        update_info['snapshot_id'] = snapshot_id
+        map_info['end_time'] = time.time()
+        map_info['run_time'] = map_info['end_time'] - map_info['start_time']
+        update_info['map_info'] = map_info
+        return update_info
 
 
 # Running in main process
@@ -148,10 +170,20 @@ class MPIndexer(Indexer):
             for uuid in uuids
         ]
         errors = []
+        update_infos = []
+        start_time = time.time()
         try:
-            for i, error in enumerate(self.pool.imap_unordered(
-                    update_object_in_snapshot, tasks, chunkiness)):
+            for i, update_info in enumerate(
+                    self.pool.imap_unordered(
+                        update_object_in_snapshot,
+                        tasks,
+                        chunkiness)
+                ):
+                update_info['return_time'] = time.time()
+                update_infos.append(update_info)
+                error = update_info.get('error')
                 if error is not None:
+                    print('Error', error)
                     errors.append(error)
                 if (i + 1) % 1000 == 0:
                     log.info('Indexing %d', i + 1)

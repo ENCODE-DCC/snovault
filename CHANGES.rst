@@ -1,6 +1,12 @@
 Changes
 =======
 
+Snovault 1.0.26 (released) encoded v82.0
+-----------------
+1. SNO-78 add long facet type (#168)
+2. SNO-80 typeahead for facets (#168)
+3. SNO-73 Add uuid queue module (#162)
+
 Snovault 1.0.25 (released) encoded v81.0
 -----------------
 1. SNO-77 Add review to submit_for validation (#166)
