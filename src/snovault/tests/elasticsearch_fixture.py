@@ -19,7 +19,7 @@ def server_process(datadir, host='127.0.0.1', port=9201, prefix='', echo=False):
         print('IN TRAVIS')
         echo = True
         args.append('-Epath.conf=%s/conf' % os.environ['TRAVIS_BUILD_DIR'])
-    else:
+    elif os.path.exists('/etc/elasticsearch'):
         print('NOT IN TRAVIS')
         args.append('-Epath.conf=./conf')
     print(args)

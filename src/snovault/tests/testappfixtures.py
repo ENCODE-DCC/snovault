@@ -7,7 +7,7 @@ _app_settings = {
     'testing': True,
     'pyramid.debug_authorization': True,
     'postgresql.statement_timeout': 20,
-    'tm.attempts': 3,
+    'retry.attempts': 3,
     'multiauth.policies': 'session remoteuser accesskey webuser',
     'multiauth.groupfinder': 'snowflakes.authorization.groupfinder',
     'multiauth.policy.session.use': 'snovault.authentication.NamespacedAuthenticationPolicy',

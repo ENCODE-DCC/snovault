@@ -623,7 +623,7 @@ def indexer_state_show(request):
 
     if not request.registry.settings.get('testing',False):  # NOTE: _indexer not working on local instances
         try:
-            r = requests.get(request.host_url + '/_indexer')
+            r = requests.get('http://localhost/_indexer')
             display['listener'] = json.loads(r.text)
             display['status'] = display['listener']['status']
         except:

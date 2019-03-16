@@ -10,4 +10,4 @@ TEST_HASHES = {
 @pytest.mark.parametrize(('password', 'pwhash'), TEST_HASHES.items())
 def test_snowflake_hash(password, pwhash):
     from snovault.snowflake_hash import SNOWHash
-    assert SNOWHash.encrypt(password) == pwhash
+    assert SNOWHash.hash(password) == pwhash

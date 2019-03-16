@@ -6,7 +6,7 @@ orbs:
 executors:
   snovault-executor:
     docker:
-      - image: circleci/buildpack-deps:trusty
+      - image: circleci/buildpack-deps:bionic
     working_directory: ~/snovault
     environment:
       - BASH_ENV: /home/circleci/.bashrc
@@ -14,7 +14,7 @@ executors:
       - ES_JAVA_OPTS: -Xms2g -Xmx2g
       - ES_BIN: /usr/share/elasticsearch/bin
       - ES_MAJOR_VERSION: 5
-      - PG_VERSION: 9.3
+      - PG_VERSION: 10
       - NODE_VERSION: 10
 
 commands:
@@ -50,7 +50,8 @@ commands:
               ruby2.3-dev
             sudo chown -R circleci /etc/elasticsearch
             sed -i "1s;^;export PATH=${ES_BIN}:${PG_BIN}:$PATH\n;" $BASH_ENV
-            sudo apt-get install -y python3.4-dev python3-pip
+            sudo apt-get install -y python3.7-dev python3-pip
+            sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.7 0
             sed -i '1s;^;alias python=python3\n;' $BASH_ENV
             sudo gem install compass
       - run:
@@ -87,7 +88,7 @@ jobs:
               --splinter-implicit-wait 10 \
               --splinter-webdriver chrome \
               --splinter-socket-timeout 300 \
-              --chrome-options "--headless --disable-gpu --no-sandbox --disable-dev-shm-usage --disable-extensions --whitelisted-ips"
+              --chrome-options "--headless --disable-gpu --no-sandbox --disable-dev-shm-usage --disable-extensions --whitelisted-ips --window-size=1920,1080"
           no_output_timeout: 30m
 
 workflows:

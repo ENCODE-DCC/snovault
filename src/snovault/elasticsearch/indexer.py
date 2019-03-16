@@ -159,6 +159,8 @@ def index(request):
     restart=False
     invalidated = []
     xmin = -1
+    is_testing = asbool(request.registry.settings.get('testing', False))
+    is_testing_full = request.json.get('is_testing_full', False)
 
     # Currently 2 possible followup indexers (base.ini [set stage_for_followup = vis_indexer, region_indexer])
     stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').replace(' ','').split(','))
@@ -234,7 +236,11 @@ def index(request):
                 state.send_notices()
                 return result
 
-            (related_set, full_reindex) = get_related_uuids(request, es, updated, renamed)
+            if is_testing and is_testing_full:
+                full_reindex = False
+                related_set = set(all_uuids(request.registry))
+            else:
+                (related_set, full_reindex) = get_related_uuids(request, es, updated, renamed)
             if full_reindex:
                 invalidated = related_set
                 flush = True
@@ -620,7 +626,7 @@ class Indexer(object):
                     'start_time': time.time(),
                     'end_time': None,
                     'run_time': None,
-                    'error': [],
+                    'error': None,
                 }
                 try:
                     encoded_es.index(
@@ -634,33 +640,27 @@ class Indexer(object):
                 except ConflictError:
                     msg = 'Conflict indexing %s at version %d' % (uuid, xmin)
                     log.warning(msg)
-                    backoff_info['error'].append(
-                        {
-                            'msg': msg,
-                            'last_exc': None,
-                        }
-                    )
+                    backoff_info['error'] = {
+                        'msg': msg,
+                        'last_exc': None,
+                    }
                     do_break = True
                 except (ConnectionError, ReadTimeoutError, TransportError) as e:
                     msg = 'Retryable error indexing %s: %r' % (uuid, e)
                     log.warning(msg)
                     last_exc = repr(e)
-                    backoff_info['error'].append(
-                        {
-                            'msg': msg,
-                            'last_exc': last_exc,
-                        }
-                    )
+                    backoff_info['error'] = {
+                        'msg': msg,
+                        'last_exc': last_exc,
+                    }
                 except Exception as e:
                     msg = 'Error indexing %s' % (uuid)
                     log.error(msg, exc_info=True)
                     last_exc = repr(e)
-                    backoff_info['error'].append(
-                        {
-                            'msg': msg,
-                            'last_exc': None,
-                        }
-                    )
+                    backoff_info['error'] = {
+                        'msg': msg,
+                        'last_exc': None,
+                    }
                     do_break = True
                 else:
                     # Get here on success and outside of try
