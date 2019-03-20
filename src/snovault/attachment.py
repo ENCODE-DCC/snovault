@@ -151,7 +151,7 @@ class ItemWithAttachment(Item):
             img = Image.open(stream)
             try:
                 orientation = img._getexif()[274]
-            except (AttributeError, KeyError):
+            except Exception:
                 # Maybe this image doesn't use exif data,
                 # or it does but the orientation field is absent.
                 orientation = 0
