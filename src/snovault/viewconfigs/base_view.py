@@ -88,11 +88,13 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
                     'field': field,
                     'title': options.get('title', field),
                     'terms': terms,
+                    'appended': 'false',
                     'total': all_buckets_total
                 }
             )
         for field, values in used_filters.items():
-            if field not in used_facets and field.rstrip('!') not in exists_facets:
+            field_without_bang = field.rstrip('!')
+            if field_without_bang not in used_facets and field_without_bang not in exists_facets:
                 title = field
                 for schema in schemas:
                     if field in schema['properties']:
@@ -102,6 +104,8 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
                     'field': field,
                     'title': title,
                     'terms': [{'key': v} for v in values],
+                    'appended': 'true',
+                    'isEqual': 'true' if field[-1] != '!' else 'false',
                     'total': total,
                 })
         return result
