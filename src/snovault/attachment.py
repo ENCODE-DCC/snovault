@@ -141,12 +141,12 @@ class ItemWithAttachment(Item):
 
         # Validate images and store height/width and update md5sum if needed
         major, minor = mime_type.split('/')
-        if major == 'image' and minor in ('png', 'gif'):
+        if major == 'image' and minor in ('png', 'gif', 'tiff'):
             stream = BytesIO(data)
             img = Image.open(stream)
             img.verify()
             attachment['width'], attachment['height'] = img.size
-        elif major == 'image' and minor in ('jpeg', 'tiff'):
+        elif major == 'image' and minor == 'jpeg':
             stream = BytesIO(data)
             img = Image.open(stream)
             try:
