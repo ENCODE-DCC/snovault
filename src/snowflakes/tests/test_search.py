@@ -655,6 +655,7 @@ def test_format_facets():
             }
         ],
         'total': 3,
+        'appended': 'false',
         'type': 'terms',
     }]
 
@@ -728,5 +729,6 @@ def test_format_facets_adds_pseudo_facet_for_extra_filters():
                 'key': 'titlevalue',
             },
         ],
+        'appended': 'false',
         'total': 42,
     }]
