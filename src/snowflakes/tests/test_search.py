@@ -729,6 +729,7 @@ def test_format_facets_adds_pseudo_facet_for_extra_filters():
                 'key': 'titlevalue',
             },
         ],
-        'appended': 'false',
+        'appended': 'true',
+        'isEqual': 'true',
         'total': 42,
     }]
