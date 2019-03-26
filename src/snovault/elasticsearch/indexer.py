@@ -632,33 +632,27 @@ class Indexer(object):
                 except ConflictError:
                     msg = 'Conflict indexing %s at version %d' % (uuid, xmin)
                     log.warning(msg)
-                    backoff_info['error'].append(
-                        {
-                            'msg': msg,
-                            'last_exc': None,
-                        }
-                    )
+                    backoff_info['error'] = {
+                        'msg': msg,
+                        'last_exc': None,
+                    }
                     do_break = True
                 except (ConnectionError, ReadTimeoutError, TransportError) as e:
                     msg = 'Retryable error indexing %s: %r' % (uuid, e)
                     log.warning(msg)
                     last_exc = repr(e)
-                    backoff_info['error'].append(
-                        {
-                            'msg': msg,
-                            'last_exc': last_exc,
-                        }
-                    )
+                    backoff_info['error'] = {
+                        'msg': msg,
+                        'last_exc': last_exc,
+                    }
                 except Exception as e:
                     msg = 'Error indexing %s' % (uuid)
                     log.error(msg, exc_info=True)
                     last_exc = repr(e)
-                    backoff_info['error'].append(
-                        {
-                            'msg': msg,
-                            'last_exc': None,
-                        }
-                    )
+                    backoff_info['error'] = {
+                        'msg': msg,
+                        'last_exc': None,
+                    }
                     do_break = True
                 else:
                     # Get here on success and outside of try
