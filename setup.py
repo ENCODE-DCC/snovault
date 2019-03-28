@@ -13,9 +13,7 @@ requires = [
     'SQLAlchemy>=1.0.0b1',
     'WSGIProxy2',
     'WebTest',
-    'botocore',
     'jmespath',
-    'boto3',
     'elasticsearch>=5.2',
     'lucenequery',
     'future',
@@ -50,13 +48,17 @@ if sys.version_info.major == 2:
         'subprocess32',
     ])
 
+s3_requires = ['boto3', 'botocore']
+
+gs_requires = ['google-cloud-storage']
+
 tests_require = [
     'pytest>=2.4.0',
     'pytest-bdd',
     'pytest-mock',
     'pytest-splinter',
     'pytest_exact_fixtures',
-]
+] + s3_requires + gs_requires
 
 setup(
     name='snovault',
@@ -76,6 +78,8 @@ setup(
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
+        's3': s3_requires,
+        'gs': gs_requires,
     },
     entry_points='''
         [console_scripts]

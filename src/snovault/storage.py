@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pyramid.httpexceptions import HTTPConflict
 from sqlalchemy import (
     Column,
@@ -32,8 +33,6 @@ from .interfaces import (
     STORAGE,
 )
 from .json_renderer import json_renderer
-import boto3
-import botocore
 import json
 import transaction
 import uuid
@@ -47,15 +46,30 @@ def includeme(config):
     registry[STORAGE] = RDBStorage(registry[DBSESSION])
     global _DBSESSION
     _DBSESSION = registry[DBSESSION]
-    if registry.settings.get('blob_bucket'):
+
+    blob_storage = registry.settings.get('blob_storage')
+    if blob_storage is None:
+        if registry.settings.get('blob_bucket'):
+            blob_storage = 's3'
+        else:
+            blob_storage = 'rdb'
+
+    if blob_storage == 'rdb':
+        registry[BLOBS] = RDBBlobStorage(registry[DBSESSION])
+    elif blob_storage == 's3':
         registry[BLOBS] = S3BlobStorage(
             registry.settings['blob_bucket'],
             read_profile_name=registry.settings.get('blob_read_profile_name'),
             store_profile_name=registry.settings.get('blob_store_profile_name')
         )
+    elif blob_storage == 'gs':
+        registry[BLOBS] = GSBlobStorage(
+            registry.settings['blob_bucket'],
+            read_credentials_path=registry.settings.get('blob_read_credentials_path'),
+            store_credentials_path=registry.settings.get('blob_store_credentials_path')
+        )
     else:
-        registry[BLOBS] = RDBBlobStorage(registry[DBSESSION])
-
+        raise ValueError("Unknown blob_storage " + blob_storage)
 
 Base = declarative_base()
 
@@ -272,6 +286,14 @@ class UUID(types.TypeDecorator):
             return uuid.UUID(value)
 
 
+def make_content_type(type_=None, charset=None):
+    if type_ is None:
+        type_ = 'text/plain' if charset else 'application/octet-stream'
+    if charset is None:
+        return type_
+    return type_ + '; charset=' + charset
+
+
 class RDBBlobStorage(object):
     def __init__(self, DBSession):
         self.DBSession = DBSession
@@ -296,13 +318,15 @@ class RDBBlobStorage(object):
 
 
 class S3BlobStorage(object):
-    def __init__(self, bucket, read_profile_name=None, store_profile_name=None):
+    def __init__(self, bucket_name, read_profile_name=None, store_profile_name=None):
+        import boto3
         self.store_conn = boto3.Session(profile_name=store_profile_name).client('s3')
         # Have to use client API for presigned_url.
         self.read_conn = boto3.Session(profile_name=read_profile_name).client('s3')
-        self.bucket = boto3.Session(profile_name=read_profile_name).resource('s3').Bucket(bucket)
+        self.bucket_name = bucket_name
 
     def store_blob(self, data, download_meta, blob_id=None):
+        import botocore
         if blob_id is None:
             blob_id = str(uuid.uuid4())
             key = None
@@ -310,7 +334,7 @@ class S3BlobStorage(object):
             # Have to check existence manually with boto3.
             try:
                 key = self.store_conn.get_object(
-                    Bucket=self.bucket.name,
+                    Bucket=self.bucket_name,
                     Key=blob_id
                 )
             except botocore.exceptions.ClientError as e:
@@ -320,13 +344,14 @@ class S3BlobStorage(object):
                 else:
                     raise
         if key is None:
+            content_type = make_content_type(download_meta.get('type'), download_meta.get('charset'))
             self.store_conn.put_object(
-                Bucket=self.bucket.name,
+                Bucket=self.bucket_name,
                 Key=blob_id,
                 Body=data,
-                ContentType=download_meta.get('type', 'application/octet-stream')
+                ContentType=content_type
             )
-        download_meta['bucket'] = self.bucket.name
+        download_meta['bucket'] = self.bucket_name
         download_meta['key'] = blob_id
 
     def _get_bucket_key(self, download_meta):
@@ -334,7 +359,7 @@ class S3BlobStorage(object):
         if 'bucket' in download_meta:
             return download_meta['bucket'], download_meta['key']
         else:
-            return self.bucket.name, download_meta['blob_id']
+            return self.bucket_name, download_meta['blob_id']
 
     def get_blob_url(self, download_meta):
         bucket_name, key = self._get_bucket_key(download_meta)
@@ -354,6 +379,53 @@ class S3BlobStorage(object):
             Bucket=bucket_name,
             Key=key
         )['Body'].read()
+
+
+class GSBlobStorage(object):
+    def __init__(self, bucket_name, read_credentials_path=None, store_credentials_path=None):
+        from google.cloud import storage
+        self.bucket_name = bucket_name
+        if store_credentials_path:
+            self.store_conn = storage.Client.from_service_account_json(store_credentials_path)
+        else:
+            self.store_conn = storage.Client()
+        # Cannot use a GCE default service account for url signing, see:
+        # https://github.com/googleapis/google-auth-library-python/issues/50
+        if read_credentials_path:
+            self.read_conn = storage.Client.from_service_account_json(read_credentials_path)
+        else:
+            self.read_conn = storage.Client()
+
+    def store_blob(self, data, download_meta, blob_id=None):
+        from google.cloud import storage
+        if blob_id is None:
+            blob_id = str(uuid.uuid4())
+            exists = False
+        else:
+            # migration
+            exists = self.store_conn.bucket(self.bucket_name).blob(blob_id).exists()
+        if not exists:
+            content_type = make_content_type( download_meta.get('type'), download_meta.get('charset'))
+            self.store_conn.bucket(self.bucket_name).blob(blob_id).upload_from_string(data, content_type=content_type)
+        download_meta['bucket'] = self.bucket_name
+        download_meta['key'] = blob_id
+
+    def _get_bucket_key(self, download_meta):
+        if 'bucket' in download_meta:
+            return download_meta['bucket'], download_meta['key']
+        else:
+            # Assume files have been migrated
+            return self.bucket_name, download_meta['blob_id']
+
+    def get_blob_url(self, download_meta):
+        bucket_name, key = self._get_bucket_key(download_meta)
+        # Not possible to use response-content-type with signed urls.
+        location = self.read_conn.bucket(bucket_name).blob(key).generate_signed_url(expiration=timedelta(hours=36))
+        return location
+
+    def get_blob(self, download_meta):
+        bucket_name, key = self._get_bucket_key(download_meta)
+        return self.read_conn.bucket(bucket_name).blob(key).download_as_string()
 
 
 class JSON(types.TypeDecorator):

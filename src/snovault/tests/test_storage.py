@@ -273,3 +273,30 @@ def test_S3BlobStorage_boto3_get_blob_url_for_s3_file(mocker):
     storage.read_conn.generate_presigned_url.assert_called_once_with(
         Params={'Key': '123', 'Bucket': 'test'}, ExpiresIn=129600, ClientMethod='get_object'
     )
+
+
+def test_GSBlobStorage_store_blob(mocker):
+    from snovault.storage import GSBlobStorage
+    from uuid import UUID
+    key = '8c427b28-1b55-4033-a276-34fd35cd2755'
+    mocker.patch('google.cloud.storage.Client')
+    mocker.patch('uuid.uuid4', return_value=UUID(key))
+    storage = GSBlobStorage('test')
+    download_meta = {'blob_id': '123'}
+    storage.store_blob('data', download_meta)
+    assert download_meta['bucket'] == 'test'
+    assert download_meta['key'] == key
+    assert storage.store_conn.mock_calls == mocker.call.bucket('test').blob(key).upload_from_string('data', content_type='application/octet-stream').call_list()
+
+
+def test_GSBlobStorage_get_blob_url(mocker):
+    from snovault.storage import GSBlobStorage
+    from datetime import timedelta
+    mocker.patch('google.cloud.storage.Client')
+    storage = GSBlobStorage('test')
+    download_meta = {'blob_id': '123'}
+    storage.read_conn.bucket().blob().generate_signed_url.return_value = 'http://testurl'
+    storage.read_conn.reset_mock()
+    url = storage.get_blob_url(download_meta)
+    assert url == 'http://testurl'
+    assert storage.read_conn.mock_calls == mocker.call.bucket('test').blob('123').generate_signed_url(expiration=timedelta(hours=36)).call_list()
