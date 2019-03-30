@@ -95,17 +95,21 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
         for field, values in used_filters.items():
             field_without_bang = field.rstrip('!')
             if field_without_bang not in used_facets and field_without_bang not in exists_facets:
-                title = field
+                title = field_without_bang
                 for schema in schemas:
                     if field in schema['properties']:
                         title = schema['properties'][field].get('title', field)
                         break
-                result.append({
-                    'field': field,
-                    'title': title,
-                    'terms': [{'key': v} for v in values],
-                    'appended': 'true',
-                    'isEqual': 'true' if field[-1] != '!' else 'false',
-                    'total': total,
-                })
+                item = [r for r in result if r['field'] == field_without_bang]
+                terms = [{'key': v, 'isEqual': 'true' if field[-1] != '!' else 'false'} for v in values]
+                if item:
+                    item[0]['terms'].extend(terms)
+                else:
+                    result.append({
+                        'field': field_without_bang,
+                        'title': title,
+                        'terms': terms,
+                        'appended': 'true',
+                        'total': total,
+                    })
         return result
