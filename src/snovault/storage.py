@@ -63,12 +63,9 @@ bakery = baked.bakery()
 baked_query_resource = bakery(lambda session: session.query(Resource))
 baked_query_unique_key = bakery(
     lambda session: session.query(Key).options(
-        orm.joinedload_all(
-            Key.resource,
-            Resource.data,
-            CurrentPropertySheet.propsheet,
-            innerjoin=True,
-        ),
+        orm.joinedload(Key.resource, innerjoin=True)
+        .joinedload(Resource.data, innerjoin=True)
+        .joinedload(CurrentPropertySheet.propsheet, innerjoin=True),
     ).filter(Key.name == bindparam('name'), Key.value == bindparam('value'))
 )
 
