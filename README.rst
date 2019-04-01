@@ -23,20 +23,14 @@ Step 2: Install or update dependencies::
 
     $ brew install libevent libmagic libxml2 libxslt openssl postgresql graphviz nginx python3
     $ brew install freetype libjpeg libtiff littlecms webp  # Required by Pillow
+    $ brew install elasticsearch
+    $ brew install --force node@10
     $ brew tap homebrew/cask
-    $ brew cask install java8
+    $ brew cask install java
     $ brew cask install chromedriver
-    $ brew tap homebrew/versions
-    $ brew install elasticsearch5@6 node@6
     $ npm install
 
-    NOTE:
-    Elasticsearch 5.4 does not work with Java 9.  If Brew cannot find java8
-    $ brew tap caskroom/versions # lookup more versions
-    $ brew cask search java # java8 now in list
-    $ brew cask install java8
-
-    $ gem install compass # This is a Ruby gem to compile Sass to CSS
+    $ sudo gem install compass # This is a Ruby gem to compile Sass to CSS
 
 If you need to update dependencies::
 
@@ -140,7 +134,6 @@ Notes on SASS/Compass
 =====================
 
 We use the `SASS <http://sass-lang.com/>`_ and `Compass <http://compass-style.org/>`_ CSS preprocessors.
-The buildout installs the SASS and Compass utilities and compiles the CSS.
 When changing the SCSS source files you must recompile the CSS using one of the following methods:
 
 Compiling "on the fly"
@@ -149,7 +142,7 @@ Compiling "on the fly"
 Compass can watch for any changes made to .scss files and instantly compile them to .css.
 To start this, from the root of the project (where config.rb is) do::
 
-    $ bin/compass watch
+    $ compass watch
 
 You can specify whether the compiled CSS is minified or not in config.rb. (Currently, it is set to minify.)
 
@@ -158,7 +151,7 @@ Force compiling
 
 ::
 
-    $ bin/compass compile
+    $ compass compile
 
 Again, you can specify whether the compiled CSS is minified or not in config.rb.
 
@@ -166,7 +159,7 @@ Also see the `Compass Command Line Documentation <http://compass-style.org/help/
 
 And of course::
 
-    $ bin/compass help
+    $ compass help
 
 
 SublimeLinter

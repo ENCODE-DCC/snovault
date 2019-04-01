@@ -268,9 +268,10 @@ def composite(loader, global_conf, **settings):
 
     def status_app(environ, start_response):
         status = '200 OK'
-        response_headers = [('Content-type', 'application/json')]
+        response_headers = [('Content-type', 'application/json; charset=utf-8')]
         start_response(status, response_headers)
-        return [json.dumps(status_holder['status'])]
+        body = json.dumps(status_holder['status'])
+        return [body.encode("utf-8")]
 
     return status_app
 

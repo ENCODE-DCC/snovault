@@ -28,6 +28,7 @@ requires = [
     'pyramid',
     'pyramid_localroles',
     'pyramid_multiauth',
+    'pyramid_retry',
     'pyramid_tm',
     'python-magic',
     'pytz',
@@ -41,7 +42,6 @@ requires = [
     'xlrd',
     'zope.sqlalchemy',
     'bcrypt',
-    'cryptacular',
 ]
 
 if sys.version_info.major == 2:

@@ -139,7 +139,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             del query['query']['query_string']
         else:
             query['query']['query_string']['fields'].extend(
-                ['_all', '*.uuid', '*.md5sum', '*.submitted_file_name']
+                ['full_text', '*.uuid', '*.md5sum', '*.submitted_file_name']
             )
         set_sort_order(self._request, search_term, types, doc_types, query, result)
         used_filters = set_filters(self._request, query, result)
@@ -166,6 +166,8 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 for type_name in doc_types
                 if hasattr(types[type_name], 'item_type')
             ]
+        if not query['query']:
+            del query['query']
         if do_scan:
             es_results = self._elastic_search.search(
                 body=query,
