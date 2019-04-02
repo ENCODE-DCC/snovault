@@ -73,7 +73,7 @@ def prepare_search_term(request):
         return search_term
 
     # avoid interpreting slashes as regular expressions
-    search_term = search_term.replace('/', r'\/')
+    search_term = search_term.replace('/', r'\/').replace('^', r'').replace('<', r'').replace('>', r'')
     # elasticsearch uses : as field delimiter, but we use it as namespace designator
     # if you need to search fields you have to use @type:field
     # if you need to search fields where the field contains ":", you will have to escape it
