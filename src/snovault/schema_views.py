@@ -9,9 +9,9 @@ from .util import mutated_schema
 
 
 def includeme(config):
-    config.add_route('schemas', '/profiles/')
+    config.add_route('schemas', '/profiles{slash:/?}')
     config.add_route('schema', '/profiles/{type_name}.json')
-    config.add_route('schemap', '/profiles/{type_name}')
+    config.add_route('schemap', '/profiles/{type_name}{slash:/?}')
     config.add_route('schemas_map', '/profiles-map/')
     config.add_route('schemas_titles', '/profiles-titles/')
     config.scan(__name__)
