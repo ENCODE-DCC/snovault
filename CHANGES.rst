@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.27 (released) encoded v83.0
+-----------------
+1. SNO-83 Rotate img attachment for EXIF (#174)
+
 Snovault 1.0.26 (released) encoded v82.0
 -----------------
 1. SNO-78 add long facet type (#168)
