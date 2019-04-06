@@ -22,6 +22,17 @@ import magic
 import mimetypes
 
 
+DEGREE_FLIP_MAP = {
+    2: (None, True),
+    3: (180, None),
+    4: (180, True),
+    5: (270, True),
+    6: (270, None),
+    7: (90, True),
+    8: (90, None),
+}
+
+
 def includeme(config):
     config.scan(__name__)
 
@@ -120,14 +131,6 @@ class ItemWithAttachment(Item):
                 raise ValidationFailure(
                     'body', [prop_name, 'href'], 'Mimetype %s is not allowed.' % mime_type)
 
-        # Validate images and store height/width
-        major, minor = mime_type.split('/')
-        if major == 'image' and minor in ('png', 'jpeg', 'gif', 'tiff'):
-            stream = BytesIO(data)
-            im = Image.open(stream)
-            im.verify()
-            attachment['width'], attachment['height'] = im.size
-
         # Validate md5 sum
         md5sum = md5(data).hexdigest()
         if 'md5sum' in attachment and attachment['md5sum'] != md5sum:
@@ -135,6 +138,38 @@ class ItemWithAttachment(Item):
                 'body', [prop_name, 'md5sum'], 'MD5 checksum does not match uploaded data.')
         else:
             download_meta['md5sum'] = attachment['md5sum'] = md5sum
+
+        # Validate images and store height/width and update md5sum if needed
+        major, minor = mime_type.split('/')
+        if major == 'image' and minor in ('png', 'gif', 'tiff'):
+            stream = BytesIO(data)
+            img = Image.open(stream)
+            img.verify()
+            attachment['width'], attachment['height'] = img.size
+        elif major == 'image' and minor == 'jpeg':
+            stream = BytesIO(data)
+            img = Image.open(stream)
+            try:
+                orientation = img._getexif()[274]
+            except Exception:
+                # Maybe this image doesn't use exif data,
+                # or it does but the orientation field is absent.
+                orientation = 0
+            degrees, flip = DEGREE_FLIP_MAP.get(orientation, (None, None))
+            transformed = False
+            if degrees:
+                img = img.rotate(degrees, expand=True)
+                transformed = True
+            if flip:
+                img = img.transpose(Image.FLIP_LEFT_RIGHT)
+                transformed = True
+            if transformed:
+                new_stream = BytesIO()
+                img.save(new_stream, format=minor)
+                data = new_stream.getvalue()
+                download_meta['md5sum'] = attachment['md5sum'] = md5(data).hexdigest()
+            img.verify()
+            attachment['width'], attachment['height'] = img.size
 
         registry = find_root(self).registry
         registry[BLOBS].store_blob(data, download_meta)
