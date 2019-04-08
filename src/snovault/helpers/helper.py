@@ -1,4 +1,5 @@
 import json
+import re
 from collections import OrderedDict
 from urllib.parse import urlencode
 from antlr4 import IllegalStateException
@@ -74,6 +75,7 @@ def prepare_search_term(request):
 
     # avoid interpreting slashes as regular expressions
     search_term = search_term.replace('/', r'\/').replace('^', r'').replace('<', r'').replace('>', r'')
+    search_term = re.sub('\?+', '?', search_term)
     # elasticsearch uses : as field delimiter, but we use it as namespace designator
     # if you need to search fields you have to use @type:field
     # if you need to search fields where the field contains ":", you will have to escape it
