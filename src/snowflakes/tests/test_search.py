@@ -722,14 +722,14 @@ def test_format_facets_adds_pseudo_facet_for_extra_filters():
         es_result, facets, used_filters, schemas, total, principals)
 
     assert result == [{
+        'appended': 'true',
         'field': 'title',
         'title': 'Title',
         'terms': [
             {
+                'isEqual': 'true',
                 'key': 'titlevalue',
             },
         ],
-        'appended': 'true',
-        'isEqual': 'true',
         'total': 42,
     }]
