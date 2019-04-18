@@ -620,7 +620,7 @@ class Indexer(object):
                     'start_time': time.time(),
                     'end_time': None,
                     'run_time': None,
-                    'error': None,
+                    'error': [],
                 }
                 try:
                     encoded_es.index(
