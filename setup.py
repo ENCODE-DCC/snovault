@@ -60,7 +60,7 @@ tests_require = [
 
 setup(
     name='snovault',
-    version='1.0.27',
+    version='1.0.28',
     description='Snovault Hybrid Object Relational Database Framework',
     long_description=README + '\n\n' + CHANGES,
     packages=find_packages('src'),

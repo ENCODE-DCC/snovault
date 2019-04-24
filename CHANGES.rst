@@ -1,6 +1,11 @@
 Changes
 =======
 
+Snovault 1.0.28 (released) encoded v84rc1
+-----------------------------------------
+1. SNO-89 Fix backoff error key in indexer (#181)
+2. SNO-85 facet-reappearing (#175)
+
 Snovault 1.0.27 (released) encoded v83.0
 -----------------
 1. SNO-83 Rotate img attachment for EXIF (#174)
