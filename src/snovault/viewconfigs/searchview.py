@@ -87,15 +87,20 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             bad_types = [t for t in doc_types if t not in types]
             msg = "Invalid type: {}".format(', '.join(bad_types))
             raise HTTPBadRequest(explanation=msg)
-        searchterm_specs = self._request.params.getall('searchTerm')
-        searchterm_only = urlencode(
+
+        search_type = 'searchTerm'
+        search_type_spec = self._request.params.getall(search_type)
+        if not search_type_spec:
+            search_type = 'advancedQuery'
+            search_type_spec = self._request.params.getall(search_type)
+        search_only = urlencode(
             [
-                ("searchTerm", searchterm)
-                for searchterm in searchterm_specs
+                (search_type, search_type)
+                for spec in search_type_spec
             ]
         )
-        if searchterm_only:
-            clear_qs = searchterm_only
+        if search_only:
+            clear_qs = search_only
         else:
             clear_qs = urlencode([("type", typ) for typ in doc_types])
         search_route = self._request.route_path('search', slash='/')

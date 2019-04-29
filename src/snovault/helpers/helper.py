@@ -330,7 +330,7 @@ def set_filters(request, query, result, static_items=None, filter_exclusion=None
                     'remove': '{}?{}'.format(request.path, query_string)
                 })
 
-        if field == 'searchTerm':
+        if field in ('searchTerm', 'advancedQuery'):
             continue
 
         # Add to list of active filters
