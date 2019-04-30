@@ -76,12 +76,20 @@ def prepare_search_term(request):
     # avoid interpreting slashes as regular expressions
     advanced_query = request.params.get('advancedQuery', '').strip().replace('/', r'\/')
     search_term = request.params.get('searchTerm')
+<<<<<<< HEAD
     # true if no search is being performed
     if search_term is None and not advanced_query:
         return '*'
     if search_term is not None:
         search_term = (search_term or '').strip()
         if search_term in ('', '*'):
+=======
+    if search_term is None and not advanced_query :
+        return '*'
+    if search_term is not None:
+        search_term = (search_term or '').strip()
+        if search_term == '' and not advanced_query:
+>>>>>>> fixed issue where only searchterm and advancedquery were used
             return '*'
         # elasticsearch uses ':' as field delimiter, but we use it as namespace designator
         # if you need to search fields you have to use @type:field
