@@ -91,8 +91,6 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
         searchterm_specs = self._request.params.getall('searchTerm')
         advanced_query_type_spec = self._request.params.getall('advancedQuery')
         search_params = [("searchTerm", searchterm) for searchterm in searchterm_specs]
-        if advanced_query_type_spec:
-            search_params.extend([('advancedQuery', advancedQuery) for advancedQuery in advanced_query_type_spec])
         search_only = urlencode(search_params)
         if search_only:
             clear_qs = search_only
