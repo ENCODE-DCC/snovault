@@ -89,7 +89,6 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             raise HTTPBadRequest(explanation=msg)
 
         searchterm_specs = self._request.params.getall('searchTerm')
-        advanced_query_type_spec = self._request.params.getall('advancedQuery')
         search_params = [("searchTerm", searchterm) for searchterm in searchterm_specs]
         search_only = urlencode(search_params)
         if search_only:
