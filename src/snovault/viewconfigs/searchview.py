@@ -50,7 +50,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
         self._default_doc_types = default_doc_types or []
         self._context = context
 
-    def preprocess_view(self, views=None, search_result_actions=None):  # pylint: disable=too-many-statements, too-many-branches, too-many-locals
+    def preprocess_view(self, views=None, search_result_actions=None, preserve_order=False):  # pylint: disable=too-many-statements, too-many-branches, too-many-locals
         '''
         Main function to construct query and build view results json
         * Only publicly accessible function
@@ -225,7 +225,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 self._elastic_search,
                 query=query,
                 index=es_index,
-                preserve_order=False
+                preserve_order=preserve_order
             )
         else:
             hits = scan(
@@ -234,7 +234,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 index=es_index,
                 from_=from_,
                 size=size,
-                preserve_order=False
+                preserve_order=preserve_order
             )
         graph = format_results(self._request, hits, result)
         if self._request.__parent__ is not None or self._return_generator:
