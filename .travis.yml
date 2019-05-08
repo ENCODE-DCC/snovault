@@ -9,7 +9,7 @@ cache:
 addons:
   apt:
     packages:
-    - oracle-java8-set-default
+    - oracle-java11-set-default
     - bsdtar
     - graphviz
     - redis-server
@@ -43,7 +43,7 @@ env:
       7F+UQNsSLGGLVORcsmBG7ByCMYljVk8i14rWonrXVjPP1fuwIp2AIZzNK6KrJ
       tQzLeb5gEy3A=
   - BOTO_CONFIG=tmp/bogusvalue
-  - JAVA_HOME=/usr/lib/jvm/java-8-oracle
+  - JAVA_HOME=/usr/lib/jvm/java-11-oracle
   - ES_VERSION=5.6.1
   - ES_DOWNLOAD_URL=https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-${ES_VERSION}.deb
   - PATH="/usr/share/elasticsearch/bin:/usr/lib/postgresql/9.3/bin:$PATH"
