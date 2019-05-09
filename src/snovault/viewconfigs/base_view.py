@@ -22,11 +22,13 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
         ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
         ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
     ]
+    #TODO Why is audit_facets here?
     def __init__(self, context, request):
         self._request = request
         self._context = context
         self._types = request.registry[TYPES]
         self._search_base = normalize_query(request)
+        #TODO should be moved to pre_process()
         self._result = {
             '@context': request.route_path('jsonld_context'),
             'filters': [],
@@ -36,7 +38,9 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
         self._elastic_search = request.registry[ELASTIC_SEARCH]
         self._es_index = RESOURCES_INDEX
         self._search_audit = request.has_permission('search_audit')
+        #TODO not sure this should be in Base
         self._search_term = prepare_search_term(request)
+        #TODO should be in pre_process()
         self._request_cache = None
         self._facets = [
             ('type', {'title': 'Data Type'}),
@@ -45,6 +49,7 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
         from_, page_size = get_pagination(request)
         self._from_ = from_
         self._size = page_size
+        #TODO what the actual h-e double hockey sticks
 
     @staticmethod
     def _format_facets(
@@ -55,6 +60,7 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
             total,
             principals
         ):
+        #TODO should be instance properties not passed
         '''Helper function for child classes'''
         # pylint: disable=too-many-locals, too-many-arguments
         result = []
@@ -63,6 +69,7 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
         aggregations = es_results['aggregations']
         used_facets = set()
         exists_facets = set()
+        #TODO make facets out of filters and ES results
         for field, options in facets:
             used_facets.add(field)
             agg_name = field.replace('.', '-')
@@ -91,6 +98,7 @@ class BaseView(object):  #pylint: disable=too-few-public-methods, too-many-insta
                     'total': all_buckets_total
                 }
             )
+        #TODO this should be make_phantom_facets()
         for field, values in used_filters.items():
             if field not in used_facets and field.rstrip('!') not in exists_facets:
                 title = field

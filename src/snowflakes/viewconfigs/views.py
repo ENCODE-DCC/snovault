@@ -33,7 +33,7 @@ def collection_view_listing_es(context, request):
 def search(context, request, search_type=None, views=None, return_generator=False, search_result_actions=None):
     search = SearchView(context, request, search_type, return_generator, DEFAULT_DOC_TYPES)
     return search.preprocess_view(views=views, search_result_actions=search_result_actions)
-
+#TODO Should this be search.go()?
 
 @view_config(route_name='report', request_method='GET', permission='search')
 def report(context, request):

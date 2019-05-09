@@ -55,8 +55,10 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
         Main function to construct query and build view results json
         * Only publicly accessible function
         '''
+        #TODO needs to be broken into like 8 methods
         types = self._types
         search_base = normalize_query(self._request)
+        #TODO this is called in __init__()!!
         result = {
             '@context': self._request.route_path('jsonld_context'),
             '@id': '/search/' + search_base,
@@ -64,10 +66,12 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             'title': 'Search',
             'filters': [],
         }
+        #TODO these are already instance properties!
         es_index = RESOURCES_INDEX
         search_audit = self._request.has_permission('search_audit')
         from_, size = get_pagination(self._request)
-        search_term = prepare_search_term(self._request)
+        #TODO third time's the charm
+        #search_term = prepare_search_term(self._request)
         if (
                 hasattr(self._context, 'type_info') and
                 hasattr(self._context.type_info, 'name') and
@@ -80,6 +84,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 doc_types = ['Item']
 
         # Normalize to item_type
+        #TODO this should all be in normalize_query()
         try:
             doc_types = sorted({types[name].name for name in doc_types})
         except KeyError:
@@ -87,6 +92,8 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             bad_types = [t for t in doc_types if t not in types]
             msg = "Invalid type: {}".format(', '.join(bad_types))
             raise HTTPBadRequest(explanation=msg)
+
+        #TODO this below should be in prepare_searchterm()
         searchterm_specs = self._request.params.getall('searchTerm')
         searchterm_only = urlencode(
             [
@@ -94,6 +101,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 for searchterm in searchterm_specs
             ]
         )
+        #TODO set up clear filters
         if searchterm_only:
             clear_qs = searchterm_only
         else:
@@ -101,12 +109,15 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
         search_route = self._request.route_path('search', slash='/')
         clear_route = '?' + clear_qs if clear_qs else ''
         result['clear_filters'] = search_route + clear_route
+        #TODO special case for FORMS
         if not doc_types:
             if self._request.params.get('mode') == 'picker':
                 doc_types = ['Item']
             else:
                 doc_types = self._default_doc_types
         else:
+        #TODO set filters with type for when you turn them off
+        #TODO duplicated mostly in set_filters()
             for item_type in doc_types:
                 t_thing = types[item_type]
                 q_thing = urlencode(
@@ -124,24 +135,30 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             if views:
                 result['views'] = views
         search_fields, _ = get_search_fields(self._request, doc_types)
+        #TODO get ES query with filters
+        #TODO this is dumb because if _search_term is * then this clause is removed from query
         query = get_filtered_query(
-            search_term,
+            self._search_term,
             search_fields,
             sorted(list_result_fields(self._request, doc_types)),
             self._principals,
             doc_types,
         )
         schemas = [types[doc_type].schema for doc_type in doc_types]
+        #TODO list_visible_columns ALREADY called in list_result_fields
         columns = list_visible_columns_for_schemas(self._request, schemas)
         if columns:
             result['columns'] = columns
-        if search_term == '*':
+        #TODO should be in get_filtered_query
+        #TODO _all is deprecated in ES6+
+        if self._search_term == '*':
             del query['query']['query_string']
         else:
+            #TODO are these unanalyzed fields?
             query['query']['query_string']['fields'].extend(
                 ['_all', '*.uuid', '*.md5sum', '*.submitted_file_name']
             )
-        set_sort_order(self._request, search_term, types, doc_types, query, result)
+        set_sort_order(self._request, self._search_term, types, doc_types, query, result)
         used_filters = set_filters(self._request, query, result)
         facets = [
             ('type', {'title': 'Data Type'}),
@@ -156,7 +173,9 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
                 ):
                 facets.append(audit_facet)
         query['aggs'] = set_facets(facets, used_filters, self._principals, doc_types)
+        #TODO why are we sorting the query?  Looks like we are mostly flattening the dicts within
         query = sort_query(query)
+        #TODO actually search the dang thing.
         do_scan = size is None or size > 1000
         if not self._request.params.get('type') or 'Item' in doc_types:
             es_index = RESOURCES_INDEX

@@ -149,10 +149,12 @@ def get_search_fields(request, doc_types):
 
     fields = {'uuid', 'unique_keys.*'}
     highlights = {}
+    #TODO highlights deprecated
     types = request.registry[TYPES]
     for doc_type in doc_types:
         type_info = types[doc_type]
         for value in type_info.schema.get('boost_values', ()):
+            #TODO "boost" doesn't do any boosting
             fields.add('embedded.' + value)
             highlights['embedded.' + value] = {}
     return list(fields), highlights
@@ -225,6 +227,7 @@ def list_result_fields(request, doc_types):
         fields.update('embedded.' + column for column in columns)
 
     # Ensure that 'audit' field is requested with _source in the ES query
+    #TODO this should probalby not be in snovault and futhermore should be in batch_download
     if request.__parent__ and '/metadata/' in request.__parent__.url and request.has_permission('search_audit'):
         fields.add('audit.*')
 
