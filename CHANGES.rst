@@ -1,6 +1,13 @@
 Changes
 =======
 
+Snovault 1.0.29 (released) encoded v85rc1
+----------------------------------------
+1. SNO-91 update-travis-java-ref (#188)
+2. SNO-87 fixed-issue-while-profile-url-does-not-work (#179)
+3. SNO-86 escape-search-text (#178)
+4. SNO-88 fix-user-search-count (#180)
+
 Snovault 1.0.28 (released) encoded v84rc1
 -----------------------------------------
 1. SNO-89 Fix backoff error key in indexer (#181)
