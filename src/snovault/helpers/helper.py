@@ -124,7 +124,7 @@ def set_sort_order(request, search_term, types, doc_types, query, result):
                     # Should always sort on raw field rather than analyzed field
                     sort['embedded.' + key] = result_sort[key] = dict(value)
 
-        # Default is most recent first, then alphabetical by label
+        # Default is most recent first, then alphabetical by label and then by uuid
         if not sort:
             sort['embedded.date_created'] = result_sort['date_created'] = {
                 'order': 'desc',
@@ -135,6 +135,11 @@ def set_sort_order(request, search_term, types, doc_types, query, result):
                 'missing': '_last',
                 'unmapped_type': 'keyword',
             }
+            sort['embedded.uuid'] = result_sort['uuid'] = {
+                'order': 'desc',
+                'unmapped_type': 'keyword',
+            }
+
 
     if sort:
         query['sort'] = sort

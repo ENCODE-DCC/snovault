@@ -52,7 +52,7 @@ class ReportView(SearchView):  # pylint: disable=too-few-public-methods
         res = SearchView(self._context, self._request).preprocess_view(
             views=views,
             search_result_actions=search_result_actions,
-            preserve_order=True,
+            preserve_order=False,
         )
         view = {
             'href': res['@id'],
