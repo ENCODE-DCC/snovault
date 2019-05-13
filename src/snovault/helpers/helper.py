@@ -149,6 +149,10 @@ def set_sort_order(request, search_term, types, doc_types, query, result):
                 'missing': '_last',
                 'unmapped_type': 'keyword',
             }
+            sort['embedded.uuid'] = result_sort['uuid'] = {
+                'order': 'desc',
+                'unmapped_type': 'keyword',
+            }
 
     if sort:
         query['sort'] = sort
