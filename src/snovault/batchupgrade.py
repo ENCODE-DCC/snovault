@@ -17,10 +17,13 @@ from snovault import (
 )
 from pyramid.view import view_config
 from pyramid.traversal import find_resource
+from pyramid import paster
+
 from .schema_utils import validate
 
+
 EPILOG = __doc__
-logger = logging.getLogger(__name__)
+BATCH_UPGRADE_LOG = logging.getLogger('snovault.batchupgrade')
 
 
 def includeme(config):
@@ -112,7 +115,7 @@ def batch_upgrade(request):
             item_type = item.type_info.item_type
             update, errors = update_item(storage, item)
         except Exception as e:
-            logger.error('Error %s updating: /%s/%s' % (e, item_type, uuid))
+            BATCH_UPGRADE_LOG.error('Error %s updating: /%s/%s' % (e, item_type, uuid))
             sp.rollback()
             error = True
         else:
@@ -121,7 +124,7 @@ def batch_upgrade(request):
                 errortext = [
                     '%s: %s' % ('/'.join([str(x) or '<root>' for x in error.path]), error.message)
                     for error in errors]
-                logger.error(
+                BATCH_UPGRADE_LOG.error(
                     'Validation failure: /%s/%s\n%s', item_type, uuid, '\n'.join(errortext))
                 sp.rollback()
                 error = True
@@ -132,6 +135,7 @@ def batch_upgrade(request):
 
 
 def run(config_uri, app_name=None, username=None, types=(), batch_size=500, processes=None):
+    BATCH_UPGRADE_LOG.info('*******Start Run*******')
     # multiprocessing.get_context is Python 3 only.
     from multiprocessing import get_context
     from multiprocessing.pool import Pool
@@ -143,7 +147,7 @@ def run(config_uri, app_name=None, username=None, types=(), batch_size=500, proc
     connection = testapp.app.registry[CONNECTION]
     uuids = [str(uuid) for uuid in connection.__iter__(*types)]
     transaction.abort()
-    logger.info('Total items: %d' % len(uuids))
+    BATCH_UPGRADE_LOG.info('Total items: %d' % len(uuids))
 
     pool = Pool(
         processes=processes,
@@ -158,7 +162,7 @@ def run(config_uri, app_name=None, username=None, types=(), batch_size=500, proc
             results = result['results']
             errors = sum(error for item_type, path, update, error in results)
             updated = sum(update for item_type, path, update, error in results)
-            logger.info('Batch: Updated %d of %d (errors %d)' %
+            BATCH_UPGRADE_LOG.info('Batch: Updated %d of %d (errors %d)' %
                         (updated, len(results), errors))
             all_results.extend(results)
     finally:
@@ -174,8 +178,9 @@ def run(config_uri, app_name=None, username=None, types=(), batch_size=500, proc
         results = list(results)
         errors = sum(error for item_type, path, update, error in results)
         updated = sum(update for item_type, path, update, error in results)
-        logger.info('Collection %s: Updated %d of %d (errors %d)' %
+        BATCH_UPGRADE_LOG.info('Collection %s: Updated %d of %d (errors %d)' %
                     (item_type, updated, len(results), errors))
+    BATCH_UPGRADE_LOG.info('*******End Run*******')
 
 
 def main():
@@ -191,7 +196,7 @@ def main():
     parser.add_argument('--processes', type=int)
     parser.add_argument('--username')
     args = parser.parse_args()
-    logging.basicConfig()
+    paster.setup_logging(args.config_uri)
     run(**vars(args))
 
 
