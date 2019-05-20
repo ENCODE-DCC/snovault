@@ -42,7 +42,7 @@ class FakeRequest(object):
 
 
 def test_set_filters():
-    from snovault.helpers.helper import set_filters
+    from snovault.searches import set_filters
 
     request = FakeRequest((
         ('field1', 'value1'),
@@ -91,7 +91,7 @@ def test_set_filters():
 
 
 def test_set_filters_searchTerm():
-    from snovault.helpers.helper import set_filters
+    from snovault.searches import set_filters
 
     request = FakeRequest((
         ('searchTerm', 'value1'),
@@ -138,7 +138,7 @@ def test_set_filters_searchTerm():
     'type', 'limit', 'mode',
     'format', 'frame', 'datastore', 'field', 'sort', 'from', 'referrer'])
 def test_set_filters_reserved_params(param):
-    from snovault.helpers.helper import set_filters
+    from snovault.searches import set_filters
 
     request = FakeRequest((
         (param, 'foo'),
@@ -175,7 +175,7 @@ def test_set_filters_reserved_params(param):
 
 
 def test_set_filters_multivalued():
-    from snovault.helpers.helper import set_filters
+    from snovault.searches import set_filters
 
     request = FakeRequest((
         ('field1', 'value1'),
@@ -230,7 +230,7 @@ def test_set_filters_multivalued():
 
 
 def test_set_filters_negated():
-    from snovault.helpers.helper import set_filters
+    from snovault.searches import set_filters
 
     request = FakeRequest((
         ('field1!', 'value1'),
@@ -279,7 +279,7 @@ def test_set_filters_negated():
 
 
 def test_set_filters_audit():
-    from snovault.helpers.helper import set_filters
+    from snovault.searches import set_filters
 
     request = FakeRequest((
         ('audit.foo', 'value1'),
@@ -329,7 +329,7 @@ def test_set_filters_audit():
 
 
 def test_set_filters_exists_missing():
-    from snovault.helpers.helper import set_filters
+    from snovault.searches import set_filters
 
     request = FakeRequest((
         ('field1', '*'),
@@ -397,7 +397,7 @@ def test_set_filters_exists_missing():
 
 def test_set_facets():
     from collections import OrderedDict
-    from snovault.helpers.helper import set_facets
+    from snovault.searches import set_facets
     facets = [
         ('type', {'title': 'Type'}),
         ('audit.foo', {'title': 'Audit'}),
@@ -483,7 +483,7 @@ def test_set_facets():
 
 def test_set_facets_negated_filter():
     from collections import OrderedDict
-    from snovault.helpers.helper import set_facets
+    from snovault.searches import set_facets
     facets = [
         ('facet1', {'title': 'Facet 1'}),
     ]
@@ -523,7 +523,7 @@ def test_set_facets_negated_filter():
 
 def test_set_facets_type_exists():
     from collections import OrderedDict
-    from snovault.helpers.helper import set_facets
+    from snovault.searches import set_facets
     facets = [
         ('field1', {'title': 'Facet 1', 'type': 'exists'}),
         ('field2', {'title': 'Facet 2', 'type': 'exists'}),
