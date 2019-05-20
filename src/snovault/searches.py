@@ -327,6 +327,7 @@ class Search(Base):
 class Report(Search):
     view_name = 'report'
     _factory_name = None
+
     def __init__(self, context, request):
         super().__init__(context, request)
 
