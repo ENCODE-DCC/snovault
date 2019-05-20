@@ -23,7 +23,7 @@ from snovault.helpers.helper import (
 )
 
 
-class Base(object):
+class Base:
     '''
     Base for all search endpoints
     '''
@@ -126,7 +126,7 @@ class Base(object):
         return result
 
 
-class Search(Base): 
+class Search(Base):
 
     view_name = 'search'
     def __init__(
@@ -137,7 +137,7 @@ class Search(Base):
             return_generator=False,
             default_doc_types=None
         ):
-        super(Search, self).__init__(context, request)
+        super().__init__(context, request)
         self._search_type = search_type
         self._return_generator = return_generator
         self._default_doc_types = default_doc_types or []
@@ -351,7 +351,7 @@ class Report(Search):
     _factory_name = None
     
     def __init__(self, context, request):
-        super(Report, self).__init__(context, request)
+        super().__init__(context, request)
 
     def preprocess_view(self, views=None, search_result_actions=None):
         '''
