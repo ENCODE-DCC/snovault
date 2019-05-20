@@ -24,9 +24,6 @@ from snovault.helpers.helper import (
 
 
 class Base:
-    '''
-    Base for all search endpoints
-    '''
 
     _audit_facets = [
         ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
@@ -60,14 +57,7 @@ class Base:
         self._size = page_size
 
     @staticmethod
-    def _format_facets(
-            es_results,
-            facets,
-            used_filters,
-            schemas,
-            total,
-            principals
-    ):
+    def _format_facets(es_results, facets, used_filters, schemas, total, principals):
         result = []
         if 'aggregations' not in es_results:
             return result
@@ -127,27 +117,15 @@ class Base:
 
 
 class Search(Base):
-
     view_name = 'search'
-    def __init__(
-            self,
-            context,
-            request,
-            search_type=None,
-            return_generator=False,
-            default_doc_types=None
-        ):
+    def __init__(self, context, request, search_type=None, return_generator=False, default_doc_types=None):
         super().__init__(context, request)
         self._search_type = search_type
         self._return_generator = return_generator
         self._default_doc_types = default_doc_types or []
         self._context = context
 
-    def preprocess_view(self, views=None, search_result_actions=None, preserve_order=False): 
-        '''
-        Main function to construct query and build view results json
-        * Only publicly accessible function
-        '''
+    def preprocess_view(self, views=None, search_result_actions=None, preserve_order=False):
         types = self._types
         search_base = normalize_query(self._request)
         result = {
@@ -165,7 +143,7 @@ class Search(Base):
                 hasattr(self._context, 'type_info') and
                 hasattr(self._context.type_info, 'name') and
                 self._context.type_info.name
-            ):
+        ):
             doc_types = [self._context.type_info.name]
         else:
             doc_types = self._request.params.getall('type')
@@ -349,7 +327,6 @@ class Search(Base):
 class Report(Search):
     view_name = 'report'
     _factory_name = None
-    
     def __init__(self, context, request):
         super().__init__(context, request)
 
