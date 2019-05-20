@@ -2,8 +2,10 @@ from pyramid.view import view_config
 
 from snovault import AbstractCollection
 from snovault.resource_views import collection_view_listing_db
-from snovault.viewconfigs.report import ReportView
-from snovault.viewconfigs.searchview import SearchView
+from snovault.searches import (
+    Search,
+    Report
+)
 
 
 def includeme(config):
@@ -31,11 +33,11 @@ def collection_view_listing_es(context, request):
 
 @view_config(route_name='search', request_method='GET', permission='search')
 def search(context, request, search_type=None, views=None, return_generator=False, search_result_actions=None):
-    search = SearchView(context, request, search_type, return_generator, DEFAULT_DOC_TYPES)
+    search = Search(context, request, search_type, return_generator, DEFAULT_DOC_TYPES)
     return search.preprocess_view(views=views, search_result_actions=search_result_actions)
 
 
 @view_config(route_name='report', request_method='GET', permission='search')
 def report(context, request):
-    report = ReportView(context, request)
+    report = Report(context, request)
     return report.preprocess_view(views=[])
