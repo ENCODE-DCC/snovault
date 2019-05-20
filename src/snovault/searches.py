@@ -9,7 +9,6 @@ from urllib.parse import urlencode
 import json
 import re
 from collections import OrderedDict
-from urllib.parse import urlencode
 from antlr4 import IllegalStateException
 from lucenequery import dialects
 from lucenequery.prefixfields import prefixfields
