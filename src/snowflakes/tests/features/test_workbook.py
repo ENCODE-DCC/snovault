@@ -8,4 +8,5 @@ pytestmark = [
 
 scenarios(
     'search.feature',
+    'report.feature',
 )
