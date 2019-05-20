@@ -610,8 +610,7 @@ def test_set_facets_type_exists():
 
 
 def test_format_facets():
-    from snovault.viewconfigs.base_view import BaseView
-
+    from snovault.searches import Base
     es_result = {
         'aggregations': {
             'field1': {
@@ -638,8 +637,14 @@ def test_format_facets():
     schemas = []
     total = 42
     principals = []
-    result = BaseView._format_facets(
-        es_result, facets, used_filters, schemas, total, principals)
+    result = Base._format_facets(
+        es_result,
+        facets,
+        used_filters,
+        schemas,
+        total,
+        principals
+    )
 
     assert result == [{
         'field': 'field1',
@@ -661,8 +666,8 @@ def test_format_facets():
 
 
 def test_format_facets_no_aggregations():
-    from snovault.viewconfigs.base_view import BaseView
-    result = BaseView._format_facets({}, [], [], [], 0, [])
+    from snovault.searches import Base
+    result = Base._format_facets({}, [], [], [], 0, [])
     assert result == []
 
 
@@ -701,7 +706,7 @@ def test_format_facets_no_aggregations():
 
 
 def test_format_facets_adds_pseudo_facet_for_extra_filters():
-    from snovault.viewconfigs.base_view import BaseView
+    from snovault.searches import Base
     es_result = {
         'aggregations': {},
     }
@@ -718,7 +723,7 @@ def test_format_facets_adds_pseudo_facet_for_extra_filters():
     }]
     total = 42
     principals = []
-    result = BaseView._format_facets(
+    result = Base._format_facets(
         es_result, facets, used_filters, schemas, total, principals)
 
     assert result == [{
