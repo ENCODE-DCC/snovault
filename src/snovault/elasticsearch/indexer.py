@@ -110,8 +110,7 @@ def get_related_uuids(request, es, updated, renamed):
     #    beg += BATCH_COUNT
     #    end += BATCH_COUNT
 
-
-    res = es.search(index=RESOURCES_INDEX, size=SEARCH_MAX, request_timeout=60, body={
+    query = {
         'query': {
             'bool': {
                 'should': [
@@ -131,7 +130,8 @@ def get_related_uuids(request, es, updated, renamed):
             },
         },
         '_source': False,
-    })
+    }
+    res = es.search(index=RESOURCES_INDEX, size=SEARCH_MAX, request_timeout=60, body=query)
 
     if res['hits']['total'] > SEARCH_MAX:
         return (list(all_uuids(request.registry)), True)  # guaranteed unique
