@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.30 (unreleased)
+----------------------------------------
+1. SNO-96 fix indexing tests (#196)
+
 Snovault 1.0.29 (released) encoded v85rc1
 ----------------------------------------
 1. SNO-91 update-travis-java-ref (#188)
