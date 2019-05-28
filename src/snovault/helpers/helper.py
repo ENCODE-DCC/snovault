@@ -281,7 +281,8 @@ def set_filters(request, query, result, static_items=None, filter_exclusion=None
 
     # Get query string items plus any static items, then extract all the fields
     qs_items = list(request.params.items())
-    qs_items.extend(implicit_facet_terms or [])
+    if implicit_facet_terms:
+        qs_items.extend(implicit_facet_terms)
     total_items = qs_items + static_items
     qs_fields = [item[0] for item in qs_items]
     fields = [item[0] for item in total_items]
