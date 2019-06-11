@@ -44,6 +44,24 @@ class ParamsParser():
             params=params
         )
 
+    def get_keys_filters(self, keys=[], params=None):
+        '''
+        Returns keys contained in keys list (= and !=).
+        '''
+        return self.get_filters_by_condition(
+            key_condition=lambda k: k in keys,
+            params=params
+        )
+
+    def get_not_keys_filters(self, not_keys=[], params=None):
+        '''
+        Returns keys not contained in not_keys list (= and !=).
+        '''
+        return self.get_filters_by_condition(
+            key_condition=lambda k: k not in not_keys,
+            params=params
+        )
+
     def get_query_string(self, params=None):
         '''
         Can be called at end of filter chain to return urlencoded string.

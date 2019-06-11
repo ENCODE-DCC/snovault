@@ -286,3 +286,38 @@ def test_searches_parsers_params_parser_filtered_is_param(dummy_request):
             params=p.get_must_match_filters()
         )
     )
+
+
+def test_searches_parsers_params_parser_get_keys_filters(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=File&file_format%21=bigWig&file_type%21=bigBed+tss_peak'
+        '&file_format_type=bed3%2B'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_keys_filters(['type', 'file_format_type']) == [
+        ('type', 'File'),
+        ('file_format_type', 'bed3+')
+    ]
+    assert p.get_keys_filters() == []
+
+
+def test_searches_parsers_params_parser_get_not_keys_filters(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&type=File&file_format%21=bigWig'
+        '&file_type%21=bigBed+tss_peak&file_format_type=bed3%2B'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_not_keys_filters(['type', 'file_format_type']) == [
+        ('status', 'released'),
+        ('file_format!', 'bigWig'),
+        ('file_type!', 'bigBed tss_peak')
+    ]
+    assert p.get_not_keys_filters() == [
+        ('status', 'released'),
+        ('type', 'File'),
+        ('file_format!', 'bigWig'),
+        ('file_type!', 'bigBed tss_peak'),
+        ('file_format_type', 'bed3+')
+    ]
