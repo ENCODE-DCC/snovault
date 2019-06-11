@@ -118,6 +118,30 @@ def test_searches_parsers_params_parser_get_type_filters(dummy_request):
     ]
 
 
+def test_searches_parsers_params_parser_get_search_term_filters_empty(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&field=status&type!=Item'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_search_term_filters() == []
+
+
+def test_searches_parsers_params_parser_get_search_term_filters(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&field=status&type!=Item'
+        '&searchTerm=my+favorite+experiment&searchTerm=my+other+experiment'
+        '&searchTerm!=whatever'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_search_term_filters() == [
+        ('searchTerm', 'my favorite experiment'),
+        ('searchTerm', 'my other experiment'),
+        ('searchTerm!', 'whatever')
+    ]
+
+
 def test_searches_parsers_params_parser_is_param(dummy_request):
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (

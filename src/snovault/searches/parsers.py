@@ -1,4 +1,5 @@
 from .interfaces import NOT_FLAG
+from .interfaces import SEARCH_TERM_KEY
 from .interfaces import TYPE_KEY
 
 
@@ -38,12 +39,6 @@ class ParamsParser():
             params=params
         )
 
-    def get_type_filters(self, params=None):
-        return self.get_key_filters(
-            key=TYPE_KEY,
-            params=params
-        )
-
     def get_must_match_filters(self, params=None):
         return self.get_filters_by_condition(
             key_condition=lambda k: not k.endswith(NOT_FLAG),
@@ -53,5 +48,17 @@ class ParamsParser():
     def get_must_not_match_filters(self, params=None):
         return self.get_filters_by_condition(
             key_condition=lambda k: k.endswith(NOT_FLAG),
+            params=params
+        )
+
+    def get_type_filters(self, params=None):
+        return self.get_key_filters(
+            key=TYPE_KEY,
+            params=params
+        )
+
+    def get_search_term_filters(self, params=None):
+        return self.get_key_filters(
+            key=SEARCH_TERM_KEY,
             params=params
         )
