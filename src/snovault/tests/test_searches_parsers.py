@@ -101,3 +101,14 @@ def test_searches_params_parser_get_type_filters(dummy_request):
         ('type', 'Experiment'),
         ('type', 'File')
     ]
+
+
+def test_searches_params_parser_is_param(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&files.file_type=fastq&field=status'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.is_param(key='type', value='File')
+    assert p.is_param(key='files.file_type', value='fastq')
+    assert not p.is_param(key='files.file_type', value='bam')
