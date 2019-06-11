@@ -59,7 +59,5 @@ def test_searches_params_parser_get_filters_by_condition_value_status(dummy_requ
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition(value_condition='status') == [
-        ('type', 'Experiment'),
-        ('type', 'File'),
         ('field', 'status')
     ]
