@@ -93,6 +93,18 @@ def test_searches_parsers_params_parser_get_filters_by_condition_contains_letter
     ]
 
 
+def test_searches_parsers_params_parser_get_key_filters(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&status=archived&type!=Item&status!=released'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_key_filters(key='status') == [
+        ('status', 'archived'),
+        ('status!', 'released')
+    ]
+
+
 def test_searches_parsers_params_parser_get_type_filters(dummy_request):
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (

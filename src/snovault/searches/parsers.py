@@ -29,9 +29,18 @@ class ParamsParser():
             and (value_condition is None or value_condition(v))
         ]
 
-    def get_type_filters(self, params=None):
+    def get_key_filters(self, key=None, params=None):
+        '''
+        Returns params with specified key (= and !=).
+        '''
         return self.get_filters_by_condition(
-            key_condition=lambda k: k == TYPE_KEY or k == TYPE_KEY + NOT_FLAG,
+            key_condition=lambda k: k is None or k == key or k == key + NOT_FLAG,
+            params=params
+        )
+
+    def get_type_filters(self, params=None):
+        return self.get_key_filters(
+            key=TYPE_KEY,
             params=params
         )
 
