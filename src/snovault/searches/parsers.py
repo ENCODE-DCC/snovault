@@ -1,3 +1,4 @@
+from .interfaces import FIELD_KEY
 from .interfaces import NOT_FLAG
 from .interfaces import SEARCH_TERM_KEY
 from .interfaces import TYPE_KEY
@@ -60,5 +61,11 @@ class ParamsParser():
     def get_search_term_filters(self, params=None):
         return self.get_key_filters(
             key=SEARCH_TERM_KEY,
+            params=params
+        )
+
+    def get_field_filters(self, params=None):
+        return self.get_key_filters(
+            key=FIELD_KEY,
             params=params
         )

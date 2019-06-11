@@ -142,6 +142,18 @@ def test_searches_parsers_params_parser_get_search_term_filters(dummy_request):
     ]
 
 
+def test_searches_parsers_params_parser_get_field_filters(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&field=status&type!=Item'
+        '&searchTerm=my+favorite+experiment&searchTerm=my+other+experiment'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_field_filters() == [
+        ('field', 'status')
+    ]
+
+
 def test_searches_parsers_params_parser_is_param(dummy_request):
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
