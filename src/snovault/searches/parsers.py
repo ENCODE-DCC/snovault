@@ -49,7 +49,7 @@ class ParamsParser():
         Returns keys contained in keys list (= and !=).
         '''
         return self.get_filters_by_condition(
-            key_condition=lambda k: k in keys,
+            key_condition=lambda k: k in keys or k.replace(NOT_FLAG, '') in keys,
             params=params
         )
 
@@ -58,7 +58,7 @@ class ParamsParser():
         Returns keys not contained in not_keys list (= and !=).
         '''
         return self.get_filters_by_condition(
-            key_condition=lambda k: k not in not_keys,
+            key_condition=lambda k: k not in not_keys and k.replace(NOT_FLAG, '') not in not_keys,
             params=params
         )
 

@@ -321,3 +321,64 @@ def test_searches_parsers_params_parser_get_not_keys_filters(dummy_request):
         ('file_type!', 'bigBed tss_peak'),
         ('file_format_type', 'bed3+')
     ]
+
+
+def test_searches_parsers_params_parser_keys_filters_not_flag(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&status!=submitted&type=File&file_format%21=bigWig'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_not_keys_filters() == [
+        ('status', 'released'),
+        ('status!', 'submitted'),
+        ('type', 'File'),
+        ('file_format!', 'bigWig')
+    ]
+    assert p.get_not_keys_filters(
+        not_keys=['status']
+    ) == [
+        ('type', 'File'),
+        ('file_format!', 'bigWig')
+    ]
+    assert p.get_not_keys_filters(
+        not_keys=['status', 'file_format']
+    ) == [
+        ('type', 'File')
+    ]
+    assert p.get_not_keys_filters(
+        not_keys=['status', 'file_format', 'type']
+    ) == []
+    assert p.get_keys_filters(
+        keys=['status']
+    ) == [
+        ('status', 'released'),
+        ('status!', 'submitted')
+    ]
+    assert p.get_keys_filters(
+        keys=['status', 'file_format']
+    ) == [
+        ('status', 'released'),
+        ('status!', 'submitted'),
+        ('file_format!', 'bigWig')
+    ]
+    assert p.get_must_not_match_filters(
+        params=p.get_keys_filters(
+            keys=['status', 'file_format'])
+    ) == [
+        ('status!', 'submitted'),
+        ('file_format!', 'bigWig')
+    ]
+    assert p.get_must_match_filters(
+        params=p.get_keys_filters(
+            keys=['status', 'file_format'])
+    ) == [
+        ('status', 'released')
+    ]
+    assert p.get_query_string(
+        params=p.get_must_match_filters(
+            params=p.get_keys_filters(
+                keys=['status', 'file_format']
+            )
+        )
+    ) == 'status=released'
