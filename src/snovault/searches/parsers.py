@@ -9,8 +9,11 @@ class ParamsParser():
         self._request = request
 
     def get_filters_by_condition(self, key_condition=None, value_condition=None):
+        '''
+        Condition must be function that accepts key or value and returns bool.
+        '''
         return [
             (k, v) for k, v in self._request.params.items()
-            if (key_condition is None or k == key_condition)
-            and (value_condition is None or v == value_condition)
+            if (key_condition is None or key_condition(k))
+            and (value_condition is None or value_condition(v))
         ]

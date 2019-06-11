@@ -39,7 +39,9 @@ def test_searches_params_parser_get_filters_by_condition_key_field(dummy_request
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
-    assert p.get_filters_by_condition(key_condition='field') == [
+    assert p.get_filters_by_condition(
+        key_condition=lambda k: k == 'field'
+    ) == [
         ('field', 'status')
     ]
 
@@ -48,7 +50,9 @@ def test_searches_params_parser_get_filters_by_condition_key_type(dummy_request)
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
-    assert p.get_filters_by_condition(key_condition='type') == [
+    assert p.get_filters_by_condition(
+        key_condition=lambda k: k == 'type'
+    ) == [
         ('type', 'Experiment'),
         ('type', 'File')
     ]
@@ -58,7 +62,9 @@ def test_searches_params_parser_get_filters_by_condition_value_status(dummy_requ
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
-    assert p.get_filters_by_condition(value_condition='status') == [
+    assert p.get_filters_by_condition(
+        value_condition=lambda v: v == 'status'
+    ) == [
         ('field', 'status')
     ]
 
@@ -68,8 +74,20 @@ def test_searches_params_parser_get_filters_by_condition_key_type_value_file(dum
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition(
-        key_condition='type',
-        value_condition='File'
+        key_condition=lambda k: k == 'type',
+        value_condition=lambda v: v == 'File'
+    ) == [
+        ('type', 'File')
+    ]
+
+
+def test_searches_params_parser_get_filters_by_condition_contains_letter(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
+    p = ParamsParser(dummy_request)
+    assert p.get_filters_by_condition(
+        key_condition=lambda k: k == 'type',
+        value_condition=lambda v: v == 'File'
     ) == [
         ('type', 'File')
     ]
