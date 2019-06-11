@@ -13,21 +13,24 @@ class ParamsParser():
     def __init__(self, request):
         self._request = request
 
-    def is_param(self, key, value):
+    def _params(self, params=None):
+        if params is None:
+            params = list(self._request.params.items())
+        return params
+
+    def is_param(self, key, value, params=None):
         '''
         Returns True if key and value pair exist in params, otherwise False.
         '''
-        return (key, value) in self._request.params.items()
+        return (key, value) in self._params(params)
 
     def get_filters_by_condition(self, key_condition=None, value_condition=None, params=None):
         '''
         Condition must be function that accepts key or value and returns bool. Optional params
         kwarg allows chaining of filters.
         '''
-        if params is None:
-            params = self._request.params.items()
         return [
-            (k, v) for k, v in params
+            (k, v) for k, v in self._params(params)
             if (key_condition is None or key_condition(k))
             and (value_condition is None or value_condition(v))
         ]
@@ -45,9 +48,7 @@ class ParamsParser():
         '''
         Can be called at end of filter chain to return urlencoded string.
         '''
-        if params is None:
-            params = self.get_filters_by_condition()
-        return urlencode(params, doseq=True)
+        return urlencode(self._params(params), doseq=True)
 
     def get_must_match_filters(self, params=None):
         return self.get_filters_by_condition(
