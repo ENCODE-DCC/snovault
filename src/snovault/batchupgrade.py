@@ -12,6 +12,7 @@ import transaction
 from copy import deepcopy
 from itertools import groupby
 
+from pyramid import paster
 from pyramid.traversal import find_resource
 from pyramid.view import view_config
 
@@ -23,8 +24,8 @@ from snovault import (
 from snovault.schema_utils import validate
 
 
+BATCH_UPGRADE_LOG = logging.getLogger('snovault.batchupgrade')
 EPILOG = __doc__
-logger = logging.getLogger(__name__)
 testapp = None
 
 
@@ -84,7 +85,7 @@ def batch_upgrade(request):
             item_type = item.type_info.item_type
             update, errors = update_item(storage, item)
         except Exception as e:
-            logger.error('Error %s updating: /%s/%s' % (e, item_type, uuid))
+            BATCH_UPGRADE_LOG.error('Error %s updating: /%s/%s' % (e, item_type, uuid))
             sp.rollback()
             error = True
         else:
@@ -92,9 +93,11 @@ def batch_upgrade(request):
                 # redmine 5161 sometimes error.path has an int
                 errortext = [
                     '%s: %s' % ('/'.join([str(x) or '<root>' for x in error.path]), error.message)
-                    for error in errors]
-                logger.error(
-                    'Validation failure: /%s/%s\n%s', item_type, uuid, '\n'.join(errortext))
+                    for error in errors
+                ]
+                BATCH_UPGRADE_LOG.error(
+                    'Validation failure: /%s/%s\n%s', item_type, uuid, '\n'.join(errortext)
+                )
                 sp.rollback()
                 error = True
             else:
@@ -139,8 +142,11 @@ def _run_pool(uuids, args):
             results = result['results']
             errors = sum(error for item_type, path, update, error in results)
             updated = sum(update for item_type, path, update, error in results)
-            logger.info('Batch: Updated %d of %d (errors %d)' %
-                        (updated, len(results), errors))
+            BATCH_UPGRADE_LOG.info(
+                'Batch: Updated %d of %d (errors %d)' % (
+                    updated, len(results), errors
+                )
+            )
             all_results.extend(results)
     finally:
         pool.terminate()
@@ -148,19 +154,42 @@ def _run_pool(uuids, args):
     return all_results
 
 
-def _summarize_results(all_results):
+def _summarize_results(all_results, verbose=False):
  
     def result_item_type(result):
-        # Ensure we always return a string
         return result[0] or ''
 
+    error_logs = []
+    updated_logs = []
+    all_logs = []
     for item_type, results in groupby(
             sorted(all_results, key=result_item_type), key=result_item_type):
         results = list(results)
         errors = sum(error for item_type, path, update, error in results)
         updated = sum(update for item_type, path, update, error in results)
-        logger.info('Collection %s: Updated %d of %d (errors %d)' %
-                    (item_type, updated, len(results), errors))
+        log_message = 'Collection {}: Updated {} of {} (errors {})' .format(
+            item_type,
+            updated,
+            len(results),
+            errors,
+        )
+        if errors:
+            errors_logs.append(log_message)
+        if updated:
+            updated_logs.append(log_message)
+        all_logs.append(log_message)
+    BATCH_UPGRADE_LOG.info('Upgrade Summary')
+    if verbose:
+        for log_msg in all_logs:
+            BATCH_UPGRADE_LOG.info(log_msg)
+    BATCH_UPGRADE_LOG.info('Sum updated: %d' % len(updated_logs))
+    if updated_logs:
+        for log_msg in updated_logs:
+            BATCH_UPGRADE_LOG.info(log_msg)
+    BATCH_UPGRADE_LOG.info('Sum errors: %d' % len(error_logs))
+    if error_logs:
+        for log_msg in error_logs:
+            BATCH_UPGRADE_LOG.error(log_msg)
 
 
 def _internal_app(configfile, app_name=None, username=None):
@@ -179,17 +208,19 @@ def _internal_app(configfile, app_name=None, username=None):
 def main():
     args = _parse_args()
     # Setup Logger
-    logging.basicConfig()
-    logging.getLogger('snovault').setLevel(logging.DEBUG)
+    paster.setup_logging(args.config_uri)
+    logging.getLogger('snovault').setLevel(logging.INFO)
     # Get Uuids
     testapp = _internal_app(args.config_uri, app_name=args.app_name, username=args.username)
     connection = testapp.app.registry[CONNECTION]
     uuids = [str(uuid) for uuid in connection.__iter__(*args.item_types)]
-    logger.info('Total items: %d' % len(uuids))
-    # Run Upgrade Pool
-    all_results = _run_pool(uuids, args)
-    # Summarize Results
-    _summarize_results(all_results)
+    if uuids:
+        BATCH_UPGRADE_LOG.info('Start Upgrade with %d items' % (len(uuids)))
+        all_results = _run_pool(uuids, args)
+        BATCH_UPGRADE_LOG.info('End Upgrade')
+        _summarize_results(all_results, verbose=args.verbose)
+    else:
+        BATCH_UPGRADE_LOG.warning('No uuids to upgrade.')
 
 
 def _parse_args():
@@ -205,6 +236,7 @@ def _parse_args():
     parser.add_argument('--item-types', action='append', default=[])
     parser.add_argument('--processes', type=int, default=2)
     parser.add_argument('--username')
+    parser.add_argument('-v', '--verbose', action='store_true')
     args = parser.parse_args()
     return args
 
