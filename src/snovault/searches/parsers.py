@@ -46,12 +46,12 @@ class ParamsParser():
 
     def get_must_match_filters(self, params=None):
         return self.get_filters_by_condition(
-            key_condition=lambda k: NOT_FLAG not in k,
+            key_condition=lambda k: not k.endswith(NOT_FLAG),
             params=params
         )
 
     def get_must_not_match_filters(self, params=None):
         return self.get_filters_by_condition(
-            key_condition=lambda k: NOT_FLAG in k,
+            key_condition=lambda k: k.endswith(NOT_FLAG),
             params=params
         )
