@@ -264,3 +264,25 @@ def test_searches_parsers_params_parser_filter_and_query_string_space(dummy_requ
     assert p.get_query_string(
         params=p.get_key_filters(key='file_type')
     ) == 'file_type=bed+bed3%2B'
+
+
+def test_searches_parsers_params_parser_filtered_is_param(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=File&status=released&file_type=bed+bed3%2B'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.is_param('status', 'released')
+    assert not p.is_param(
+        'status',
+        'released',
+        params=p.get_type_filters()
+    )
+    assert p.is_param(
+        'file_type',
+        'bed bed3+',
+        params=p.get_key_filters(
+            key='file_type',
+            params=p.get_must_match_filters()
+        )
+    )
