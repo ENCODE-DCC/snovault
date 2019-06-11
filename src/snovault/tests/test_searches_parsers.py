@@ -95,11 +95,14 @@ def test_searches_parsers_params_parser_get_filters_by_condition_contains_letter
 
 def test_searches_parsers_params_parser_get_type_filters(dummy_request):
     from snovault.searches.parsers import ParamsParser
-    dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&field=status&type!=Item'
+    )
     p = ParamsParser(dummy_request)
     assert p.get_type_filters() == [
         ('type', 'Experiment'),
-        ('type', 'File')
+        ('type', 'File'),
+        ('type!', 'Item')
     ]
 
 
@@ -134,5 +137,19 @@ def test_searches_parsers_params_parser_get_must_not_match_filter(dummy_request)
     )
     p = ParamsParser(dummy_request)
     assert p.get_must_not_match_filters() == [
+        ('type!', 'Experiment')
+    ]
+
+
+def test_searches_parsers_params_parser_chain_filters(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type!=Experiment&type=File&files.file_type=fastq&field!=status'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_type_filters(params=p.get_must_not_match_filters()) == [
+        ('type!', 'Experiment')
+    ]
+    assert p.get_must_not_match_filters(params=p.get_type_filters()) == [
         ('type!', 'Experiment')
     ]

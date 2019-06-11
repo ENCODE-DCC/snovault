@@ -31,7 +31,7 @@ class ParamsParser():
 
     def get_type_filters(self, params=None):
         return self.get_filters_by_condition(
-            key_condition=lambda k: k == TYPE_KEY,
+            key_condition=lambda k: k == TYPE_KEY or k == TYPE_KEY + NOT_FLAG,
             params=params
         )
 
