@@ -1,3 +1,4 @@
+from .interfaces import TYPE_KEY
 
 
 class ParamsParser():
@@ -17,3 +18,6 @@ class ParamsParser():
             if (key_condition is None or key_condition(k))
             and (value_condition is None or value_condition(v))
         ]
+
+    def get_type_filters(self):
+        return self.get_filters_by_condition(key_condition=lambda k: k == TYPE_KEY)

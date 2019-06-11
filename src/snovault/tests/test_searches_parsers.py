@@ -86,8 +86,18 @@ def test_searches_params_parser_get_filters_by_condition_contains_letter(dummy_r
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition(
-        key_condition=lambda k: k == 'type',
-        value_condition=lambda v: v == 'File'
+        key_condition=lambda k: 't' in k,
+        value_condition=lambda v: 'F' in v
     ) == [
+        ('type', 'File')
+    ]
+
+
+def test_searches_params_parser_get_type_filters(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
+    p = ParamsParser(dummy_request)
+    assert p.get_type_filters() == [
+        ('type', 'Experiment'),
         ('type', 'File')
     ]

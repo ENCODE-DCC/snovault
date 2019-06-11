@@ -1,0 +1,1 @@
+TYPE_KEY = 'type'
