@@ -382,3 +382,37 @@ def test_searches_parsers_params_parser_keys_filters_not_flag(dummy_request):
             )
         )
     ) == 'status=released'
+
+
+def test_searches_parsers_params_parser_get_size(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&status!=submitted&type=File&file_format%21=bigWig'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_size() == []
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&status!=submitted&type=File'
+        '&file_format%21=bigWig&size=100'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_size() == [
+        ('size', '100')
+    ]
+
+
+def test_searches_parsers_params_parser_get_limit(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&status!=submitted&type=File&file_format%21=bigWig'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_limit() == []
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&status!=submitted&type=File'
+        '&file_format%21=bigWig&limit=all'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_limit() == [
+        ('limit', 'all')
+    ]

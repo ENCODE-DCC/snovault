@@ -1,6 +1,8 @@
 from .interfaces import FIELD_KEY
+from .interfaces import LIMIT_KEY
 from .interfaces import NOT_FLAG
 from .interfaces import SEARCH_TERM_KEY
+from .interfaces import SIZE_KEY
 from .interfaces import TYPE_KEY
 from urllib.parse import urlencode
 
@@ -95,5 +97,17 @@ class ParamsParser():
     def get_field_filters(self, params=None):
         return self.get_key_filters(
             key=FIELD_KEY,
+            params=params
+        )
+
+    def get_size(self, params=None):
+        return self.get_key_filters(
+            key=SIZE_KEY,
+            params=params
+        )
+
+    def get_limit(self, params=None):
+        return self.get_key_filters(
+            key=LIMIT_KEY,
             params=params
         )
