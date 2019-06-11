@@ -1,5 +1,7 @@
 import pytest
 from pyramid.security import effective_principals
+from urllib.parse import quote_plus, parse_qs
+from webob.compat import parse_qsl_text
 
 
 def test_searches_parsers_params_parser_init(dummy_request):
@@ -201,3 +203,64 @@ def test_searches_parsers_params_parser_chain_filters(dummy_request):
     assert p.get_must_not_match_filters(params=p.get_type_filters()) == [
         ('type!', 'Experiment')
     ]
+
+
+def test_searches_parsers_params_parser_get_query_string(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=File&file_format%21=bigWig&file_type%21=bigBed+tss_peak'
+        '&file_format_type=bed3%2B'
+    )
+    p = ParamsParser(dummy_request)
+    assert dummy_request.environ['QUERY_STRING'] == p.get_query_string()
+
+
+def test_searches_parsers_params_parser_filter_and_query_string(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=File&file_format%21=bigWig&file_type%21=bigBed+tss_peak'
+        '&file_format_type=bed3%2B'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_type_filters() == [
+        ('type', 'File')
+    ]
+    assert p.get_query_string(
+        params=p.get_type_filters()
+    ) == 'type=File'
+    assert p.get_must_not_match_filters() == [
+        ('file_format!', 'bigWig'),
+        ('file_type!', 'bigBed tss_peak')
+    ]
+    assert p.get_query_string(
+        params=p.get_must_not_match_filters()
+    ) == 'file_format%21=bigWig&file_type%21=bigBed+tss_peak'
+    assert p.get_must_match_filters() == [
+        ('type', 'File'),
+        ('file_format_type', 'bed3+')
+    ]
+    assert p.get_query_string(
+        params=p.get_must_match_filters()
+    ) == 'type=File&file_format_type=bed3%2B'
+    assert dummy_request.environ['QUERY_STRING'] == p.get_query_string()
+
+
+def test_searches_parsers_params_parser_filter_and_query_string_space(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=File&status=released&file_type=bed+bed3%2B'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_key_filters(
+        key='file_type',
+        params=p.get_must_match_filters()
+    ) == [
+        ('file_type', 'bed bed3+')
+    ]
+    assert p.get_search_term_filters() == []
+    assert p.get_query_string(
+        params=p.get_search_term_filters()
+    ) == ''
+    assert p.get_query_string(
+        params=p.get_key_filters(key='file_type')
+    ) == 'file_type=bed+bed3%2B'

@@ -2,6 +2,7 @@ from .interfaces import FIELD_KEY
 from .interfaces import NOT_FLAG
 from .interfaces import SEARCH_TERM_KEY
 from .interfaces import TYPE_KEY
+from urllib.parse import urlencode
 
 
 class ParamsParser():
@@ -39,6 +40,14 @@ class ParamsParser():
             key_condition=lambda k: k is None or k == key or k == key + NOT_FLAG,
             params=params
         )
+
+    def get_query_string(self, params=None):
+        '''
+        Can be called at end of filter chain to return urlencoded string.
+        '''
+        if params is None:
+            params = self.get_filters_by_condition()
+        return urlencode(params, doseq=True)
 
     def get_must_match_filters(self, params=None):
         return self.get_filters_by_condition(
