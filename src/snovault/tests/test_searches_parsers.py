@@ -112,3 +112,27 @@ def test_searches_parsers_params_parser_is_param(dummy_request):
     assert p.is_param(key='type', value='File')
     assert p.is_param(key='files.file_type', value='fastq')
     assert not p.is_param(key='files.file_type', value='bam')
+
+
+def test_searches_parsers_params_parser_get_must_match_filter(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&files.file_type!=fastq&field=status'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_must_match_filters() == [
+        ('type', 'Experiment'),
+        ('type', 'File'),
+        ('field', 'status')
+    ]
+
+
+def test_searches_parsers_params_parser_get_must_not_match_filter(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type!=Experiment&type=File&files.file_type=fastq&field=status'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_must_not_match_filters() == [
+        ('type!', 'Experiment')
+    ]

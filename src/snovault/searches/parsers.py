@@ -1,3 +1,4 @@
+from .interfaces import NOT_FLAG
 from .interfaces import TYPE_KEY
 
 
@@ -15,15 +16,33 @@ class ParamsParser():
         '''
         return (key, value) in self._request.params.items()
 
-    def get_filters_by_condition(self, key_condition=None, value_condition=None):
+    def get_filters_by_condition(self, key_condition=None, value_condition=None, params=None):
         '''
-        Condition must be function that accepts key or value and returns bool.
+        Condition must be function that accepts key or value and returns bool. Optional params
+        kwarg allows chaining of filters.
         '''
+        if params is None:
+            params = self._request.params.items()
         return [
-            (k, v) for k, v in self._request.params.items()
+            (k, v) for k, v in params
             if (key_condition is None or key_condition(k))
             and (value_condition is None or value_condition(v))
         ]
 
-    def get_type_filters(self):
-        return self.get_filters_by_condition(key_condition=lambda k: k == TYPE_KEY)
+    def get_type_filters(self, params=None):
+        return self.get_filters_by_condition(
+            key_condition=lambda k: k == TYPE_KEY,
+            params=params
+        )
+
+    def get_must_match_filters(self, params=None):
+        return self.get_filters_by_condition(
+            key_condition=lambda k: NOT_FLAG not in k,
+            params=params
+        )
+
+    def get_must_not_match_filters(self, params=None):
+        return self.get_filters_by_condition(
+            key_condition=lambda k: NOT_FLAG in k,
+            params=params
+        )
