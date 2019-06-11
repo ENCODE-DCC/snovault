@@ -2,14 +2,14 @@ import pytest
 from pyramid.security import effective_principals
 
 
-def test_searches_params_parser_init(dummy_request):
+def test_searches_parsers_params_parser_init(dummy_request):
     from snovault.searches.parsers import ParamsParser
     p = ParamsParser(dummy_request)
     assert isinstance(p, ParamsParser)
     assert p._request is dummy_request
 
 
-def test_searches_params_parser_query_string(dummy_request):
+def test_searches_parsers_params_parser_query_string(dummy_request):
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment'
     p = ParamsParser(dummy_request)
@@ -17,14 +17,14 @@ def test_searches_params_parser_query_string(dummy_request):
     assert p._request.params.getall('type') == ['Experiment']
 
 
-def test_searches_params_parser_query_string_not(dummy_request):
+def test_searches_parsers_params_parser_query_string_not(dummy_request):
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type!=Experiment'
     p = ParamsParser(dummy_request)
     assert 'type!' in p._request.params
 
 
-def test_searches_params_parser_get_filters_by_condition_none(dummy_request):
+def test_searches_parsers_params_parser_get_filters_by_condition_none(dummy_request):
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
@@ -35,7 +35,7 @@ def test_searches_params_parser_get_filters_by_condition_none(dummy_request):
     ]
 
 
-def test_searches_params_parser_get_filters_by_condition_key_field(dummy_request):
+def test_searches_parsers_params_parser_get_filters_by_condition_key_field(dummy_request):
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
@@ -46,7 +46,7 @@ def test_searches_params_parser_get_filters_by_condition_key_field(dummy_request
     ]
 
 
-def test_searches_params_parser_get_filters_by_condition_key_type(dummy_request):
+def test_searches_parsers_params_parser_get_filters_by_condition_key_type(dummy_request):
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
@@ -58,7 +58,7 @@ def test_searches_params_parser_get_filters_by_condition_key_type(dummy_request)
     ]
 
 
-def test_searches_params_parser_get_filters_by_condition_value_status(dummy_request):
+def test_searches_parsers_params_parser_get_filters_by_condition_value_status(dummy_request):
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
@@ -69,7 +69,7 @@ def test_searches_params_parser_get_filters_by_condition_value_status(dummy_requ
     ]
 
 
-def test_searches_params_parser_get_filters_by_condition_key_type_value_file(dummy_request):
+def test_searches_parsers_params_parser_get_filters_by_condition_key_type_value_file(dummy_request):
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
@@ -81,7 +81,7 @@ def test_searches_params_parser_get_filters_by_condition_key_type_value_file(dum
     ]
 
 
-def test_searches_params_parser_get_filters_by_condition_contains_letter(dummy_request):
+def test_searches_parsers_params_parser_get_filters_by_condition_contains_letter(dummy_request):
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
@@ -93,7 +93,7 @@ def test_searches_params_parser_get_filters_by_condition_contains_letter(dummy_r
     ]
 
 
-def test_searches_params_parser_get_type_filters(dummy_request):
+def test_searches_parsers_params_parser_get_type_filters(dummy_request):
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
@@ -103,7 +103,7 @@ def test_searches_params_parser_get_type_filters(dummy_request):
     ]
 
 
-def test_searches_params_parser_is_param(dummy_request):
+def test_searches_parsers_params_parser_is_param(dummy_request):
     from snovault.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&files.file_type=fastq&field=status'
