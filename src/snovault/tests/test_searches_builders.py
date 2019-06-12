@@ -1,13 +1,13 @@
 import pytest
 
 
-def test_searches_builders_view_builder_init():
+def test_searches_builders_response_builder_init():
     from snovault.searches.builders import ResponseBuilder
     rb = ResponseBuilder()
     assert isinstance(rb, ResponseBuilder)
 
 
-def test_searchers_builders_view_builder_validate_response_fields():
+def test_searchers_builders_response_builder_validate_response_fields():
     from snovault.searches.builders import ResponseBuilder
     from snovault.searches.fields import AbstractResponseField
     rf = AbstractResponseField()
