@@ -19,7 +19,7 @@ class ViewBuilder():
 
     def render(self):
         '''
-        Expects respone_fields will return dictionaries with unique keys.
+        Expects response_fields will return dictionaries with unique keys.
         '''
         for f in self.response_fields:
             self.response.update(f.render())
