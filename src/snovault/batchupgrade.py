@@ -7,6 +7,7 @@ Example:
 
 """
 import logging
+import time
 import transaction
 
 from copy import deepcopy
@@ -122,6 +123,13 @@ def _pool_worker(batch):
     return res.json
 
 
+def _pool_chunksize(uuid_count, chunksize, processes):
+    chunkiness = int((uuid_count - 1) / processes) + 1
+    if chunkiness > chunksize:
+        return chunksize
+    return chunkiness
+
+
 def _run_pool(uuids, args):
     from multiprocessing import get_context
     from multiprocessing.pool import Pool
@@ -131,22 +139,28 @@ def _run_pool(uuids, args):
         initializer=_pool_initializer,
         initargs=(args.config_uri, args.app_name, args.username),
         context=get_context('forkserver'),
+        maxtasksperchild=args.maxtasksperchild,
     )
+    est_loops = int(len(uuids) / args.batchsize)
     all_results = []
     try:
-        for result in pool.imap_unordered(
+        pool_gen = pool.imap_unordered(
             _pool_worker,
             _pool_batch_results(uuids, args.batchsize),
             chunksize=args.chunksize,
-        ):
+        )
+        for loop, result in enumerate(pool_gen, 1):
             results = result['results']
             errors = sum(error for item_type, path, update, error in results)
             updated = sum(update for item_type, path, update, error in results)
-            BATCH_UPGRADE_LOG.info(
-                'Batch: Updated %d of %d (errors %d)' % (
-                    updated, len(results), errors
-                )
+            log_msg = "{} of ~{} Batch: Updated {} of {} (errors {})".format(
+                loop,
+                est_loops,
+                updated,
+                len(results),
+                errors,
             )
+            BATCH_UPGRADE_LOG.info(log_msg)
             all_results.extend(results)
     finally:
         pool.terminate()
@@ -154,7 +168,7 @@ def _run_pool(uuids, args):
     return all_results
 
 
-def _summarize_results(all_results, verbose=False):
+def _summarize_results(all_results, runtime_str=None, verbose=False):
  
     def result_item_type(result):
         return result[0] or ''
@@ -190,6 +204,8 @@ def _summarize_results(all_results, verbose=False):
     if error_logs:
         for log_msg in error_logs:
             BATCH_UPGRADE_LOG.error(log_msg)
+    if runtime_str:
+        BATCH_UPGRADE_LOG.info("Run Time: %s" % runtime_str)
 
 
 def _internal_app(configfile, app_name=None, username=None):
@@ -215,10 +231,21 @@ def main():
     connection = testapp.app.registry[CONNECTION]
     uuids = [str(uuid) for uuid in connection.__iter__(*args.item_types)]
     if uuids:
-        BATCH_UPGRADE_LOG.info('Start Upgrade with %d items' % (len(uuids)))
+        log_msg = "Start Upgrade with {} items: {}, {}, {}, {}".format(
+            len(uuids),
+            args.batchsize,
+            args.chunksize,
+            args.processes,
+            args.maxtasksperchild,
+        )
+        BATCH_UPGRADE_LOG.info(log_msg)
+        pool_start = time.time()
         all_results = _run_pool(uuids, args)
+        runtime_mins_str = "{:0.2f} minutes".format(
+            (time.time() - pool_start) / 60
+        )
         BATCH_UPGRADE_LOG.info('End Upgrade')
-        _summarize_results(all_results, verbose=args.verbose)
+        _summarize_results(all_results, runtime_str=runtime_mins_str, verbose=args.verbose)
     else:
         BATCH_UPGRADE_LOG.warning('No uuids to upgrade.')
 
@@ -234,6 +261,7 @@ def _parse_args():
     parser.add_argument('--batchsize', type=int, default=50)
     parser.add_argument('--chunksize', type=int, default=1)
     parser.add_argument('--item-types', action='append', default=[])
+    parser.add_argument('--maxtasksperchild', type=int, default=1)
     parser.add_argument('--processes', type=int, default=2)
     parser.add_argument('--username')
     parser.add_argument('-v', '--verbose', action='store_true')
