@@ -427,3 +427,14 @@ def test_searches_parsers_params_parser_get_sort(dummy_request):
     assert p.get_sort() == [
         ('sort', 'date_created')
     ]
+
+
+def test_searches_parsers_params_parser_get_frame(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'frame=embedded&status!=submitted&type=File&sort=date_created'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_frame() == [
+        ('frame', 'embedded')
+    ]
