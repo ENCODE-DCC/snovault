@@ -50,15 +50,6 @@ class QueryBuilder():
     def add_aggs(self):
         pass
 
-    def build_query(self):
+    def render(self):
         pass
 
-
-class QueryResultBuilder():
-
-    def __init__(self, query, query_submitter):
-        self.query = query
-        self.query_submitter = query_submitter
-
-    def get_results():
-        pass
