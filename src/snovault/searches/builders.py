@@ -1,7 +1,7 @@
 from .fields import AbstractResponseField
 
 
-class ViewBuilder():
+class ResponseBuilder():
 
     def __init__(self, response_fields=[]):
         self.response = {}
@@ -52,4 +52,3 @@ class QueryBuilder():
 
     def render(self):
         pass
-
