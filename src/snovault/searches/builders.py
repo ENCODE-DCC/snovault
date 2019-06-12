@@ -24,31 +24,3 @@ class ResponseBuilder():
         for f in self.response_fields:
             self.response.update(f.render())
         return self.response
-
-
-class QueryBuilder():
-
-    def __init__(self, query=None, defaults=None):
-        self.query = query
-        self.defaults = defaults
-
-    def add_query_string(self):
-        pass
-
-    def add_filter(self):
-        pass
-
-    def add_post_filter(self):
-        pass
-
-    def add_sort_by(self):
-        pass
-
-    def add_indices(self):
-        pass
-
-    def add_aggs(self):
-        pass
-
-    def render(self):
-        pass
