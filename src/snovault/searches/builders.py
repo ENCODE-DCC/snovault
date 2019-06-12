@@ -62,18 +62,3 @@ class QueryResultBuilder():
 
     def get_results():
         pass
-
-
-class ResponseBuilder():
-
-    def __init__(self):
-        self._response = {}
-
-    def get_response_template(self):
-        pass
-
-    def add_frontend_fields(self):
-        pass
-
-    def add_search_results(self):
-        pass
