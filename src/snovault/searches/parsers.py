@@ -3,6 +3,7 @@ from .interfaces import LIMIT_KEY
 from .interfaces import NOT_FLAG
 from .interfaces import SEARCH_TERM_KEY
 from .interfaces import SIZE_KEY
+from .interfaces import SORT_KEY
 from .interfaces import TYPE_KEY
 from urllib.parse import urlencode
 
@@ -109,5 +110,11 @@ class ParamsParser():
     def get_limit(self, params=None):
         return self.get_key_filters(
             key=LIMIT_KEY,
+            params=params
+        )
+
+    def get_sort(self, params=None):
+        return self.get_key_filters(
+            key=SORT_KEY,
             params=params
         )

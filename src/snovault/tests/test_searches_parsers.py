@@ -416,3 +416,14 @@ def test_searches_parsers_params_parser_get_limit(dummy_request):
     assert p.get_limit() == [
         ('limit', 'all')
     ]
+
+
+def test_searches_parsers_params_parser_get_sort(dummy_request):
+    from snovault.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&status!=submitted&type=File&sort=date_created'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_sort() == [
+        ('sort', 'date_created')
+    ]
