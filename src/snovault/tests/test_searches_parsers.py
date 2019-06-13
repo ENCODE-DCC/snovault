@@ -5,14 +5,14 @@ from webob.compat import parse_qsl_text
 
 
 def test_searches_parsers_params_parser_init(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     p = ParamsParser(dummy_request)
     assert isinstance(p, ParamsParser)
     assert p._request is dummy_request
 
 
 def test_searches_parsers_params_parser_query_string(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment'
     p = ParamsParser(dummy_request)
     assert 'type' in p._request.params
@@ -20,14 +20,14 @@ def test_searches_parsers_params_parser_query_string(dummy_request):
 
 
 def test_searches_parsers_params_parser_query_string_not(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type!=Experiment'
     p = ParamsParser(dummy_request)
     assert 'type!' in p._request.params
 
 
 def test_searches_parsers_params_parser_get_filters_by_condition_none(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition() == [
@@ -38,7 +38,7 @@ def test_searches_parsers_params_parser_get_filters_by_condition_none(dummy_requ
 
 
 def test_searches_parsers_params_parser_get_filters_by_condition_key_field(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition(
@@ -49,7 +49,7 @@ def test_searches_parsers_params_parser_get_filters_by_condition_key_field(dummy
 
 
 def test_searches_parsers_params_parser_get_filters_by_condition_key_type(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition(
@@ -61,7 +61,7 @@ def test_searches_parsers_params_parser_get_filters_by_condition_key_type(dummy_
 
 
 def test_searches_parsers_params_parser_get_filters_by_condition_value_status(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition(
@@ -72,7 +72,7 @@ def test_searches_parsers_params_parser_get_filters_by_condition_value_status(du
 
 
 def test_searches_parsers_params_parser_get_filters_by_condition_key_type_value_file(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition(
@@ -84,7 +84,7 @@ def test_searches_parsers_params_parser_get_filters_by_condition_key_type_value_
 
 
 def test_searches_parsers_params_parser_get_filters_by_condition_contains_letter(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition(
@@ -96,7 +96,7 @@ def test_searches_parsers_params_parser_get_filters_by_condition_contains_letter
 
 
 def test_searches_parsers_params_parser_get_key_filters(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&status=archived&type!=Item&status!=released'
     )
@@ -108,7 +108,7 @@ def test_searches_parsers_params_parser_get_key_filters(dummy_request):
 
 
 def test_searches_parsers_params_parser_get_type_filters(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&field=status&type!=Item'
     )
@@ -121,7 +121,7 @@ def test_searches_parsers_params_parser_get_type_filters(dummy_request):
 
 
 def test_searches_parsers_params_parser_get_search_term_filters_empty(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&field=status&type!=Item'
     )
@@ -130,7 +130,7 @@ def test_searches_parsers_params_parser_get_search_term_filters_empty(dummy_requ
 
 
 def test_searches_parsers_params_parser_get_search_term_filters(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&field=status&type!=Item'
         '&searchTerm=my+favorite+experiment&searchTerm=my+other+experiment'
@@ -145,7 +145,7 @@ def test_searches_parsers_params_parser_get_search_term_filters(dummy_request):
 
 
 def test_searches_parsers_params_parser_get_field_filters(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&field=status&type!=Item'
         '&searchTerm=my+favorite+experiment&searchTerm=my+other+experiment'
@@ -157,7 +157,7 @@ def test_searches_parsers_params_parser_get_field_filters(dummy_request):
 
 
 def test_searches_parsers_params_parser_is_param(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&files.file_type=fastq&field=status'
     )
@@ -168,7 +168,7 @@ def test_searches_parsers_params_parser_is_param(dummy_request):
 
 
 def test_searches_parsers_params_parser_get_must_match_filter(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&files.file_type!=fastq&field=status'
     )
@@ -181,7 +181,7 @@ def test_searches_parsers_params_parser_get_must_match_filter(dummy_request):
 
 
 def test_searches_parsers_params_parser_get_must_not_match_filter(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type!=Experiment&type=File&files.file_type=fastq&field=status'
     )
@@ -192,7 +192,7 @@ def test_searches_parsers_params_parser_get_must_not_match_filter(dummy_request)
 
 
 def test_searches_parsers_params_parser_chain_filters(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type!=Experiment&type=File&files.file_type=fastq&field!=status'
     )
@@ -206,7 +206,7 @@ def test_searches_parsers_params_parser_chain_filters(dummy_request):
 
 
 def test_searches_parsers_params_parser_get_query_string(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=File&file_format%21=bigWig&file_type%21=bigBed+tss_peak'
         '&file_format_type=bed3%2B'
@@ -216,7 +216,7 @@ def test_searches_parsers_params_parser_get_query_string(dummy_request):
 
 
 def test_searches_parsers_params_parser_filter_and_query_string(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=File&file_format%21=bigWig&file_type%21=bigBed+tss_peak'
         '&file_format_type=bed3%2B'
@@ -246,7 +246,7 @@ def test_searches_parsers_params_parser_filter_and_query_string(dummy_request):
 
 
 def test_searches_parsers_params_parser_filter_and_query_string_space(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=File&status=released&file_type=bed+bed3%2B'
     )
@@ -267,7 +267,7 @@ def test_searches_parsers_params_parser_filter_and_query_string_space(dummy_requ
 
 
 def test_searches_parsers_params_parser_filtered_is_param(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=File&status=released&file_type=bed+bed3%2B'
     )
@@ -289,7 +289,7 @@ def test_searches_parsers_params_parser_filtered_is_param(dummy_request):
 
 
 def test_searches_parsers_params_parser_get_keys_filters(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=File&file_format%21=bigWig&file_type%21=bigBed+tss_peak'
         '&file_format_type=bed3%2B'
@@ -303,7 +303,7 @@ def test_searches_parsers_params_parser_get_keys_filters(dummy_request):
 
 
 def test_searches_parsers_params_parser_get_not_keys_filters(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'status=released&type=File&file_format%21=bigWig'
         '&file_type%21=bigBed+tss_peak&file_format_type=bed3%2B'
@@ -324,7 +324,7 @@ def test_searches_parsers_params_parser_get_not_keys_filters(dummy_request):
 
 
 def test_searches_parsers_params_parser_keys_filters_not_flag(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'status=released&status!=submitted&type=File&file_format%21=bigWig'
     )
@@ -385,7 +385,7 @@ def test_searches_parsers_params_parser_keys_filters_not_flag(dummy_request):
 
 
 def test_searches_parsers_params_parser_get_size(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'status=released&status!=submitted&type=File&file_format%21=bigWig'
     )
@@ -402,7 +402,7 @@ def test_searches_parsers_params_parser_get_size(dummy_request):
 
 
 def test_searches_parsers_params_parser_get_limit(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'status=released&status!=submitted&type=File&file_format%21=bigWig'
     )
@@ -419,7 +419,7 @@ def test_searches_parsers_params_parser_get_limit(dummy_request):
 
 
 def test_searches_parsers_params_parser_get_sort(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'status=released&status!=submitted&type=File&sort=date_created'
     )
@@ -430,7 +430,7 @@ def test_searches_parsers_params_parser_get_sort(dummy_request):
 
 
 def test_searches_parsers_params_parser_get_frame(dummy_request):
-    from snovault.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'frame=embedded&status!=submitted&type=File&sort=date_created'
     )
