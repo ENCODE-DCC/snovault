@@ -12,7 +12,11 @@ class Query():
     def new_query(self):
         return SearchDSL()
 
-    def query_string(self):
+    def using(self, client):
+        self.query = self.query.using(client)
+        return self
+
+    def get_query_string(self):
         pass
 
     def filter(self):
@@ -39,8 +43,7 @@ class Query():
     @classmethod
     def from_dict(cls, query_dict):
         return cls(
-            query=cls.new_query().from_dict(
+            query=cls().new_query().from_dict(
                 query_dict
             )
         )
-        
