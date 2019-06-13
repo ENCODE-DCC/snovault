@@ -37,6 +37,13 @@ def includeme(config):
     config.scan(__name__)
 
 
+class InternalRedirect(Response):
+    @staticmethod
+    def _make_location_absolute(environ, value):
+        # Avoid changing Location header so Apache internally redirects.
+        return value
+
+
 def parse_data_uri(uri):
     if not uri.startswith('data:'):
         raise ValueError(uri)
@@ -240,9 +247,10 @@ def download(context, request):
 
     # If blob is external, serve via proxy using X-Accel-Redirect
     blob_storage = request.registry[BLOBS]
-    if hasattr(blob_storage, 'get_blob_url'):
+    accel_redirect_header = request.registry.settings.get('accel_redirect_header')
+    if hasattr(blob_storage, 'get_blob_url') and accel_redirect_header:
         blob_url = blob_storage.get_blob_url(download_meta)
-        return Response(headers={'X-Accel-Redirect': '/_proxy/' + str(blob_url)})
+        return InternalRedirect(headers={accel_redirect_header: '/_proxy/' + str(blob_url)})
 
     # Otherwise serve the blob data ourselves
     blob = request.registry[BLOBS].get_blob(download_meta)
