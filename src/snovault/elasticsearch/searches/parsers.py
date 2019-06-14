@@ -72,6 +72,38 @@ class ParamsParser():
         '''
         return urlencode(self._params(params), doseq=True)
 
+    def params_to_list(self, key=False, params=None):
+        '''
+        Can be called at end of filter chain to return list of keys
+        or values. Returns values by default.
+        '''
+        idx = 0 if key else 1
+        return [
+            x[idx]
+            for x in self._params(params)
+        ]
+
+    def param_keys_to_list(self, params=None):
+        '''
+        Can be called at end of filter chain to return list of keys.
+        '''
+        return self.params_to_list(key=True, params=params)
+
+    def param_values_to_list(self, params=None):
+        '''
+        Can be called at end of filter chain to return list of values.
+        '''
+        return self.params_to_list(key=False, params=params)
+
+    def remove_not_flag(self, list_of_values, not_flag=NOT_FLAG):
+        '''
+        Can be used to remove not flag from list of param keys.
+        '''
+        return [
+            x.replace(not_flag, '')
+            for x in list_of_values
+        ]
+
     def get_must_match_filters(self, params=None):
         return self.get_filters_by_condition(
             key_condition=lambda k: not k.endswith(NOT_FLAG),

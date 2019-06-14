@@ -438,3 +438,65 @@ def test_searches_parsers_params_parser_get_frame(dummy_request):
     assert p.get_frame() == [
         ('frame', 'embedded')
     ]
+
+
+def test_searches_parsers_params_parser_param_keys_to_list(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'frame=embedded&status!=submitted&type=File&sort=date_created'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.param_keys_to_list() == [
+        'frame',
+        'status!',
+        'type',
+        'sort',
+    ]
+
+
+def test_searches_parsers_params_parser_param_values_to_list(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'frame=embedded&status!=submitted&type=File&sort=date_created'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.param_values_to_list() == [
+        'embedded',
+        'submitted',
+        'File',
+        'date_created',
+    ]
+
+
+def test_searches_parsers_params_parser_param_keys_to_list_remove_not_flag(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'frame=embedded&status!=submitted&type=File&sort=date_created'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.remove_not_flag(p.param_keys_to_list()) == [
+        'frame',
+        'status',
+        'type',
+        'sort',
+    ]
+
+
+def test_searches_parsers_params_parser_params_to_list(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'frame=embedded&status!=submitted&type=File&sort=date_created'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.params_to_list(key=False) == [
+        'embedded',
+        'submitted',
+        'File',
+        'date_created',
+    ]
+    assert p.params_to_list(key=True) == [
+        'frame',
+        'status!',
+        'type',
+        'sort',
+    ]
