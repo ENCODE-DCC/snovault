@@ -15,5 +15,4 @@ NOT_FILTERS = [
     'filterresponse',
     'remove',
     'cart',
-    'size',
 ]
