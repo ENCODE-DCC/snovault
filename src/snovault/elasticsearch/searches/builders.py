@@ -78,6 +78,15 @@ class QueryBuilder():
     def _new_search(self):
         self.search = self._get_search()
 
+    def _add_query(self):
+        pass
+
+    def _add_filters(self):
+        pass
+
+    def _add_aggs(self):
+        pass
+
     def build_query(self):
         '''
         Public method to be implemented by children.
@@ -92,9 +101,6 @@ class BasicSearchQuery(QueryBuilder):
     
     def build_query(self):
         self._new_search()
-        
-        s = Search(using=es, index='snovault-resources')
-        s = s.query('query_string', query='chip-seq rna', fields=['_all'], default_operator='AND')
-        s.aggs.bucket('types', 'terms', field='embedded.@type')
-        s = s.post_filter('terms', principals_allowed__view=['system.Everyone'])
-        s = s.post_filter('terms', **{'embedded.@type': ['Experiment']})
+        self._add_query()
+        self._add_filters()
+        self._add_aggs()
