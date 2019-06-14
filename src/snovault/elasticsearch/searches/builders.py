@@ -9,7 +9,6 @@ class ResponseBuilder():
     def __init__(self, response_fields=[]):
         self.response = {}
         self.response_fields = response_fields
-        self.validate_response_fields()
 
     def render(self):
         '''
@@ -31,7 +30,7 @@ class QueryBuilder():
         self.args = args
         self.kwargs = kwargs
 
-    def _get_search(self):
+    def _get_or_create_search(self):
         if self.search is None:
             self.search = Search(
                 using=self._get_client,
@@ -40,7 +39,7 @@ class QueryBuilder():
         return self.search
 
     def _get_client(self):
-        return self.params_parser._request.registry[ELASTIC_SEARCH]
+        return self.kwargs.get('client') or self.params_parser._request.registry[ELASTIC_SEARCH]
 
     def _get_index(self):
         return RESOURCES_INDEX
@@ -55,28 +54,25 @@ class QueryBuilder():
         return self.params_parser.get_not_keys_filters(not_keys=NOT_FILTERS)
 
     def _get_post_filters(self):
-        return None
+        return self.kwargs.get('post_filters')
 
     def _get_sort(self):
         return self.params_parser.get_sort()
 
-    def _get_size(self):
+    def _get_limit(self):
         return self.params_parser.get_limit()
 
     def _get_search_fields(self):
-        return None
+        return self.kwargs.get('search_fields')
 
     def _get_return_fields(self):
         return self.params_parser.get_field_filters()
 
     def _get_facets(self):
-        return None
+        return self.kwargs.get('facets')
 
     def _get_facet_size(self):
-        return None
-
-    def _new_search(self):
-        self.search = self._get_search()
+        return self.kwargs.get('facet_size')
 
     def _add_query(self):
         pass
@@ -96,11 +92,11 @@ class QueryBuilder():
 
 class BasicSearchQuery(QueryBuilder):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(args, kwargs)
-    
+    def __init__(self, params_parser, *args, **kwargs):
+        super().__init__(params_parser, *args, **kwargs)
+
     def build_query(self):
-        self._new_search()
+        self._get_or_create_search()
         self._add_query()
         self._add_filters()
         self._add_aggs()
