@@ -1,4 +1,7 @@
+from .defaults import NOT_FILTERS
 from elasticsearch_dsl import Search
+from snovault.elasticsearch import ELASTIC_SEARCH
+from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 
 
 class ResponseBuilder():
@@ -21,11 +24,59 @@ class QueryBuilder():
     '''
     Interface for building specific queries.
     '''
+    search = None
 
     def __init__(self, params_parser, *args, **kwargs):
         self.params_parser = params_parser
         self.args = args
         self.kwargs = kwargs
+
+    def _get_search(self):
+        if self.search is None:
+            self.search = Search(
+                using=self._get_client,
+                index=self._get_index,
+            )
+        return self.search
+
+    def _get_client(self):
+        return self.params_parser._request.registry[ELASTIC_SEARCH]
+
+    def _get_index(self):
+        return RESOURCES_INDEX
+
+    def _get_doc_types(self):
+        return self.params_parser.get_type_filters()
+
+    def _get_query(self):
+        return self.params_parser.get_search_term_filters()
+
+    def _get_filters(self):
+        return self.params_parser.get_not_keys_filters(not_keys=NOT_FILTERS)
+
+    def _get_post_filters(self):
+        return None
+
+    def _get_sort(self):
+        return self.params_parser.get_sort()
+
+    def _get_size(self):
+        return self.params_parser.get_limit()
+
+    def _get_search_fields(self):
+        return None
+
+    def _get_return_fields(self):
+        return self.params_parser.get_field_filters()
+
+    def _get_facets(self):
+        return None
+
+    def _get_facet_size(self):
+        return None
+
+    def _new_search(self):
+        self.search = self._get_search()
 
     def build_query(self):
         '''
@@ -38,9 +89,10 @@ class BasicSearchQuery(QueryBuilder):
 
     def __init__(self, *args, **kwargs):
         super.__init__(args, kwargs)
-
-
+    
     def build_query(self):
+        self._new_search()
+        
         s = Search(using=es, index='snovault-resources')
         s = s.query('query_string', query='chip-seq rna', fields=['_all'], default_operator='AND')
         s.aggs.bucket('types', 'terms', field='embedded.@type')
