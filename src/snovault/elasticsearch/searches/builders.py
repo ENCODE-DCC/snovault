@@ -97,7 +97,7 @@ class QueryBuilder():
 class BasicSearchQuery(QueryBuilder):
 
     def __init__(self, *args, **kwargs):
-        super.__init__(args, kwargs)
+        super().__init__(args, kwargs)
     
     def build_query(self):
         self._new_search()
