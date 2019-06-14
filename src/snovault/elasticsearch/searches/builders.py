@@ -104,3 +104,4 @@ class BasicSearchQuery(QueryBuilder):
         self._add_query()
         self._add_filters()
         self._add_aggs()
+        return self.search
