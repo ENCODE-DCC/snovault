@@ -1,4 +1,4 @@
-from .builders import BasicSearchQuery
+from .queries import BasicSearchQuery
 
 
 class AbstractResponseField:
