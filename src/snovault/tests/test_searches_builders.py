@@ -25,61 +25,61 @@ def test_searches_builders_response_builder_init():
 
 
 def test_searches_builders_query_builder_init():
-    from snovault.elasticsearch.searches.builders import QueryBuilder
-    qb = QueryBuilder({})
-    assert isinstance(qb, QueryBuilder)
+    from snovault.elasticsearch.searches.builders import AbstractQuery
+    aq = AbstractQuery({})
+    assert isinstance(aq, AbstractQuery)
 
 
 def test_searches_builders_query_builder_get_or_create_search(params_parser):
-    from snovault.elasticsearch.searches.builders import QueryBuilder
+    from snovault.elasticsearch.searches.builders import AbstractQuery
     from elasticsearch_dsl import Search
-    qb = QueryBuilder(params_parser)
-    assert qb.search is None
-    s = qb._get_or_create_search()
-    assert s is qb.search
-    assert isinstance(qb.search, Search)
+    aq = AbstractQuery(params_parser)
+    assert aq.search is None
+    s = aq._get_or_create_search()
+    assert s is aq.search
+    assert isinstance(aq.search, Search)
 
 
 def test_searches_builders_query_builder_get_client(params_parser):
-    from snovault.elasticsearch.searches.builders import QueryBuilder
+    from snovault.elasticsearch.searches.builders import AbstractQuery
     from elasticsearch import Elasticsearch
-    qb = QueryBuilder(params_parser, client={'a': 'client'})
-    c = qb._get_client()
+    aq = AbstractQuery(params_parser, client={'a': 'client'})
+    c = aq._get_client()
     assert c == {'a': 'client'}
-    qb = QueryBuilder(params_parser)
-    c = qb._get_client()
+    aq = AbstractQuery(params_parser)
+    c = aq._get_client()
     assert isinstance(c, Elasticsearch)
 
 
 def test_searches_builders_query_builder_get_index(params_parser):
-    from snovault.elasticsearch.searches.builders import QueryBuilder
+    from snovault.elasticsearch.searches.builders import AbstractQuery
     from snovault.elasticsearch.interfaces import RESOURCES_INDEX
-    qb = QueryBuilder(params_parser)
-    assert qb._get_index() == RESOURCES_INDEX
+    aq = AbstractQuery(params_parser)
+    assert aq._get_index() == RESOURCES_INDEX
 
 
 def test_searches_builders_query_builder_get_doc_types(params_parser):
-    from snovault.elasticsearch.searches.builders import QueryBuilder
-    qb = QueryBuilder(params_parser)
-    doc_types = qb._get_doc_types()
+    from snovault.elasticsearch.searches.builders import AbstractQuery
+    aq = AbstractQuery(params_parser)
+    doc_types = aq._get_doc_types()
     assert doc_types == [
         ('type', 'Experiment')
     ]
 
 
 def test_searches_builders_query_builder_get_query(params_parser):
-    from snovault.elasticsearch.searches.builders import QueryBuilder
-    qb = QueryBuilder(params_parser)
-    search_terms = qb.params_parser.param_values_to_list(qb._get_query())
+    from snovault.elasticsearch.searches.builders import AbstractQuery
+    aq = AbstractQuery(params_parser)
+    search_terms = aq.params_parser.param_values_to_list(aq._get_query())
     assert search_terms == [
         'chip-seq'
     ]
 
 
 def test_searches_builders_query_builder_get_filters(params_parser):
-    from snovault.elasticsearch.searches.builders import QueryBuilder
-    qb = QueryBuilder(params_parser)
-    filters = qb._get_filters()
+    from snovault.elasticsearch.searches.builders import AbstractQuery
+    aq = AbstractQuery(params_parser)
+    filters = aq._get_filters()
     assert filters == [
         ('assay_title', 'Histone ChIP-seq'),
         ('award.project', 'Roadmap'),
@@ -93,15 +93,15 @@ def test_searches_builders_query_builder_get_filters(params_parser):
 
 
 def test_searches_builders_query_builder_get_post_filters(params_parser):
-    from snovault.elasticsearch.searches.builders import QueryBuilder
-    qb = QueryBuilder(params_parser)
-    assert qb._get_post_filters() is None
+    from snovault.elasticsearch.searches.builders import AbstractQuery
+    aq = AbstractQuery(params_parser)
+    assert aq._get_post_filters() is None
 
 
 def test_searches_builders_query_builder_get_sort(params_parser):
-    from snovault.elasticsearch.searches.builders import QueryBuilder
-    qb = QueryBuilder(params_parser)
-    sort_by = qb._get_sort()
+    from snovault.elasticsearch.searches.builders import AbstractQuery
+    aq = AbstractQuery(params_parser)
+    sort_by = aq._get_sort()
     assert sort_by == [
         ('sort', 'date_created'),
         ('sort', '-files.file_size')
@@ -109,24 +109,24 @@ def test_searches_builders_query_builder_get_sort(params_parser):
 
 
 def test_searches_builders_query_builder_get_limit(params_parser):
-    from snovault.elasticsearch.searches.builders import QueryBuilder
-    qb = QueryBuilder(params_parser)
-    limit = qb.params_parser.param_values_to_list(qb._get_limit())
+    from snovault.elasticsearch.searches.builders import AbstractQuery
+    aq = AbstractQuery(params_parser)
+    limit = aq.params_parser.param_values_to_list(aq._get_limit())
     assert limit == [
         '10'
     ]
 
 
 def test_searches_builders_query_builder_get_search_fields(params_parser):
-    from snovault.elasticsearch.searches.builders import QueryBuilder
-    qb = QueryBuilder(params_parser)
-    assert qb._get_search_fields() is None
+    from snovault.elasticsearch.searches.builders import AbstractQuery
+    aq = AbstractQuery(params_parser)
+    assert aq._get_search_fields() is None
 
 
 def test_searches_builders_query_builder_get_return_fields(params_parser):
-    from snovault.elasticsearch.searches.builders import QueryBuilder
-    qb = QueryBuilder(params_parser)
-    return_fields = qb.params_parser.param_values_to_list(qb._get_return_fields())
+    from snovault.elasticsearch.searches.builders import AbstractQuery
+    aq = AbstractQuery(params_parser)
+    return_fields = aq.params_parser.param_values_to_list(aq._get_return_fields())
     assert return_fields == [
         '@id',
         'accession'
@@ -134,15 +134,15 @@ def test_searches_builders_query_builder_get_return_fields(params_parser):
 
 
 def test_searches_builders_query_builder_get_facets(params_parser):
-    from snovault.elasticsearch.searches.builders import QueryBuilder
-    qb = QueryBuilder(params_parser)
-    assert qb._get_facets() is None
+    from snovault.elasticsearch.searches.builders import AbstractQuery
+    aq = AbstractQuery(params_parser)
+    assert aq._get_facets() is None
 
 
 def test_searches_builders_query_builder_get_facet_size(params_parser):
-    from snovault.elasticsearch.searches.builders import QueryBuilder
-    qb = QueryBuilder(params_parser)
-    assert qb._get_facet_size() is None
+    from snovault.elasticsearch.searches.builders import AbstractQuery
+    aq = AbstractQuery(params_parser)
+    assert aq._get_facet_size() is None
 
 
 def test_searches_builders_query_builder_add_query(params_parser):
@@ -158,10 +158,10 @@ def test_searches_builders_query_builder_add_aggs(params_parser):
 
 
 def test_searches_builders_query_builder_build_query():
-    from snovault.elasticsearch.searches.builders import QueryBuilder
-    qb = QueryBuilder({})
+    from snovault.elasticsearch.searches.builders import AbstractQuery
+    aq = AbstractQuery({})
     with pytest.raises(NotImplementedError):
-        qb.build_query()
+        aq.build_query()
 
 
 def test_searches_builders_basic_search_query_builder_init(params_parser):

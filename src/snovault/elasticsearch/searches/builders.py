@@ -19,7 +19,7 @@ class ResponseBuilder():
         return self.response
 
 
-class QueryBuilder():
+class AbstractQuery():
     '''
     Interface for building specific queries.
     '''
@@ -90,7 +90,7 @@ class QueryBuilder():
         raise NotImplementedError
 
 
-class BasicSearchQuery(QueryBuilder):
+class BasicSearchQuery(AbstractQuery):
 
     def __init__(self, params_parser, *args, **kwargs):
         super().__init__(params_parser, *args, **kwargs)
