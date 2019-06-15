@@ -6,7 +6,7 @@ class AbstractResponseField:
     Interface for defining a field in a response.
     '''
     response = {}
-    
+
     def __init__(self, field_name=None):
         self.field_name = field_name
 
