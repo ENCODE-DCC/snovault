@@ -1,8 +1,10 @@
-from .fields import AbstractResponseField
+from .fields import ResponseField
 
 
-class ResponseBuilder():
-
+class FieldedResponse():
+    '''
+    Returns rendered ResponseFields.
+    '''
     def __init__(self, response_fields=[]):
         self.response = {}
         self.response_fields = response_fields
@@ -10,11 +12,11 @@ class ResponseBuilder():
 
     def validate_response_fields(self):
         for f in self.response_fields:
-            if not isinstance(f, AbstractResponseField):
+            if not isinstance(f, ResponseField):
                 raise ValueError(
                     '{} must be of type {}'.format(
                         f.__class__.__name__,
-                        AbstractResponseField.__name__
+                        ResponseField.__name__
                     )
                 )
 

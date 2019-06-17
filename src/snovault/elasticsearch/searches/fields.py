@@ -1,7 +1,7 @@
 from .queries import BasicSearchQuery
 
 
-class AbstractResponseField:
+class ResponseField:
     '''
     Interface for defining a field in a response.
     '''
@@ -18,7 +18,7 @@ class AbstractResponseField:
         raise NotImplementedError
 
 
-class BasicSearchResponseField(AbstractResponseField):
+class BasicSearchResponseField(ResponseField):
 
     def __init__(self, field_name=None, params_parser=None):
         self.params_parser = params_parser
