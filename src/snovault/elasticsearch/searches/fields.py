@@ -1,4 +1,4 @@
-from .queries import BasicSearchQuery
+from .queries import BasicSearchQueryFactory
 
 
 class ResponseField:
@@ -25,7 +25,7 @@ class BasicSearchResponseField(ResponseField):
         super().__init__(field_name)
 
     def _build_query(self):
-        bsq = BasicSearchQuery(self.params_parser)
+        bsq = BasicSearchQueryFactory(self.params_parser)
 
     def _execute_query(self):
         pass

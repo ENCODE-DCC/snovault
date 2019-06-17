@@ -4,7 +4,7 @@ from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 
 
-class AbstractQuery():
+class AbstractQueryFactory():
     '''
     Interface for building specific queries.
     '''
@@ -75,7 +75,7 @@ class AbstractQuery():
         raise NotImplementedError
 
 
-class BasicSearchQuery(AbstractQuery):
+class BasicSearchQueryFactory(AbstractQueryFactory):
 
     def __init__(self, params_parser, *args, **kwargs):
         super().__init__(params_parser, *args, **kwargs)

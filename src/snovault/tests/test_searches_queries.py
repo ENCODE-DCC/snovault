@@ -18,61 +18,61 @@ def params_parser(dummy_request):
     return ParamsParser(dummy_request)
 
 
-def test_searches_queries_abstract_query_init():
-    from snovault.elasticsearch.searches.queries import AbstractQuery
-    aq = AbstractQuery({})
-    assert isinstance(aq, AbstractQuery)
+def test_searches_queries_abstract_query_factory_init():
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory({})
+    assert isinstance(aq, AbstractQueryFactory)
 
 
-def test_searches_queries_abstract_query_get_or_create_search(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQuery
+def test_searches_queries_abstract_query_factory_get_or_create_search(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from elasticsearch_dsl import Search
-    aq = AbstractQuery(params_parser)
+    aq = AbstractQueryFactory(params_parser)
     assert aq.search is None
     s = aq._get_or_create_search()
     assert s is aq.search
     assert isinstance(aq.search, Search)
 
 
-def test_searches_queries_abstract_query_get_client(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQuery
+def test_searches_queries_abstract_query_factory_get_client(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from elasticsearch import Elasticsearch
-    aq = AbstractQuery(params_parser, client={'a': 'client'})
+    aq = AbstractQueryFactory(params_parser, client={'a': 'client'})
     c = aq._get_client()
     assert c == {'a': 'client'}
-    aq = AbstractQuery(params_parser)
+    aq = AbstractQueryFactory(params_parser)
     c = aq._get_client()
     assert isinstance(c, Elasticsearch)
 
 
-def test_searches_queries_abstract_query_get_index(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQuery
+def test_searches_queries_abstract_query_factory_get_index(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from snovault.elasticsearch.interfaces import RESOURCES_INDEX
-    aq = AbstractQuery(params_parser)
+    aq = AbstractQueryFactory(params_parser)
     assert aq._get_index() == RESOURCES_INDEX
 
 
-def test_searches_queries_abstract_query_get_doc_types(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQuery
-    aq = AbstractQuery(params_parser)
+def test_searches_queries_abstract_query_factory_get_doc_types(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
     doc_types = aq._get_doc_types()
     assert doc_types == [
         ('type', 'Experiment')
     ]
 
 
-def test_searches_queries_abstract_query_get_query(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQuery
-    aq = AbstractQuery(params_parser)
+def test_searches_queries_abstract_query_factory_get_query(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
     search_terms = aq.params_parser.param_values_to_list(aq._get_query())
     assert search_terms == [
         'chip-seq'
     ]
 
 
-def test_searches_queries_abstract_query_get_filters(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQuery
-    aq = AbstractQuery(params_parser)
+def test_searches_queries_abstract_query_factory_get_filters(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
     filters = aq._get_filters()
     assert filters == [
         ('assay_title', 'Histone ChIP-seq'),
@@ -86,15 +86,15 @@ def test_searches_queries_abstract_query_get_filters(params_parser):
     ]
 
 
-def test_searches_queries_abstract_query_get_post_filters(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQuery
-    aq = AbstractQuery(params_parser)
+def test_searches_queries_abstract_query_factory_get_post_filters(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
     assert aq._get_post_filters() is None
 
 
-def test_searches_queries_abstract_query_get_sort(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQuery
-    aq = AbstractQuery(params_parser)
+def test_searches_queries_abstract_query_factory_get_sort(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
     sort_by = aq._get_sort()
     assert sort_by == [
         ('sort', 'date_created'),
@@ -102,24 +102,24 @@ def test_searches_queries_abstract_query_get_sort(params_parser):
     ]
 
 
-def test_searches_queries_abstract_query_get_limit(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQuery
-    aq = AbstractQuery(params_parser)
+def test_searches_queries_abstract_query_factory_get_limit(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
     limit = aq.params_parser.param_values_to_list(aq._get_limit())
     assert limit == [
         '10'
     ]
 
 
-def test_searches_queries_abstract_query_get_search_fields(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQuery
-    aq = AbstractQuery(params_parser)
+def test_searches_queries_abstract_query_factory_get_search_fields(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
     assert aq._get_search_fields() is None
 
 
-def test_searches_queries_abstract_query_get_return_fields(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQuery
-    aq = AbstractQuery(params_parser)
+def test_searches_queries_abstract_query_factory_get_return_fields(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
     return_fields = aq.params_parser.param_values_to_list(aq._get_return_fields())
     assert return_fields == [
         '@id',
@@ -127,39 +127,39 @@ def test_searches_queries_abstract_query_get_return_fields(params_parser):
     ]
 
 
-def test_searches_queries_abstract_query_get_facets(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQuery
-    aq = AbstractQuery(params_parser)
+def test_searches_queries_abstract_query_factory_get_facets(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
     assert aq._get_facets() is None
 
 
-def test_searches_queries_abstract_query_get_facet_size(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQuery
-    aq = AbstractQuery(params_parser)
+def test_searches_queries_abstract_query_factory_get_facet_size(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
     assert aq._get_facet_size() is None
 
 
-def test_searches_queries_abstract_query_add_query(params_parser):
+def test_searches_queries_abstract_query_factory_add_query(params_parser):
     assert False 
 
 
-def test_searches_queries_abstract_query_add_filters(params_parser):
+def test_searches_queries_abstract_query_factory_add_filters(params_parser):
     assert False 
 
 
-def test_searches_queries_abstract_query_add_aggs(params_parser):
+def test_searches_queries_abstract_query_factory_add_aggs(params_parser):
     assert False 
 
 
-def test_searches_queries_abstract_query_build_query():
-    from snovault.elasticsearch.searches.queries import AbstractQuery
-    aq = AbstractQuery({})
+def test_searches_queries_abstract_query_factory_build_query():
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory({})
     with pytest.raises(NotImplementedError):
         aq.build_query()
 
 
-def test_searches_builders_basic_search_query_builder_init(params_parser):
-    from snovault.elasticsearch.searches.queries import BasicSearchQuery
-    bsq = BasicSearchQuery(params_parser)
-    assert isinstance(bsq, BasicSearchQuery)
-    assert bsq.params_parser == params_parser
+def test_searches_builders_basic_search_query_factory_init(params_parser):
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactory
+    bsqf = BasicSearchQueryFactory(params_parser)
+    assert isinstance(bsqf, BasicSearchQueryFactory)
+    assert bsqf.params_parser == params_parser
