@@ -22,10 +22,14 @@ class ResponseField:
 class BasicSearchResponseField(ResponseField):
 
     def __init__(self, *args, **kwargs):
+        self.params_parser = kwargs.pop('params_parser', None)
         super().__init__(*args, **kwargs)
 
     def _build_query(self):
-        bsq = BasicSearchQueryFactory(self.params_parser)
+        bsq = BasicSearchQueryFactory(
+            self.params_parser,
+            **self.kwargs
+        )
 
     def _execute_query(self):
         pass
