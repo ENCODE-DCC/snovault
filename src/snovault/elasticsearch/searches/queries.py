@@ -1,4 +1,7 @@
 from .defaults import NOT_FILTERS
+from .interfaces import AND_JOIN
+from .interfaces import AND_NOT_JOIN
+from .interfaces import NOT_JOIN
 from elasticsearch_dsl import Search
 from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
@@ -35,8 +38,17 @@ class AbstractQueryFactory():
     def _get_default_doc_types(self):
         return self.kwargs.get('default_doc_types')
 
+    def _get_must_match_search_term(self):
+        pass
+
+    def _get_must_not_match_search_term(self):
+        pass
+
     def _get_query(self):
-        return self.params_parser.get_search_term_filters()
+        return self._combine_search_term_queries(
+            must_match_filters=self.params_parser.get_must_match_search_term_filters(),
+            must_not_match_filters=self.params_parser.get_must_not_match_search_term_filters()
+        )
 
     def _get_filters(self):
         return self.params_parser.get_not_keys_filters(not_keys=NOT_FILTERS)
@@ -62,6 +74,16 @@ class AbstractQueryFactory():
     def _get_facet_size(self):
         return self.kwargs.get('facet_size')
 
+    def _combine_search_term_queries(self, must_match_filters=[], must_not_match_filters=[]):
+        must = AND_JOIN.join(['({})'.format(q[1]) for q in must_match_filters])
+        must_not = AND_NOT_JOIN.join(['({})'.format(q[1]) for q in must_not_match_filters])
+        if must and must_not:
+            return must + AND_NOT_JOIN + must_not
+        elif must:
+            return must
+        elif must_not:
+            return NOT_JOIN.lstrip() + must_not
+
     def _add_query(self):
         pass
 
@@ -82,6 +104,8 @@ class BasicSearchQueryFactory(AbstractQueryFactory):
 
     def __init__(self, params_parser, *args, **kwargs):
         super().__init__(params_parser, *args, **kwargs)
+
+    
 
     def build_query(self):
         self._get_or_create_search()

@@ -80,10 +80,8 @@ def test_searches_queries_abstract_query_factory_get_default_doc_types(params_pa
 def test_searches_queries_abstract_query_factory_get_query(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    search_terms = aq.params_parser.param_values_to_list(aq._get_query())
-    assert search_terms == [
-        'chip-seq'
-    ]
+    search_terms = aq._get_query()
+    assert search_terms == '(chip-seq)'
 
 
 def test_searches_queries_abstract_query_factory_get_filters(params_parser):
@@ -141,6 +139,51 @@ def test_searches_queries_abstract_query_factory_get_return_fields(params_parser
         '@id',
         'accession'
     ]
+
+
+def test_searches_queries_abstract_query_factory_combine_search_term_queries(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip+seq&searchTerm=rna&searchTerm!=ENCODE+2'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    combined_search_terms = aq._combine_search_term_queries(
+        must_match_filters=aq.params_parser.get_must_match_search_term_filters(),
+        must_not_match_filters=aq.params_parser.get_must_not_match_search_term_filters()
+    )
+    assert combined_search_terms == '(chip seq) AND (rna) AND NOT (ENCODE 2)'
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip+seq'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    combined_search_terms = aq._combine_search_term_queries(
+        must_match_filters=aq.params_parser.get_must_match_search_term_filters(),
+        must_not_match_filters=aq.params_parser.get_must_not_match_search_term_filters()
+    )
+    assert combined_search_terms == '(chip seq)'
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm!=rna&searchTerm!=ENCODE+2'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    combined_search_terms = aq._combine_search_term_queries(
+        must_match_filters=aq.params_parser.get_must_match_search_term_filters(),
+        must_not_match_filters=aq.params_parser.get_must_not_match_search_term_filters()
+    )
+    assert combined_search_terms == 'NOT (rna) AND NOT (ENCODE 2)'
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    combined_search_terms = aq._combine_search_term_queries(
+        must_match_filters=aq.params_parser.get_must_match_search_term_filters(),
+        must_not_match_filters=aq.params_parser.get_must_not_match_search_term_filters()
+    )
+    assert combined_search_terms is None
 
 
 def test_searches_queries_abstract_query_factory_get_facets(params_parser):
