@@ -142,6 +142,61 @@ class TestingLinkTarget(Item):
 
 
 @collection(
+    'testing-search-scheams',
+    unique_key='testing_search_schema:name'
+)
+class TestingSearchSchema(Item):
+    item_type = 'testing_search_schema'
+    name_key = 'name'
+    schema = {
+        'type': 'object',
+        'properties': {
+            'name': {
+                'type': 'string',
+                'uniqueKey': True,
+            },
+            'status': {
+                'type': 'string',
+            },
+            'uuid': {
+                'title': 'UUID',
+                'description': 'Unique identifier',
+                'type': 'string',
+                'format': 'uuid',
+                'permission': 'import_items',
+                'requestMethod': 'POST',
+            },
+            'accession': {
+                'title': 'Accession',
+                'description': '',
+                'type': 'string',
+                'format': 'accession',
+                'permission': 'import_items'
+            },
+        },
+        'additionalProperties': False,
+        'facets': {
+            'status': {
+                'title': 'Status'
+            }
+        },
+        'boost_values': {
+            'accession': 1.0,
+            'status': 1.0
+        },
+        'columns': {
+            'accession': {
+                'title': 'Accession'
+            },
+            'status': {
+                'title': 'Status'
+            }
+        }
+    }
+    audit_inherit = ['*']
+
+
+@collection(
     'testing-post-put-patch',
     acl=[
         (Allow, 'group.submitter', ['add', 'edit', 'view']),
