@@ -128,6 +128,20 @@ class ParamsParser():
             params=params
         )
 
+    def get_must_match_search_term_filters(self, params=None):
+        return self.get_must_match_filters(
+            params=self.get_search_term_filters(
+                params=params
+            )
+        )
+
+    def get_must_not_match_search_term_filters(self, params=None):
+        return self.get_must_not_match_filters(
+            params=self.get_search_term_filters(
+                params=params
+            )
+        )
+
     def get_field_filters(self, params=None):
         return self.get_key_filters(
             key=FIELD_KEY,

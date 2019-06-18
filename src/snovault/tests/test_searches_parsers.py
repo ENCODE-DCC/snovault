@@ -1,7 +1,4 @@
 import pytest
-from pyramid.security import effective_principals
-from urllib.parse import quote_plus, parse_qs
-from webob.compat import parse_qsl_text
 
 
 def test_searches_parsers_params_parser_init(dummy_request):
@@ -140,6 +137,33 @@ def test_searches_parsers_params_parser_get_search_term_filters(dummy_request):
     assert p.get_search_term_filters() == [
         ('searchTerm', 'my favorite experiment'),
         ('searchTerm', 'my other experiment'),
+        ('searchTerm!', 'whatever')
+    ]
+
+
+def test_searches_parsers_params_parser_get_must_match_search_term_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&field=status&type!=Item'
+        '&searchTerm=my+favorite+experiment&searchTerm=my+other+experiment'
+        '&searchTerm!=whatever'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_must_match_search_term_filters() == [
+        ('searchTerm', 'my favorite experiment'),
+        ('searchTerm', 'my other experiment')
+    ]
+
+
+def test_searches_parsers_params_parser_get_must_not_match_search_term_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&field=status&type!=Item'
+        '&searchTerm=my+favorite+experiment&searchTerm=my+other+experiment'
+        '&searchTerm!=whatever'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_must_not_match_search_term_filters() == [
         ('searchTerm!', 'whatever')
     ]
 
