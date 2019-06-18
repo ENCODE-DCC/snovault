@@ -7,8 +7,9 @@ class ResponseField:
     '''
     response = {}
 
-    def __init__(self, field_name=None):
-        self.field_name = field_name
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
 
     def render(self):
         '''
@@ -20,9 +21,8 @@ class ResponseField:
 
 class BasicSearchResponseField(ResponseField):
 
-    def __init__(self, field_name=None, params_parser=None):
-        self.params_parser = params_parser
-        super().__init__(field_name)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def _build_query(self):
         bsq = BasicSearchQueryFactory(self.params_parser)
