@@ -32,6 +32,9 @@ class AbstractQueryFactory():
     def _get_doc_types(self):
         return self.params_parser.get_type_filters()
 
+    def _get_default_doc_types(self):
+        return self.kwargs.get('default_doc_types')
+
     def _get_query(self):
         return self.params_parser.get_search_term_filters()
 

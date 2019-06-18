@@ -61,6 +61,22 @@ def test_searches_queries_abstract_query_factory_get_doc_types(params_parser):
     ]
 
 
+def test_searches_queries_abstract_query_factory_get_default_doc_types(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(
+        params_parser,
+        default_doc_types=[
+            'Snowflake',
+            'Pancake'
+        ]
+    )
+    default_doc_types = aq._get_default_doc_types()
+    assert default_doc_types == [
+        'Snowflake',
+        'Pancake'
+    ]
+
+
 def test_searches_queries_abstract_query_factory_get_query(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
