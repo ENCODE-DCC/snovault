@@ -46,12 +46,6 @@ class AbstractQueryFactory():
     def _get_default_item_types(self):
         return self.kwargs.get('default_item_types', [])
 
-    def _get_must_match_search_term(self):
-        pass
-
-    def _get_must_not_match_search_term(self):
-        pass
-
     def _get_query(self):
         return self._combine_search_term_queries(
             must_match_filters=self.params_parser.get_must_match_search_term_filters(),
