@@ -378,6 +378,74 @@ def test_searches_queries_abstract_query_factory_add_query_no_search_term(dummy_
     assert aq.search is None
 
 
+def test_searches_queries_abstract_query_factory_add_must_equal_terms_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_must_equal_terms_filter(
+        field='status',
+        terms=['released', 'archived']
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'bool': {
+                'filter': [
+                    {
+                        'terms': {
+                            'status': [
+                                'released',
+                                'archived'
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_must_not_equal_terms_filter(
+        field='status',
+        terms=['released', 'archived']
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'bool': {
+                'filter': [
+                    {
+                        'bool': {
+                            'must_not': [
+                                {
+                                    'terms': {
+                                        'status': [
+                                            'released',
+                                            'archived'
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_field_must_exist_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    assert False 
+
+
+def test_searches_queries_abstract_query_factory_add_field_must_not_exist_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    assert False
+
+
 def test_searches_queries_abstract_query_factory_add_filters(params_parser):
     assert False 
 

@@ -9,6 +9,7 @@ from .interfaces import BOOST_VALUES
 from .interfaces import EMBEDDED
 from .interfaces import NOT_JOIN
 from .interfaces import QUERY_STRING
+from .interfaces import TERMS
 from elasticsearch_dsl import Search
 from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
@@ -117,6 +118,24 @@ class AbstractQueryFactory():
                 default_operator=AND
             )
 
+    def _add_must_equal_terms_filter(self, field, terms):
+        self.search = self._get_or_create_search().filter(
+            TERMS,
+            **{field: terms}
+        )
+
+    def _add_must_not_equal_terms_filter(self, field, terms):
+        self.search = self._get_or_create_search().exclude(
+            TERMS,
+            **{field: terms}
+        )
+
+    def _add_field_must_exist_filter(self, field):
+        pass
+
+    def _add_field_must_not_exist_filter(self, field):
+        pass
+
     def _add_filters(self):
         pass
 
@@ -137,8 +156,6 @@ class BasicSearchQueryFactory(AbstractQueryFactory):
 
     def __init__(self, params_parser, *args, **kwargs):
         super().__init__(params_parser, *args, **kwargs)
-
-    
 
     def build_query(self):
         self._get_or_create_search()
