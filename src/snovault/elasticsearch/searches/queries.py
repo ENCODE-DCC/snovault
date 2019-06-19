@@ -123,6 +123,9 @@ class AbstractQueryFactory():
     def _add_aggs(self):
         pass
 
+    def _add_source(self):
+        pass
+
     def build_query(self):
         '''
         Public method to be implemented by children.
