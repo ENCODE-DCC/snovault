@@ -320,6 +320,52 @@ def test_searches_queries_abstract_query_factory_add_query_with_type(dummy_reque
     )
 
 
+def test_searches_queries_abstract_query_factory_add_query_with_default_type(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(
+        params_parser,
+        default_item_types=[
+            'TestingSearchSchema'
+        ]
+    )
+    aq._add_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all',
+                    '*.uuid',
+                    '*.md5sum',
+                    '*.submitted_file_name',
+                    '*.unique_keys.*',
+                    'embedded.accession',
+                    'embedded.status'
+                ],
+                'query': '(chip-seq)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['query_string']['query']
+        == expected_query['query']['query_string']['query']
+    )
+    assert (
+        constructed_query['query']['query_string']['default_operator']
+        == expected_query['query']['query_string']['default_operator']
+    )
+    assert (
+        set(constructed_query['query']['query_string']['fields'])
+        == set(expected_query['query']['query_string']['fields'])
+    )
+
+
 def test_searches_queries_abstract_query_factory_add_query_no_search_term(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
@@ -337,6 +383,10 @@ def test_searches_queries_abstract_query_factory_add_filters(params_parser):
 
 
 def test_searches_queries_abstract_query_factory_add_aggs(params_parser):
+    assert False
+
+
+def test_searches_queries_abstract_query_factory_add_source(params_parser):
     assert False 
 
 
