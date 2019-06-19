@@ -347,6 +347,19 @@ def test_searches_parsers_params_parser_get_not_keys_filters(dummy_request):
     ]
 
 
+def test_searches_parsers_params_parser_get_wildcard_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&type=*&file_format%21=*'
+        '&file_type%21=bigBed+tss_peak&file_format_type=bed3%2B'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_wildcard_filters() == [
+        ('type', '*'),
+        ('file_format!', '*')
+    ]
+
+
 def test_searches_parsers_params_parser_keys_filters_not_flag(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (

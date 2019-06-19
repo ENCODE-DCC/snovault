@@ -6,6 +6,7 @@ from .interfaces import SEARCH_TERM_KEY
 from .interfaces import SIZE_KEY
 from .interfaces import SORT_KEY
 from .interfaces import TYPE_KEY
+from .interfaces import WILDCARD
 from urllib.parse import urlencode
 
 
@@ -63,6 +64,15 @@ class ParamsParser():
         '''
         return self.get_filters_by_condition(
             key_condition=lambda k: k not in not_keys and k.replace(NOT_FLAG, '') not in not_keys,
+            params=params
+        )
+
+    def get_wildcard_filters(self, params=None):
+        '''
+        Returns params with wildcard value.
+        '''
+        return self.get_filters_by_condition(
+            value_condition=lambda v: v == WILDCARD,
             params=params
         )
 
