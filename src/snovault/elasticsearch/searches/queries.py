@@ -1,10 +1,18 @@
+from itertools import chain
+
 from .defaults import NOT_FILTERS
+from .defaults import BASE_SEARCH_FIELDS
+from .interfaces import AND
 from .interfaces import AND_JOIN
 from .interfaces import AND_NOT_JOIN
+from .interfaces import BOOST_VALUES
+from .interfaces import EMBEDDED
 from .interfaces import NOT_JOIN
+from .interfaces import QUERY_STRING
 from elasticsearch_dsl import Search
 from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
+from snovault.interfaces import TYPES
 
 
 class AbstractQueryFactory():
@@ -32,11 +40,11 @@ class AbstractQueryFactory():
     def _get_index(self):
         return RESOURCES_INDEX
 
-    def _get_doc_types(self):
+    def _get_item_types(self):
         return self.params_parser.get_type_filters()
 
-    def _get_default_doc_types(self):
-        return self.kwargs.get('default_doc_types')
+    def _get_default_item_types(self):
+        return self.kwargs.get('default_item_types', [])
 
     def _get_must_match_search_term(self):
         pass
@@ -54,7 +62,7 @@ class AbstractQueryFactory():
         return self.params_parser.get_not_keys_filters(not_keys=NOT_FILTERS)
 
     def _get_post_filters(self):
-        return self.kwargs.get('post_filters')
+        return self.kwargs.get('post_filters', [])
 
     def _get_sort(self):
         return self.params_parser.get_sort()
@@ -63,16 +71,37 @@ class AbstractQueryFactory():
         return self.params_parser.get_limit()
 
     def _get_search_fields(self):
-        return self.kwargs.get('search_fields')
+        search_fields = set()
+        search_fields.update(BASE_SEARCH_FIELDS)
+        for item_type in chain(
+                self.params_parser.param_values_to_list(self._get_item_types()),
+                self._get_default_item_types()
+        ):
+            search_fields.update(
+                self._prefix_values(
+                    EMBEDDED,
+                    self._get_boost_values_from_item_type(item_type).keys()
+                )
+            )
+        return list(search_fields)
 
     def _get_return_fields(self):
         return self.params_parser.get_field_filters()
 
     def _get_facets(self):
-        return self.kwargs.get('facets')
+        return self.kwargs.get('facets', [])
 
     def _get_facet_size(self):
         return self.kwargs.get('facet_size')
+
+    def _get_boost_values_from_item_type(self, item_type):
+        return self.params_parser._request.registry[TYPES][item_type].schema.get(
+            BOOST_VALUES,
+            {}
+        )
+
+    def _prefix_values(self, prefix, values):
+        return [prefix + v for v in values]
 
     def _combine_search_term_queries(self, must_match_filters=[], must_not_match_filters=[]):
         must = AND_JOIN.join(['({})'.format(q[1]) for q in must_match_filters])
@@ -85,7 +114,14 @@ class AbstractQueryFactory():
             return NOT_JOIN.lstrip() + must_not
 
     def _add_query(self):
-        pass
+        query = self._get_query()
+        if query:
+            self.search = self._get_or_create_search().query(
+                QUERY_STRING,
+                query=query,
+                fields=self._get_search_fields(),
+                default_operator=AND
+            )
 
     def _add_filters(self):
         pass

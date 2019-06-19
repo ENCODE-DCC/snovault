@@ -18,6 +18,19 @@ def params_parser(dummy_request):
     return ParamsParser(dummy_request)
 
 
+@pytest.fixture
+def params_parser_snovault_types(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch import ELASTIC_SEARCH
+    from elasticsearch import Elasticsearch
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession'
+    )
+    dummy_request.registry[ELASTIC_SEARCH] = Elasticsearch()
+    return ParamsParser(dummy_request)
+
+
 def test_searches_queries_abstract_query_factory_init():
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory({})
@@ -52,26 +65,26 @@ def test_searches_queries_abstract_query_factory_get_index(params_parser):
     assert aq._get_index() == RESOURCES_INDEX
 
 
-def test_searches_queries_abstract_query_factory_get_doc_types(params_parser):
+def test_searches_queries_abstract_query_factory_get_item_types(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    doc_types = aq._get_doc_types()
-    assert doc_types == [
+    item_types = aq._get_item_types()
+    assert item_types == [
         ('type', 'Experiment')
     ]
 
 
-def test_searches_queries_abstract_query_factory_get_default_doc_types(params_parser):
+def test_searches_queries_abstract_query_factory_get_default_item_types(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(
         params_parser,
-        default_doc_types=[
+        default_item_types=[
             'Snowflake',
             'Pancake'
         ]
     )
-    default_doc_types = aq._get_default_doc_types()
-    assert default_doc_types == [
+    default_item_types = aq._get_default_item_types()
+    assert default_item_types == [
         'Snowflake',
         'Pancake'
     ]
@@ -103,7 +116,7 @@ def test_searches_queries_abstract_query_factory_get_filters(params_parser):
 def test_searches_queries_abstract_query_factory_get_post_filters(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    assert aq._get_post_filters() is None
+    assert aq._get_post_filters() == []
 
 
 def test_searches_queries_abstract_query_factory_get_sort(params_parser):
@@ -125,10 +138,23 @@ def test_searches_queries_abstract_query_factory_get_limit(params_parser):
     ]
 
 
-def test_searches_queries_abstract_query_factory_get_search_fields(params_parser):
+def test_searches_queries_abstract_query_factory_get_search_fields(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser)
-    assert aq._get_search_fields() is None
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    search_fields = aq._get_search_fields()
+    print(search_fields)
+    assert all(
+        f in search_fields
+        for f in [
+                'embedded.status',
+                '*.md5sum',
+                '_all',
+                '*.unique_keys.*',
+                'embedded.accession',
+                '*.uuid',
+                '*.submitted_file_name'
+        ]
+    )
 
 
 def test_searches_queries_abstract_query_factory_get_return_fields(params_parser):
@@ -189,7 +215,7 @@ def test_searches_queries_abstract_query_factory_combine_search_term_queries(dum
 def test_searches_queries_abstract_query_factory_get_facets(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    assert aq._get_facets() is None
+    assert aq._get_facets() == []
 
 
 def test_searches_queries_abstract_query_factory_get_facet_size(params_parser):
@@ -198,8 +224,33 @@ def test_searches_queries_abstract_query_factory_get_facet_size(params_parser):
     assert aq._get_facet_size() is None
 
 
-def test_searches_queries_abstract_query_factory_add_query(params_parser):
-    assert False 
+def test_searches_queries_abstract_query_factory_get_boost_values_from_item_type(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_boost_values_from_item_type(
+        'TestingSearchSchema'
+    ) == {'accession': 1.0, 'status': 1.0}
+
+
+def test_searches_queries_abstract_query_factory_prefix_values(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._prefix_values(
+        'embedded.',
+        ['uuid', 'status', '@type']
+    ) == ['embedded.uuid', 'embedded.status', 'embedded.@type']
+
+
+def test_searches_queries_abstract_query_factory_add_query(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip+seq'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_query()
+    assert aq.search.to_dict() == {}
 
 
 def test_searches_queries_abstract_query_factory_add_filters(params_parser):

@@ -17,3 +17,12 @@ NOT_FILTERS = [
     'cart',
     'searchTerm'
 ]
+
+
+BASE_SEARCH_FIELDS = [
+    '_all',
+    '*.uuid',
+    '*.md5sum',
+    '*.submitted_file_name',
+    '*.unique_keys.*',
+]
