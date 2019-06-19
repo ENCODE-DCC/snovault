@@ -320,6 +320,18 @@ def test_searches_queries_abstract_query_factory_add_query_with_type(dummy_reque
     )
 
 
+def test_searches_queries_abstract_query_factory_add_query_no_search_term(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_query()
+    assert aq.search is None
+
+
 def test_searches_queries_abstract_query_factory_add_filters(params_parser):
     assert False 
 
