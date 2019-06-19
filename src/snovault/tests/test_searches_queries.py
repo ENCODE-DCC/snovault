@@ -142,7 +142,6 @@ def test_searches_queries_abstract_query_factory_get_search_fields(params_parser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
     search_fields = aq._get_search_fields()
-    print(search_fields)
     assert all(
         f in search_fields
         for f in [
@@ -171,7 +170,7 @@ def test_searches_queries_abstract_query_factory_combine_search_term_queries(dum
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
-        'searchTerm=chip+seq&searchTerm=rna&searchTerm!=ENCODE+2'
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
@@ -179,9 +178,9 @@ def test_searches_queries_abstract_query_factory_combine_search_term_queries(dum
         must_match_filters=aq.params_parser.get_must_match_search_term_filters(),
         must_not_match_filters=aq.params_parser.get_must_not_match_search_term_filters()
     )
-    assert combined_search_terms == '(chip seq) AND (rna) AND NOT (ENCODE 2)'
+    assert combined_search_terms == '(chip-seq) AND (rna) AND NOT (ENCODE 2)'
     dummy_request.environ['QUERY_STRING'] = (
-        'searchTerm=chip+seq'
+        'searchTerm=chip-seq'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
@@ -189,7 +188,7 @@ def test_searches_queries_abstract_query_factory_combine_search_term_queries(dum
         must_match_filters=aq.params_parser.get_must_match_search_term_filters(),
         must_not_match_filters=aq.params_parser.get_must_not_match_search_term_filters()
     )
-    assert combined_search_terms == '(chip seq)'
+    assert combined_search_terms == '(chip-seq)'
     dummy_request.environ['QUERY_STRING'] = (
         'searchTerm!=rna&searchTerm!=ENCODE+2'
     )
@@ -245,12 +244,39 @@ def test_searches_queries_abstract_query_factory_add_query(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
-        'searchTerm=chip+seq'
+        'searchTerm=chip-seq'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     aq._add_query()
-    assert aq.search.to_dict() == {}
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all',
+                    '*.uuid',
+                    '*.md5sum',
+                    '*.submitted_file_name',
+                    '*.unique_keys.*'
+                ],
+                'query': '(chip-seq)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['query_string']['query']
+        == expected_query['query']['query_string']['query']
+    )
+    assert (
+        constructed_query['query']['query_string']['default_operator']
+        == expected_query['query']['query_string']['default_operator']
+    )
+    assert (
+        set(constructed_query['query']['query_string']['fields'])
+        == set(expected_query['query']['query_string']['fields'])
+    )
 
 
 def test_searches_queries_abstract_query_factory_add_filters(params_parser):
