@@ -15,7 +15,8 @@ NOT_FILTERS = [
     'filterresponse',
     'remove',
     'cart',
-    'searchTerm'
+    'searchTerm',
+    'advancedQuery',
 ]
 
 
