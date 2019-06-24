@@ -25,5 +25,5 @@ BASE_SEARCH_FIELDS = [
     '*.uuid',
     '*.md5sum',
     '*.submitted_file_name',
-    '*.unique_keys.*',
+    'unique_keys.*',
 ]
