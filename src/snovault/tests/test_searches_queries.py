@@ -510,6 +510,50 @@ def test_searches_queries_abstract_query_factory_add_field_must_and_must_not_exi
     }
 
 
+def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_terms_aggregation('Statuses', 'embedded.status', size=10)
+    assert aq.search.to_dict() == {
+        'aggs': {
+            'Statuses': {
+                'terms': {
+                    'field': 'embedded.status',
+                    'size': 10
+                }
+            }
+        },
+        'query': {'match_all': {}}
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_exists_aggregation(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_exists_aggregation('Processed file', 'embedded.derived_from', size=10)
+    assert aq.search.to_dict() == {
+        'aggs': {
+            'Processed file': {
+                'filters': {
+                    'filters': {
+                        'no': {
+                            'bool': {
+                                'must_not': [{'exists': {'field': 'embedded.derived_from'}}]
+                            }
+                        },
+                        'yes': {
+                            'exists': {
+                                'field': 'embedded.derived_from'
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        'query': {'match_all': {}}
+    }
+
+
 def test_searches_queries_abstract_query_factory_add_filters(params_parser):
     assert False 
 

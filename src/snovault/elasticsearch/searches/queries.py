@@ -8,9 +8,13 @@ from .interfaces import AND_NOT_JOIN
 from .interfaces import BOOST_VALUES
 from .interfaces import EMBEDDED
 from .interfaces import EXISTS
+from .interfaces import FILTERS
 from .interfaces import NOT_JOIN
+from .interfaces import NO
 from .interfaces import QUERY_STRING
 from .interfaces import TERMS
+from .interfaces import YES
+from elasticsearch_dsl import A
 from elasticsearch_dsl import Search
 from elasticsearch_dsl import Q
 from snovault.elasticsearch import ELASTIC_SEARCH
@@ -143,6 +147,26 @@ class AbstractQueryFactory():
             ~Q(EXISTS, field=field)
         )
 
+    def _add_terms_aggregation(self, title, field, size=200):
+        self._get_or_create_search().aggs.bucket(
+            title,
+            TERMS,
+            field=field,
+            size=size
+        )
+
+    def _add_exists_aggregation(self, title, field, size=200):
+        self._get_or_create_search().aggs.bucket(
+            title,
+            A(
+                FILTERS,
+                filters={
+                    YES: Q(EXISTS, field=field),
+                    NO: ~Q(EXISTS, field=field)
+                }
+            )
+        )
+
     def _add_filters(self):
         pass
 
@@ -169,4 +193,5 @@ class BasicSearchQueryFactory(AbstractQueryFactory):
         self._add_query_string_query()
         self._add_filters()
         self._add_aggs()
+        self._add_source()
         return self.search
