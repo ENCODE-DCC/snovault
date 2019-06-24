@@ -518,8 +518,27 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_pa
         'aggs': {
             'Statuses': {
                 'terms': {
+                    'exclude': [],
                     'field': 'embedded.status',
-                    'size': 10
+                    'size': 10,
+                }
+            }
+        },
+        'query': {'match_all': {}}
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_terms_aggregation_with_exclusion(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_terms_aggregation('Statuses', 'embedded.status', exclude=['Item'])
+    assert aq.search.to_dict() == {
+        'aggs': {
+            'Statuses': {
+                'terms': {
+                    'exclude': ['Item'],
+                    'field': 'embedded.status',
+                    'size': 200
                 }
             }
         },

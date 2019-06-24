@@ -147,12 +147,13 @@ class AbstractQueryFactory():
             ~Q(EXISTS, field=field)
         )
 
-    def _add_terms_aggregation(self, title, field, size=200):
+    def _add_terms_aggregation(self, title, field, exclude=[], size=200):
         self._get_or_create_search().aggs.bucket(
             title,
             TERMS,
             field=field,
-            size=size
+            size=size,
+            exclude=exclude
         )
 
     def _add_exists_aggregation(self, title, field, size=200):
