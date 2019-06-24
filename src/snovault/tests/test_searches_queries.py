@@ -148,7 +148,7 @@ def test_searches_queries_abstract_query_factory_get_search_fields(params_parser
                 'embedded.status',
                 '*.md5sum',
                 '_all',
-                '*.unique_keys.*',
+                'unique_keys.*',
                 'embedded.accession',
                 '*.uuid',
                 '*.submitted_file_name'
@@ -259,7 +259,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_re
                     '*.uuid',
                     '*.md5sum',
                     '*.submitted_file_name',
-                    '*.unique_keys.*'
+                    'unique_keys.*'
                 ],
                 'query': '(chip-seq)'
             }
@@ -298,7 +298,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_typ
                     '*.uuid',
                     '*.md5sum',
                     '*.submitted_file_name',
-                    '*.unique_keys.*',
+                    'unique_keys.*',
                     'embedded.accession',
                     'embedded.status'
                 ],
@@ -344,7 +344,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_def
                     '*.uuid',
                     '*.md5sum',
                     '*.submitted_file_name',
-                    '*.unique_keys.*',
+                    'unique_keys.*',
                     'embedded.accession',
                     'embedded.status'
                 ],
@@ -437,13 +437,77 @@ def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_filter
 def test_searches_queries_abstract_query_factory_add_field_must_exist_filter(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    assert False 
+    aq._add_field_must_exist_filter(
+        'embedded.status'
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'exists': {
+                'field': 'embedded.status'
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_field_must_exist_filter_multiple(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_field_must_exist_filter(
+        'embedded.status'
+    )
+    aq._add_field_must_exist_filter(
+        'embedded.lab'
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'bool': {
+                'must': [
+                    {'exists': {'field': 'embedded.status'}},
+                    {'exists': {'field': 'embedded.lab'}}
+                ]
+            }
+        }
+    }
 
 
 def test_searches_queries_abstract_query_factory_add_field_must_not_exist_filter(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    assert False
+    aq._add_field_must_not_exist_filter(
+        'embedded.file_size'
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'bool': {
+                'must_not': [
+                    {'exists': {'field': 'embedded.file_size'}}
+                ]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_field_must_and_must_not_exist_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_field_must_exist_filter(
+        'embedded.status'
+    )
+    aq._add_field_must_not_exist_filter(
+        'embedded.file_size'
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'bool': {
+                'must': [
+                    {'exists': {'field': 'embedded.status'}}
+                ],
+                'must_not': [
+                    {'exists': {'field': 'embedded.file_size'}}
+                ]
+            }
+        }
+    }
 
 
 def test_searches_queries_abstract_query_factory_add_filters(params_parser):

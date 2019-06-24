@@ -7,10 +7,12 @@ from .interfaces import AND_JOIN
 from .interfaces import AND_NOT_JOIN
 from .interfaces import BOOST_VALUES
 from .interfaces import EMBEDDED
+from .interfaces import EXISTS
 from .interfaces import NOT_JOIN
 from .interfaces import QUERY_STRING
 from .interfaces import TERMS
 from elasticsearch_dsl import Search
+from elasticsearch_dsl import Q
 from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.interfaces import TYPES
@@ -131,10 +133,15 @@ class AbstractQueryFactory():
         )
 
     def _add_field_must_exist_filter(self, field):
-        pass
+        self.search = self._get_or_create_search().query(
+            EXISTS,
+            field=field
+        )
 
     def _add_field_must_not_exist_filter(self, field):
-        pass
+        self.search = self._get_or_create_search().query(
+            ~Q(EXISTS, field=field)
+        )
 
     def _add_filters(self):
         pass
