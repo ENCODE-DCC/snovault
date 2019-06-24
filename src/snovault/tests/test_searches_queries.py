@@ -240,7 +240,7 @@ def test_searches_queries_abstract_query_factory_prefix_values(params_parser):
     ) == ['embedded.uuid', 'embedded.status', 'embedded.@type']
 
 
-def test_searches_queries_abstract_query_factory_add_query(dummy_request):
+def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
@@ -248,7 +248,7 @@ def test_searches_queries_abstract_query_factory_add_query(dummy_request):
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    aq._add_query()
+    aq._add_query_string_query()
     constructed_query = aq.search.to_dict()
     expected_query = {
         'query': {
@@ -279,7 +279,7 @@ def test_searches_queries_abstract_query_factory_add_query(dummy_request):
     )
 
 
-def test_searches_queries_abstract_query_factory_add_query_with_type(dummy_request):
+def test_searches_queries_abstract_query_factory_add_query_string_query_with_type(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
@@ -287,7 +287,7 @@ def test_searches_queries_abstract_query_factory_add_query_with_type(dummy_reque
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    aq._add_query()
+    aq._add_query_string_query()
     constructed_query = aq.search.to_dict()
     expected_query = {
         'query': {
@@ -320,7 +320,7 @@ def test_searches_queries_abstract_query_factory_add_query_with_type(dummy_reque
     )
 
 
-def test_searches_queries_abstract_query_factory_add_query_with_default_type(dummy_request):
+def test_searches_queries_abstract_query_factory_add_query_string_query_with_default_type(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
@@ -333,7 +333,7 @@ def test_searches_queries_abstract_query_factory_add_query_with_default_type(dum
             'TestingSearchSchema'
         ]
     )
-    aq._add_query()
+    aq._add_query_string_query()
     constructed_query = aq.search.to_dict()
     expected_query = {
         'query': {
@@ -366,7 +366,7 @@ def test_searches_queries_abstract_query_factory_add_query_with_default_type(dum
     )
 
 
-def test_searches_queries_abstract_query_factory_add_query_no_search_term(dummy_request):
+def test_searches_queries_abstract_query_factory_add_query_string_query_no_search_term(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
@@ -374,7 +374,7 @@ def test_searches_queries_abstract_query_factory_add_query_no_search_term(dummy_
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    aq._add_query()
+    aq._add_query_string_query()
     assert aq.search is None
 
 

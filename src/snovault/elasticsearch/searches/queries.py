@@ -108,7 +108,7 @@ class AbstractQueryFactory():
         elif must_not:
             return NOT_JOIN.lstrip() + must_not
 
-    def _add_query(self):
+    def _add_query_string_query(self):
         query = self._get_query()
         if query:
             self.search = self._get_or_create_search().query(
@@ -159,7 +159,7 @@ class BasicSearchQueryFactory(AbstractQueryFactory):
 
     def build_query(self):
         self._get_or_create_search()
-        self._add_query()
+        self._add_query_string_query()
         self._add_filters()
         self._add_aggs()
         return self.search
