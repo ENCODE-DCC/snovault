@@ -557,7 +557,13 @@ def test_searches_queries_abstract_query_factory_add_exists_aggregation(params_p
                     'filters': {
                         'no': {
                             'bool': {
-                                'must_not': [{'exists': {'field': 'embedded.derived_from'}}]
+                                'must_not': [
+                                    {
+                                        'exists': {
+                                            'field': 'embedded.derived_from'
+                                        }
+                                    }
+                                ]
                             }
                         },
                         'yes': {
