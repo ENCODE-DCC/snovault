@@ -240,6 +240,26 @@ def test_searches_queries_abstract_query_factory_prefix_values(params_parser):
     ) == ['embedded.uuid', 'embedded.status', 'embedded.@type']
 
 
+def test_searches_queries_abstract_query_factory_make_query_string_query(params_parser):
+    assert False
+
+
+def test_searches_queries_abstract_query_factory_make_must_equal_terms_query(params_parser):
+    assert False
+
+
+def test_searches_queries_abstract_query_factory_make_field_must_exist_query(params_parser):
+    assert False
+
+
+def test_searches_queries_abstract_query_factory_make_terms_aggregation(params_parser):
+    assert False
+
+
+def test_searches_queries_abstract_query_factory_make_exists_aggregation(params_parser):
+    assert False
+
+
 def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
@@ -549,7 +569,7 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation_with_excl
 def test_searches_queries_abstract_query_factory_add_exists_aggregation(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    aq._add_exists_aggregation('Processed file', 'embedded.derived_from', size=10)
+    aq._add_exists_aggregation('Processed file', 'embedded.derived_from')
     assert aq.search.to_dict() == {
         'aggs': {
             'Processed file': {

@@ -115,57 +115,99 @@ class AbstractQueryFactory():
         elif must_not:
             return NOT_JOIN.lstrip() + must_not
 
-    def _add_query_string_query(self):
-        query = self._get_query()
-        if query:
-            self.search = self._get_or_create_search().query(
-                QUERY_STRING,
-                query=query,
-                fields=self._get_search_fields(),
-                default_operator=AND
-            )
+    def _make_query_string_query(self, query, fields, default_operator=AND):
+        return Q(
+            QUERY_STRING,
+            query=query,
+            fields=fields,
+            default_operator=default_operator
+        )
 
-    def _add_must_equal_terms_filter(self, field, terms):
-        self.search = self._get_or_create_search().filter(
+    def _make_must_equal_terms_query(self, field, terms):
+        return Q(
             TERMS,
             **{field: terms}
         )
 
-    def _add_must_not_equal_terms_filter(self, field, terms):
-        self.search = self._get_or_create_search().exclude(
-            TERMS,
-            **{field: terms}
-        )
-
-    def _add_field_must_exist_filter(self, field):
-        self.search = self._get_or_create_search().query(
+    def _make_field_must_exist_query(self, field):
+        return Q(
             EXISTS,
             field=field
         )
 
-    def _add_field_must_not_exist_filter(self, field):
-        self.search = self._get_or_create_search().query(
-            ~Q(EXISTS, field=field)
-        )
-
-    def _add_terms_aggregation(self, title, field, exclude=[], size=200):
-        self._get_or_create_search().aggs.bucket(
-            title,
+    def _make_terms_aggregation(self, field, exclude=[], size=200):
+        return A(
             TERMS,
             field=field,
             size=size,
             exclude=exclude
         )
 
-    def _add_exists_aggregation(self, title, field, size=200):
+    def _make_exists_aggregation(self, field):
+        return A(
+            FILTERS,
+            filters={
+                YES: Q(EXISTS, field=field),
+                NO: ~Q(EXISTS, field=field)
+            }
+        )
+
+    def _add_query_string_query(self):
+        query = self._get_query()
+        if query:
+            self.search = self._get_or_create_search().query(
+                self._make_query_string_query(
+                    query=query,
+                    fields=self._get_search_fields(),
+                    default_operator=AND
+                )
+            )
+
+    def _add_must_equal_terms_filter(self, field, terms):
+        self.search = self._get_or_create_search().filter(
+            self._make_must_equal_terms_query(
+                field=field,
+                terms=terms
+            )
+        )
+
+    def _add_must_not_equal_terms_filter(self, field, terms):
+        self.search = self._get_or_create_search().exclude(
+            self._make_must_equal_terms_query(
+                field=field,
+                terms=terms
+            )
+        )
+
+    def _add_field_must_exist_filter(self, field):
+        self.search = self._get_or_create_search().query(
+            self._make_field_must_exist_query(
+                field=field
+            )
+        )
+
+    def _add_field_must_not_exist_filter(self, field):
+        self.search = self._get_or_create_search().query(
+            ~self._make_field_must_exist_query(
+                field=field
+            )
+        )
+
+    def _add_terms_aggregation(self, title, field, exclude=[], size=200):
         self._get_or_create_search().aggs.bucket(
             title,
-            A(
-                FILTERS,
-                filters={
-                    YES: Q(EXISTS, field=field),
-                    NO: ~Q(EXISTS, field=field)
-                }
+            self._make_terms_aggregation(
+                field=field,
+                size=size,
+                exclude=exclude
+            )
+        )
+
+    def _add_exists_aggregation(self, title, field):
+        self._get_or_create_search().aggs.bucket(
+            title,
+            self._make_exists_aggregation(
+                field=field
             )
         )
 
