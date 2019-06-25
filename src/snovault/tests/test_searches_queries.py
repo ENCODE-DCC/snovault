@@ -629,6 +629,42 @@ def test_searches_queries_abstract_query_factory_add_must_equal_terms_filter(par
     }
 
 
+def test_searches_queries_abstract_query_factory_add_must_equal_terms_post_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_must_equal_terms_post_filter(
+        field='status',
+        terms=['released', 'archived']
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'match_all': {}
+        },
+        'post_filter': {
+            'terms': {'status': ['released', 'archived']}}
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_post_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_must_not_equal_terms_post_filter(
+        field='status',
+        terms=['released', 'archived']
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'match_all': {}
+        },
+        'post_filter': {
+            'bool': {
+                'filter': [
+                    {'bool': {'must_not': [{'terms': {'status': ['released', 'archived']}}]}}]
+            }
+        }
+    }
+
+
 def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_filter(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
@@ -675,6 +711,25 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_filter(par
     }
 
 
+def test_searches_queries_abstract_query_factory_add_field_must_exist_post_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_field_must_exist_post_filter(
+        'embedded.status'
+    )
+    assert aq.search.to_dict() == {
+        'post_filter': {
+            'bool': {
+                'filter': [
+                    {'exists': {'field': 'embedded.status'}}]
+            }
+        },
+        'query': {
+            'match_all': {}
+        }
+    }
+
+
 def test_searches_queries_abstract_query_factory_add_field_must_exist_filter_multiple(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
@@ -706,6 +761,26 @@ def test_searches_queries_abstract_query_factory_add_field_must_not_exist_filter
         'query': {
             'bool': {
                 'filter': [{'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}}]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_field_must_not_exist_post_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_field_must_not_exist_post_filter(
+        'embedded.file_size'
+    )
+    print(aq.search.to_dict())
+    assert aq.search.to_dict() == {
+        'query': {
+            'match_all': {}
+        },
+        'post_filter': {
+            'bool': {
+                'filter': [
+                    {'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}}]
             }
         }
     }
