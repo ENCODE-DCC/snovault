@@ -15,8 +15,8 @@ from .interfaces import QUERY_STRING
 from .interfaces import TERMS
 from .interfaces import YES
 from elasticsearch_dsl import A
-from elasticsearch_dsl import Search
 from elasticsearch_dsl import Q
+from elasticsearch_dsl import Search
 from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.interfaces import TYPES
@@ -24,7 +24,8 @@ from snovault.interfaces import TYPES
 
 class AbstractQueryFactory():
     '''
-    Interface for building specific queries.
+    Interface for building specific queries. Don't change functionality here, instead
+    inherit and extend/override functions as needed.
     '''
     search = None
 
