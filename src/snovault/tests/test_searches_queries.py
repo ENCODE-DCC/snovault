@@ -116,7 +116,16 @@ def test_searches_queries_abstract_query_factory_get_filters(params_parser):
 def test_searches_queries_abstract_query_factory_get_post_filters(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    assert aq._get_post_filters() == []
+    assert aq._get_post_filters() == [
+        ('assay_title', 'Histone ChIP-seq'),
+        ('award.project', 'Roadmap'),
+        ('assembly', 'GRCh38'),
+        ('biosample_ontology.classification', 'primary cell'),
+        ('target.label', 'H3K27me3'),
+        ('biosample_ontology.classification!', 'cell line'),
+        ('biosample_ontology.term_name!', 'naive thymus-derived CD4-positive, alpha-beta T cell'),
+        ('status', 'released')
+    ]
 
 
 def test_searches_queries_abstract_query_factory_get_sort(params_parser):

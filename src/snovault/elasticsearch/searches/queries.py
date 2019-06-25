@@ -65,7 +65,7 @@ class AbstractQueryFactory():
         return self.params_parser.get_not_keys_filters(not_keys=NOT_FILTERS)
 
     def _get_post_filters(self):
-        return self.kwargs.get('post_filters', [])
+        return self.kwargs.get('post_filters', self._get_filters())
 
     def _get_sort(self):
         return self.params_parser.get_sort()
