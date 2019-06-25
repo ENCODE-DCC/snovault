@@ -398,7 +398,7 @@ def test_searches_queries_abstract_query_factory_make_filter_aggregation(params_
         }
     }
 
-    
+
 def test_searches_queries_abstract_query_factory_make_filter_aggregation_bool_context(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
@@ -420,6 +420,51 @@ def test_searches_queries_abstract_query_factory_make_filter_aggregation_bool_co
                 'filter': [
                     {'exists': {'field': 'embedded.status'}},
                     {'bool': {'must_not': [{'exists': {'field': 'embedded.audit'}}]}}]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    fasa = aq._make_filter_and_sub_aggregation(
+        title='Lab name terms on Experiments that have files with file_size',
+        filter_context=(
+            aq._make_must_equal_terms_query(
+                field='@type',
+                terms=['Experiment']
+            )
+            & aq._make_bool_filter_query(
+                filter=[
+                    aq._make_field_must_exist_query(
+                        field='embeddded.files.file_size'
+                    )
+                ]
+            )
+        ),
+        sub_aggregation=aq._make_terms_aggregation(
+            field='embedded.lab.name'
+        )
+    )
+    print(fasa.to_dict())
+    assert fasa.to_dict() == {
+        'aggs': {
+            'Lab name terms on Experiments that have files with file_size': {
+                'terms': {
+                    'size': 200,
+                    'field': 'embedded.lab.name',
+                    'exclude': []
+                }
+            }
+        },
+        'filter': {
+            'bool': {
+                'filter': [
+                    {'exists': {'field': 'embeddded.files.file_size'}}
+                ],
+                'must': [
+                    {'terms': {'@type': ['Experiment']}}]
             }
         }
     }
@@ -930,6 +975,9 @@ def test_searches_queries_abstract_query_factory_add_aggs(params_parser):
 def test_searches_queries_abstract_query_factory_add_source(params_parser):
     assert False 
 
+
+def test_searches_queries_abstract_query_factory_add_filters_and_sub_aggregation(params_parser):
+    assert False
 
 def test_searches_queries_abstract_query_factory_build_query():
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory

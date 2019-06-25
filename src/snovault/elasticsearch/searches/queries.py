@@ -165,6 +165,11 @@ class AbstractQueryFactory():
             filter_context
         )
 
+    def _make_filter_and_sub_aggregation(self, title, filter_context, sub_aggregation):
+        a = self._make_filter_aggregation(filter_context)
+        a.bucket(title, sub_aggregation)
+        return a
+
     def _add_query_string_query(self):
         query = self._get_query()
         if query:
@@ -265,6 +270,9 @@ class AbstractQueryFactory():
                 field=field
             )
         )
+
+    def _add_filters_and_sub_aggregations(self, title, field):
+        pass
 
     def _add_filters(self):
         pass
