@@ -382,23 +382,88 @@ def test_searches_queries_abstract_query_factory_make_bool_filter_and_query_cont
 
 
 def test_searches_queries_abstract_query_factory_make_query_string_query(params_parser):
-    assert False
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    qsq = aq._make_query_string_query(
+        'my TEST',
+        fields=['embedded.description'],
+        default_operator='OR'
+    )
+    assert qsq.to_dict() == {
+        'query_string': {
+            'default_operator': 'OR',
+            'fields': ['embedded.description'],
+            'query': 'my TEST'
+        }
+    }
 
 
 def test_searches_queries_abstract_query_factory_make_must_equal_terms_query(params_parser):
-    assert False
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    mtq = aq._make_must_equal_terms_query(
+        field='embedded.status',
+        terms=['released']
+    )
+    assert mtq.to_dict() == {
+        'terms': {
+            'embedded.status': ['released']
+        }
+    }
 
 
 def test_searches_queries_abstract_query_factory_make_field_must_exist_query(params_parser):
-    assert False
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    meq = aq._make_field_must_exist_query(
+        field='embedded.file_size'
+    )
+    assert meq.to_dict() == {
+        'exists': {
+            'field': 'embedded.file_size'
+        }
+    }
 
 
 def test_searches_queries_abstract_query_factory_make_terms_aggregation(params_parser):
-    assert False
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    ta = aq._make_terms_aggregation(
+        field='embedded.lab.name',
+        exclude=['other lab'],
+        size=14
+    )
+    assert ta.to_dict() == {
+        'terms': {
+            'exclude': ['other lab'],
+            'field': 'embedded.lab.name',
+            'size': 14
+        }
+    }
 
 
 def test_searches_queries_abstract_query_factory_make_exists_aggregation(params_parser):
-    assert False
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    eq = aq._make_exists_aggregation(
+        field='embedded.file_available'
+    )
+    assert eq.to_dict() == {
+        'filters': {
+            'filters': {
+                'no': {
+                    'bool': {
+                        'must_not': [
+                            {'exists': {'field': 'embedded.file_available'}}
+                        ]
+                    }
+                },
+                'yes': {
+                    'exists': {'field': 'embedded.file_available'}
+                }
+            }
+        }
+    }
 
 
 def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_request):
