@@ -8,6 +8,7 @@ from .interfaces import SORT_KEY
 from .interfaces import TYPE_KEY
 from .interfaces import WILDCARD
 from urllib.parse import urlencode
+from collections import defaultdict
 
 
 class ParamsParser():
@@ -236,6 +237,12 @@ class ParamsParser():
             key=FRAME_KEY,
             params=params
         )
+
+    def group_values_by_key(self, params=None):
+        values_by_key = defaultdict(list)
+        for p in self._params(params):
+            values_by_key[p[0]].append(p[1])
+        return dict(values_by_key)
 
     def split_filters_by_must_and_exists(self, params=None):
         '''

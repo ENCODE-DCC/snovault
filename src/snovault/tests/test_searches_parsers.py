@@ -602,6 +602,27 @@ def test_searches_parsers_params_parser_params_to_list(dummy_request):
     ]
 
 
+def test_searches_parsers_params_parser_group_values_by_key(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=*&status=released&status!=submitted&type=File&file_size=*'
+        '&file_format%21=bigWig&restricted!=*&no_file_available!=*&limit=all'
+        '&status=archived&status=revoked&file_format!=fastq'
+    )
+    p = ParamsParser(dummy_request)
+    values_by_key = p.group_values_by_key()
+    assert values_by_key == {
+        'file_format!': ['bigWig', 'fastq'],
+        'file_size': ['*'],
+        'limit': ['all'],
+        'no_file_available!': ['*'],
+        'restricted!': ['*'],
+        'status': ['released', 'archived', 'revoked'],
+        'status!': ['submitted'],
+        'type': ['*', 'File']
+    }
+
+
 def test_searchers_parsers_params_parser_split_filters_by_must_and_exists(dummy_request):
     from snovault.elasticsearch.searches.defaults import NOT_FILTERS
     from snovault.elasticsearch.searches.parsers import ParamsParser
