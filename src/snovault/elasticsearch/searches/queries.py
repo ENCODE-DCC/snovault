@@ -170,17 +170,6 @@ class AbstractQueryFactory():
         a.bucket(title, sub_aggregation)
         return a
 
-    def _add_query_string_query(self):
-        query = self._get_query()
-        if query:
-            self.search = self._get_or_create_search().query(
-                self._make_query_string_query(
-                    query=query,
-                    fields=self._get_search_fields(),
-                    default_operator=AND
-                )
-            )
-
     def _add_must_equal_terms_filter(self, field, terms):
         self.search = self._get_or_create_search().filter(
             self._make_must_equal_terms_query(
@@ -271,16 +260,27 @@ class AbstractQueryFactory():
             )
         )
 
-    def _add_filters_and_sub_aggregations(self, title, field):
+    def add_query_string_query(self):
+        query = self._get_query()
+        if query:
+            self.search = self._get_or_create_search().query(
+                self._make_query_string_query(
+                    query=query,
+                    fields=self._get_search_fields(),
+                    default_operator=AND
+                )
+            )
+
+    def add_filters(self):
         pass
 
-    def _add_filters(self):
+    def add_post_filters(self):
         pass
 
-    def _add_aggs(self):
+    def add_aggregations_and_aggregation_filters(self, title, field):
         pass
 
-    def _add_source(self):
+    def add_source(self):
         pass
 
     def build_query(self):

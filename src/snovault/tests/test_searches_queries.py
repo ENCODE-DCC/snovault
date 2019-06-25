@@ -643,7 +643,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_re
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    aq._add_query_string_query()
+    aq.add_query_string_query()
     constructed_query = aq.search.to_dict()
     expected_query = {
         'query': {
@@ -682,7 +682,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_typ
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    aq._add_query_string_query()
+    aq.add_query_string_query()
     constructed_query = aq.search.to_dict()
     expected_query = {
         'query': {
@@ -728,7 +728,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_def
             'TestingSearchSchema'
         ]
     )
-    aq._add_query_string_query()
+    aq.add_query_string_query()
     constructed_query = aq.search.to_dict()
     expected_query = {
         'query': {
@@ -769,7 +769,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_no_searc
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    aq._add_query_string_query()
+    aq.add_query_string_query()
     assert aq.search is None
 
 
@@ -1048,15 +1048,16 @@ def test_searches_queries_abstract_query_factory_add_filters(params_parser):
     assert False 
 
 
-def test_searches_queries_abstract_query_factory_add_aggs(params_parser):
-    assert False
+def test_searches_queries_abstract_query_factory_add_post_filters(params_parser):
+    assert False 
+
 
 
 def test_searches_queries_abstract_query_factory_add_source(params_parser):
     assert False 
 
 
-def test_searches_queries_abstract_query_factory_add_filters_and_sub_aggregation(params_parser):
+def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregation_filters(params_parser):
     assert False
 
 
