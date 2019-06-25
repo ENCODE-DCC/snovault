@@ -470,6 +470,77 @@ def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation
     }
 
 
+def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation_bool(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    fasa = aq._make_filter_and_sub_aggregation(
+        title='Small processed versus raw files on first day of ENCODE4',
+        filter_context=aq._make_bool_query(
+            must=[
+                aq._make_field_must_exist_query(
+                    field='embedded.file_type'
+                )
+            ],
+            should=[
+                aq._make_must_equal_terms_query(
+                    field='embedded.file_size',
+                    terms=['1', '2', '3']
+                )
+            ],
+            must_not=[
+                aq._make_must_equal_terms_query(
+                    field='embedded.@type',
+                    terms=['Publication']
+                ),
+                aq._make_must_equal_terms_query(
+                    field='embedded.award.rfa',
+                    terms=['ENCODE2']
+                )
+            ],
+            filter=[
+                aq._make_must_equal_terms_query(
+                    field='embedded.date_created',
+                    terms=['05/01/2017']
+                )
+            ]
+        ),
+        sub_aggregation=aq._make_exists_aggregation(
+            field='embedded.derived_from'
+        )
+    )
+    assert fasa.to_dict() == {
+        'aggs': {
+            'Small processed versus raw files on first day of ENCODE4': {
+                'filters': {
+                    'filters': {
+                        'no': {
+                            'bool': {
+                                'must_not': [{'exists': {'field': 'embedded.derived_from'}}]}
+                        },
+                        'yes': {
+                            'exists': {'field': 'embedded.derived_from'}}}
+                }
+            }
+        },
+        'filter': {
+            'bool': {
+                'must_not': [
+                    {'terms': {'embedded.@type': ['Publication']}},
+                    {'terms': {'embedded.award.rfa': ['ENCODE2']}}
+                ],
+                'filter': [
+                    {'terms': {'embedded.date_created': ['05/01/2017']}}
+                ],
+                'must': [
+                    {'exists': {'field': 'embedded.file_type'}}
+                ],
+                'should': [
+                    {'terms': {'embedded.file_size': ['1', '2', '3']}}]
+            }
+        }
+    }
+
+
 def test_searches_queries_abstract_query_factory_make_query_string_query(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
