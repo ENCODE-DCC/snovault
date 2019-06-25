@@ -74,6 +74,13 @@ def test_searches_queries_abstract_query_factory_get_item_types(params_parser):
     ]
 
 
+def test_searches_queries_abstract_query_factory_get_principals(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    principals = aq._get_principals()
+    assert principals == ['system.Everyone']
+
+
 def test_searches_queries_abstract_query_factory_get_default_item_types(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(
@@ -594,6 +601,47 @@ def test_searches_queries_abstract_query_factory_make_field_must_exist_query(par
     }
 
 
+def test_searches_queries_abstract_query_factory_make_default_filters(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    df = aq._make_default_filters()
+    assert df[0].to_dict() == {
+        'terms': {
+            'principals_allowed.view': ['system.Everyone']
+        }
+    }
+    assert df[1].to_dict() == {
+        'terms': {
+            'embedded.@type': ['TestingSearchSchema']
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_default_filters_default_types(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&assembly=GRCh38&biosample_ontology.classification=primary+cell'
+        '&target.label=H3K27me3&biosample_ontology.classification%21=cell+line'
+    )
+    p = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(p, default_item_types=['Snowflake', 'Pancake'])
+    df = aq._make_default_filters()
+    assert df[0].to_dict() == {
+        'terms': {
+            'principals_allowed.view': ['system.Everyone']
+        }
+    }
+    assert df[1].to_dict() == {
+        'terms': {
+            'embedded.@type': [
+                'Snowflake', 'Pancake'
+            ]
+        }
+    }
+
+
 def test_searches_queries_abstract_query_factory_make_terms_aggregation(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
@@ -1050,7 +1098,6 @@ def test_searches_queries_abstract_query_factory_add_filters(params_parser):
 
 def test_searches_queries_abstract_query_factory_add_post_filters(params_parser):
     assert False 
-
 
 
 def test_searches_queries_abstract_query_factory_add_source(params_parser):

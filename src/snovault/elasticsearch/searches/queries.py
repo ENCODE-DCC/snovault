@@ -8,10 +8,12 @@ from .interfaces import AND_NOT_JOIN
 from .interfaces import BOOL
 from .interfaces import BOOST_VALUES
 from .interfaces import EMBEDDED
+from .interfaces import EMBEDDED_TYPE
 from .interfaces import EXISTS
 from .interfaces import FILTERS
 from .interfaces import NOT_JOIN
 from .interfaces import NO
+from .interfaces import PRINCIPALS_ALLOWED_VIEW
 from .interfaces import QUERY_STRING
 from .interfaces import TERMS
 from .interfaces import YES
@@ -48,6 +50,9 @@ class AbstractQueryFactory():
 
     def _get_index(self):
         return RESOURCES_INDEX
+
+    def _get_principals(self):
+        return self.params_parser._request.effective_principals
 
     def _get_item_types(self):
         return self.params_parser.get_type_filters()
@@ -141,6 +146,25 @@ class AbstractQueryFactory():
             EXISTS,
             field=field
         )
+
+    def _make_default_filters(self):
+        return [
+            self._make_must_equal_terms_query(
+                field=PRINCIPALS_ALLOWED_VIEW,
+                terms=self._get_principals()
+            ),
+            self._make_must_equal_terms_query(
+                field=EMBEDDED_TYPE,
+                terms=(
+                    self.params_parser.param_values_to_list(
+                        params=self.params_parser.get_must_match_filters(
+                            params=self._get_item_types()
+                        )
+                    )
+                    or self._get_default_item_types()
+                )
+            )
+        ]
 
     def _make_terms_aggregation(self, field, exclude=[], size=200):
         return A(
@@ -272,7 +296,11 @@ class AbstractQueryFactory():
             )
 
     def add_filters(self):
-        pass
+        self.search = self._get_or_create_search().query(
+            self._make_bool_query(
+                must=self._make_default_filters()
+            )
+        )
 
     def add_post_filters(self):
         pass
