@@ -115,13 +115,13 @@ class ParamsParser():
         '''
         return self.params_to_list(key=False, params=params)
 
-    def remove_not_flag(self, list_of_values, not_flag=NOT_FLAG):
+    def remove_not_flag(self, params=None, not_flag=NOT_FLAG):
         '''
         Can be used to remove not flag from list of param keys.
         '''
         return [
-            x.replace(not_flag, '')
-            for x in list_of_values
+            (x[0].replace(not_flag, ''), x[1])
+            for x in self._params(params)
         ]
 
     def get_must_match_filters(self, params=None):

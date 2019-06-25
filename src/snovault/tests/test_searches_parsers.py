@@ -568,17 +568,17 @@ def test_searches_parsers_params_parser_param_values_to_list(dummy_request):
     ]
 
 
-def test_searches_parsers_params_parser_param_keys_to_list_remove_not_flag(dummy_request):
+def test_searches_parsers_params_parser_param_remove_not_flag(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'frame=embedded&status!=submitted&type=File&sort=date_created'
     )
     p = ParamsParser(dummy_request)
-    assert p.remove_not_flag(p.param_keys_to_list()) == [
-        'frame',
-        'status',
-        'type',
-        'sort',
+    assert p.remove_not_flag() == [
+        ('frame', 'embedded'),
+        ('status', 'submitted'),
+        ('type', 'File'),
+        ('sort', 'date_created')
     ]
 
 
