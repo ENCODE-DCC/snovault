@@ -159,6 +159,12 @@ class AbstractQueryFactory():
             }
         )
 
+    def _make_filter_aggregation(self, filter_context):
+        return A(
+            'filter',
+            filter_context
+        )
+
     def _add_query_string_query(self):
         query = self._get_query()
         if query:

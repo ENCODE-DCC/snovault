@@ -381,6 +381,23 @@ def test_searches_queries_abstract_query_factory_make_bool_filter_and_query_cont
     }
 
 
+def test_searches_queries_abstract_query_factory_make_filter_aggregation(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    fa = aq._make_filter_aggregation(
+        filter_context=aq._make_must_equal_terms_query(
+            field='embedded.@type',
+            terms=['File']
+        )
+    )
+    assert fa.to_dict() == {
+        'filter': {
+            'terms': {
+                'embedded.@type': ['File']
+            }
+        }}
+    
+
 def test_searches_queries_abstract_query_factory_make_query_string_query(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
@@ -772,7 +789,6 @@ def test_searches_queries_abstract_query_factory_add_field_must_not_exist_post_f
     aq._add_field_must_not_exist_post_filter(
         'embedded.file_size'
     )
-    print(aq.search.to_dict())
     assert aq.search.to_dict() == {
         'query': {
             'match_all': {}
