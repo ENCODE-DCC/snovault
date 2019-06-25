@@ -395,8 +395,35 @@ def test_searches_queries_abstract_query_factory_make_filter_aggregation(params_
             'terms': {
                 'embedded.@type': ['File']
             }
-        }}
+        }
+    }
+
     
+def test_searches_queries_abstract_query_factory_make_filter_aggregation_bool_context(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    fa = aq._make_filter_aggregation(
+        filter_context=aq._make_bool_filter_query(
+            filter=[
+                aq._make_field_must_exist_query(
+                    field='embedded.status'
+                ),
+                ~aq._make_field_must_exist_query(
+                    field='embedded.audit'
+                )
+            ]
+        )
+    )
+    assert fa.to_dict() == {
+        'filter': {
+            'bool': {
+                'filter': [
+                    {'exists': {'field': 'embedded.status'}},
+                    {'bool': {'must_not': [{'exists': {'field': 'embedded.audit'}}]}}]
+            }
+        }
+    }
+
 
 def test_searches_queries_abstract_query_factory_make_query_string_query(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
