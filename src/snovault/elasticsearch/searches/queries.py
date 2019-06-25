@@ -277,7 +277,7 @@ class AbstractQueryFactory():
     def add_post_filters(self):
         pass
 
-    def add_aggregations_and_aggregation_filters(self, title, field):
+    def add_aggregations_and_aggregation_filters(self):
         pass
 
     def add_source(self):
@@ -296,9 +296,9 @@ class BasicSearchQueryFactory(AbstractQueryFactory):
         super().__init__(params_parser, *args, **kwargs)
 
     def build_query(self):
-        self._get_or_create_search()
-        self._add_query_string_query()
-        self._add_filters()
-        self._add_aggs()
-        self._add_source()
+        self.add_query_string_query()
+        self.add_filters()
+        self.add_post_filters()
+        self.add_aggregations_and_aggregation_filters()
+        self.add_source()
         return self.search
