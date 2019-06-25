@@ -1,4 +1,4 @@
-NOT_FILTERS = [
+OPTIONAL_PARAMS = [
     'type',
     'limit',
     'mode',
@@ -15,10 +15,14 @@ NOT_FILTERS = [
     'filterresponse',
     'remove',
     'cart',
+]
+
+FREE_TEXT_QUERIES = [
     'searchTerm',
     'advancedQuery',
 ]
 
+NOT_FILTERS = OPTIONAL_PARAMS + FREE_TEXT_QUERIES
 
 BASE_SEARCH_FIELDS = [
     '_all',
