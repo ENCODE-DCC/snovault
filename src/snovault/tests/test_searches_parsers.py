@@ -204,7 +204,7 @@ def test_searches_parsers_params_parser_get_must_match_filter(dummy_request):
     ]
 
 
-def test_searches_parsers_params_parser_get_must_not_match_filter(dummy_request):
+def test_searches_parsers_params_parser_get_must_not_match_filters(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type!=Experiment&type=File&files.file_type=fastq&field=status'
@@ -212,6 +212,55 @@ def test_searches_parsers_params_parser_get_must_not_match_filter(dummy_request)
     p = ParamsParser(dummy_request)
     assert p.get_must_not_match_filters() == [
         ('type!', 'Experiment')
+    ]
+
+
+def test_searches_parsers_params_parser_get_must_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&files.file_type!=fastq&field=status&type=*'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_must_filters() == [
+        ('type', 'Experiment'),
+        ('type', 'File'),
+        ('field', 'status')
+    ]
+
+
+def test_searches_parsers_params_parser_get_must_not_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&files.file_type!=fastq'
+        '&field=status&type=*&file_size!=*'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_must_not_filters() == [
+        ('files.file_type!', 'fastq')
+    ]
+
+
+def test_searches_parsers_params_parser_get_exists_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&files.file_type!=fastq'
+        '&field=status&type=*&file_size!=*'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_exists_filters() == [
+        ('type', '*')
+    ]
+
+
+def test_searches_parsers_params_parser_get_not_exists_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&files.file_type!=fastq'
+        '&field=status&type=*&file_size!=*'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_not_exists_filters() == [
+        ('file_size!', '*')
     ]
 
 
@@ -357,6 +406,20 @@ def test_searches_parsers_params_parser_get_wildcard_filters(dummy_request):
     assert p.get_wildcard_filters() == [
         ('type', '*'),
         ('file_format!', '*')
+    ]
+
+
+def test_searches_parsers_params_parser_get_not_wildcard_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&type=*&file_format%21=*'
+        '&file_type%21=bigBed+tss_peak&file_format_type=bed3%2B'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_not_wildcard_filters() == [
+        ('status', 'released'),
+        ('file_type!', 'bigBed tss_peak'),
+        ('file_format_type', 'bed3+')
     ]
 
 

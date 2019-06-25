@@ -76,6 +76,15 @@ class ParamsParser():
             params=params
         )
 
+    def get_not_wildcard_filters(self, params=None):
+        '''
+        Returns params without wildcard value.
+        '''
+        return self.get_filters_by_condition(
+            value_condition=lambda v: v != WILDCARD,
+            params=params
+        )
+
     def get_query_string(self, params=None):
         '''
         Can be called at end of filter chain to return urlencoded string.
@@ -115,15 +124,61 @@ class ParamsParser():
         ]
 
     def get_must_match_filters(self, params=None):
+        '''
+        Returns params where key must equal value.
+        '''
         return self.get_filters_by_condition(
             key_condition=lambda k: not k.endswith(NOT_FLAG),
             params=params
         )
 
     def get_must_not_match_filters(self, params=None):
+        '''
+        Returns params where key must not equal value.
+        '''
         return self.get_filters_by_condition(
             key_condition=lambda k: k.endswith(NOT_FLAG),
             params=params
+        )
+
+    def get_must_filters(self, params=None):
+        '''
+        Like get_must_match_filters but wildcard values are excluded.
+        '''
+        return self.get_not_wildcard_filters(
+            params=self.get_must_match_filters(
+                params=params
+            )
+        )
+
+    def get_must_not_filters(self, params=None):
+        '''
+        Like get_must_not_match_filters but wildcard values are excluded.
+        '''
+        return self.get_not_wildcard_filters(
+            params=self.get_must_not_match_filters(
+                params=params
+            )
+        )
+
+    def get_exists_filters(self, params=None):
+        '''
+        Like get_must_match_filters but only wildcard values are included.
+        '''
+        return self.get_wildcard_filters(
+            params=self.get_must_match_filters(
+                params=params
+            )
+        )
+
+    def get_not_exists_filters(self, params=None):
+        '''
+        Like get_must_not_match_filters but only wildcard values are included.
+        '''
+        return self.get_wildcard_filters(
+            params=self.get_must_not_match_filters(
+                params=params
+            )
         )
 
     def get_type_filters(self, params=None):
@@ -181,3 +236,6 @@ class ParamsParser():
             key=FRAME_KEY,
             params=params
         )
+
+    def split_filters_by_wildcard_and_not(self, params=None):
+        pass
