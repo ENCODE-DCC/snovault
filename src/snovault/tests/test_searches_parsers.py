@@ -600,3 +600,32 @@ def test_searches_parsers_params_parser_params_to_list(dummy_request):
         'type',
         'sort',
     ]
+
+
+def test_searchers_parsers_params_parser_split_filters_by_must_and_exists(dummy_request):
+    from snovault.elasticsearch.searches.defaults import NOT_FILTERS
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=*&status=released&status!=submitted&type=File&file_size=*'
+        '&file_format%21=bigWig&restricted!=*&no_file_available!=*&limit=all'
+    )
+    p = ParamsParser(dummy_request)
+    must, must_not, exists, not_exists = p.split_filters_by_must_and_exists(
+        params=p.get_not_keys_filters(not_keys=NOT_FILTERS) + p.get_type_filters()
+    )
+    assert must == [
+        ('status', 'released'),
+        ('type', 'File')
+    ]
+    assert must_not == [
+        ('status!', 'submitted'),
+        ('file_format!', 'bigWig')
+    ]
+    assert exists == [
+        ('file_size', '*'),
+        ('type', '*')
+    ]
+    assert not_exists == [
+        ('restricted!', '*'),
+        ('no_file_available!', '*')
+    ]

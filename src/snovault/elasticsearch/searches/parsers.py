@@ -237,5 +237,13 @@ class ParamsParser():
             params=params
         )
 
-    def split_filters_by_wildcard_and_not(self, params=None):
-        pass
+    def split_filters_by_must_and_exists(self, params=None):
+        '''
+        Partitions params into four groups: must, must_not, exists, not_exists.
+        This is a split based on wildcard and equals/not equals.
+        '''
+        must = self.get_must_filters(params=params)
+        must_not = self.get_must_not_filters(params=params)
+        exists = self.get_exists_filters(params=params)
+        not_exists = self.get_not_exists_filters(params=params)
+        return must, must_not, exists, not_exists
