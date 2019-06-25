@@ -240,6 +240,99 @@ def test_searches_queries_abstract_query_factory_prefix_values(params_parser):
     ) == ['embedded.uuid', 'embedded.status', 'embedded.@type']
 
 
+def test_searches_queries_abstract_query_factory_make_bool_filter_query(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    bf = aq._make_bool_filter_query(
+        filter=[
+            aq._make_must_equal_terms_query(
+                field='embedded.status',
+                terms=['revoked', 'archived']
+            )
+        ]
+    )
+    assert bf.to_dict() == {
+        'bool': {
+            'filter': [
+                {
+                    'terms': {
+                        'embedded.status': [
+                            'revoked',
+                            'archived'
+                        ]
+                    }
+                }
+            ]
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_bool_filter_query_must_not(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    bf = aq._make_bool_filter_query(
+        filter=[
+            ~aq._make_must_equal_terms_query(
+                field='embedded.status',
+                terms=['revoked', 'archived']
+            )
+        ]
+    )
+    assert bf.to_dict() == {
+        'bool': {
+            'filter': [
+                {
+                    'bool': {
+                        'must_not': [
+                            {
+                                'terms': {
+                                    'embedded.status': [
+                                        'revoked',
+                                        'archived'
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_bool_filter_query_must_and_must_not(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    bf = aq._make_bool_filter_query(
+        filter=[
+            ~aq._make_must_equal_terms_query(
+                field='embedded.status',
+                terms=['revoked', 'archived']
+            ),
+            ~aq._make_field_must_exist_query(
+                field='embedded.file_size'
+            ),
+            aq._make_must_equal_terms_query(
+                field='embedded.@type',
+                terms=['Item']
+            ),
+            aq._make_field_must_exist_query(
+                field='embedded.@type'
+            )
+        ]
+    )
+    assert bf.to_dict() == {
+        'bool': {
+            'filter': [
+                {'bool': {'must_not': [{'terms': {'embedded.status': ['revoked', 'archived']}}]}},
+                {'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}},
+                {'terms': {'embedded.@type': ['Item']}},
+                {'exists': {'field': 'embedded.@type'}}
+            ]
+        }
+    }
+
+
 def test_searches_queries_abstract_query_factory_make_query_string_query(params_parser):
     assert False
 
@@ -462,9 +555,9 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_filter(par
     )
     assert aq.search.to_dict() == {
         'query': {
-            'exists': {
-                'field': 'embedded.status'
-            }
+            'bool': {
+                'filter': [{'exists': {'field': 'embedded.status'}}]
+                }
         }
     }
 
@@ -481,7 +574,7 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_filter_mul
     assert aq.search.to_dict() == {
         'query': {
             'bool': {
-                'must': [
+                'filter': [
                     {'exists': {'field': 'embedded.status'}},
                     {'exists': {'field': 'embedded.lab'}}
                 ]
@@ -499,9 +592,7 @@ def test_searches_queries_abstract_query_factory_add_field_must_not_exist_filter
     assert aq.search.to_dict() == {
         'query': {
             'bool': {
-                'must_not': [
-                    {'exists': {'field': 'embedded.file_size'}}
-                ]
+                'filter': [{'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}}]
             }
         }
     }
@@ -519,11 +610,9 @@ def test_searches_queries_abstract_query_factory_add_field_must_and_must_not_exi
     assert aq.search.to_dict() == {
         'query': {
             'bool': {
-                'must': [
-                    {'exists': {'field': 'embedded.status'}}
-                ],
-                'must_not': [
-                    {'exists': {'field': 'embedded.file_size'}}
+                'filter': [
+                    {'exists': {'field': 'embedded.status'}},
+                    {'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}}
                 ]
             }
         }

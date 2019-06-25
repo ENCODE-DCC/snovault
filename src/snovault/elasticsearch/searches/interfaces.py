@@ -1,6 +1,7 @@
 AND = 'AND'
 AND_JOIN = ' AND '
 AND_NOT_JOIN = ' AND NOT '
+BOOL = 'bool'
 BOOST_VALUES = 'boost_values'
 EMBEDDED = 'embedded.'
 EXISTS = 'exists'

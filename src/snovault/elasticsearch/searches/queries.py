@@ -5,6 +5,7 @@ from .defaults import BASE_SEARCH_FIELDS
 from .interfaces import AND
 from .interfaces import AND_JOIN
 from .interfaces import AND_NOT_JOIN
+from .interfaces import BOOL
 from .interfaces import BOOST_VALUES
 from .interfaces import EMBEDDED
 from .interfaces import EXISTS
@@ -123,6 +124,12 @@ class AbstractQueryFactory():
             default_operator=default_operator
         )
 
+    def _make_bool_filter_query(self, filter=None):
+        return Q(
+            BOOL,
+            filter=filter
+        )
+
     def _make_must_equal_terms_query(self, field, terms):
         return Q(
             TERMS,
@@ -181,15 +188,19 @@ class AbstractQueryFactory():
 
     def _add_field_must_exist_filter(self, field):
         self.search = self._get_or_create_search().query(
-            self._make_field_must_exist_query(
-                field=field
+            self._make_bool_filter_query(
+                filter=[
+                    self._make_field_must_exist_query(field=field),
+                ]
             )
         )
 
     def _add_field_must_not_exist_filter(self, field):
         self.search = self._get_or_create_search().query(
-            ~self._make_field_must_exist_query(
-                field=field
+             self._make_bool_filter_query(
+                filter=[
+                    ~self._make_field_must_exist_query(field=field),
+                ]
             )
         )
 
