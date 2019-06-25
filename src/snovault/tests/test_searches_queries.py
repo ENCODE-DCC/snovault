@@ -333,6 +333,54 @@ def test_searches_queries_abstract_query_factory_make_bool_filter_query_must_and
     }
 
 
+def test_searches_queries_abstract_query_factory_make_bool_filter_and_query_context(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    bf = aq._make_bool_filter_query(
+        filter=[
+            ~aq._make_must_equal_terms_query(
+                field='embedded.status',
+                terms=['revoked', 'archived']
+            ),
+            ~aq._make_field_must_exist_query(
+                field='embedded.file_size'
+            ),
+            aq._make_must_equal_terms_query(
+                field='embedded.@type',
+                terms=['Item']
+            ),
+            aq._make_field_must_exist_query(
+                field='embedded.@type'
+            )
+        ]
+    )
+    aq.search = aq._get_or_create_search().query(bf)
+    aq.search = aq.search.query(
+        aq._make_query_string_query('test query', fields=['name, title'])
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'bool': {
+                'filter': [
+                    {'bool': {'must_not': [{'terms': {'embedded.status': ['revoked', 'archived']}}]}},
+                    {'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}},
+                    {'terms': {'embedded.@type': ['Item']}},
+                    {'exists': {'field': 'embedded.@type'}}
+                ],
+                'must': [
+                    {
+                        'query_string': {
+                            'query': 'test query',
+                            'default_operator': 'AND',
+                            'fields': ['name, title']
+                        }
+                    }
+                ]
+            }
+        }
+    }
+
+
 def test_searches_queries_abstract_query_factory_make_query_string_query(params_parser):
     assert False
 
