@@ -1093,7 +1093,18 @@ def test_searches_queries_abstract_query_factory_add_exists_aggregation(params_p
 
 
 def test_searches_queries_abstract_query_factory_add_filters(params_parser):
-    assert False 
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_filters()
+    assert aq.search.to_dict() == {
+        'query': {
+            'bool': {
+                'must': [
+                    {'terms': {'principals_allowed.view': ['system.Everyone']}},
+                    {'terms': {'embedded.@type': ['Experiment']}}]
+            }
+        }
+    }
 
 
 def test_searches_queries_abstract_query_factory_add_post_filters(params_parser):
