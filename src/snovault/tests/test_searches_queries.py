@@ -243,7 +243,7 @@ def test_searches_queries_abstract_query_factory_prefix_values(params_parser):
 def test_searches_queries_abstract_query_factory_make_bool_filter_query(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    bf = aq._make_bool_filter_query(
+    bf = aq._make_bool_query(
         filter=[
             aq._make_must_equal_terms_query(
                 field='embedded.status',
@@ -270,7 +270,7 @@ def test_searches_queries_abstract_query_factory_make_bool_filter_query(params_p
 def test_searches_queries_abstract_query_factory_make_bool_filter_query_must_not(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    bf = aq._make_bool_filter_query(
+    bf = aq._make_bool_query(
         filter=[
             ~aq._make_must_equal_terms_query(
                 field='embedded.status',
@@ -303,7 +303,7 @@ def test_searches_queries_abstract_query_factory_make_bool_filter_query_must_not
 def test_searches_queries_abstract_query_factory_make_bool_filter_query_must_and_must_not(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    bf = aq._make_bool_filter_query(
+    bf = aq._make_bool_query(
         filter=[
             ~aq._make_must_equal_terms_query(
                 field='embedded.status',
@@ -336,7 +336,7 @@ def test_searches_queries_abstract_query_factory_make_bool_filter_query_must_and
 def test_searches_queries_abstract_query_factory_make_bool_filter_and_query_context(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    bf = aq._make_bool_filter_query(
+    bf = aq._make_bool_query(
         filter=[
             ~aq._make_must_equal_terms_query(
                 field='embedded.status',
@@ -403,7 +403,7 @@ def test_searches_queries_abstract_query_factory_make_filter_aggregation_bool_co
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
     fa = aq._make_filter_aggregation(
-        filter_context=aq._make_bool_filter_query(
+        filter_context=aq._make_bool_query(
             filter=[
                 aq._make_field_must_exist_query(
                     field='embedded.status'
@@ -435,7 +435,7 @@ def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation
                 field='@type',
                 terms=['Experiment']
             )
-            & aq._make_bool_filter_query(
+            & aq._make_bool_query(
                 filter=[
                     aq._make_field_must_exist_query(
                         field='embeddded.files.file_size'
@@ -447,7 +447,6 @@ def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation
             field='embedded.lab.name'
         )
     )
-    print(fasa.to_dict())
     assert fasa.to_dict() == {
         'aggs': {
             'Lab name terms on Experiments that have files with file_size': {
@@ -464,7 +463,8 @@ def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation
                     {'exists': {'field': 'embeddded.files.file_size'}}
                 ],
                 'must': [
-                    {'terms': {'@type': ['Experiment']}}]
+                    {'terms': {'@type': ['Experiment']}}
+                ]
             }
         }
     }
@@ -978,6 +978,7 @@ def test_searches_queries_abstract_query_factory_add_source(params_parser):
 
 def test_searches_queries_abstract_query_factory_add_filters_and_sub_aggregation(params_parser):
     assert False
+
 
 def test_searches_queries_abstract_query_factory_build_query():
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory

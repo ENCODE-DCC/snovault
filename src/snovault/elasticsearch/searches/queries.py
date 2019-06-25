@@ -124,10 +124,10 @@ class AbstractQueryFactory():
             default_operator=default_operator
         )
 
-    def _make_bool_filter_query(self, filter=None):
+    def _make_bool_query(self, **kwargs):
         return Q(
             BOOL,
-            filter=filter
+            **kwargs
         )
 
     def _make_must_equal_terms_query(self, field, terms):
@@ -207,7 +207,7 @@ class AbstractQueryFactory():
 
     def _add_must_not_equal_terms_post_filter(self, field, terms):
         self.search = self._get_or_create_search().post_filter(
-            self._make_bool_filter_query(
+            self._make_bool_query(
                 filter=[
                     ~self._make_must_equal_terms_query(
                         field=field,
@@ -219,7 +219,7 @@ class AbstractQueryFactory():
 
     def _add_field_must_exist_filter(self, field):
         self.search = self._get_or_create_search().query(
-            self._make_bool_filter_query(
+            self._make_bool_query(
                 filter=[
                     self._make_field_must_exist_query(field=field),
                 ]
@@ -228,7 +228,7 @@ class AbstractQueryFactory():
 
     def _add_field_must_exist_post_filter(self, field):
         self.search = self._get_or_create_search().post_filter(
-            self._make_bool_filter_query(
+            self._make_bool_query(
                 filter=[
                     self._make_field_must_exist_query(field=field),
                 ]
@@ -237,7 +237,7 @@ class AbstractQueryFactory():
 
     def _add_field_must_not_exist_filter(self, field):
         self.search = self._get_or_create_search().query(
-            self._make_bool_filter_query(
+            self._make_bool_query(
                 filter=[
                     ~self._make_field_must_exist_query(field=field),
                 ]
@@ -246,7 +246,7 @@ class AbstractQueryFactory():
 
     def _add_field_must_not_exist_post_filter(self, field):
         self.search = self._get_or_create_search().post_filter(
-            self._make_bool_filter_query(
+            self._make_bool_query(
                 filter=[
                     ~self._make_field_must_exist_query(field=field),
                 ]
