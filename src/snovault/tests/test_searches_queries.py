@@ -395,9 +395,6 @@ def test_searches_queries_abstract_query_factory_make_bool_filter_and_query_cont
             }
         }
     }
-
-
-
     fa = aq._make_filter_aggregation(
         filter_context=aq._make_must_equal_terms_query(
             field='embedded.@type',
