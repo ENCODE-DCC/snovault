@@ -359,8 +359,8 @@ class AbstractQueryFactory():
         must, must_not, exists, not_exists = self._make_split_filter_queries()
         self.search = self._get_or_create_search().post_filter(
             self._make_bool_query(
-                must=[must + exists],
-                must_not=[must_not, not_exists]
+                must=must + exists,
+                must_not=must_not + not_exists
             )
         )
 

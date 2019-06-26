@@ -1837,8 +1837,95 @@ def test_searches_queries_abstract_query_factory_add_filters(params_parser):
 
 
 def test_searches_queries_abstract_query_factory_add_post_filters(params_parser):
-    assert False 
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_post_filters()
+    actual_must = aq.search.to_dict()['post_filter']['bool']['must']
+    expected_must = [
+        {'terms': {'target.label': ['H3K27me3']}},
+        {'terms': {'assembly': ['GRCh38']}},
+        {'terms': {'award.project': ['Roadmap']}},
+        {'terms': {'assay_title': ['Histone ChIP-seq']}},
+        {'terms': {'status': ['released']}},
+        {'terms': {'biosample_ontology.classification': ['primary cell']}}
+    ]
+    assert all(e in actual_must for e in expected_must)
+    actual_must_not = aq.search.to_dict()['post_filter']['bool']['must_not']
+    expected_must_not = [
+        {
+            'terms': {
+                'biosample_ontology.term_name': [
+                    'naive thymus-derived CD4-positive, alpha-beta T cell'
+                ]
+            }
+        },
+        {
+            'terms': {
+                'biosample_ontology.classification': [
+                    'cell line'
+                ]
+            }
+        }
+    ]
+    assert all(e in actual_must_not for e in expected_must_not)
 
+
+def test_searches_queries_abstract_query_factory_add_query_string_and_post_filters_wildcards(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&type=TestingSearchSchema&status=*&restricted!=*'
+        '&no_file_available!=*&limit=10&field=@id&field=accession&lab.name=*'
+        '&file_type=bam'
+    )
+    p = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(p)
+    aq.add_query_string_query()
+    aq.add_post_filters()
+    actual_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'query': '(chip-seq)',
+                'fields': [
+                    '_all',
+                    '*.uuid',
+                    'unique_keys.*',
+                    'embedded.accession',
+                    'embedded.status',
+                    '*.submitted_file_name',
+                    '*.md5sum'
+                ],
+                'default_operator': 'AND'
+            }
+        },
+        'post_filter': {
+            'bool': {
+                'must': [
+                    {'terms': {'file_type': ['bam']}},
+                    {'exists': {'field': 'lab.name'}},
+                    {'exists': {'field': 'status'}}
+                ],
+                'must_not': [
+                    {'exists': {'field': 'restricted'}},
+                    {'exists': {'field': 'no_file_available'}}
+                ]
+            }
+        }
+    }
+    assert (
+        expected_query['query']['query_string']['query']
+        == actual_query['query']['query_string']['query']
+    )
+    assert all(
+        e in actual_query['post_filter']['bool']['must_not']
+        for e in expected_query['post_filter']['bool']['must_not']
+    )
+    assert all(
+        e in actual_query['post_filter']['bool']['must']
+        for e in expected_query['post_filter']['bool']['must']
+    )
+    
 
 def test_searches_queries_abstract_query_factory_add_source(params_parser):
     assert False 
