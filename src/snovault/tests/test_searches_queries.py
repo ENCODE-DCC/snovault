@@ -1010,7 +1010,7 @@ def test_searches_queries_abstract_query_factory_add_field_must_not_exist_filter
         'embedded.file_size'
     )
     assert aq.search.to_dict() == {
-        'query': {
+       'query': {
             'bool': {
                 'filter': [{'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}}]
             }
@@ -1079,7 +1079,51 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_pa
 def test_searches_queries_abstract_query_factory_make_split_filter_queries(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    assert False
+    must, must_not, exists, not_exists = aq._make_split_filter_queries()
+    expected_must = [
+        {'terms': {'award.project': ['Roadmap']}},
+        {'terms': {'target.label': ['H3K27me3']}},
+        {'terms': {'assembly': ['GRCh38']}},
+        {'terms': {'status': ['released']}},
+        {'terms': {'biosample_ontology.classification': ['primary cell']}},
+        {'terms': {'assay_title': ['Histone ChIP-seq']}}
+    ]
+    actual_must = [m.to_dict() for m in must]
+    assert all(e in actual_must for e in expected_must)
+    expected_must_not = [
+        {'terms': {'biosample_ontology.classification': ['cell line']}},
+        {
+            'terms': {
+                'biosample_ontology.term_name': [
+                    'naive thymus-derived CD4-positive, alpha-beta T cell'
+                ]
+            }
+        }
+    ]
+    actual_must_not = [m.to_dict() for m in must_not]
+    assert all(e in actual_must_not for e in expected_must_not)
+    assert [e.to_dict() for e in exists] == []
+    assert [e.to_dict() for e in not_exists] == []
+
+
+def test_searches_queries_abstract_query_factory_make_split_filter_queries_wildcards(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=*&restricted!=*&no_file_available!=*'
+        '&limit=10&field=@id&field=accession&lab.name=*&file_type=bam'
+    )
+    p = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(p)
+    must, must_not, exists, not_exists = aq._make_split_filter_queries()
+    assert [m.to_dict() for m in must] == [{'terms': {'file_type': ['bam']}}]
+    assert [m.to_dict() for m in must_not] == []
+    expected_exists = [{'exists': {'field': 'lab.name'}}, {'exists': {'field': 'status'}}]
+    actual_exists = [e.to_dict() for e in exists]
+    assert all(e in actual_exists for e in expected_exists)
+    expected_not_exists = [{'exists': {'field': 'restricted'}}, {'exists': {'field': 'no_file_available'}}]
+    actual_not_exists = [e.to_dict() for e in not_exists]
+    assert all(e in actual_not_exists for e in expected_not_exists)
 
 
 def test_searches_queries_abstract_query_factory_make_filter_aggregation(params_parser):

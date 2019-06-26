@@ -198,7 +198,11 @@ class AbstractQueryFactory():
         _must, _must_not, _exists, _not_exists = self.params_parser.split_filters_by_must_and_exists(
             params=self._get_filters()
         )
-        
+        must = self._make_must_equal_terms_queries_from_params(_must)
+        must_not = self._make_must_equal_terms_queries_from_params(_must_not)
+        exists = self._make_field_must_exist_query_from_params(_exists)
+        not_exists = self._make_field_must_exist_query_from_params(_not_exists)
+        return must, must_not, exists, not_exists
 
 
     def _make_terms_aggregation(self, field, exclude=[], size=200):
@@ -353,14 +357,10 @@ class AbstractQueryFactory():
         has been computed.
         '''
         must, must_not, exists, not_exists = self._make_split_filter_queries()
-        self.search = self._get_or_create_search(
+        self.search = self._get_or_create_search().post_filter(
             self._make_bool_query(
-                must=[
-                    must + exists
-                ],
-                must_not=[
-                    must_not + not_exists
-                ]
+                must=[must + exists],
+                must_not=[must_not, not_exists]
             )
         )
 
