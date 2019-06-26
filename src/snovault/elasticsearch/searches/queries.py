@@ -1,7 +1,13 @@
+from elasticsearch_dsl import A
+from elasticsearch_dsl import Q
+from elasticsearch_dsl import Search
 from itertools import chain
+from snovault.elasticsearch import ELASTIC_SEARCH
+from snovault.elasticsearch.interfaces import RESOURCES_INDEX
+from snovault.interfaces import TYPES
 
-from .defaults import NOT_FILTERS
 from .defaults import BASE_SEARCH_FIELDS
+from .defaults import NOT_FILTERS
 from .interfaces import AND
 from .interfaces import AND_JOIN
 from .interfaces import AND_NOT_JOIN
@@ -17,12 +23,6 @@ from .interfaces import PRINCIPALS_ALLOWED_VIEW
 from .interfaces import QUERY_STRING
 from .interfaces import TERMS
 from .interfaces import YES
-from elasticsearch_dsl import A
-from elasticsearch_dsl import Q
-from elasticsearch_dsl import Search
-from snovault.elasticsearch import ELASTIC_SEARCH
-from snovault.elasticsearch.interfaces import RESOURCES_INDEX
-from snovault.interfaces import TYPES
 
 
 class AbstractQueryFactory():
