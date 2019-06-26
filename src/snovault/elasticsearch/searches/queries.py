@@ -204,7 +204,6 @@ class AbstractQueryFactory():
         not_exists = self._make_field_must_exist_query_from_params(_not_exists)
         return must, must_not, exists, not_exists
 
-
     def _make_terms_aggregation(self, field, exclude=[], size=200):
         return A(
             TERMS,
