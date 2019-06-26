@@ -372,7 +372,7 @@ def test_searches_queries_abstract_query_factory_make_bool_filter_and_query_cont
     )
     aq.search = aq._get_or_create_search().query(bf)
     aq.search = aq.search.query(
-        aq._make_query_string_query('test query', fields=['name, title'])
+        aq._make_query_string_query('test query', fields=['name', 'title'])
     )
     assert aq.search.to_dict() == {
         'query': {
@@ -388,7 +388,7 @@ def test_searches_queries_abstract_query_factory_make_bool_filter_and_query_cont
                         'query_string': {
                             'query': 'test query',
                             'default_operator': 'AND',
-                            'fields': ['name, title']
+                            'fields': ['name', 'title']
                         }
                     }
                 ]
