@@ -141,11 +141,36 @@ class AbstractQueryFactory():
             **{field: terms}
         )
 
+    def _make_must_equal_terms_queries_from_params(self, params):
+        return [
+            self._make_must_equal_terms_query(
+                field=field,
+                terms=terms
+            )
+            for field, terms in self.params_parser.group_values_by_key(
+                    self.params_parser.remove_not_flag(
+                        params=params
+                    )
+            ).items()
+        ]
+
     def _make_field_must_exist_query(self, field):
         return Q(
             EXISTS,
             field=field
         )
+
+    def _make_field_must_exist_query_from_params(self, params):
+        return [
+            self._make_field_must_exist_query(
+                field=field
+            )
+            for field, _ in self.params_parser.group_values_by_key(
+                    self.params_parser.remove_not_flag(
+                        params=params
+                    )
+            ).items()
+        ]
 
     def _make_default_filters(self):
         return [
@@ -165,6 +190,16 @@ class AbstractQueryFactory():
                 )
             )
         ]
+
+    def _make_split_filter_queries(self):
+        '''
+        Returns appropriate queries from param filters.
+        '''
+        _must, _must_not, _exists, _not_exists = self.params_parser.split_filters_by_must_and_exists(
+            params=self._get_filters()
+        )
+        
+
 
     def _make_terms_aggregation(self, field, exclude=[], size=200):
         return A(
@@ -296,17 +331,38 @@ class AbstractQueryFactory():
             )
 
     def add_filters(self):
+        '''
+        These filters apply to the entire aggregation and result context.
+        '''
         self.search = self._get_or_create_search().query(
             self._make_bool_query(
                 must=self._make_default_filters()
             )
         )
 
-    def add_post_filters(self):
+    def add_aggregations_and_aggregation_filters(self):
+        '''
+        Each aggregation is computed in a filter context that filters
+        everything but the params of the same type.
+        '''
         pass
 
-    def add_aggregations_and_aggregation_filters(self):
-        pass
+    def add_post_filters(self):
+        '''
+        These filters apply to the final results returned, after aggregation
+        has been computed.
+        '''
+        must, must_not, exists, not_exists = self._make_split_filter_queries()
+        self.search = self._get_or_create_search(
+            self._make_bool_query(
+                must=[
+                    must + exists
+                ],
+                must_not=[
+                    must_not + not_exists
+                ]
+            )
+        )
 
     def add_source(self):
         pass

@@ -397,6 +397,691 @@ def test_searches_queries_abstract_query_factory_make_bool_filter_and_query_cont
     }
 
 
+
+    fa = aq._make_filter_aggregation(
+        filter_context=aq._make_must_equal_terms_query(
+            field='embedded.@type',
+            terms=['File']
+        )
+    )
+    assert fa.to_dict() == {
+        'filter': {
+            'terms': {
+                'embedded.@type': ['File']
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_filter_aggregation_bool_context(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    fa = aq._make_filter_aggregation(
+        filter_context=aq._make_bool_query(
+            filter=[
+                aq._make_field_must_exist_query(
+                    field='embedded.status'
+                ),
+                ~aq._make_field_must_exist_query(
+                    field='embedded.audit'
+                )
+            ]
+        )
+    )
+    assert fa.to_dict() == {
+        'filter': {
+            'bool': {
+                'filter': [
+                    {'exists': {'field': 'embedded.status'}},
+                    {'bool': {'must_not': [{'exists': {'field': 'embedded.audit'}}]}}]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    fasa = aq._make_filter_and_sub_aggregation(
+        title='Lab name terms on Experiments that have files with file_size',
+        filter_context=(
+            aq._make_must_equal_terms_query(
+                field='@type',
+                terms=['Experiment']
+            )
+            & aq._make_bool_query(
+                filter=[
+                    aq._make_field_must_exist_query(
+                        field='embeddded.files.file_size'
+                    )
+                ]
+            )
+        ),
+        sub_aggregation=aq._make_terms_aggregation(
+            field='embedded.lab.name'
+        )
+    )
+    assert fasa.to_dict() == {
+        'aggs': {
+            'Lab name terms on Experiments that have files with file_size': {
+                'terms': {
+                    'size': 200,
+                    'field': 'embedded.lab.name',
+                    'exclude': []
+                }
+            }
+        },
+        'filter': {
+            'bool': {
+                'filter': [
+                    {'exists': {'field': 'embeddded.files.file_size'}}
+                ],
+                'must': [
+                    {'terms': {'@type': ['Experiment']}}
+                ]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation_bool(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    fasa = aq._make_filter_and_sub_aggregation(
+        title='Small processed versus raw files on first day of ENCODE4',
+        filter_context=aq._make_bool_query(
+            must=[
+                aq._make_field_must_exist_query(
+                    field='embedded.file_type'
+                )
+            ],
+            should=[
+                aq._make_must_equal_terms_query(
+                    field='embedded.file_size',
+                    terms=['1', '2', '3']
+                )
+            ],
+            must_not=[
+                aq._make_must_equal_terms_query(
+                    field='embedded.@type',
+                    terms=['Publication']
+                ),
+                aq._make_must_equal_terms_query(
+                    field='embedded.award.rfa',
+                    terms=['ENCODE2']
+                )
+            ],
+            filter=[
+                aq._make_must_equal_terms_query(
+                    field='embedded.date_created',
+                    terms=['05/01/2017']
+                )
+            ]
+        ),
+        sub_aggregation=aq._make_exists_aggregation(
+            field='embedded.derived_from'
+        )
+    )
+    assert fasa.to_dict() == {
+        'aggs': {
+            'Small processed versus raw files on first day of ENCODE4': {
+                'filters': {
+                    'filters': {
+                        'no': {
+                            'bool': {
+                                'must_not': [{'exists': {'field': 'embedded.derived_from'}}]}
+                        },
+                        'yes': {
+                            'exists': {'field': 'embedded.derived_from'}}}
+                }
+            }
+        },
+        'filter': {
+            'bool': {
+                'must_not': [
+                    {'terms': {'embedded.@type': ['Publication']}},
+                    {'terms': {'embedded.award.rfa': ['ENCODE2']}}
+                ],
+                'filter': [
+                    {'terms': {'embedded.date_created': ['05/01/2017']}}
+                ],
+                'must': [
+                    {'exists': {'field': 'embedded.file_type'}}
+                ],
+                'should': [
+                    {'terms': {'embedded.file_size': ['1', '2', '3']}}]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_query_string_query(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    qsq = aq._make_query_string_query(
+        'my TEST',
+        fields=['embedded.description'],
+        default_operator='OR'
+    )
+    assert qsq.to_dict() == {
+        'query_string': {
+            'default_operator': 'OR',
+            'fields': ['embedded.description'],
+            'query': 'my TEST'
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_must_equal_terms_query(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    mtq = aq._make_must_equal_terms_query(
+        field='embedded.status',
+        terms=['released']
+    )
+    assert mtq.to_dict() == {
+        'terms': {
+            'embedded.status': ['released']
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_must_equal_terms_queries_from_params(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    mtqs = aq._make_must_equal_terms_queries_from_params(
+        params=sorted(aq._get_filters())
+    )
+    actual = [m.to_dict() for m in mtqs]
+    expected = [
+        {'terms': {'assay_title': ['Histone ChIP-seq']}},
+        {'terms': {'status': ['released']}},
+        {'terms': {'biosample_ontology.term_name': ['naive thymus-derived CD4-positive, alpha-beta T cell']}},
+        {'terms': {'biosample_ontology.classification': ['primary cell', 'cell line']}},
+        {'terms': {'target.label': ['H3K27me3']}},
+        {'terms': {'assembly': ['GRCh38']}},
+        {'terms': {'award.project': ['Roadmap']}}
+    ]
+    assert all(e in actual for e in expected)
+
+
+def test_searches_queries_abstract_query_factory_make_field_must_exist_query(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    meq = aq._make_field_must_exist_query(
+        field='embedded.file_size'
+    )
+    assert meq.to_dict() == {
+        'exists': {
+            'field': 'embedded.file_size'
+        }
+    }
+
+def test_searches_queries_abstract_query_factory_make_field_must_exist_queries_from_params(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    meqs = aq._make_field_must_exist_query_from_params(
+        params=aq._get_filters()
+    )
+    actual = [m.to_dict() for m in meqs]
+    expected = [
+        {'exists': {'field': 'assay_title'}},
+        {'exists': {'field': 'assembly'}},
+        {'exists': {'field': 'biosample_ontology.classification'}},
+        {'exists': {'field': 'status'}},
+        {'exists': {'field': 'biosample_ontology.term_name'}},
+        {'exists': {'field': 'target.label'}},
+        {'exists': {'field': 'award.project'}}
+    ]
+    assert all(e in actual for e in expected)
+
+
+def test_searches_queries_abstract_query_factory_make_default_filters(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    df = aq._make_default_filters()
+    assert df[0].to_dict() == {
+        'terms': {
+            'principals_allowed.view': ['system.Everyone']
+        }
+    }
+    assert df[1].to_dict() == {
+        'terms': {
+            'embedded.@type': ['TestingSearchSchema']
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_default_filters_default_types(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&assembly=GRCh38&biosample_ontology.classification=primary+cell'
+        '&target.label=H3K27me3&biosample_ontology.classification%21=cell+line'
+    )
+    p = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(p, default_item_types=['Snowflake', 'Pancake'])
+    df = aq._make_default_filters()
+    assert df[0].to_dict() == {
+        'terms': {
+            'principals_allowed.view': ['system.Everyone']
+        }
+    }
+    assert df[1].to_dict() == {
+        'terms': {
+            'embedded.@type': [
+                'Snowflake', 'Pancake'
+            ]
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_terms_aggregation(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    ta = aq._make_terms_aggregation(
+        field='embedded.lab.name',
+        exclude=['other lab'],
+        size=14
+    )
+    assert ta.to_dict() == {
+        'terms': {
+            'exclude': ['other lab'],
+            'field': 'embedded.lab.name',
+            'size': 14
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_exists_aggregation(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    eq = aq._make_exists_aggregation(
+        field='embedded.file_available'
+    )
+    assert eq.to_dict() == {
+        'filters': {
+            'filters': {
+                'no': {
+                    'bool': {
+                        'must_not': [
+                            {'exists': {'field': 'embedded.file_available'}}
+                        ]
+                    }
+                },
+                'yes': {
+                    'exists': {'field': 'embedded.file_available'}
+                }
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all',
+                    '*.uuid',
+                    '*.md5sum',
+                    '*.submitted_file_name',
+                    'unique_keys.*'
+                ],
+                'query': '(chip-seq)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['query_string']['query']
+        == expected_query['query']['query_string']['query']
+    )
+    assert (
+        constructed_query['query']['query_string']['default_operator']
+        == expected_query['query']['query_string']['default_operator']
+    )
+    assert (
+        set(constructed_query['query']['query_string']['fields'])
+        == set(expected_query['query']['query_string']['fields'])
+    )
+
+
+def test_searches_queries_abstract_query_factory_add_query_string_query_with_type(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&type=TestingSearchSchema&status=released'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all',
+                    '*.uuid',
+                    '*.md5sum',
+                    '*.submitted_file_name',
+                    'unique_keys.*',
+                    'embedded.accession',
+                    'embedded.status'
+                ],
+                'query': '(chip-seq)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['query_string']['query']
+        == expected_query['query']['query_string']['query']
+    )
+    assert (
+        constructed_query['query']['query_string']['default_operator']
+        == expected_query['query']['query_string']['default_operator']
+    )
+    assert (
+        set(constructed_query['query']['query_string']['fields'])
+        == set(expected_query['query']['query_string']['fields'])
+    )
+
+
+def test_searches_queries_abstract_query_factory_add_query_string_query_with_default_type(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(
+        params_parser,
+        default_item_types=[
+            'TestingSearchSchema'
+        ]
+    )
+    aq.add_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all',
+                    '*.uuid',
+                    '*.md5sum',
+                    '*.submitted_file_name',
+                    'unique_keys.*',
+                    'embedded.accession',
+                    'embedded.status'
+                ],
+                'query': '(chip-seq)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['query_string']['query']
+        == expected_query['query']['query_string']['query']
+    )
+    assert (
+        constructed_query['query']['query_string']['default_operator']
+        == expected_query['query']['query_string']['default_operator']
+    )
+    assert (
+        set(constructed_query['query']['query_string']['fields'])
+        == set(expected_query['query']['query_string']['fields'])
+    )
+
+
+def test_searches_queries_abstract_query_factory_add_query_string_query_no_search_term(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_query_string_query()
+    assert aq.search is None
+
+
+def test_searches_queries_abstract_query_factory_add_must_equal_terms_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_must_equal_terms_filter(
+        field='status',
+        terms=['released', 'archived']
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'bool': {
+                'filter': [
+                    {
+                        'terms': {
+                            'status': [
+                                'released',
+                                'archived'
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_must_equal_terms_post_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_must_equal_terms_post_filter(
+        field='status',
+        terms=['released', 'archived']
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'match_all': {}
+        },
+        'post_filter': {
+            'terms': {'status': ['released', 'archived']}}
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_post_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_must_not_equal_terms_post_filter(
+        field='status',
+        terms=['released', 'archived']
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'match_all': {}
+        },
+        'post_filter': {
+            'bool': {
+                'filter': [
+                    {'bool': {'must_not': [{'terms': {'status': ['released', 'archived']}}]}}]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_must_not_equal_terms_filter(
+        field='status',
+        terms=['released', 'archived']
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'bool': {
+                'filter': [
+                    {
+                        'bool': {
+                            'must_not': [
+                                {
+                                    'terms': {
+                                        'status': [
+                                            'released',
+                                            'archived'
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_field_must_exist_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_field_must_exist_filter(
+        'embedded.status'
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'bool': {
+                'filter': [{'exists': {'field': 'embedded.status'}}]
+                }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_field_must_exist_post_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_field_must_exist_post_filter(
+        'embedded.status'
+    )
+    assert aq.search.to_dict() == {
+        'post_filter': {
+            'bool': {
+                'filter': [
+                    {'exists': {'field': 'embedded.status'}}]
+            }
+        },
+        'query': {
+            'match_all': {}
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_field_must_exist_filter_multiple(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_field_must_exist_filter(
+        'embedded.status'
+    )
+    aq._add_field_must_exist_filter(
+        'embedded.lab'
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'bool': {
+                'filter': [
+                    {'exists': {'field': 'embedded.status'}},
+                    {'exists': {'field': 'embedded.lab'}}
+                ]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_field_must_not_exist_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_field_must_not_exist_filter(
+        'embedded.file_size'
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'bool': {
+                'filter': [{'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}}]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_field_must_not_exist_post_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_field_must_not_exist_post_filter(
+        'embedded.file_size'
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'match_all': {}
+        },
+        'post_filter': {
+            'bool': {
+                'filter': [
+                    {'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}}]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_field_must_and_must_not_exist_filter(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_field_must_exist_filter(
+        'embedded.status'
+    )
+    aq._add_field_must_not_exist_filter(
+        'embedded.file_size'
+    )
+    assert aq.search.to_dict() == {
+        'query': {
+            'bool': {
+                'filter': [
+                    {'exists': {'field': 'embedded.status'}},
+                    {'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}}
+                ]
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq._add_terms_aggregation('Statuses', 'embedded.status', size=10)
+    assert aq.search.to_dict() == {
+        'aggs': {
+            'Statuses': {
+                'terms': {
+                    'exclude': [],
+                    'field': 'embedded.status',
+                    'size': 10,
+                }
+            }
+        },
+        'query': {'match_all': {}}
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_split_filter_queries(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    assert False
+
+
 def test_searches_queries_abstract_query_factory_make_filter_aggregation(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
