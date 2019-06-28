@@ -6,6 +6,7 @@ from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.interfaces import TYPES
 
+from .defaults import BASE_FACETS
 from .defaults import BASE_SEARCH_FIELDS
 from .defaults import NOT_FILTERS
 from .interfaces import AND
@@ -17,6 +18,7 @@ from .interfaces import BOOST_VALUES
 from .interfaces import EMBEDDED
 from .interfaces import EMBEDDED_TYPE
 from .interfaces import EXISTS
+from .interfaces import FACETS
 from .interfaces import FILTERS
 from .interfaces import NOT_JOIN
 from .interfaces import NO
@@ -56,11 +58,26 @@ class AbstractQueryFactory():
     def _get_principals(self):
         return self.params_parser._request.effective_principals
 
+    def _get_schema_for_item_type(self, item_type):
+        return self.params_parser._request.registry[TYPES][item_type].schema
+
+    def _get_boost_values_for_item_type(self, item_type):
+        return self._get_schema_for_item_type(item_type).get(
+            BOOST_VALUES,
+            {}
+        )
+
+    def _get_facets_for_item_type(self, item_type):
+        return self._get_schema_for_item_type(item_type).get(FACETS)
+
     def _get_item_types(self):
         return self.params_parser.get_type_filters()
 
     def _get_default_item_types(self):
         return self.kwargs.get('default_item_types', [])
+
+    def _get_default_facets(self):
+        return self.kwargs.get('default_facets', BASE_FACETS)
 
     def _get_query(self):
         return self._combine_search_term_queries(
@@ -90,7 +107,7 @@ class AbstractQueryFactory():
             search_fields.update(
                 self._prefix_values(
                     EMBEDDED,
-                    self._get_boost_values_from_item_type(item_type).keys()
+                    self._get_boost_values_for_item_type(item_type).keys()
                 )
             )
         return list(search_fields)
@@ -103,12 +120,6 @@ class AbstractQueryFactory():
 
     def _get_facet_size(self):
         return self.kwargs.get('facet_size')
-
-    def _get_boost_values_from_item_type(self, item_type):
-        return self.params_parser._request.registry[TYPES][item_type].schema.get(
-            BOOST_VALUES,
-            {}
-        )
 
     def _prefix_value(self, prefix, value):
         return prefix + value

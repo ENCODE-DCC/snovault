@@ -81,6 +81,20 @@ def test_searches_queries_abstract_query_factory_get_principals(params_parser):
     assert principals == ['system.Everyone']
 
 
+def test_searches_queries_abstract_query_factory_get_schema_for_item_type(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    schema = aq._get_schema_for_item_type('TestingSearchSchema')
+    assert isinstance(schema, dict)
+
+
+def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    facets = aq._get_facets_for_item_type('TestingSearchSchema')
+    assert facets == {'status': {'title': 'Status'}}
+
+
 def test_searches_queries_abstract_query_factory_get_default_item_types(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(
@@ -95,6 +109,29 @@ def test_searches_queries_abstract_query_factory_get_default_item_types(params_p
         'Snowflake',
         'Pancake'
     ]
+
+
+def test_searches_queries_abstract_query_factory_get_default_facets(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(
+        params_parser,
+        default_facets=[
+            ('type', {'title': 'Data Type'}),
+            ('file_format', {'title': 'File Format'}),
+        ]
+    )
+    default_facets = aq._get_default_facets()
+    assert default_facets == [
+        ('type', {'title': 'Data Type'}),
+        ('file_format', {'title': 'File Format'}),
+    ]
+    aq = AbstractQueryFactory(
+        params_parser
+    )
+    assert aq._get_default_facets() == [
+        ('type', {'title': 'Data Type'}),
+    ]
+
 
 
 def test_searches_queries_abstract_query_factory_get_query(params_parser):
@@ -240,10 +277,10 @@ def test_searches_queries_abstract_query_factory_get_facet_size(params_parser):
     assert aq._get_facet_size() is None
 
 
-def test_searches_queries_abstract_query_factory_get_boost_values_from_item_type(params_parser):
+def test_searches_queries_abstract_query_factory_get_boost_values_for_item_type(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    assert aq._get_boost_values_from_item_type(
+    assert aq._get_boost_values_for_item_type(
         'TestingSearchSchema'
     ) == {'accession': 1.0, 'status': 1.0}
     
