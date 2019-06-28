@@ -95,10 +95,7 @@ class ParamsParser():
         if not key or not value:
             raise ValueError('Must specify key and value')
         return self.get_filters_by_condition(
-            key_and_value_condition=lambda k, v: not all([
-                k == key,
-                v == value,
-            ]),
+            key_and_value_condition=lambda k, v: not (k == key and v == value),
             params=params
         )
 
