@@ -2277,3 +2277,204 @@ def test_searches_builders_basic_search_query_factory_init(params_parser):
     bsqf = BasicSearchQueryFactory(params_parser)
     assert isinstance(bsqf, BasicSearchQueryFactory)
     assert bsqf.params_parser == params_parser
+
+
+def test_searches_builders_basic_search_query_factory_build_query(dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch import ELASTIC_SEARCH
+    from elasticsearch import Elasticsearch
+    from pyramid.testing import DummyResource
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released&status=archived&file_format=bam'
+        '&lab.name!=thermo&restricted!=*&dbxref=*&replcate.biosample.title=cell'
+        '&limit=10'
+    )
+    dummy_request.registry[ELASTIC_SEARCH] = Elasticsearch()
+    dummy_request.context = DummyResource()
+    params_parser = ParamsParser(dummy_request)
+    bsqf = BasicSearchQueryFactory(params_parser)
+    query = bsqf.build_query()
+    expected = {
+        'query': {
+            'bool': {
+                'must': [
+                    {'terms': {'principals_allowed.view': ['system.Everyone']}},
+                    {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                ]
+            }
+        },
+        'aggs': {
+            'Status': {
+                'aggs': {
+                    'status': {
+                        'terms': {
+                            'size': 200,
+                            'exclude': [],
+                            'field': 'embedded.status'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}},
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'exists': {'field': 'embedded.dbxref'}}],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}}
+                        ]
+                    }
+                }
+            },
+            'Audit category: ERROR': {
+                'aggs': {
+                    'audit-ERROR-category': {
+                        'terms': {
+                            'size': 200,
+                            'exclude': [],
+                            'field': 'audit.ERROR.category'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released', 'archived']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}},
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'exists': {'field': 'embedded.dbxref'}}
+                        ],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}}
+                        ]
+                    }
+                }
+            },
+            'Audit category: NOT COMPLIANT': {
+                'aggs': {
+                    'audit-NOT_COMPLIANT-category': {
+                        'terms': {
+                            'size': 200,
+                            'exclude': [],
+                            'field': 'audit.NOT_COMPLIANT.category'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released', 'archived']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}},
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'exists': {'field': 'embedded.dbxref'}}],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}}
+                        ]
+                    }
+                }
+            },
+            'Data Type': {
+                'aggs': {
+                    'type': {
+                        'terms': {
+                            'size': 200,
+                            'exclude': ['Item'],
+                            'field': 'embedded.@type'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released', 'archived']}},
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'exists': {'field': 'embedded.dbxref'}}
+                        ],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}}
+                        ]
+                    }
+                }
+            },
+            'Name': {
+                'aggs': {
+                    'name': {
+                        'terms': {
+                            'size': 200,
+                            'exclude': [],
+                            'field': 'embedded.name'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released', 'archived']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}},
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'exists': {'field': 'embedded.dbxref'}}
+                        ],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}}
+                        ]
+                    }
+                }
+            },
+            'Audit category: WARNING': {
+                'aggs': {
+                    'audit-WARNING-category': {
+                        'terms': {
+                            'size': 200,
+                            'exclude': [],
+                            'field': 'audit.WARNING.category'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released', 'archived']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}},
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'exists': {'field': 'embedded.dbxref'}}
+                        ],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}}
+                        ]
+                    }
+                }
+            }
+        },
+        '_source': ['embedded.*'],
+        'post_filter': {
+            'bool': {
+                'must': [
+                    {'terms': {'embedded.status': ['released', 'archived']}},
+                    {'terms': {'embedded.@type': ['TestingSearchSchema']}},
+                    {'terms': {'embedded.file_format': ['bam']}},
+                    {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                    {'exists': {'field': 'embedded.dbxref'}}
+                ], 'must_not': [
+                    {'terms': {'embedded.lab.name': ['thermo']}},
+                    {'exists': {'field': 'embedded.restricted'}}
+                ]
+            }
+        }
+    }
+    actual = query.to_dict()
+    expected_post_filter_bool_must = expected['post_filter']['bool']['must']
+    actual_post_filter_bool_must = actual['post_filter']['bool']['must']
+    assert all(e in actual_post_filter_bool_must for e in expected_post_filter_bool_must)
