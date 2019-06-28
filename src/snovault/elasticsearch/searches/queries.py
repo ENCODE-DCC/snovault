@@ -71,9 +71,8 @@ class AbstractQueryFactory():
             {}
         )
 
-
     def _get_facets_for_item_type(self, item_type):
-        return self._get_schema_for_item_type(item_type).get(FACETS)
+        return self._get_schema_for_item_type(item_type).get(FACETS, {}).items()
 
     def _show_internal_audits(self):
         if all([
@@ -96,7 +95,23 @@ class AbstractQueryFactory():
         return self.kwargs.get('default_item_types', [])
 
     def _get_default_facets(self):
-        return self.kwargs.get('default_facets', BASE_FIELD_FACETS)
+        return self.kwargs.get(
+            'default_facets',
+            BASE_FIELD_FACETS + self._get_audit_facets()
+        )
+
+    def _get_default_and_maybe_item_facets(self):
+        facets = self._get_default_facets()
+        item_type_values = self.params_parser.param_values_to_list(
+            params=self._get_item_types()
+        )
+        if len(item_type_values) == 1:
+            facets.extend(
+                self._get_facets_for_item_type(
+                    item_type_values[0]
+                )
+            )
+        return facets
 
     def _get_query(self):
         return self._combine_search_term_queries(

@@ -178,6 +178,9 @@ class TestingSearchSchema(Item):
         'facets': {
             'status': {
                 'title': 'Status'
+            },
+            'name': {
+                'title': 'Name'
             }
         },
         'boost_values': {

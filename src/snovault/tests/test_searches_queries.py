@@ -92,7 +92,11 @@ def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
     facets = aq._get_facets_for_item_type('TestingSearchSchema')
-    assert facets == {'status': {'title': 'Status'}}
+    expected = [
+        ('name', {'title': 'Name'}),
+        ('status', {'title': 'Status'})
+    ]
+    assert all(e in facets for e in expected)
 
 
 def test_searches_queries_abstract_query_factory_get_default_item_types(params_parser):
@@ -113,6 +117,8 @@ def test_searches_queries_abstract_query_factory_get_default_item_types(params_p
 
 def test_searches_queries_abstract_query_factory_get_default_facets(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.testing import DummyResource
+    params_parser._request.context = DummyResource()
     aq = AbstractQueryFactory(
         params_parser,
         default_facets=[
@@ -130,8 +136,27 @@ def test_searches_queries_abstract_query_factory_get_default_facets(params_parse
     )
     assert aq._get_default_facets() == [
         ('type', {'title': 'Data Type'}),
+        ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
+        ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
+        ('audit.WARNING.category', {'title': 'Audit category: WARNING'})
     ]
 
+
+def test_searches_queries_abstract_query_factory_get_default_and_maybe_item_facets(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.testing import DummyResource
+    params_parser_snovault_types._request.context = DummyResource()
+    aq = AbstractQueryFactory(
+        params_parser_snovault_types
+    )
+    assert aq._get_default_and_maybe_item_facets() == [
+        ('type', {'title': 'Data Type'}),
+        ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
+        ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
+        ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
+        ('status', {'title': 'Status'}),
+        ('name', {'title': 'Name'})
+    ]
 
 
 def test_searches_queries_abstract_query_factory_get_query(params_parser):
@@ -334,7 +359,6 @@ def test_searches_queries_abstract_query_factory_get_audit_facets(dummy_request)
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     assert aq._get_audit_facets() == BASE_AUDIT_FACETS
-    
 
 
 def test_searches_queries_abstract_query_factory_prefix_value(params_parser):
