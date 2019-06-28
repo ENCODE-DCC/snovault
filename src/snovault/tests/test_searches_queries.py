@@ -122,20 +122,20 @@ def test_searches_queries_abstract_query_factory_get_default_facets(params_parse
     aq = AbstractQueryFactory(
         params_parser,
         default_facets=[
-            ('type', {'title': 'Data Type'}),
+            ('type', {'title': 'Data Type', 'exclude': ['Item']}),
             ('file_format', {'title': 'File Format'}),
         ]
     )
     default_facets = aq._get_default_facets()
     assert default_facets == [
-        ('type', {'title': 'Data Type'}),
+        ('type', {'title': 'Data Type', 'exclude': ['Item']}),
         ('file_format', {'title': 'File Format'}),
     ]
     aq = AbstractQueryFactory(
         params_parser
     )
     assert aq._get_default_facets() == [
-        ('type', {'title': 'Data Type'}),
+        ('type', {'title': 'Data Type', 'exclude': ['Item']}),
         ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
         ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
         ('audit.WARNING.category', {'title': 'Audit category: WARNING'})
@@ -149,14 +149,16 @@ def test_searches_queries_abstract_query_factory_get_default_and_maybe_item_face
     aq = AbstractQueryFactory(
         params_parser_snovault_types
     )
-    assert aq._get_default_and_maybe_item_facets() == [
-        ('type', {'title': 'Data Type'}),
+    expected = [
+        ('type', {'title': 'Data Type', 'exclude': ['Item']}),
         ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
         ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
         ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
         ('status', {'title': 'Status'}),
         ('name', {'title': 'Name'})
     ]
+    actual = aq._get_default_and_maybe_item_facets()
+    assert all(e in actual for e in expected)
 
 
 def test_searches_queries_abstract_query_factory_get_query(params_parser):
@@ -290,10 +292,26 @@ def test_searches_queries_abstract_query_factory_combine_search_term_queries(dum
     assert combined_search_terms is None
 
 
-def test_searches_queries_abstract_query_factory_get_facets(params_parser):
+def test_searches_queries_abstract_query_factory_get_facets(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser)
+    from pyramid.testing import DummyResource
+    params_parser_snovault_types._request.context = DummyResource()
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    expected = [
+        ('type', {'title': 'Data Type', 'exclude': ['Item']}),
+        ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
+        ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
+        ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
+        ('status', {'title': 'Status'}), ('name', {'title': 'Name'})
+    ]
+    actual = aq._get_facets()
+    assert all(e in actual for e in expected)
+    aq = AbstractQueryFactory(
+        params_parser_snovault_types,
+        facets=[]
+    )
     assert aq._get_facets() == []
+    
 
 
 def test_searches_queries_abstract_query_factory_get_facet_size(params_parser):
@@ -559,10 +577,10 @@ def test_searches_queries_abstract_query_factory_make_filter_aggregation_bool_co
     }
 
 
-def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation(params_parser):
+def test_searches_queries_abstract_query_factory_make_filter_and_subaggregation(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    fasa = aq._make_filter_and_sub_aggregation(
+    fasa = aq._make_filter_and_subaggregation(
         title='Lab name terms on Experiments that have files with file_size',
         filter_context=(
             aq._make_must_equal_terms_query(
@@ -577,7 +595,7 @@ def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation
                 ]
             )
         ),
-        sub_aggregation=aq._make_terms_aggregation(
+        subaggregation=aq._make_terms_aggregation(
             field='embedded.lab.name'
         )
     )
@@ -604,10 +622,10 @@ def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation
     }
 
 
-def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation_bool(params_parser):
+def test_searches_queries_abstract_query_factory_make_filter_and_subaggregation_bool(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    fasa = aq._make_filter_and_sub_aggregation(
+    fasa = aq._make_filter_and_subaggregation(
         title='Small processed versus raw files on first day of ENCODE4',
         filter_context=aq._make_bool_query(
             must=[
@@ -638,7 +656,7 @@ def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation
                 )
             ]
         ),
-        sub_aggregation=aq._make_exists_aggregation(
+        subaggregation=aq._make_exists_aggregation(
             field='embedded.derived_from'
         )
     )
@@ -1326,10 +1344,10 @@ def test_searches_queries_abstract_query_factory_make_filter_aggregation_bool_co
     }
 
 
-def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation(params_parser):
+def test_searches_queries_abstract_query_factory_make_filter_and_subaggregation(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    fasa = aq._make_filter_and_sub_aggregation(
+    fasa = aq._make_filter_and_subaggregation(
         title='Lab name terms on Experiments that have files with file_size',
         filter_context=(
             aq._make_must_equal_terms_query(
@@ -1344,7 +1362,7 @@ def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation
                 ]
             )
         ),
-        sub_aggregation=aq._make_terms_aggregation(
+        subaggregation=aq._make_terms_aggregation(
             field='embedded.lab.name'
         )
     )
@@ -1371,10 +1389,10 @@ def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation
     }
 
 
-def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation_bool(params_parser):
+def test_searches_queries_abstract_query_factory_make_filter_and_subaggregation_bool(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    fasa = aq._make_filter_and_sub_aggregation(
+    fasa = aq._make_filter_and_subaggregation(
         title='Small processed versus raw files on first day of ENCODE4',
         filter_context=aq._make_bool_query(
             must=[
@@ -1405,7 +1423,7 @@ def test_searches_queries_abstract_query_factory_make_filter_and_sub_aggregation
                 )
             ]
         ),
-        sub_aggregation=aq._make_exists_aggregation(
+        subaggregation=aq._make_exists_aggregation(
             field='embedded.derived_from'
         )
     )
@@ -2089,8 +2107,154 @@ def test_searches_queries_abstract_query_factory_add_source(params_parser):
     assert False 
 
 
-def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregation_filters(params_parser):
+def test_searches_queries_abstract_query_factory_subaggregation_factory(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.testing import DummyResource
     assert False
+
+
+def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregation_filters(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.testing import DummyResource
+    params_parser_snovault_types._request.context = DummyResource()
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    aq.add_aggregations_and_aggregation_filters()
+    expected = {
+        'query': {
+            'match_all': {}
+        },
+        'aggs': {
+            'Audit category: WARNING': {
+                'aggs': {
+                    'audit-WARNING-category': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 200,
+                            'field': 'audit.WARNING.category'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                        ]
+                    }
+                }
+            },
+            'Audit category: NOT COMPLIANT': {
+                'aggs': {
+                    'audit-NOT_COMPLIANT-category': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 200,
+                            'field': 'audit.NOT_COMPLIANT.category'
+                        }
+                    }
+                }
+                ,
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                        ]
+                    }
+                }
+            },
+            'Status': {
+                'aggs': {
+                    'status': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 200,
+                            'field': 'embedded.status'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                        ]
+                    }
+                }
+            },
+            'Name': {
+                'aggs': {
+                    'name': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 200,
+                            'field': 'embedded.name'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                        ]
+                    }
+                }
+            },
+            'Data Type': {
+                'aggs': {
+                    'type': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 200,
+                            'field': 'embedded.@type'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}}
+                        ]
+                    }
+                }
+            },
+            'Audit category: ERROR': {
+                'aggs': {
+                    'audit-ERROR-category': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 200,
+                            'field': 'audit.ERROR.category'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    actual = aq.search.to_dict()
+    assert all(
+        k in actual.get('aggs', {}).keys()
+        for k in expected.get('aggs', {}).keys()
+    )
+    assert actual.get(
+        'aggs', {}
+    ).get(
+        'Data Type', {}
+    ).get(
+        'aggs', {}
+    ).get(
+        'type', {}
+    ).get(
+        'terms', {}
+    ).get('exclude') == ['Item']
 
 
 def test_searches_queries_abstract_query_factory_build_query():

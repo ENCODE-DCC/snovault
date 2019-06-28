@@ -17,17 +17,23 @@ from .interfaces import AND_NOT_JOIN
 from .interfaces import AUDIT
 from .interfaces import BOOL
 from .interfaces import BOOST_VALUES
+from .interfaces import DASH
 from .interfaces import EMBEDDED
 from .interfaces import EMBEDDED_TYPE
+from .interfaces import EXCLUDE
 from .interfaces import EXISTS
 from .interfaces import FACETS
 from .interfaces import FILTERS
 from .interfaces import GROUP_SUBMITTER
+from .interfaces import LENGTH
+from .interfaces import LONG
 from .interfaces import NOT_JOIN
 from .interfaces import NO
+from .interfaces import PERIOD
 from .interfaces import PRINCIPALS_ALLOWED_VIEW
 from .interfaces import QUERY_STRING
 from .interfaces import SEARCH_AUDIT
+from .interfaces import TITLE
 from .interfaces import TERMS
 from .interfaces import TYPE_KEY
 from .interfaces import YES
@@ -150,7 +156,7 @@ class AbstractQueryFactory():
         return self.params_parser.get_field_filters()
 
     def _get_facets(self):
-        return self.kwargs.get('facets', [])
+        return self.kwargs.get('facets', self._get_default_and_maybe_item_facets())
 
     def _get_facet_size(self):
         return self.kwargs.get('facet_size')
@@ -258,7 +264,7 @@ class AbstractQueryFactory():
         not_exists = self._make_field_must_exist_query_from_params(_not_exists)
         return must, must_not, exists, not_exists
 
-    def _make_terms_aggregation(self, field, exclude=[], size=200):
+    def _make_terms_aggregation(self, field, exclude=[], size=200, *kwargs):
         return A(
             TERMS,
             field=field,
@@ -275,15 +281,15 @@ class AbstractQueryFactory():
             }
         )
 
-    def _make_filter_aggregation(self, filter_context):
+    def _make_filter_aggregation(self, filter_context, **kwargs):
         return A(
             'filter',
             filter_context
         )
 
-    def _make_filter_and_sub_aggregation(self, title, filter_context, sub_aggregation):
+    def _make_filter_and_subaggregation(self, title, filter_context, subaggregation):
         a = self._make_filter_aggregation(filter_context)
-        a.bucket(title, sub_aggregation)
+        a.bucket(title, subaggregation)
         return a
 
     def _map_param_key_to_elasticsearch_field(self, param_key):
@@ -309,6 +315,11 @@ class AbstractQueryFactory():
                 self._map_param_key_to_elasticsearch_field(param_key),
                 param_value
             )
+
+    def _subaggregation_factory(self, facet_option_type):
+        if facet_option_type == EXISTS:
+            return self._make_exists_aggregation
+        return self._make_terms_aggregation
 
     def _add_must_equal_terms_filter(self, field, terms):
         self.search = self._get_or_create_search().filter(
@@ -426,7 +437,32 @@ class AbstractQueryFactory():
         Each aggregation is computed in a filter context that filters
         everything but the params of the same type.
         '''
-        pass
+        params = self._get_post_filters()
+        for facet_type, facet_options in self._get_facets():
+            filtered_params = self.params_parser.get_not_keys_filters(
+                not_keys=[facet_type],
+                params=params
+            )
+            must, must_not, exists, not_exists = self._make_split_filter_queries(
+                params=filtered_params
+            )
+            subaggregation = self._subaggregation_factory(facet_options.get(TYPE_KEY))
+            subaggregation = subaggregation(
+                field=self._map_param_key_to_elasticsearch_field(facet_type),
+                exclude=facet_options.get(EXCLUDE, []),
+                #TODO: size should be defined in schema instead of long keyword.
+                size=3000 if facet_options.get(LENGTH) == LONG else 200
+            )
+            agg = self._make_filter_and_subaggregation(
+                title=facet_type.replace(PERIOD, DASH),
+                filter_context=self._make_bool_query(
+                    must=must + exists,
+                    must_not= must_not + not_exists
+                ),
+                subaggregation=subaggregation
+            )
+            self._get_or_create_search().aggs.bucket(facet_options.get(TITLE), agg)
+            
 
     def add_post_filters(self):
         '''

@@ -29,7 +29,13 @@ BASE_SEARCH_FIELDS = [
     'unique_keys.*',
 ]
 BASE_FIELD_FACETS = [
-    ('type', {'title': 'Data Type'}),
+    (
+        'type',
+        {
+            'title': 'Data Type',
+            'exclude': ['Item']
+        }
+    ),
 ]
 BASE_AUDIT_FACETS = [
         ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
