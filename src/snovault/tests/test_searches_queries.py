@@ -131,7 +131,8 @@ def test_searches_queries_abstract_query_factory_get_post_filters(params_parser)
         ('target.label', 'H3K27me3'),
         ('biosample_ontology.classification!', 'cell line'),
         ('biosample_ontology.term_name!', 'naive thymus-derived CD4-positive, alpha-beta T cell'),
-        ('status', 'released')
+        ('status', 'released'),
+        ('type', 'Experiment')
     ]
 
 
@@ -1150,12 +1151,20 @@ def test_searches_queries_abstract_query_factory_make_split_filter_queries_wildc
     p = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(p)
     must, must_not, exists, not_exists = aq._make_split_filter_queries()
-    assert [m.to_dict() for m in must] == [{'terms': {'embedded.file_type': ['bam']}}]
+    actual_must = [m.to_dict() for m in must]
+    expected_must = [
+        {'terms': {'embedded.file_type': ['bam']}},
+        {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+    ]
+    assert all(e in actual_must for e in expected_must)
     assert [m.to_dict() for m in must_not] == []
     expected_exists = [{'exists': {'field': 'embedded.lab.name'}}, {'exists': {'field': 'embedded.status'}}]
     actual_exists = [e.to_dict() for e in exists]
     assert all(e in actual_exists for e in expected_exists)
-    expected_not_exists = [{'exists': {'field': 'embedded.restricted'}}, {'exists': {'field': 'embedded.no_file_available'}}]
+    expected_not_exists = [
+        {'exists': {'field': 'embedded.restricted'}},
+        {'exists': {'field': 'embedded.no_file_available'}}
+    ]
     actual_not_exists = [e.to_dict() for e in not_exists]
     assert all(e in actual_not_exists for e in expected_not_exists)
 
@@ -1876,6 +1885,7 @@ def test_searches_queries_abstract_query_factory_add_post_filters(params_parser)
     aq.add_post_filters()
     actual_must = aq.search.to_dict()['post_filter']['bool']['must']
     expected_must = [
+        {'terms': {'embedded.@type': ['Experiment']}},
         {'terms': {'embedded.target.label': ['H3K27me3']}},
         {'terms': {'embedded.assembly': ['GRCh38']}},
         {'terms': {'embedded.award.project': ['Roadmap']}},
@@ -1936,6 +1946,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_and_post_filte
         'post_filter': {
             'bool': {
                 'must': [
+                    {'terms': {'embedded.@type': ['TestingSearchSchema']}},
                     {'terms': {'embedded.file_type': ['bam']}},
                     {'exists': {'field': 'embedded.lab.name'}},
                     {'exists': {'field': 'embedded.status'}}

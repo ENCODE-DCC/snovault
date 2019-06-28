@@ -72,7 +72,7 @@ class AbstractQueryFactory():
         return self.params_parser.get_not_keys_filters(not_keys=NOT_FILTERS)
 
     def _get_post_filters(self):
-        return self.kwargs.get('post_filters', self._get_filters())
+        return self.kwargs.get('post_filters', self._get_filters() + self._get_item_types())
 
     def _get_sort(self):
         return self.params_parser.get_sort()
@@ -205,7 +205,7 @@ class AbstractQueryFactory():
         Returns appropriate queries from param filters.
         '''
         _must, _must_not, _exists, _not_exists = self.params_parser.split_filters_by_must_and_exists(
-            params=params or self._get_filters()
+            params=params or self._get_post_filters()
         )
         must = self._make_must_equal_terms_queries_from_params(_must)
         must_not = self._make_must_equal_terms_queries_from_params(_must_not)
