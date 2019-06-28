@@ -11,6 +11,7 @@ from .defaults import NOT_FILTERS
 from .interfaces import AND
 from .interfaces import AND_JOIN
 from .interfaces import AND_NOT_JOIN
+from .interfaces import AUDIT
 from .interfaces import BOOL
 from .interfaces import BOOST_VALUES
 from .interfaces import EMBEDDED
@@ -22,6 +23,7 @@ from .interfaces import NO
 from .interfaces import PRINCIPALS_ALLOWED_VIEW
 from .interfaces import QUERY_STRING
 from .interfaces import TERMS
+from .interfaces import TYPE_KEY
 from .interfaces import YES
 
 
@@ -108,8 +110,14 @@ class AbstractQueryFactory():
             {}
         )
 
+    def _prefix_value(self, prefix, value):
+        return prefix + value
+
     def _prefix_values(self, prefix, values):
-        return [prefix + v for v in values]
+        return [
+            self._prefix_value(prefix, v)
+            for v in values
+        ]
 
     def _combine_search_term_queries(self, must_match_filters=[], must_not_match_filters=[]):
         must = AND_JOIN.join(['({})'.format(q[1]) for q in must_match_filters])
@@ -231,6 +239,22 @@ class AbstractQueryFactory():
         a = self._make_filter_aggregation(filter_context)
         a.bucket(title, sub_aggregation)
         return a
+
+    def _map_param_key_to_elasticsearch_field(self, params):
+        '''
+        Special rules for mapping param key to actual field in ES.
+        For exampe type -> embedded.@type.
+        '''
+        for k, v in params:
+            if k == TYPE_KEY:
+                yield (EMBEDDED_TYPE, v)
+            elif k.startswith(AUDIT):
+                yield (k, v)
+            else:
+                yield (
+                    self._prefix_value(EMBEDDED, k),
+                    v
+                )
 
     def _add_must_equal_terms_filter(self, field, terms):
         self.search = self._get_or_create_search().filter(

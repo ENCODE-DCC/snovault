@@ -245,6 +245,15 @@ def test_searches_queries_abstract_query_factory_get_boost_values_from_item_type
     assert aq._get_boost_values_from_item_type(
         'TestingSearchSchema'
     ) == {'accession': 1.0, 'status': 1.0}
+    
+
+def test_searches_queries_abstract_query_factory_prefix_value(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._prefix_value(
+        'embedded.',
+        'uuid'
+    ) == 'embedded.uuid'
 
 
 def test_searches_queries_abstract_query_factory_prefix_values(params_parser):
@@ -714,6 +723,27 @@ def test_searches_queries_abstract_query_factory_make_exists_aggregation(params_
         }
     }
 
+
+def test_searches_queries_abstract_query_factory_map_param_key_to_elasticsearch_field(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&type=TestingSearchSchema&status=released'
+        '&audit.WARNING.category=missing+biosample+characterization&file_size=12'
+        '&limit=all'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    mapped_keys = list(aq._map_param_key_to_elasticsearch_field(
+        params=aq._get_filters() + aq._get_item_types()
+    ))
+    print(mapped_keys)
+    assert mapped_keys == [
+        ('embedded.status', 'released'),
+        ('audit.WARNING.category', 'missing biosample characterization'),
+        ('embedded.file_size', '12'),
+        ('embedded.@type', 'TestingSearchSchema')
+    ]
 
 def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
