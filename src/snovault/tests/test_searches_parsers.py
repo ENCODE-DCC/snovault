@@ -39,7 +39,7 @@ def test_searches_parsers_params_parser_get_filters_by_condition_key_field(dummy
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition(
-        key_condition=lambda k: k == 'field'
+        key_and_value_condition=lambda k, _: k == 'field'
     ) == [
         ('field', 'status')
     ]
@@ -50,7 +50,7 @@ def test_searches_parsers_params_parser_get_filters_by_condition_key_type(dummy_
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition(
-        key_condition=lambda k: k == 'type'
+        key_and_value_condition=lambda k, _: k == 'type'
     ) == [
         ('type', 'Experiment'),
         ('type', 'File')
@@ -62,7 +62,7 @@ def test_searches_parsers_params_parser_get_filters_by_condition_value_status(du
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition(
-        value_condition=lambda v: v == 'status'
+        key_and_value_condition=lambda _, v: v == 'status'
     ) == [
         ('field', 'status')
     ]
@@ -73,8 +73,7 @@ def test_searches_parsers_params_parser_get_filters_by_condition_key_type_value_
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition(
-        key_condition=lambda k: k == 'type',
-        value_condition=lambda v: v == 'File'
+        key_and_value_condition=lambda k, v: k == 'type' and v == 'File'
     ) == [
         ('type', 'File')
     ]
@@ -85,8 +84,7 @@ def test_searches_parsers_params_parser_get_filters_by_condition_contains_letter
     dummy_request.environ['QUERY_STRING'] = 'type=Experiment&type=File&field=status'
     p = ParamsParser(dummy_request)
     assert p.get_filters_by_condition(
-        key_condition=lambda k: 't' in k,
-        value_condition=lambda v: 'F' in v
+        key_and_value_condition=lambda k, v: 't' in k and 'F' in v
     ) == [
         ('type', 'File')
     ]
@@ -421,6 +419,77 @@ def test_searches_parsers_params_parser_get_not_wildcard_filters(dummy_request):
         ('file_type!', 'bigBed tss_peak'),
         ('file_format_type', 'bed3+')
     ]
+
+
+def test_searches_parsers_params_parser_remove_key_and_value_pair_from_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&type=Biosample&type!=Experiment&type=*'
+        '&file_format%21=*&file_type%21=bigBed+tss_peak'
+        '&file_format_type=bed3%2B'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.remove_key_and_value_pair_from_filters(
+        key='file_format!',
+        value='*'
+    ) == [
+        ('status', 'released'),
+        ('type', 'Biosample'),
+        ('type!', 'Experiment'),
+        ('type', '*'),
+        ('file_type!', 'bigBed tss_peak'),
+        ('file_format_type', 'bed3+')
+    ]
+    assert p.remove_key_and_value_pair_from_filters(
+        key='status',
+        value='released'
+    ) == [
+        ('type', 'Biosample'),
+        ('type!', 'Experiment'),
+        ('type', '*'),
+        ('file_format!', '*'),
+        ('file_type!', 'bigBed tss_peak'),
+        ('file_format_type', 'bed3+')
+    ]
+    assert p.remove_key_and_value_pair_from_filters(
+        key='type',
+        value='Experiment'
+    )== [
+        ('status', 'released'),
+        ('type', 'Biosample'),
+        ('type!', 'Experiment'),
+        ('type', '*'),
+        ('file_format!', '*'),
+        ('file_type!', 'bigBed tss_peak'),
+        ('file_format_type', 'bed3+')
+    ]
+    assert p.remove_key_and_value_pair_from_filters(
+        key='status',
+        value='released'
+    ) == [
+        ('type', 'Biosample'),
+        ('type!', 'Experiment'),
+        ('type', '*'),
+        ('file_format!', '*'),
+        ('file_type!', 'bigBed tss_peak'),
+        ('file_format_type', 'bed3+')
+    ]
+    assert p.remove_key_and_value_pair_from_filters(
+        key='status!',
+        value='released'
+    ) == [
+        ('status', 'released'),
+        ('type', 'Biosample'),
+        ('type!', 'Experiment'),
+        ('type', '*'),
+        ('file_format!', '*'),
+        ('file_type!', 'bigBed tss_peak'),
+        ('file_format_type', 'bed3+')
+    ]
+    with pytest.raises(ValueError):
+        p.remove_key_and_value_pair_from_filters(key='type')
+    with pytest.raises(ValueError):
+        p.remove_key_and_value_pair_from_filters(value='*')
 
 
 def test_searches_parsers_params_parser_keys_filters_not_flag(dummy_request):

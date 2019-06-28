@@ -31,15 +31,15 @@ class ParamsParser():
         '''
         return (key, value) in self._params(params)
 
-    def get_filters_by_condition(self, key_condition=None, value_condition=None, params=None):
+    def get_filters_by_condition(self, key_and_value_condition=None, params=None):
         '''
-        Condition must be function that accepts key or value and returns bool. Optional params
+        Condition must be function that accepts key and value and returns bool. Optional params
         kwarg allows chaining of filters.
         '''
         return [
-            (k, v) for k, v in self._params(params)
-            if (key_condition is None or key_condition(k))
-            and (value_condition is None or value_condition(v))
+            (k, v)
+            for k, v in self._params(params)
+            if key_and_value_condition is None or key_and_value_condition(k, v)
         ]
 
     def get_key_filters(self, key=None, params=None):
@@ -47,7 +47,7 @@ class ParamsParser():
         Returns params with specified key (= and !=).
         '''
         return self.get_filters_by_condition(
-            key_condition=lambda k: k is None or k == key or k == key + NOT_FLAG,
+            key_and_value_condition=lambda k, _: k is None or k == key or k == key + NOT_FLAG,
             params=params
         )
 
@@ -56,7 +56,7 @@ class ParamsParser():
         Returns keys contained in keys list (= and !=).
         '''
         return self.get_filters_by_condition(
-            key_condition=lambda k: k in keys or k.replace(NOT_FLAG, '') in keys,
+            key_and_value_condition=lambda k, _: k in keys or k.replace(NOT_FLAG, '') in keys,
             params=params
         )
 
@@ -65,7 +65,7 @@ class ParamsParser():
         Returns keys not contained in not_keys list (= and !=).
         '''
         return self.get_filters_by_condition(
-            key_condition=lambda k: k not in not_keys and k.replace(NOT_FLAG, '') not in not_keys,
+            key_and_value_condition=lambda k, _: k not in not_keys and k.replace(NOT_FLAG, '') not in not_keys,
             params=params
         )
 
@@ -74,7 +74,7 @@ class ParamsParser():
         Returns params with wildcard value.
         '''
         return self.get_filters_by_condition(
-            value_condition=lambda v: v == WILDCARD,
+            key_and_value_condition=lambda _, v: v == WILDCARD,
             params=params
         )
 
@@ -83,7 +83,22 @@ class ParamsParser():
         Returns params without wildcard value.
         '''
         return self.get_filters_by_condition(
-            value_condition=lambda v: v != WILDCARD,
+            key_and_value_condition=lambda _, v: v != WILDCARD,
+            params=params
+        )
+
+    def remove_key_and_value_pair_from_filters(self, key=None, value=None, params=None):
+        '''
+        Returns all params except for the exact key and value pair.
+        Used for generating the clear filter links.
+        '''
+        if not key or not value:
+            raise ValueError('Must specify key and value')
+        return self.get_filters_by_condition(
+            key_and_value_condition=lambda k, v: not all([
+                k == key,
+                v == value,
+            ]),
             params=params
         )
 
@@ -130,7 +145,7 @@ class ParamsParser():
         Returns params where key must equal value.
         '''
         return self.get_filters_by_condition(
-            key_condition=lambda k: not k.endswith(NOT_FLAG),
+            key_and_value_condition=lambda k, _: not k.endswith(NOT_FLAG),
             params=params
         )
 
@@ -139,7 +154,7 @@ class ParamsParser():
         Returns params where key must not equal value.
         '''
         return self.get_filters_by_condition(
-            key_condition=lambda k: k.endswith(NOT_FLAG),
+            key_and_value_condition=lambda k, _: k.endswith(NOT_FLAG),
             params=params
         )
 
