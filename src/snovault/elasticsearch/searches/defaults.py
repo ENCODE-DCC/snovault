@@ -16,11 +16,14 @@ OPTIONAL_PARAMS = [
     'remove',
     'cart',
 ]
+
 FREE_TEXT_QUERIES = [
     'searchTerm',
     'advancedQuery',
 ]
+
 NOT_FILTERS = OPTIONAL_PARAMS + FREE_TEXT_QUERIES
+
 BASE_SEARCH_FIELDS = [
     '_all',
     '*.uuid',
@@ -28,6 +31,12 @@ BASE_SEARCH_FIELDS = [
     '*.submitted_file_name',
     'unique_keys.*',
 ]
+
+BASE_RETURN_FIELDS = [
+    'embedded.@id',
+    'embedded.@type',
+]
+
 BASE_FIELD_FACETS = [
     (
         'type',
@@ -37,12 +46,14 @@ BASE_FIELD_FACETS = [
         }
     ),
 ]
+
 BASE_AUDIT_FACETS = [
         ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
         ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
         ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
 
 ]
+
 INTERNAL_AUDIT_FACETS = [
     ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
 ]

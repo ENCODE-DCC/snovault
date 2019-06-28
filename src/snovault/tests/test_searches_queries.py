@@ -240,10 +240,9 @@ def test_searches_queries_abstract_query_factory_get_search_fields(params_parser
 def test_searches_queries_abstract_query_factory_get_return_fields(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    return_fields = aq.params_parser.param_values_to_list(aq._get_return_fields())
+    return_fields = aq._get_return_fields()
     assert return_fields == [
-        '@id',
-        'accession'
+        'embedded.*'
     ]
 
 
@@ -2104,13 +2103,22 @@ def test_searches_queries_abstract_query_factory_add_query_string_and_post_filte
     
 
 def test_searches_queries_abstract_query_factory_add_source(params_parser):
-    assert False 
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    aq.add_source()
+    assert aq.search.to_dict() == {'_source': ['embedded.*'], 'query': {'match_all': {}}}
 
 
 def test_searches_queries_abstract_query_factory_subaggregation_factory(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    from pyramid.testing import DummyResource
-    assert False
+    from elasticsearch_dsl.aggs import Filters, Terms
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    sa = aq._subaggregation_factory('exists')(field='')
+    assert isinstance(sa, Filters)
+    sa = aq._subaggregation_factory('terms')(field='')
+    assert isinstance(sa, Terms)
+    sa = aq._subaggregation_factory('typeahead')(field='')
+    assert isinstance(sa, Terms)
 
 
 def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregation_filters(params_parser_snovault_types):

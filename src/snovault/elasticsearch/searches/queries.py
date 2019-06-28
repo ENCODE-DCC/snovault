@@ -33,9 +33,11 @@ from .interfaces import PERIOD
 from .interfaces import PRINCIPALS_ALLOWED_VIEW
 from .interfaces import QUERY_STRING
 from .interfaces import SEARCH_AUDIT
+from .interfaces import _SOURCE
 from .interfaces import TITLE
 from .interfaces import TERMS
 from .interfaces import TYPE_KEY
+from .interfaces import WILDCARD
 from .interfaces import YES
 
 
@@ -153,7 +155,7 @@ class AbstractQueryFactory():
         return list(search_fields)
 
     def _get_return_fields(self):
-        return self.params_parser.get_field_filters()
+        return [EMBEDDED + WILDCARD]
 
     def _get_facets(self):
         return self.kwargs.get('facets', self._get_default_and_maybe_item_facets())
@@ -446,7 +448,9 @@ class AbstractQueryFactory():
             must, must_not, exists, not_exists = self._make_split_filter_queries(
                 params=filtered_params
             )
-            subaggregation = self._subaggregation_factory(facet_options.get(TYPE_KEY))
+            subaggregation = self._subaggregation_factory(
+                facet_options.get(TYPE_KEY)
+            )
             subaggregation = subaggregation(
                 field=self._map_param_key_to_elasticsearch_field(facet_type),
                 exclude=facet_options.get(EXCLUDE, []),
@@ -478,7 +482,11 @@ class AbstractQueryFactory():
         )
 
     def add_source(self):
-        pass
+        self.search = self._get_or_create_search().extra(
+            **{
+                _SOURCE: self._get_return_fields()
+            }
+        )
 
     def build_query(self):
         '''
