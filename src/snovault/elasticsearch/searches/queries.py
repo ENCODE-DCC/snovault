@@ -143,16 +143,10 @@ class AbstractQueryFactory():
             **kwargs
         )
 
-    def _make_must_equal_terms_query(self, field, terms):
-        return Q(
-            TERMS,
-            **{field: terms}
-        )
-
-    def _make_must_equal_terms_queries_from_params(self, params):
+    def _make_queries_from_params(self, query_context, params):
         return [
-            self._make_must_equal_terms_query(
-                field=field,
+            query_context(
+                field=self._map_param_key_to_elasticsearch_field(param_key=field),
                 terms=terms
             )
             for field, terms in self.params_parser.group_values_by_key(
@@ -161,24 +155,31 @@ class AbstractQueryFactory():
                     )
             ).items()
         ]
+        
 
-    def _make_field_must_exist_query(self, field):
+    def _make_must_equal_terms_query(self, field, terms, **kwargs):
+        return Q(
+            TERMS,
+            **{field: terms}
+        )
+
+    def _make_must_equal_terms_queries_from_params(self, params):
+        return self._make_queries_from_params(
+            query_context=self._make_must_equal_terms_query,
+            params=params
+        )
+
+    def _make_field_must_exist_query(self, field, **kwargs):
         return Q(
             EXISTS,
             field=field
         )
 
     def _make_field_must_exist_query_from_params(self, params):
-        return [
-            self._make_field_must_exist_query(
-                field=field
-            )
-            for field, _ in self.params_parser.group_values_by_key(
-                    self.params_parser.remove_not_flag(
-                        params=params
-                    )
-            ).items()
-        ]
+        return self._make_queries_from_params(
+            query_context=self._make_field_must_exist_query,
+            params=params
+        )
 
     def _make_default_filters(self):
         return [
@@ -199,12 +200,12 @@ class AbstractQueryFactory():
             )
         ]
 
-    def _make_split_filter_queries(self):
+    def _make_split_filter_queries(self, params=None):
         '''
         Returns appropriate queries from param filters.
         '''
         _must, _must_not, _exists, _not_exists = self.params_parser.split_filters_by_must_and_exists(
-            params=self._get_filters()
+            params=params or self._get_filters()
         )
         must = self._make_must_equal_terms_queries_from_params(_must)
         must_not = self._make_must_equal_terms_queries_from_params(_must_not)
@@ -240,21 +241,29 @@ class AbstractQueryFactory():
         a.bucket(title, sub_aggregation)
         return a
 
-    def _map_param_key_to_elasticsearch_field(self, params):
+    def _map_param_key_to_elasticsearch_field(self, param_key):
         '''
         Special rules for mapping param key to actual field in ES.
         For exampe type -> embedded.@type.
         '''
-        for k, v in params:
-            if k == TYPE_KEY:
-                yield (EMBEDDED_TYPE, v)
-            elif k.startswith(AUDIT):
-                yield (k, v)
-            else:
-                yield (
-                    self._prefix_value(EMBEDDED, k),
-                    v
-                )
+
+        if param_key == TYPE_KEY:
+            return EMBEDDED_TYPE
+        elif param_key.startswith(AUDIT):
+            return param_key
+        else:
+            return self._prefix_value(EMBEDDED, param_key)
+
+    def _map_params_to_elasticsearch_fields(self, params):
+        '''
+        Like _map_param_key_to_elasticsearch_field but used for iterating over list
+        of param tuples.
+        '''
+        for param_key, param_value in params:
+            yield (
+                self._map_param_key_to_elasticsearch_field(param_key),
+                param_value
+            )
 
     def _add_must_equal_terms_filter(self, field, terms):
         self.search = self._get_or_create_search().filter(

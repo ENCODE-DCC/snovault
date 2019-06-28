@@ -600,13 +600,13 @@ def test_searches_queries_abstract_query_factory_make_must_equal_terms_queries_f
     )
     actual = [m.to_dict() for m in mtqs]
     expected = [
-        {'terms': {'assay_title': ['Histone ChIP-seq']}},
-        {'terms': {'status': ['released']}},
-        {'terms': {'biosample_ontology.term_name': ['naive thymus-derived CD4-positive, alpha-beta T cell']}},
-        {'terms': {'biosample_ontology.classification': ['primary cell', 'cell line']}},
-        {'terms': {'target.label': ['H3K27me3']}},
-        {'terms': {'assembly': ['GRCh38']}},
-        {'terms': {'award.project': ['Roadmap']}}
+        {'terms': {'embedded.assay_title': ['Histone ChIP-seq']}},
+        {'terms': {'embedded.status': ['released']}},
+        {'terms': {'embedded.biosample_ontology.term_name': ['naive thymus-derived CD4-positive, alpha-beta T cell']}},
+        {'terms': {'embedded.biosample_ontology.classification': ['primary cell', 'cell line']}},
+        {'terms': {'embedded.target.label': ['H3K27me3']}},
+        {'terms': {'embedded.assembly': ['GRCh38']}},
+        {'terms': {'embedded.award.project': ['Roadmap']}}
     ]
     assert all(e in actual for e in expected)
 
@@ -631,13 +631,13 @@ def test_searches_queries_abstract_query_factory_make_field_must_exist_queries_f
     )
     actual = [m.to_dict() for m in meqs]
     expected = [
-        {'exists': {'field': 'assay_title'}},
-        {'exists': {'field': 'assembly'}},
-        {'exists': {'field': 'biosample_ontology.classification'}},
-        {'exists': {'field': 'status'}},
-        {'exists': {'field': 'biosample_ontology.term_name'}},
-        {'exists': {'field': 'target.label'}},
-        {'exists': {'field': 'award.project'}}
+        {'exists': {'field': 'embedded.assay_title'}},
+        {'exists': {'field': 'embedded.assembly'}},
+        {'exists': {'field': 'embedded.biosample_ontology.classification'}},
+        {'exists': {'field': 'embedded.status'}},
+        {'exists': {'field': 'embedded.biosample_ontology.term_name'}},
+        {'exists': {'field': 'embedded.target.label'}},
+        {'exists': {'field': 'embedded.award.project'}}
     ]
     assert all(e in actual for e in expected)
 
@@ -724,7 +724,15 @@ def test_searches_queries_abstract_query_factory_make_exists_aggregation(params_
     }
 
 
-def test_searches_queries_abstract_query_factory_map_param_key_to_elasticsearch_field(dummy_request):
+def test_searches_queries_abstract_query_factory_map_param_key_to_elasticsearch_field():
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory({})
+    assert aq._map_param_key_to_elasticsearch_field('type') == 'embedded.@type'
+    assert aq._map_param_key_to_elasticsearch_field('audit.WARNING.category') == 'audit.WARNING.category'
+    assert aq._map_param_key_to_elasticsearch_field('status') == 'embedded.status'
+
+
+def test_searches_queries_abstract_query_factory_map_params_to_elasticsearch_fields(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
@@ -734,10 +742,9 @@ def test_searches_queries_abstract_query_factory_map_param_key_to_elasticsearch_
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    mapped_keys = list(aq._map_param_key_to_elasticsearch_field(
+    mapped_keys = list(aq._map_params_to_elasticsearch_fields(
         params=aq._get_filters() + aq._get_item_types()
     ))
-    print(mapped_keys)
     assert mapped_keys == [
         ('embedded.status', 'released'),
         ('audit.WARNING.category', 'missing biosample characterization'),
@@ -1108,20 +1115,20 @@ def test_searches_queries_abstract_query_factory_make_split_filter_queries(param
     aq = AbstractQueryFactory(params_parser)
     must, must_not, exists, not_exists = aq._make_split_filter_queries()
     expected_must = [
-        {'terms': {'award.project': ['Roadmap']}},
-        {'terms': {'target.label': ['H3K27me3']}},
-        {'terms': {'assembly': ['GRCh38']}},
-        {'terms': {'status': ['released']}},
-        {'terms': {'biosample_ontology.classification': ['primary cell']}},
-        {'terms': {'assay_title': ['Histone ChIP-seq']}}
+        {'terms': {'embedded.award.project': ['Roadmap']}},
+        {'terms': {'embedded.target.label': ['H3K27me3']}},
+        {'terms': {'embedded.assembly': ['GRCh38']}},
+        {'terms': {'embedded.status': ['released']}},
+        {'terms': {'embedded.biosample_ontology.classification': ['primary cell']}},
+        {'terms': {'embedded.assay_title': ['Histone ChIP-seq']}}
     ]
     actual_must = [m.to_dict() for m in must]
     assert all(e in actual_must for e in expected_must)
     expected_must_not = [
-        {'terms': {'biosample_ontology.classification': ['cell line']}},
+        {'terms': {'embedded.biosample_ontology.classification': ['cell line']}},
         {
             'terms': {
-                'biosample_ontology.term_name': [
+                'embedded.biosample_ontology.term_name': [
                     'naive thymus-derived CD4-positive, alpha-beta T cell'
                 ]
             }
@@ -1143,12 +1150,12 @@ def test_searches_queries_abstract_query_factory_make_split_filter_queries_wildc
     p = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(p)
     must, must_not, exists, not_exists = aq._make_split_filter_queries()
-    assert [m.to_dict() for m in must] == [{'terms': {'file_type': ['bam']}}]
+    assert [m.to_dict() for m in must] == [{'terms': {'embedded.file_type': ['bam']}}]
     assert [m.to_dict() for m in must_not] == []
-    expected_exists = [{'exists': {'field': 'lab.name'}}, {'exists': {'field': 'status'}}]
+    expected_exists = [{'exists': {'field': 'embedded.lab.name'}}, {'exists': {'field': 'embedded.status'}}]
     actual_exists = [e.to_dict() for e in exists]
     assert all(e in actual_exists for e in expected_exists)
-    expected_not_exists = [{'exists': {'field': 'restricted'}}, {'exists': {'field': 'no_file_available'}}]
+    expected_not_exists = [{'exists': {'field': 'embedded.restricted'}}, {'exists': {'field': 'embedded.no_file_available'}}]
     actual_not_exists = [e.to_dict() for e in not_exists]
     assert all(e in actual_not_exists for e in expected_not_exists)
 
@@ -1869,26 +1876,26 @@ def test_searches_queries_abstract_query_factory_add_post_filters(params_parser)
     aq.add_post_filters()
     actual_must = aq.search.to_dict()['post_filter']['bool']['must']
     expected_must = [
-        {'terms': {'target.label': ['H3K27me3']}},
-        {'terms': {'assembly': ['GRCh38']}},
-        {'terms': {'award.project': ['Roadmap']}},
-        {'terms': {'assay_title': ['Histone ChIP-seq']}},
-        {'terms': {'status': ['released']}},
-        {'terms': {'biosample_ontology.classification': ['primary cell']}}
+        {'terms': {'embedded.target.label': ['H3K27me3']}},
+        {'terms': {'embedded.assembly': ['GRCh38']}},
+        {'terms': {'embedded.award.project': ['Roadmap']}},
+        {'terms': {'embedded.assay_title': ['Histone ChIP-seq']}},
+        {'terms': {'embedded.status': ['released']}},
+        {'terms': {'embedded.biosample_ontology.classification': ['primary cell']}}
     ]
     assert all(e in actual_must for e in expected_must)
     actual_must_not = aq.search.to_dict()['post_filter']['bool']['must_not']
     expected_must_not = [
         {
             'terms': {
-                'biosample_ontology.term_name': [
+                'embedded.biosample_ontology.term_name': [
                     'naive thymus-derived CD4-positive, alpha-beta T cell'
                 ]
             }
         },
         {
             'terms': {
-                'biosample_ontology.classification': [
+                'embedded.biosample_ontology.classification': [
                     'cell line'
                 ]
             }
@@ -1929,13 +1936,13 @@ def test_searches_queries_abstract_query_factory_add_query_string_and_post_filte
         'post_filter': {
             'bool': {
                 'must': [
-                    {'terms': {'file_type': ['bam']}},
-                    {'exists': {'field': 'lab.name'}},
-                    {'exists': {'field': 'status'}}
+                    {'terms': {'embedded.file_type': ['bam']}},
+                    {'exists': {'field': 'embedded.lab.name'}},
+                    {'exists': {'field': 'embedded.status'}}
                 ],
                 'must_not': [
-                    {'exists': {'field': 'restricted'}},
-                    {'exists': {'field': 'no_file_available'}}
+                    {'exists': {'field': 'embedded.restricted'}},
+                    {'exists': {'field': 'embedded.no_file_available'}}
                 ]
             }
         }
