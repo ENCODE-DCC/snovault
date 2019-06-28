@@ -283,7 +283,59 @@ def test_searches_queries_abstract_query_factory_get_boost_values_for_item_type(
     assert aq._get_boost_values_for_item_type(
         'TestingSearchSchema'
     ) == {'accession': 1.0, 'status': 1.0}
+
+
+def test_searches_queries_abstract_query_factory_show_internal_audits(dummy_request):
+    from pyramid.testing import DummyResource
+    from pyramid.security import Allow
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['REMOTE_USER'] = 'TEST_SUBMITTER'
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&assembly=GRCh38&biosample_ontology.classification=primary+cell'
+        '&target.label=H3K27me3&biosample_ontology.classification%21=cell+line'
+        '&biosample_ontology.term_name%21=naive+thymus-derived+CD4-positive%2C+alpha-beta+T+cell'
+        '&limit=10&status=released&searchTerm=chip-seq&sort=date_created&sort=-files.file_size'
+        '&field=@id&field=accession'
+    )
+    dummy_request.context = DummyResource()
+    dummy_request.context.__acl__ = lambda: [(Allow, 'group.submitter', 'search_audit')]
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._show_internal_audits() == True
+    dummy_request.context.__acl__ = lambda: []
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._show_internal_audits() == False
+
+
+def test_searches_queries_abstract_query_factory_get_audit_facets(dummy_request):
+    from pyramid.testing import DummyResource
+    from pyramid.security import Allow
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.defaults import BASE_AUDIT_FACETS, INTERNAL_AUDIT_FACETS
+    dummy_request.environ['REMOTE_USER'] = 'TEST_SUBMITTER'
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&assembly=GRCh38&biosample_ontology.classification=primary+cell'
+        '&target.label=H3K27me3&biosample_ontology.classification%21=cell+line'
+        '&biosample_ontology.term_name%21=naive+thymus-derived+CD4-positive%2C+alpha-beta+T+cell'
+        '&limit=10&status=released&searchTerm=chip-seq&sort=date_created&sort=-files.file_size'
+        '&field=@id&field=accession'
+    )
+    dummy_request.context = DummyResource()
+    dummy_request.context.__acl__ = lambda: [(Allow, 'group.submitter', 'search_audit')]
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_audit_facets() == BASE_AUDIT_FACETS + INTERNAL_AUDIT_FACETS
+    dummy_request.context.__acl__ = lambda: []
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_audit_facets() == BASE_AUDIT_FACETS
     
+
 
 def test_searches_queries_abstract_query_factory_prefix_value(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory

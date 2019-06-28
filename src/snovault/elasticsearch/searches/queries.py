@@ -6,8 +6,10 @@ from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.interfaces import TYPES
 
-from .defaults import BASE_FACETS
+from .defaults import BASE_AUDIT_FACETS
+from .defaults import BASE_FIELD_FACETS
 from .defaults import BASE_SEARCH_FIELDS
+from .defaults import INTERNAL_AUDIT_FACETS
 from .defaults import NOT_FILTERS
 from .interfaces import AND
 from .interfaces import AND_JOIN
@@ -20,10 +22,12 @@ from .interfaces import EMBEDDED_TYPE
 from .interfaces import EXISTS
 from .interfaces import FACETS
 from .interfaces import FILTERS
+from .interfaces import GROUP_SUBMITTER
 from .interfaces import NOT_JOIN
 from .interfaces import NO
 from .interfaces import PRINCIPALS_ALLOWED_VIEW
 from .interfaces import QUERY_STRING
+from .interfaces import SEARCH_AUDIT
 from .interfaces import TERMS
 from .interfaces import TYPE_KEY
 from .interfaces import YES
@@ -67,8 +71,23 @@ class AbstractQueryFactory():
             {}
         )
 
+
     def _get_facets_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(FACETS)
+
+    def _show_internal_audits(self):
+        if all([
+                self.params_parser._request.has_permission(SEARCH_AUDIT),
+                GROUP_SUBMITTER in self._get_principals()
+        ]):
+            return True
+        return False
+
+
+    def _get_audit_facets(self):
+        if self._show_internal_audits():
+            return BASE_AUDIT_FACETS + INTERNAL_AUDIT_FACETS
+        return BASE_AUDIT_FACETS
 
     def _get_item_types(self):
         return self.params_parser.get_type_filters()
@@ -77,7 +96,7 @@ class AbstractQueryFactory():
         return self.kwargs.get('default_item_types', [])
 
     def _get_default_facets(self):
-        return self.kwargs.get('default_facets', BASE_FACETS)
+        return self.kwargs.get('default_facets', BASE_FIELD_FACETS)
 
     def _get_query(self):
         return self._combine_search_term_queries(

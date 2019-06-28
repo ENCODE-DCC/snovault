@@ -28,6 +28,15 @@ BASE_SEARCH_FIELDS = [
     '*.submitted_file_name',
     'unique_keys.*',
 ]
-BASE_FACETS = [
+BASE_FIELD_FACETS = [
     ('type', {'title': 'Data Type'}),
+]
+BASE_AUDIT_FACETS = [
+        ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
+        ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
+        ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
+
+]
+INTERNAL_AUDIT_FACETS = [
+    ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
 ]
