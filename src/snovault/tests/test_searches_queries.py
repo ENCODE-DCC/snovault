@@ -2252,17 +2252,7 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
         k in actual.get('aggs', {}).keys()
         for k in expected.get('aggs', {}).keys()
     )
-    assert actual.get(
-        'aggs', {}
-    ).get(
-        'Data Type', {}
-    ).get(
-        'aggs', {}
-    ).get(
-        'type', {}
-    ).get(
-        'terms', {}
-    ).get('exclude') == ['Item']
+    assert actual['aggs']['Data Type']['aggs']['type']['terms']['exclude'] == ['Item']
 
 
 def test_searches_queries_abstract_query_factory_build_query():
