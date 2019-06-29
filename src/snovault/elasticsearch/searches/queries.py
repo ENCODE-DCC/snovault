@@ -504,6 +504,16 @@ class BasicSearchQueryFactory(AbstractQueryFactory):
         self.add_query_string_query()
         self.add_filters()
         self.add_post_filters()
-        self.add_aggregations_and_aggregation_filters()
         self.add_source()
+        return self.search
+
+
+class BasicSearchQueryFactoryWithFacets(BasicSearchQueryFactory):
+
+    def __init__(self, params_parser, *args, **kwargs):
+        super().__init__(params_parser, *args, **kwargs)
+
+    def build_query(self):
+        super().build_query()
+        self.add_aggregations_and_aggregation_filters()
         return self.search

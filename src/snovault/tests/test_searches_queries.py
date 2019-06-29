@@ -2291,6 +2291,58 @@ def test_searches_builders_basic_search_query_factory_build_query(dummy_request)
                 ]
             }
         },
+        '_source': ['embedded.*'],
+        'post_filter': {
+            'bool': {
+                'must': [
+                    {'terms': {'embedded.@type': ['TestingSearchSchema']}},
+                    {'terms': {'embedded.status': ['released', 'archived']}},
+                    {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                    {'terms': {'embedded.file_format': ['bam']}},
+                    {'exists': {'field': 'embedded.dbxref'}}
+                ],
+                'must_not': [
+                    {'terms': {'embedded.lab.name': ['thermo']}},
+                    {'exists': {'field': 'embedded.restricted'}}
+                ]
+            }
+        }
+    }
+    actual = query.to_dict()
+    expected_must = actual['post_filter']['bool']['must']
+    actual_must = expected['post_filter']['bool']['must']
+    assert all(e in actual_must for e in expected_must)
+
+
+def test_searches_builders_basic_search_query_factory_with_facets_init(params_parser):
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
+    bsqf = BasicSearchQueryFactoryWithFacets(params_parser)
+    assert isinstance(bsqf, BasicSearchQueryFactoryWithFacets)
+    assert bsqf.params_parser == params_parser
+
+
+def test_searches_builders_basic_search_query_factory_with_facets_build_query(dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.testing import DummyResource
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released&status=archived&file_format=bam'
+        '&lab.name!=thermo&restricted!=*&dbxref=*&replcate.biosample.title=cell'
+        '&limit=10'
+    )
+    dummy_request.context = DummyResource()
+    params_parser = ParamsParser(dummy_request)
+    bsqf = BasicSearchQueryFactoryWithFacets(params_parser)
+    query = bsqf.build_query()
+    expected = {
+        'query': {
+            'bool': {
+                'must': [
+                    {'terms': {'principals_allowed.view': ['system.Everyone']}},
+                    {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                ]
+            }
+        },
         'aggs': {
             'Status': {
                 'aggs': {
