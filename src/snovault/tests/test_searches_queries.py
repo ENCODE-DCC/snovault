@@ -2282,15 +2282,12 @@ def test_searches_builders_basic_search_query_factory_init(params_parser):
 def test_searches_builders_basic_search_query_factory_build_query(dummy_request):
     from snovault.elasticsearch.searches.queries import BasicSearchQueryFactory
     from snovault.elasticsearch.searches.parsers import ParamsParser
-    from snovault.elasticsearch import ELASTIC_SEARCH
-    from elasticsearch import Elasticsearch
     from pyramid.testing import DummyResource
     dummy_request.environ['QUERY_STRING'] = (
         'type=TestingSearchSchema&status=released&status=archived&file_format=bam'
         '&lab.name!=thermo&restricted!=*&dbxref=*&replcate.biosample.title=cell'
         '&limit=10'
     )
-    dummy_request.registry[ELASTIC_SEARCH] = Elasticsearch()
     dummy_request.context = DummyResource()
     params_parser = ParamsParser(dummy_request)
     bsqf = BasicSearchQueryFactory(params_parser)
@@ -2467,7 +2464,8 @@ def test_searches_builders_basic_search_query_factory_build_query(dummy_request)
                     {'terms': {'embedded.file_format': ['bam']}},
                     {'terms': {'embedded.replcate.biosample.title': ['cell']}},
                     {'exists': {'field': 'embedded.dbxref'}}
-                ], 'must_not': [
+                ],
+                'must_not': [
                     {'terms': {'embedded.lab.name': ['thermo']}},
                     {'exists': {'field': 'embedded.restricted'}}
                 ]
