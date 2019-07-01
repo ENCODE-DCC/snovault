@@ -1,7 +1,12 @@
 Changes
 =======
 
-Snovault 1.0.32 (released) encoded v87.0
+Snovault 1.0.33 (released) encoded v87.0
+----------------------------------------
+1. SNO-103 fix-batch-upgrade-error-logging (#206)
+2. SNO-102 use-openjdk-java-for-circleci (#205)
+
+Snovault 1.0.32 (released) encoded v87rc1
 ----------------------------------------
 1. SNO-99 port travis tests to circleci (#202)
 2. SNO-100 Parallelize batchupgrade script (#201)
