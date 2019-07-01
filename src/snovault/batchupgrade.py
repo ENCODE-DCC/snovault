@@ -3,7 +3,10 @@ Also run this when the links or keys are changed in the schema.
 
 Example:
 
-    %(prog)s production.ini --app-name app
+Demo
+    bin/batchupgrade development.ini --app-name app
+Production or Release Candidate
+    bin/batchupgrade production.ini --app-name app --processes 16 --batchsize 1000
 
 """
 import logging
@@ -80,13 +83,18 @@ def batch_upgrade(request):
         item_type = None
         update = False
         error = False
+        error_msg = ''
         sp = session.begin_nested()
         try:
             item = find_resource(root, uuid)
             item_type = item.type_info.item_type
             update, errors = update_item(storage, item)
-        except Exception as e:
-            BATCH_UPGRADE_LOG.error('Error %s updating: /%s/%s' % (e, item_type, uuid))
+        except Exception as ecp:
+            error_msg = "Exception: {} updating: /{}/{}".format(
+                ecp,
+                item_type,
+                uuid,
+            )
             sp.rollback()
             error = True
         else:
@@ -96,14 +104,16 @@ def batch_upgrade(request):
                     '%s: %s' % ('/'.join([str(x) or '<root>' for x in error.path]), error.message)
                     for error in errors
                 ]
-                BATCH_UPGRADE_LOG.error(
-                    'Validation failure: /%s/%s\n%s', item_type, uuid, '\n'.join(errortext)
+                error_msg = "Validation failure: /{}/{}\n{}".format(
+                    item_type,
+                    uuid,
+                    '\n'.join(errortext),
                 )
                 sp.rollback()
                 error = True
             else:
                 sp.commit()
-        results.append((item_type, uuid, update, error))
+        results.append((item_type, uuid, update, error, error_msg))
     return {'results': results}
 
 
@@ -151,16 +161,22 @@ def _run_pool(uuids, args):
         )
         for loop, result in enumerate(pool_gen, 1):
             results = result['results']
-            errors = sum(error for item_type, path, update, error in results)
-            updated = sum(update for item_type, path, update, error in results)
+            error_msgs = [
+                error_msg
+                for _, _, _, _, error_msg in results
+                if error_msg
+            ]
+            updated_cnt = sum(update for _, _, update, _, _ in results)
             log_msg = "{} of ~{} Batch: Updated {} of {} (errors {})".format(
                 loop,
                 est_loops,
-                updated,
+                updated_cnt,
                 len(results),
-                errors,
+                len(error_msgs),
             )
             BATCH_UPGRADE_LOG.info(log_msg)
+            for error_msg in error_msgs:
+                BATCH_UPGRADE_LOG.error("\t%s", error_msg)
             all_results.extend(results)
     finally:
         pool.terminate()
@@ -169,7 +185,7 @@ def _run_pool(uuids, args):
 
 
 def _summarize_results(all_results, runtime_str=None, verbose=False):
- 
+
     def result_item_type(result):
         return result[0] or ''
 
@@ -179,17 +195,17 @@ def _summarize_results(all_results, runtime_str=None, verbose=False):
     for item_type, results in groupby(
             sorted(all_results, key=result_item_type), key=result_item_type):
         results = list(results)
-        errors = sum(error for item_type, path, update, error in results)
-        updated = sum(update for item_type, path, update, error in results)
-        log_message = 'Collection {}: Updated {} of {} (errors {})' .format(
+        errors_cnt = sum(error for _, _, _, error, _ in results)
+        updated_cnt = sum(update for _, _, update, _, _ in results)
+        log_message = "Collection {}: Updated {} of {} (errors {})".format(
             item_type,
-            updated,
+            updated_cnt,
             len(results),
-            errors,
+            errors_cnt,
         )
-        if errors:
-            errors_logs.append(log_message)
-        if updated:
+        if errors_cnt:
+            error_logs.append(log_message)
+        if updated_cnt:
             updated_logs.append(log_message)
         all_logs.append(log_message)
     BATCH_UPGRADE_LOG.info('Upgrade Summary')
