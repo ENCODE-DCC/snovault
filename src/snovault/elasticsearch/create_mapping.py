@@ -33,8 +33,7 @@ log = logging.getLogger(__name__)
 META_MAPPING = {
     '_all': {
         'enabled': False,
-        'analyzer': 'snovault_index_analyzer',
-        'search_analyzer': 'snovault_search_analyzer'
+        'analyzer': 'standard'
     },
     'dynamic_templates': [
         {
@@ -247,8 +246,7 @@ def es_mapping(mapping):
     return {
         '_all': {
             'enabled': True,
-            'analyzer': 'snovault_index_analyzer',
-            'search_analyzer': 'snovault_search_analyzer'
+            'analyzer': 'standard'
         },
         'dynamic_templates': [
             {
