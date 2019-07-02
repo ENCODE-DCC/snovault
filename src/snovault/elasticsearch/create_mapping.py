@@ -91,7 +91,7 @@ def schema_mapping(name, schema):
                 properties[k] = mapping
         return {
             'type': 'object',
-            'include_in_all': False,
+            # 'include_in_all': False,
             'properties': properties,
         }
 
@@ -316,17 +316,17 @@ def es_mapping(mapping):
             'object': {
                 'type': 'object',
                 'enabled': False,
-                'include_in_all': False,
+                # 'include_in_all': False,
             },
             'properties': {
                 'type': 'object',
                 'enabled': False,
-                'include_in_all': False,
+                # 'include_in_all': False,
             },
             'propsheets': {
                 'type': 'object',
                 'enabled': False,
-                'include_in_all': False,
+                # 'include_in_all': False,
             },
             'embedded_uuids': {
                 'type': 'keyword',
@@ -338,11 +338,11 @@ def es_mapping(mapping):
             },
             'paths': {
                 'type': 'keyword',
-                'include_in_all': False,
+                # 'include_in_all': False,
             },
             'audit': {
                 'type': 'object',
-                'include_in_all': False,
+                # 'include_in_all': False,
                 'properties': {
                     'ERROR': {
                         'type': 'object',
@@ -424,24 +424,33 @@ def type_mapping(types, item_type, embed=True):
 
             m = m['properties'][p]
 
-    boost_values = schema.get('boost_values', None)
-    if boost_values is None:
-        boost_values = {
-            prop_name: 1.0
-            for prop_name in ['@id', 'title']
-            if prop_name in mapping['properties']
-        }
-    for name, boost in boost_values.items():
-        props = name.split('.')
-        last = props.pop()
-        new_mapping = mapping['properties']
-        for prop in props:
-            new_mapping = new_mapping[prop]['properties']
-        new_mapping[last]['boost'] = boost
-        if last in NON_SUBSTRING_FIELDS:
-            new_mapping[last]['include_in_all'] = False
-        else:
-            new_mapping[last]['include_in_all'] = True
+    # boost_values = schema.get('boost_values', None)
+    # if boost_values is None:
+    #     boost_values = {
+    #         prop_name: 1.0
+    #         for prop_name in ['@id', 'title']
+    #         if prop_name in mapping['properties']
+    #     }
+    # for name, boost in boost_values.items():
+    #     import pdb; pdb.set_trace();
+    #     props = name.split('.')
+    #     last = props.pop()
+    #     new_mapping = mapping['properties']
+    #     for prop in props:
+    #         #import pdb; pdb.set_trace();
+    #         new_mapping = new_mapping[prop]['properties']
+    #     new_mapping[last]['boost'] = boost
+    #     #import pdb; pdb.set_trace();
+    #     if last in NON_SUBSTRING_FIELDS:
+    #         new_mapping[last]['include_in_all'] = False
+    #     else:
+    #         new_mapping[last]['include_in_all'] = True
+
+    for key, values in mapping.get('properties', {}).items():
+        if (key not in NON_SUBSTRING_FIELDS):
+            continue
+        values['include_in_all'] = False
+
     return mapping
 
 

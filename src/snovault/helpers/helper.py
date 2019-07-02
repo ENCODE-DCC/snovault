@@ -172,6 +172,7 @@ def get_search_fields(request, doc_types):
     types = request.registry[TYPES]
     for doc_type in doc_types:
         type_info = types[doc_type]
+        # what can be done instead of boost_values?
         for value in type_info.schema.get('boost_values', ()):
             fields.add('embedded.' + value)
             highlights['embedded.' + value] = {}
