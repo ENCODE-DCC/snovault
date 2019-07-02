@@ -4,6 +4,7 @@ from collections import defaultdict
 from .interfaces import FIELD_KEY
 from .interfaces import FRAME_KEY
 from .interfaces import LIMIT_KEY
+from .interfaces import MODE_KEY
 from .interfaces import NOT_FLAG
 from .interfaces import SEARCH_TERM_KEY
 from .interfaces import SIZE_KEY
@@ -248,6 +249,12 @@ class ParamsParser():
     def get_frame(self, params=None):
         return self.get_key_filters(
             key=FRAME_KEY,
+            params=params
+        )
+
+    def get_mode(self, params=None):
+        return self.get_key_filters(
+            key=MODE_KEY,
             params=params
         )
 
