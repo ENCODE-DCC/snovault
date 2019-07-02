@@ -209,6 +209,28 @@ def test_searches_queries_abstract_query_factory_get_sort(params_parser):
         ('sort', '-files.file_size')
     ]
 
+def test_searches_queries_abstract_query_factory_get_one_value(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&limit=50&field=@id&mode=picker&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    value = aq._get_one_value(
+        params=aq._get_limit()
+    )
+    assert value == '10'
+    value = aq._get_one_value(
+        params=aq._get_mode()
+    )
+    assert value == 'picker'
+    value = aq._get_one_value(
+        params=[]
+    )
+    assert not value
+
 
 def test_searches_queries_abstract_query_factory_get_limit(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
