@@ -1,4 +1,4 @@
-from .queries import BasicSearchQueryFactory
+from .queries import BasicSearchQueryFactoryWithFacets
 
 
 class ResponseField:
@@ -19,14 +19,14 @@ class ResponseField:
         raise NotImplementedError
 
 
-class BasicSearchResponseField(ResponseField):
+class BasicSearchWithFacetsResponseField(ResponseField):
 
     def __init__(self, *args, **kwargs):
         self.params_parser = kwargs.pop('params_parser', None)
         super().__init__(*args, **kwargs)
 
     def _build_query(self):
-        bsq = BasicSearchQueryFactory(
+        bsq = BasicSearchQueryFactoryWithFacets(
             self.params_parser,
             **self.kwargs
         )
