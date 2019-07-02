@@ -273,10 +273,31 @@ def test_searches_queries_abstract_query_factory_get_search_fields(params_parser
                 '_all',
                 'unique_keys.*',
                 'embedded.accession',
+                'embedded.label',
                 '*.uuid',
                 '*.submitted_file_name'
         ]
     )
+
+def test_searches_queries_abstract_query_factory_get_search_fields_mode_picker(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&frame=object&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    search_fields = aq._get_search_fields()
+    assert set(search_fields) == set([
+        '*.uuid',
+        '*.md5sum',
+        'embedded.accession',
+        'embedded.status',
+        'embedded.label',
+        '_all',
+        '*.submitted_file_name',
+        'unique_keys.*'
+    ])
 
 
 def test_searches_queries_abstract_query_factory_get_return_fields(params_parser):
@@ -366,7 +387,7 @@ def test_searches_queries_abstract_query_factory_get_boost_values_for_item_type(
     aq = AbstractQueryFactory(params_parser)
     assert aq._get_boost_values_for_item_type(
         'TestingSearchSchema'
-    ) == {'accession': 1.0, 'status': 1.0}
+    ) == {'accession': 1.0, 'status': 1.0, 'label': 1.0}
 
 
 def test_searches_queries_abstract_query_factory_show_internal_audits(dummy_request):
@@ -985,6 +1006,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_typ
                     '*.submitted_file_name',
                     'unique_keys.*',
                     'embedded.accession',
+                    'embedded.label',
                     'embedded.status'
                 ],
                 'query': '(chip-seq)'
@@ -1031,7 +1053,8 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_def
                     '*.submitted_file_name',
                     'unique_keys.*',
                     'embedded.accession',
-                    'embedded.status'
+                    'embedded.label',
+                    'embedded.status',
                 ],
                 'query': '(chip-seq)'
             }
@@ -1687,7 +1710,8 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_typ
                     '*.submitted_file_name',
                     'unique_keys.*',
                     'embedded.accession',
-                    'embedded.status'
+                    'embedded.status',
+                    'embedded.label'
                 ],
                 'query': '(chip-seq)'
             }
@@ -1733,7 +1757,8 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_def
                     '*.submitted_file_name',
                     'unique_keys.*',
                     'embedded.accession',
-                    'embedded.status'
+                    'embedded.status',
+                    'embedded.label'
                 ],
                 'query': '(chip-seq)'
             }

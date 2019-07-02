@@ -173,6 +173,10 @@ class TestingSearchSchema(Item):
                 'format': 'accession',
                 'permission': 'import_items'
             },
+            'label': {
+                'type': 'string',
+            }
+            
         },
         'additionalProperties': False,
         'facets': {
@@ -185,7 +189,8 @@ class TestingSearchSchema(Item):
         },
         'boost_values': {
             'accession': 1.0,
-            'status': 1.0
+            'status': 1.0,
+            'label': 1.0
         },
         'columns': {
             'accession': {

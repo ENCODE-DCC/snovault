@@ -92,7 +92,6 @@ class AbstractQueryFactory():
             return True
         return False
 
-
     def _get_audit_facets(self):
         if self._show_internal_audits():
             return BASE_AUDIT_FACETS + INTERNAL_AUDIT_FACETS
@@ -152,10 +151,11 @@ class AbstractQueryFactory():
     def _get_search_fields(self):
         search_fields = set()
         search_fields.update(BASE_SEARCH_FIELDS)
-        for item_type in chain(
-                self.params_parser.param_values_to_list(self._get_item_types()),
-                self._get_default_item_types()
-        ):
+        item_types = (
+            self.params_parser.param_values_to_list(self._get_item_types())
+            or self._get_default_item_types()
+        )
+        for item_type in item_types:
             search_fields.update(
                 self._prefix_values(
                     EMBEDDED,
