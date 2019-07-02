@@ -102,7 +102,7 @@ class AbstractQueryFactory():
         return self.params_parser.get_type_filters()
 
     def _get_default_item_types(self):
-        mode = self._get_one_value(
+        mode = self.params_parser.get_one_value(
             params=self._get_mode()
         )
         if mode == PICKER:
@@ -139,12 +139,6 @@ class AbstractQueryFactory():
 
     def _get_post_filters(self):
         return self.kwargs.get('post_filters', self._get_filters() + self._get_item_types())
-
-    def _get_one_value(self, params):
-        if len(params) >= 1:
-            return self.params_parser.param_values_to_list(
-                params=params
-            )[0]
         
     def _get_sort(self):
         return self.params_parser.get_sort()

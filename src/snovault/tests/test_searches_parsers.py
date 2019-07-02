@@ -684,6 +684,14 @@ def test_searches_parsers_params_parser_params_to_list(dummy_request):
         'sort',
     ]
 
+def test_searches_parsers_params_parser_params_get_one_value(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'frame=embedded&status!=submitted&type=File&sort=date_created'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_one_value() == 'embedded'
+
 
 def test_searches_parsers_params_parser_group_values_by_key(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser

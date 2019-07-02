@@ -264,6 +264,13 @@ class ParamsParser():
             values_by_key[p[0]].append(p[1])
         return dict(values_by_key)
 
+    def get_one_value(self, params=None):
+        values = self.param_values_to_list(
+            params=self._params(params)
+        )
+        if len(values) >= 1:
+            return values[0]
+
     def split_filters_by_must_and_exists(self, params=None):
         '''
         Partitions params into four groups: must, must_not, exists, not_exists.

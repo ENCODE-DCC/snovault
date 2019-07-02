@@ -238,15 +238,15 @@ def test_searches_queries_abstract_query_factory_get_one_value(dummy_request):
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    value = aq._get_one_value(
+    value = aq.params_parser.get_one_value(
         params=aq._get_limit()
     )
     assert value == '10'
-    value = aq._get_one_value(
+    value = aq.params_parser.get_one_value(
         params=aq._get_mode()
     )
     assert value == 'picker'
-    value = aq._get_one_value(
+    value = aq.params_parser.get_one_value(
         params=[]
     )
     assert not value
