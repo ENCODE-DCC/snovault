@@ -113,6 +113,26 @@ def test_searches_queries_abstract_query_factory_get_default_item_types(params_p
         'Snowflake',
         'Pancake'
     ]
+    aq = AbstractQueryFactory(
+        params_parser,
+    )
+    default_item_types = aq._get_default_item_types()
+    assert not default_item_types
+
+    
+def test_searches_queries_abstract_query_factory_get_default_item_types_mode_picker(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(
+        params_parser
+    )
+    default_item_types = aq._get_default_item_types()
+    assert default_item_types == ['Item']
 
 
 def test_searches_queries_abstract_query_factory_get_default_facets(params_parser):

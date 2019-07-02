@@ -25,11 +25,13 @@ from .interfaces import EXISTS
 from .interfaces import FACETS
 from .interfaces import FILTERS
 from .interfaces import GROUP_SUBMITTER
+from .interfaces import ITEM
 from .interfaces import LENGTH
 from .interfaces import LONG
 from .interfaces import NOT_JOIN
 from .interfaces import NO
 from .interfaces import PERIOD
+from .interfaces import PICKER
 from .interfaces import PRINCIPALS_ALLOWED_VIEW
 from .interfaces import QUERY_STRING
 from .interfaces import SEARCH_AUDIT
@@ -100,6 +102,11 @@ class AbstractQueryFactory():
         return self.params_parser.get_type_filters()
 
     def _get_default_item_types(self):
+        mode = self._get_one_value(
+            params=self._get_mode()
+        )
+        if mode == PICKER:
+            return [ITEM]
         return self.kwargs.get('default_item_types', [])
 
     def _get_default_facets(self):
