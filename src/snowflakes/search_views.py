@@ -1,8 +1,8 @@
 from pyramid.view import view_config
 
-from snovault.elasticsearch.search.responses import FieldedResponse
-from snovault.elasticsearch.search.fields import BasicSearchWithFacetsResponseField
-from snovault.elasticsearch.search.parsers import ParamsParser
+from snovault.elasticsearch.searches.responses import FieldedResponse
+from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
+from snovault.elasticsearch.searches.parsers import ParamsParser
 
 
 def includeme(config):
@@ -29,5 +29,5 @@ def searchv2(context, request):
             )
         ]
     )
-    fr.render()
+    return fr.render()
 

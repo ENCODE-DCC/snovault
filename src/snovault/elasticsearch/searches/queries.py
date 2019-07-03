@@ -48,9 +48,9 @@ class AbstractQueryFactory():
     Interface for building specific queries. Don't change functionality here, instead
     inherit and extend/override functions as needed.
     '''
-    search = None
 
     def __init__(self, params_parser, *args, **kwargs):
+        self.search = None
         self.params_parser = params_parser
         self.args = args
         self.kwargs = kwargs
@@ -58,8 +58,8 @@ class AbstractQueryFactory():
     def _get_or_create_search(self):
         if self.search is None:
             self.search = Search(
-                using=self._get_client,
-                index=self._get_index,
+                using=self._get_client(),
+                index=self._get_index(),
             )
         return self.search
 

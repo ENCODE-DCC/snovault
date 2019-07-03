@@ -6,6 +6,6 @@ from webob.multidict import MultiDict
 
 
 def test_searchv2_view(workbook, testapp):
-    r = testapp.get('/search/?type=Snowflake')
+    r = testapp.get('/searchv2/?type=Snowflake')
     print(r.json)
     assert False

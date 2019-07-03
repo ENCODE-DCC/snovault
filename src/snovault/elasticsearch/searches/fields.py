@@ -30,19 +30,20 @@ class BasicSearchWithFacetsResponseField(ResponseField):
 
     def _build_query(self):
         bsq = BasicSearchQueryFactoryWithFacets(
-            self.params_parser,
+            params_parser=self.params_parser,
             **self.kwargs
         )
         self.query = bsq.build_query()
 
-    def _execute_query(self, query):
+    def _execute_query(self):
         self.results = self.query.execute()
 
     def _format_results(self):
+
         self.response.update(
             {
-                GRAPH: list(self.results),
-                'aggs': self.results.aggs
+                GRAPH: [r.embedded.to_dict() for r in self.results],
+                'aggs': self.results.aggs.to_dict()
             }
         )
 

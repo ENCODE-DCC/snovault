@@ -2171,7 +2171,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_and_post_filte
 
 def test_searches_queries_abstract_query_factory_add_source(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser_snovault_types)
+    aq = AbstractQueryFactory(params_parser)
     aq.add_source()
     assert aq.search.to_dict() == {'_source': ['embedded.*'], 'query': {'match_all': {}}}
 
