@@ -11,3 +11,23 @@ def test_searches_fields_basic_search_response_field_init():
     from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
     brf = BasicSearchWithFacetsResponseField()
     assert isinstance(brf, BasicSearchWithFacetsResponseField)
+
+
+def test_searches_fields_basic_search_response_build_query():
+    from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
+    brf = BasicSearchWithFacetsResponseField()
+    assert False
+
+
+def test_searches_fields_basic_search_response_execute_query():
+    from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
+    brf = BasicSearchWithFacetsResponseField()
+    assert False
+
+
+def test_searches_fields_basic_search_response_format_results_query():
+    from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
+    brf = BasicSearchWithFacetsResponseField()
+    assert False
+
+
