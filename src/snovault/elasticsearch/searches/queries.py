@@ -86,8 +86,7 @@ class AbstractQueryFactory():
     def _get_facets_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(FACETS, {}).items()
 
-    @assert_none_returned(error_message='Invalid types:')
-    def _validate_item_types(self, item_types):
+    def _get_invalid_item_types(self, item_types):
         registered_types = self._get_registered_types()
         return [
             item_type
@@ -95,12 +94,27 @@ class AbstractQueryFactory():
             if item_type not in registered_types
         ]
 
+    @assert_none_returned(error_message='Invalid types:')
+    def _validate_item_types(self, item_types):
+        return self._get_invalid_item_types(item_types)
+
     def _normalize_item_types(self, item_types):
         registered_types = self._get_registered_types()
         return [
             registered_types[item_type].name
             for item_type in item_types
         ]
+
+    def _get_default_item_types(self):
+        mode = self.params_parser.get_one_value(
+            params=self._get_mode()
+        )
+        if mode == PICKER:
+            return [ITEM]
+        return self.kwargs.get('default_item_types', [])
+
+    def _get_item_types(self):
+        return self.params_parser.get_type_filters()
 
     def _show_internal_audits(self):
         if all([
@@ -114,17 +128,6 @@ class AbstractQueryFactory():
         if self._show_internal_audits():
             return BASE_AUDIT_FACETS + INTERNAL_AUDIT_FACETS
         return BASE_AUDIT_FACETS
-
-    def _get_item_types(self):
-        return self.params_parser.get_type_filters()
-
-    def _get_default_item_types(self):
-        mode = self.params_parser.get_one_value(
-            params=self._get_mode()
-        )
-        if mode == PICKER:
-            return [ITEM]
-        return self.kwargs.get('default_item_types', [])
 
     def _get_default_facets(self):
         return self.kwargs.get(
