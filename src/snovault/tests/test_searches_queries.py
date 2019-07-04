@@ -230,26 +230,39 @@ def test_searches_queries_abstract_query_factory_get_sort(params_parser):
     ]
 
 def test_searches_queries_abstract_query_factory_get_one_value(dummy_request):
+    from pyramid.httpexceptions import HTTPBadRequest
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=TestingSearchSchema&status=released'
-        '&limit=10&limit=50&field=@id&mode=picker&field=accession'
+        '&sort=age&sort=color&field=@id&mode=picker&field=accession'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     value = aq.params_parser.get_one_value(
-        params=aq._get_limit()
+        params=aq._get_sort()
     )
-    assert value == '10'
-    value = aq.params_parser.get_one_value(
-        params=aq._get_mode()
-    )
-    assert value == 'picker'
+    assert value == 'age'
     value = aq.params_parser.get_one_value(
         params=[]
     )
     assert not value
+
+
+def test_searches_queries_abstract_query_factory_assert_one_or_none(dummy_request):
+    from pyramid.httpexceptions import HTTPBadRequest
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&limit=50&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    with pytest.raises(HTTPBadRequest):
+        aq._get_mode()
+    with pytest.raises(HTTPBadRequest):
+        aq._get_limit()
 
 
 def test_searches_queries_abstract_query_factory_get_limit(params_parser):

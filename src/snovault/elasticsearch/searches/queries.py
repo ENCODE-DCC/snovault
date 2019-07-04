@@ -137,7 +137,6 @@ class AbstractQueryFactory():
     def _get_post_filters(self):
         return self.kwargs.get('post_filters', self._get_filters() + self._get_item_types())
 
-    @assert_one_or_none
     def _get_sort(self):
         return self.params_parser.get_sort()
 
