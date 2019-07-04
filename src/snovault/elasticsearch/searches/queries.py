@@ -6,7 +6,8 @@ from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.interfaces import TYPES
 
-from .decorators import assert_one_or_none
+from .decorators import assert_none_returned
+from .decorators import assert_one_or_none_returned
 from .defaults import BASE_AUDIT_FACETS
 from .defaults import BASE_FIELD_FACETS
 from .defaults import BASE_SEARCH_FIELDS
@@ -85,6 +86,22 @@ class AbstractQueryFactory():
     def _get_facets_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(FACETS, {}).items()
 
+    @assert_none_returned(error_message='Invalid types:')
+    def _validate_item_types(self, item_types):
+        registered_types = self._get_registered_types()
+        return [
+            item_type
+            for item_type in item_types
+            if item_type not in registered_types
+        ]
+
+    def _normalize_item_types(self, item_types):
+        registered_types = self._get_registered_types()
+        return [
+            registered_types[item_type].name
+            for item_type in item_types
+        ]
+
     def _show_internal_audits(self):
         if all([
                 self.params_parser._request.has_permission(SEARCH_AUDIT),
@@ -143,11 +160,11 @@ class AbstractQueryFactory():
     def _get_sort(self):
         return self.params_parser.get_sort()
 
-    @assert_one_or_none
+    @assert_one_or_none_returned(error_message='Invalid to specify multiple limit parameters:')
     def _get_limit(self):
         return self.params_parser.get_limit()
 
-    @assert_one_or_none
+    @assert_one_or_none_returned(error_message='Invalid to specify multiple mode parameters:')
     def _get_mode(self):
         return self.params_parser.get_mode()
 

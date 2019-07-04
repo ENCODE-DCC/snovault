@@ -104,6 +104,23 @@ def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params
     ]
     assert all(e in facets for e in expected)
 
+    
+def test_searches_queries_abstract_query_factory_validate_item_types(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    item_types = ['TestingSearchSchema']
+    aq._validate_item_types(item_types)
+    assert False
+
+
+def test_searches_queries_abstract_query_factory_normalize_item_types(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    item_types = ['TestingSearchSchema']
+    normalized_item_types = aq._normalize_item_types(item_types=item_types)
+    print(normalized_item_types)
+    assert False
+
 
 def test_searches_queries_abstract_query_factory_get_default_item_types(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory

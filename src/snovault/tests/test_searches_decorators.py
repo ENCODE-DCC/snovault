@@ -3,15 +3,31 @@ import pytest
 from pyramid.httpexceptions import HTTPBadRequest
 
 
-def test_searches_decorators_assert_one_or_none():
-    from snovault.elasticsearch.searches.decorators import assert_one_or_none
+def test_searches_decorators_assert_condition_returned():
+    assert False
+
+
+def test_searches_decorators_assert_none_returned():
+    from snovault.elasticsearch.searches.decorators import assert_none_returned
+    @assert_none_returned(error_message='Invalid type')
     def dummy_func(values):
         return values
-    dummy_func = assert_one_or_none(dummy_func)
-    dummy_func([])
-    dummy_func([1])
-    dummy_func(['one'])
-    dummy_func([('one', 'two')])
+    assert dummy_func([]) == []
+    with pytest.raises(HTTPBadRequest):
+        dummy_func([1])
+    with pytest.raises(HTTPBadRequest):
+        dummy_func([1, 2]) == [1, 2]
+
+
+def test_searches_decorators_assert_one_or_none_returned():
+    from snovault.elasticsearch.searches.decorators import assert_one_or_none_returned
+    @assert_one_or_none_returned(error_message='Multiple values invalid')
+    def dummy_func(values):
+        return values
+    assert dummy_func([]) == []
+    assert dummy_func([1]) == [1]
+    assert dummy_func(['one']) == ['one']
+    assert dummy_func([('one', 'two')]) == [('one', 'two')]
     with pytest.raises(HTTPBadRequest):
         dummy_func([1, 2])
     with pytest.raises(HTTPBadRequest):
