@@ -73,6 +73,9 @@ class AbstractQueryFactory():
     def _get_principals(self):
         return self.params_parser._request.effective_principals
 
+    def _get_registered_types(self):
+        return self.params_parser._request.registry[TYPES]
+
     def _get_schema_for_item_type(self, item_type):
         return self.params_parser._request.registry[TYPES][item_type].schema
 

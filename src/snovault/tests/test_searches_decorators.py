@@ -29,10 +29,10 @@ def test_searches_decorators_deduplicate():
     assert dummy_func([1, 2]) == [1, 2]
     assert dummy_func([1, 2, 1]) == [1, 2]
     assert dummy_func([('one', 'two')]) == [('one', 'two')]
-    actual = assert dummy_func(
+    actual = dummy_func(
         [('one', 'two'), ('three', 'two'), ('one', 'two'), ('one', 'one')]
     )
     expected = [('one', 'one'), ('one', 'two'), ('three', 'two')]
     assert len(expected) == len(actual)
     assert all(e in actual for e in expected)
-    assert len(set(a) - set(e)) == 0
+    assert len(set(actual) - set(expected)) == 0
