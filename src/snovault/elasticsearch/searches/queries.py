@@ -77,7 +77,7 @@ class AbstractQueryFactory():
         return self.params_parser._request.registry[TYPES]
 
     def _get_schema_for_item_type(self, item_type):
-        return self.params_parser._request.registry[TYPES][item_type].schema
+        return self._get_registered_types()[item_type].schema
 
     def _get_boost_values_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(BOOST_VALUES, {})

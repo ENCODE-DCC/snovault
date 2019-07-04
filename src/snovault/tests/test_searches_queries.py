@@ -81,11 +81,11 @@ def test_searches_queries_abstract_query_factory_get_principals(params_parser):
     assert principals == ['system.Everyone']
 
 def test_searches_queries_abstract_query_factory_get_registered_types(params_parser_snovault_types):
+    from snovault.typeinfo import TypesTool
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
     registered_types = aq._get_registered_types()
-    print(registered_types)
-    assert False
+    assert isinstance(registered_types, TypesTool)
 
 def test_searches_queries_abstract_query_factory_get_schema_for_item_type(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
