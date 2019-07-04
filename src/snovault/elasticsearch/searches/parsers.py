@@ -265,6 +265,9 @@ class ParamsParser():
         return dict(values_by_key)
 
     def get_one_value(self, params=None):
+        '''
+        Converts param list to values and takes first.
+        '''
         values = self.param_values_to_list(
             params=self._params(params)
         )
