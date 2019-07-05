@@ -1,4 +1,6 @@
 from .fields import ResponseField
+from .mixins import AggsToFacetsMixin
+from .mixins import HitsToGraphMixin
 
 
 class FieldedResponse():
@@ -27,3 +29,15 @@ class FieldedResponse():
         for f in self.response_fields:
             self.response.update(f.render())
         return self.response
+
+
+class QueryResponse():
+
+    def __init__(self, results):
+        self.results = results
+
+
+class BasicQueryResponseWithFacets(QueryResponse, HitsToGraphMixin, AggsToFacetsMixin):
+
+    def __init__(self, results, *args, **kwargs):
+        super().__init__(results)

@@ -1,5 +1,7 @@
+from .interfaces import FACETS
 from .interfaces import GRAPH
 from .queries import BasicSearchQueryFactoryWithFacets
+from .responses import BasicQueryResponseWithFacets
 
 
 class ResponseField:
@@ -36,14 +38,16 @@ class BasicSearchWithFacetsResponseField(ResponseField):
         self.query = bsq.build_query()
 
     def _execute_query(self):
-        self.results = self.query.execute()
+        self.results = BasicQueryResponseWithFacets(
+            results=self.query.execute()
+        )
 
     def _format_results(self):
 
         self.response.update(
             {
-                GRAPH: [r.embedded.to_dict() for r in self.results],
-                'aggs': self.results.aggs.to_dict()
+                GRAPH: self.results.to_graph(),
+                FACETS: self.results.to_facets()
             }
         )
 

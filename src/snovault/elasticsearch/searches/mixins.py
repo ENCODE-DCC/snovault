@@ -6,12 +6,10 @@ from .interfaces import TOTAL
 from .interfaces import TYPE_KEY
 
 
+class AggsToFacetsMixin():
 
-class AggregationFormatter():
-
-    def __init__(self, aggregations, query_builder):
-        self.aggregations = aggregations
-        self.query_builder = query_builder
+    def __init__(self):
+        pass
 
     def _get_aggregation_field(self):
          pass
@@ -44,3 +42,18 @@ class AggregationFormatter():
 
     def format_aggregations(self):
         pass
+
+    def aggs_to_facets(self):
+        pass
+
+
+class HitsToGraphMixin():
+
+    def __init__(self):
+        pass
+
+    def to_graph(self):
+        return [
+            r.embedded.to_dict()
+            for r in self.results
+        ]
