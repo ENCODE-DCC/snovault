@@ -40,10 +40,10 @@ class AggsToFacetsMixin():
         }
 
 
-    def format_aggregations(self):
+    def _format_aggregations(self):
         pass
 
-    def aggs_to_facets(self):
+    def to_facets(self):
         pass
 
 
