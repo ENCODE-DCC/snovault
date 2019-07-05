@@ -52,3 +52,14 @@ def test_searches_decorators_deduplicate():
     assert len(expected) == len(actual)
     assert all(e in actual for e in expected)
     assert len(set(actual) - set(expected)) == 0
+
+
+def test_searces_decorators_remove_from_return():
+    from snovault.elasticsearch.searches.decorators import remove_from_return
+    @remove_from_return(keys=['del_me'], values=[None])
+    def dummy_func(value_dict):
+        return value_dict
+    assert dummy_func({'a': 1}) == {'a': 1}
+    assert dummy_func({'a': 1, 'del_me': 'and me'}) == {'a': 1}
+    assert dummy_func({'a': 1, 'b': None, 'del_me': 'and me'}) == {'a': 1}
+    assert dummy_func([]) == []

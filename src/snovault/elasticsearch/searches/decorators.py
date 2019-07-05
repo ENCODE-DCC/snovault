@@ -41,3 +41,24 @@ def deduplicate(func):
         r = func(*args, **kwargs)
         return list(set(r))
     return wrapper
+
+
+def remove_from_return(keys=[], values=[]):
+    '''
+    Removes dict item if it matches key or value.
+    '''
+    def remove_from_return_decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            r = func(*args, **kwargs)
+            if isinstance(r, dict):
+                keys_to_remove = []
+                for k, v in r.items():
+                    if k in keys or v in values:
+                        keys_to_remove.append(k)
+                for k in keys_to_remove:
+                    r.pop(k, None)
+            return r
+        return wrapper
+    return remove_from_return_decorator
+        
