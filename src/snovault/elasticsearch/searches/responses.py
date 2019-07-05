@@ -32,6 +32,9 @@ class FieldedResponse():
 
 
 class QueryResponse():
+    '''
+    Holds results and allows mixin of aggregation and hits formatters.
+    '''
 
     def __init__(self, results, params_parser):
         self.results = results
