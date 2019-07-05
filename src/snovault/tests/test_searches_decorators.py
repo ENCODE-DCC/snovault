@@ -4,7 +4,16 @@ from pyramid.httpexceptions import HTTPBadRequest
 
 
 def test_searches_decorators_assert_condition_returned():
-    assert False
+    from snovault.elasticsearch.searches.decorators import assert_condition_returned
+    @assert_condition_returned(condition=lambda x: any(n > 1 for n in x), error_message='Invalid value:')
+    def dummy_func(values):
+        return values
+    assert dummy_func([0, -1, 0, -25]) == [0, -1, 0, -25]
+    assert dummy_func([0, 1, 0, -25]) == [0, 1, 0, -25]
+    with pytest.raises(HTTPBadRequest) as e:
+        dummy_func([0, 2, 0, -25])
+    assert str(e.value) == 'Invalid value: [0, 2, 0, -25]'
+    assert e.typename == 'HTTPBadRequest'
 
 
 def test_searches_decorators_assert_none_returned():
@@ -63,3 +72,8 @@ def test_searces_decorators_remove_from_return():
     assert dummy_func({'a': 1, 'del_me': 'and me'}) == {'a': 1}
     assert dummy_func({'a': 1, 'b': None, 'del_me': 'and me'}) == {'a': 1}
     assert dummy_func([]) == []
+    @remove_from_return(values=[1])
+    def dummy_func(value_dict):
+        return value_dict
+    assert dummy_func({'a': 1}) == {}
+    assert dummy_func({'a': 2}) == {'a': 2}
