@@ -40,5 +40,5 @@ class QueryResponse():
 
 class BasicQueryResponseWithFacets(QueryResponse, HitsToGraphMixin, AggsToFacetsMixin):
 
-    def __init__(self, results, *args, **kwargs):
-        super().__init__(results)
+    def __init__(self, results, params_parser, *args, **kwargs):
+        super().__init__(results, params_parers)
