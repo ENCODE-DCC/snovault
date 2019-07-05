@@ -2,7 +2,7 @@ from functools import wraps
 from pyramid.httpexceptions import HTTPBadRequest
 
 
-def assert_condition_returned(condition, error_message=''):
+def assert_condition_returned(condition, error_message='', exception=HTTPBadRequest):
     '''
     Decorator for checking return value of function. Results will
     be passed into condition function and error raised if True.
@@ -13,7 +13,7 @@ def assert_condition_returned(condition, error_message=''):
             result = func(*args, **kwargs)
             if condition(result):
                 msg = '{} {}'.format(error_message, result)
-                raise HTTPBadRequest(
+                raise exception(
                     explanation=msg
                 )
             return result
