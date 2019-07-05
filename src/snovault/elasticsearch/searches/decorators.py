@@ -56,6 +56,7 @@ def remove_from_return(keys=[], values=[]):
                 for k, v in r.items():
                     if k in keys or v in values:
                         keys_to_remove.append(k)
+                # Avoid mutating while iterating over.
                 for k in keys_to_remove:
                     r.pop(k, None)
             return r
