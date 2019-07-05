@@ -33,8 +33,9 @@ class FieldedResponse():
 
 class QueryResponse():
 
-    def __init__(self, results):
+    def __init__(self, results, params_parser):
         self.results = results
+        self.params_parser = params_parser
 
 
 class BasicQueryResponseWithFacets(QueryResponse, HitsToGraphMixin, AggsToFacetsMixin):
