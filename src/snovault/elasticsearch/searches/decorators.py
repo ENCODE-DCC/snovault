@@ -23,7 +23,7 @@ def assert_condition_returned(condition, error_message=''):
 
 def assert_none_returned(error_message):
     return assert_condition_returned(
-        condition=lambda result: result,
+        condition=lambda result: bool(result),
         error_message=error_message
     )
 
