@@ -71,16 +71,16 @@ class AggsToFacetsMixin:
         return self._get_facet_title(facet_name) not in self._get_aggregations()
 
     def _format_aggregation(self, facet_name):
-        self.facets.append(
-            {
-                FIELD_KEY: facet_name,
-                TITLE: self._get_facet_title(facet_name),
-                TERMS: self._get_aggregation_bucket(facet_name),
-                TOTAL: self._get_aggregation_total(facet_name),
-                TYPE_KEY: self._get_facet_type(facet_name),
-                APPENDED: self._aggregation_is_appeneded(facet_name),
-            }
-        )
+        facet = {
+            FIELD_KEY: facet_name,
+            TITLE: self._get_facet_title(facet_name),
+            TERMS: self._get_aggregation_bucket(facet_name),
+            TOTAL: self._get_aggregation_total(facet_name),
+            TYPE_KEY: self._get_facet_type(facet_name),
+            APPENDED: self._aggregation_is_appeneded(facet_name)
+        }
+        if facet.get(TERMS):
+            self.facets.append(facet)
 
     def _format_aggregations(self):
         self.facets = []
