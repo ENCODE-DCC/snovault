@@ -6,7 +6,7 @@ from .interfaces import TOTAL
 from .interfaces import TYPE_KEY
 
 
-class AggsToFacetsMixin():
+class AggsToFacetsMixin:
 
     def __init__(self):
         pass
@@ -47,7 +47,7 @@ class AggsToFacetsMixin():
         pass
 
 
-class HitsToGraphMixin():
+class HitsToGraphMixin:
 
     def __init__(self):
         pass

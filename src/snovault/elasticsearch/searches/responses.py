@@ -2,7 +2,7 @@ from .mixins import AggsToFacetsMixin
 from .mixins import HitsToGraphMixin
 
 
-class FieldedResponse():
+class FieldedResponse:
     '''
     Returns rendered ResponseFields.
     '''
@@ -31,7 +31,7 @@ class FieldedResponse():
         return self.response
 
 
-class QueryResponse():
+class QueryResponse:
     '''
     Holds results and allows mixin of aggregation and hits formatters.
     '''

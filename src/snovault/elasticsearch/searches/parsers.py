@@ -13,7 +13,7 @@ from .interfaces import TYPE_KEY
 from .interfaces import WILDCARD
 
 
-class ParamsParser():
+class ParamsParser:
     '''
     Parses query string parameters from request object for use in search.
     '''

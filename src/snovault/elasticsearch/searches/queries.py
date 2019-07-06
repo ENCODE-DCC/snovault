@@ -45,7 +45,7 @@ from .interfaces import WILDCARD
 from .interfaces import YES
 
 
-class AbstractQueryFactory():
+class AbstractQueryFactory:
     '''
     Interface for building specific queries. Don't change functionality here, instead
     inherit and extend/override functions as needed.
