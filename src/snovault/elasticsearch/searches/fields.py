@@ -6,7 +6,7 @@ from .responses import BasicQueryResponseWithFacets
 
 class ResponseField:
     '''
-    Interface for defining a field in a response.
+    Interface for defining a field in a FieldedResponse.
     '''
 
     def __init__(self, *args, **kwargs):

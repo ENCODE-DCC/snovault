@@ -1,4 +1,3 @@
-from .fields import ResponseField
 from .mixins import AggsToFacetsMixin
 from .mixins import HitsToGraphMixin
 
@@ -13,6 +12,7 @@ class FieldedResponse():
         self.validate_response_fields()
 
     def validate_response_fields(self):
+        from .fields import ResponseField
         for f in self.response_fields:
             if not isinstance(f, ResponseField):
                 raise ValueError(
@@ -44,4 +44,4 @@ class QueryResponse():
 class BasicQueryResponseWithFacets(QueryResponse, HitsToGraphMixin, AggsToFacetsMixin):
 
     def __init__(self, results, params_parser, *args, **kwargs):
-        super().__init__(results, params_parers)
+        super().__init__(results, params_parser)
