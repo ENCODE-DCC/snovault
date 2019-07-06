@@ -9,3 +9,9 @@ def test_searchv2_view(workbook, testapp):
     r = testapp.get('/searchv2/?type=Snowflake')
     print(r.json)
     assert False
+
+
+def test_searchv2_view_facets(workbook, testapp):
+    r = testapp.get('/searchv2/?type=Snowflake')
+    print(r.json['facets'])
+    assert False

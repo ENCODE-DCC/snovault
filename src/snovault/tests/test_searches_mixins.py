@@ -21,7 +21,15 @@ def test_searches_mixins_aggs_to_facets_mixin_get_facet_type():
     assert False
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_results():
+def test_searches_mixins_aggs_to_facets_mixin_parse_aggregation_bucket_to_list():
+    assert False
+
+
+def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_result():
+    assert False
+
+
+def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_bucket():
     assert False
 
 
