@@ -241,7 +241,7 @@ class AbstractQueryFactory:
                     )
             ).items()
         ]
-        
+
 
     def _make_must_equal_terms_query(self, field, terms, **kwargs):
         return Q(

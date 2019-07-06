@@ -27,20 +27,21 @@ class BasicSearchWithFacetsResponseField(ResponseField):
     def __init__(self, *args, **kwargs):
         self.params_parser = kwargs.pop('params_parser', None)
         super().__init__(*args, **kwargs)
+        self.query_builder = None
         self.query = None
         self.results = None
 
     def _build_query(self):
-        bsq = BasicSearchQueryFactoryWithFacets(
+        self.query_builder = BasicSearchQueryFactoryWithFacets(
             params_parser=self.params_parser,
             **self.kwargs
         )
-        self.query = bsq.build_query()
+        self.query = self.query_builder.build_query()
 
     def _execute_query(self):
         self.results = BasicQueryResponseWithFacets(
             results=self.query.execute(),
-            params_parser=self.params_parser
+            query_builder=self.query_builder
         )
 
     def _format_results(self):
