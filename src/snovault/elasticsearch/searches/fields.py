@@ -39,11 +39,11 @@ class BasicSearchWithFacetsResponseField(ResponseField):
 
     def _execute_query(self):
         self.results = BasicQueryResponseWithFacets(
-            results=self.query.execute()
+            results=self.query.execute(),
+            params_parser=self.params_parser
         )
 
     def _format_results(self):
-
         self.response.update(
             {
                 GRAPH: self.results.to_graph(),
