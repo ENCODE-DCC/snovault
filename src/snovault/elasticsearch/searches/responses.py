@@ -1,3 +1,4 @@
+from .decorators import remove_from_return
 from .mixins import AggsToFacetsMixin
 from .mixins import HitsToGraphMixin
 
@@ -22,6 +23,7 @@ class FieldedResponse:
                     )
                 )
 
+    @remove_from_return(values=[None])
     def render(self):
         '''
         Expects response_fields will return dictionaries with unique keys.
