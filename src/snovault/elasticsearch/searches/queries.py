@@ -473,9 +473,9 @@ class AbstractQueryFactory:
         everything but the params of the same type.
         '''
         params = self._get_post_filters()
-        for facet_type, facet_options in self._get_facets():
+        for facet_name, facet_options in self._get_facets():
             filtered_params = self.params_parser.get_not_keys_filters(
-                not_keys=[facet_type],
+                not_keys=[facet_name],
                 params=params
             )
             must, must_not, exists, not_exists = self._make_split_filter_queries(
@@ -485,16 +485,16 @@ class AbstractQueryFactory:
                 facet_options.get(TYPE_KEY)
             )
             subaggregation = subaggregation(
-                field=self._map_param_key_to_elasticsearch_field(facet_type),
+                field=self._map_param_key_to_elasticsearch_field(facet_name),
                 exclude=facet_options.get(EXCLUDE, []),
                 #TODO: size should be defined in schema instead of long keyword.
                 size=3000 if facet_options.get(LENGTH) == LONG else 200
             )
             agg = self._make_filter_and_subaggregation(
-                title=facet_type.replace(PERIOD, DASH),
+                title=facet_name.replace(PERIOD, DASH),
                 filter_context=self._make_bool_query(
                     must=must + exists,
-                    must_not= must_not + not_exists
+                    must_not=must_not + not_exists
                 ),
                 subaggregation=subaggregation
             )
