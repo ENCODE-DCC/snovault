@@ -1,15 +1,23 @@
 import pytest
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_field():
+def test_searches_mixins_aggs_to_facets_mixin_aggregations():
     assert False
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_title():
+def test_searches_mixins_aggs_to_facets_mixin_facets():
     assert False
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_type():
+def test_searches_mixins_aggs_to_facets_mixin_get_facet_by_name():
+    assert False
+
+
+def test_searches_mixins_aggs_to_facets_mixin_get_facet_title():
+    assert False
+
+
+def test_searches_mixins_aggs_to_facets_mixin_get_facet_type():
     assert False
 
 
