@@ -187,9 +187,16 @@ def index_settings():
                     "english_possessive_stemmer": {
                         "type":       "stemmer",
                         "language":   "possessive_english"
+                    },
+                    'delimiter': {
+                        'type': 'word_delimiter',
+                        'catenate_all': True,
+                        'preserve_original': True,
+                        'stem_english_possessive': True
                     }
+                }
                 },
-                'analyzer': {
+            'analyzer': {
                     'default': {
                         'type': 'custom',
                         'tokenizer': 'whitespace',
@@ -209,6 +216,7 @@ def index_settings():
                             'english_stop',
                             'english_stemmer',
                             'asciifolding',
+                            'delimiter',
                             'substring'
                         ]
                     },
@@ -221,7 +229,8 @@ def index_settings():
                             'english_stop',
                             'english_stemmer',
                             'lowercase',
-                            'asciifolding'
+                            'asciifolding',
+                            'delimiter'
                         ]
                     },
                     'snovault_path_analyzer': {
