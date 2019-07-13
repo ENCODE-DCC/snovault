@@ -43,7 +43,6 @@ def get_filtered_query(term, search_fields, result_fields, principals, doc_types
             'query_string': {
                 'query': term,
                 'fields': search_fields,
-                'default_operator': 'AND'
             }
         },
         'post_filter': {
