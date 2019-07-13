@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 META_MAPPING = {
     '_all': {
         'enabled': False,
-        'analyzer': 'english'
+        'analyzer': 'standard'
     },
     'dynamic_templates': [
         {
@@ -55,7 +55,7 @@ NON_SUBSTRING_FIELDS = ['uuid', '@id', 'submitted_by', 'md5sum',
 KEYWORD_FIELDS = ['schema_version', 'uuid', 'accession', 'alternate_accessions',
                   'aliases', 'status', 'date_created', 'submitted_by',
                   'internal_status', 'target', 'biosample_type']
-TEXT_FIELDS = ['pipeline_error_detail', 'description', 'notes', 'summary', 'biosample_summary']
+TEXT_FIELDS = ['pipeline_error_detail', 'description', 'notes']
 
 
 def sorted_pairs_hook(pairs):
@@ -246,7 +246,7 @@ def es_mapping(mapping):
     return {
         '_all': {
             'enabled': True,
-            'analyzer': 'standard'
+            'analyzer': 'english'
         },
         'dynamic_templates': [
             {
