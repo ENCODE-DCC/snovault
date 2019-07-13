@@ -183,7 +183,7 @@ def index_settings():
                         'tokenizer': 'whitespace',
                         'char_filter': 'html_strip',
                         'filter': [
-                            'standard',
+                            'english',
                             'lowercase',
                         ]
                     },
@@ -192,7 +192,7 @@ def index_settings():
                         'tokenizer': 'whitespace',
                         'char_filter': 'html_strip',
                         'filter': [
-                            'standard',
+                            'english',
                             'lowercase',
                             'asciifolding',
                             'substring'
@@ -202,7 +202,7 @@ def index_settings():
                         'type': 'custom',
                         'tokenizer': 'whitespace',
                         'filter': [
-                            'standard',
+                            'english',
                             'lowercase',
                             'asciifolding'
                         ]
@@ -246,7 +246,8 @@ def es_mapping(mapping):
     return {
         '_all': {
             'enabled': True,
-            'analyzer': 'english'
+            'analyzer': 'snovault_index_analyzer',
+            'search_analyzer': 'snovault_search_analyzer'
         },
         'dynamic_templates': [
             {
