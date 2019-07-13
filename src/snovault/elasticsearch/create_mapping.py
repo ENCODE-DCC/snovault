@@ -175,6 +175,18 @@ def index_settings():
                         'type': 'nGram',
                         'min_gram': 1,
                         'max_gram': 33
+                    },
+                    "english_stop": {
+                        "type":       "stop",
+                        "stopwords":  "_english_"
+                    },
+                    "english_stemmer": {
+                        "type":       "stemmer",
+                        "language":   "english"
+                    },
+                    "english_possessive_stemmer": {
+                        "type":       "stemmer",
+                        "language":   "possessive_english"
                     }
                 },
                 'analyzer': {
@@ -183,7 +195,7 @@ def index_settings():
                         'tokenizer': 'whitespace',
                         'char_filter': 'html_strip',
                         'filter': [
-                            'english',
+                            'standard',
                             'lowercase',
                         ]
                     },
@@ -192,8 +204,10 @@ def index_settings():
                         'tokenizer': 'whitespace',
                         'char_filter': 'html_strip',
                         'filter': [
-                            'english',
+                            'english_possessive_stemmer',
                             'lowercase',
+                            'english_stop',
+                            'english_stemmer',
                             'asciifolding',
                             'substring'
                         ]
@@ -202,7 +216,10 @@ def index_settings():
                         'type': 'custom',
                         'tokenizer': 'whitespace',
                         'filter': [
-                            'english',
+                            'english_possessive_stemmer',
+                            'lowercase',
+                            'english_stop',
+                            'english_stemmer',
                             'lowercase',
                             'asciifolding'
                         ]
