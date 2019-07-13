@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 META_MAPPING = {
     '_all': {
         'enabled': False,
-        'analyzer': 'standard'
+        'analyzer': 'english'
     },
     'dynamic_templates': [
         {
