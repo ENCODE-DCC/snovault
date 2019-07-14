@@ -194,9 +194,8 @@ def index_settings():
                         'preserve_original': True,
                         'stem_english_possessive': True
                     }
-                }
                 },
-            'analyzer': {
+                'analyzer': {
                     'default': {
                         'type': 'custom',
                         'tokenizer': 'whitespace',
