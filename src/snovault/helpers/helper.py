@@ -76,32 +76,27 @@ def prepare_search_term(request):
     # avoid interpreting slashes as regular expressions
     advanced_query = request.params.get('advancedQuery', '').strip().replace('/', r'\/')
     search_term = request.params.get('searchTerm')
-    # true if no search is being performed
-    if search_term is None and not advanced_query:
+    if not search_term and not advanced_query:
         return '*'
-    if search_term is not None:
-        search_term = (search_term or '').strip()
-        if search_term in ('', '*'):
+    search_term = (search_term or '').strip()
+    if search_term:
+        if search_term == '*':
             return '*'
         # elasticsearch uses ':' as field delimiter, but we use it as namespace designator
         # if you need to search fields you have to use @type:field
         # if you need to search fields where the field contains ":", you will have to escape it
         # yourself
         search_term = search_term.replace('/', r'\/').replace('^', r'').replace('<', r'').replace('>', r'')
-        search_term = re.sub('\?+', '?', search_term)
         if search_term.find("@type") < 0:
             search_term = search_term.replace(':', r'\:')
-    search_query = ''
-    if advanced_query:
-        try:
-            query = prefixfields('embedded.', advanced_query, dialects.elasticsearch)
-        except IllegalStateException:
-            msg = "Invalid query: {}".format(advanced_query)
-            raise HTTPBadRequest(explanation=msg)
-        else:
-            search_query = query.getText()
-    if search_term:
-        search_query = ''.join([search_query, ' And ', search_term]) if search_query else search_term
+    search_query = ''.join([advanced_query, ' And ', search_term]) if advanced_query else search_term
+    try:
+        query = prefixfields('embedded.', search_query, dialects.elasticsearch)
+    except IllegalStateException:
+        msg = "Invalid query: {}".format(search_query)
+        raise HTTPBadRequest(explanation=msg)
+    else:
+        search_query = query.getText()
     return search_query
 
 
