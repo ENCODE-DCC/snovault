@@ -1,5 +1,6 @@
 from .interfaces import FACETS
 from .interfaces import GRAPH
+from .interfaces import TITLE
 from .queries import BasicSearchQueryFactoryWithFacets
 from .responses import BasicQueryResponseWithFacets
 
@@ -57,3 +58,14 @@ class BasicSearchWithFacetsResponseField(ResponseField):
         self._execute_query()
         self._format_results()
         return self.response
+
+
+class TitleField(ResponseField):
+    def __init__(self, *args, **kwargs):
+        self.title = kwargs.pop('title', None)
+        super().__init__(*args, **kwargs)
+
+    def render(self):
+        return {
+            TITLE: self.title
+        }
