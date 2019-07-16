@@ -176,17 +176,17 @@ def index_settings():
                         'min_gram': 1,
                         'max_gram': 33
                     },
-                    "english_stop": {
-                        "type":       "stop",
-                        "stopwords":  "_english_"
+                    'english_stop': {
+                        'type': 'stop',
+                        'stopwords': '_english_'
                     },
-                    "english_stemmer": {
-                        "type":       "stemmer",
-                        "language":   "english"
+                    'english_stemmer': {
+                        'type': 'stemmer',
+                        'language': 'english'
                     },
-                    "english_possessive_stemmer": {
-                        "type":       "stemmer",
-                        "language":   "possessive_english"
+                    'english_possessive_stemmer': {
+                        'type': 'stemmer',
+                        'language': 'possessive_english'
                     },
                     'delimiter': {
                         'type': 'word_delimiter',
