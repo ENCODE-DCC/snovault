@@ -78,19 +78,13 @@ def prepare_search_term(request):
     search_term = request.params.get('searchTerm', '').strip().replace('/', r'\/')
     if search_term == '*' or (not search_term and not advanced_query):
         return '*'
-    # elasticsearch uses ':' as field delimiter, but we use it as namespace designator
-    # if you need to search fields you have to use @type:field
-    # if you need to search fields where the field contains ":", you will have to escape it
-    # yourself
     if search_term and search_term.find("@type") < 0:
         search_term = search_term.replace(':', r'\:')
     search_query = ''
     if advanced_query and search_term:
-        search_query = ''.join([advanced_query, ' And ', search_term])
-    elif advanced_query and not search_term:
-        search_query = advanced_query
-    elif not advanced_query and search_term:
-        search_query = search_term   
+        search_query = ' '.join([advanced_query, 'AND', search_term])
+    else:
+        search_query = search_term or advanced_query
     try:
         query = prefixfields('embedded.', search_query, dialects.elasticsearch)
     except IllegalStateException:
