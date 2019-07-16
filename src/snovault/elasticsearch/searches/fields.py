@@ -60,7 +60,7 @@ class BasicSearchWithFacetsResponseField(ResponseField):
         return self.response
 
 
-class TitleField(ResponseField):
+class TitleResponseField(ResponseField):
     def __init__(self, *args, **kwargs):
         self.title = kwargs.pop('title', None)
         super().__init__(*args, **kwargs)

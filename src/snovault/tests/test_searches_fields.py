@@ -31,14 +31,14 @@ def test_searches_fields_basic_search_response_format_results_query():
     assert False
 
 
-def test_searches_fields_title_field_init():
-    from snovault.elasticsearch.searches.fields import TitleField
-    tf = TitleField()
-    assert isinstance(tf, TitleField)
+def test_searches_fields_title_response_field_init():
+    from snovault.elasticsearch.searches.fields import TitleResponseField
+    tf = TitleResponseField()
+    assert isinstance(tf, TitleResponseField)
 
 
 def test_searches_fields_title_field_title_value():
-    from snovault.elasticsearch.searches.fields import TitleField
-    tf = TitleField(title='Search')
+    from snovault.elasticsearch.searches.fields import TitleResponseField
+    tf = TitleResponseField(title='Search')
     rtf = tf.render()
     assert rtf == {'title': 'Search'}
