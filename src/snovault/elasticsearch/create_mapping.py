@@ -227,7 +227,6 @@ def index_settings():
                             'lowercase',
                             'english_stop',
                             'english_stemmer',
-                            'lowercase',
                             'asciifolding',
                             'delimiter'
                         ]
