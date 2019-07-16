@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from .interfaces import APPENDED
 from .interfaces import BUCKETS
 from .interfaces import DASH
@@ -19,6 +21,7 @@ class AggsToFacetsMixin:
     def _get_aggregations(self):
         return self.results.aggs.to_dict()
 
+    @lru_cache
     def _get_facets(self):
         return {
             k: v
