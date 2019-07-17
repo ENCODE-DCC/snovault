@@ -199,7 +199,8 @@ def index_settings():
                         'type': 'word_delimiter',
                         'catenate_all': True,
                         'preserve_original': True,
-                        'stem_english_possessive': True
+                        'stem_english_possessive': True,
+                        'split_on_numerics': False
                     }
                 },
                 'analyzer': {
