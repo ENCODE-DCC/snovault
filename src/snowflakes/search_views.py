@@ -25,7 +25,9 @@ DEFAULT_ITEM_TYPES = [
 def searchv2(context, request):
     fr = FieldedResponse(
         response_fields=[
-            TitleResponseField(title=SEARCH_TITLE),
+            TitleResponseField(
+                title=SEARCH_TITLE
+            ),
             BasicSearchWithFacetsResponseField(
                 params_parser=ParamsParser(request),
                 default_item_types=DEFAULT_ITEM_TYPES
