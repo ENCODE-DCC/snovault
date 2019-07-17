@@ -56,7 +56,13 @@ NON_SUBSTRING_FIELDS = ['uuid', '@id', 'submitted_by', 'md5sum',
 KEYWORD_FIELDS = ['schema_version', 'uuid', 'accession', 'alternate_accessions',
                   'aliases', 'status', 'date_created', 'submitted_by',
                   'internal_status', 'target', 'biosample_type']
-TEXT_FIELDS = ['pipeline_error_detail', 'description', 'notes']
+TEXT_FIELDS = [
+    'pipeline_error_detail',
+    'description',
+    'notes',
+    'summary',
+    'biosample_summary'
+]
 
 
 def sorted_pairs_hook(pairs):
