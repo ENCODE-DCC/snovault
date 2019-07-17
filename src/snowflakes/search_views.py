@@ -11,6 +11,7 @@ from snovault.elasticsearch.searches.responses import FieldedResponse
 
 def includeme(config):
     config.add_route('searchv2', '/searchv2{slash:/?}')
+    config.add_route('searchv2_raw', '/searchv2_raw{slash:/?}')
     config.scan(__name__)
 
 
