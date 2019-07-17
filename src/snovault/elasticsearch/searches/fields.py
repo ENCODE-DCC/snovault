@@ -71,6 +71,9 @@ class RawSearchWithAggsResponseField(BasicSearchWithFacetsResponseField):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def _execute_query(self):
+        self.results = self.query.execute()
+
     def _format_results(self):
         self.response.update(
             self.results.to_dict()
@@ -84,6 +87,7 @@ class RawSearchWithAggsResponseField(BasicSearchWithFacetsResponseField):
 
 
 class TitleResponseField(ResponseField):
+
     def __init__(self, *args, **kwargs):
         self.title = kwargs.pop('title', None)
         super().__init__(*args, **kwargs)

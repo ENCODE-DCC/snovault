@@ -43,6 +43,18 @@ def test_searches_fields_raw_search_with_aggs_response_field_init():
     assert isinstance(rs, RawSearchWithAggsResponseField)
 
 
+def test_searches_fields_raw_search_with_aggs_response_field_execute_query():
+    from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
+    rs = RawSearchWithAggsResponseField()
+    assert False
+
+
+def test_searches_fields_raw_search_with_aggs_response_field_format_results():
+    from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
+    rs = RawSearchWithAggsResponseField()
+    assert False
+
+
 def test_searches_fields_raw_search_with_aggs_response_field_render():
     from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
     rs = RawSearchWithAggsResponseField()
