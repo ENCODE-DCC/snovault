@@ -43,9 +43,11 @@ def searchv2(context, request):
 @view_config(route_name='searchv2_raw', request_method='GET', permission='search')
 def searchv2_raw(context, request):
     fr = FieldedResponse(
+        response_fields=[
             RawSearchWithAggsResponseField(
                 params_parser=ParamsParser(request),
                 default_item_types=DEFAULT_ITEM_TYPES
             )
+        ]
     )
     return fr.render()
