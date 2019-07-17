@@ -24,6 +24,9 @@ class ResponseField:
 
 
 class BasicSearchWithFacetsResponseField(ResponseField):
+    '''
+    Returns formatted results from ES query.
+    '''
 
     def __init__(self, *args, **kwargs):
         self.params_parser = kwargs.pop('params_parser', None)
@@ -51,6 +54,26 @@ class BasicSearchWithFacetsResponseField(ResponseField):
                 GRAPH: self.results.to_graph(),
                 FACETS: self.results.to_facets()
             }
+        )
+
+    def render(self):
+        self._build_query()
+        self._execute_query()
+        self._format_results()
+        return self.response
+
+
+class RawSearchWithAggsResponseField(BasicSearchWithFacetsResponseField):
+    '''
+    Returns raw results from ES query.
+    '''
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _format_results(self):
+        self.response.update(
+            self.results.to_dict()
         )
 
     def render(self):
