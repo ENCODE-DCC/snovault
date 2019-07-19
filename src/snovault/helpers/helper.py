@@ -157,7 +157,7 @@ def get_search_fields(request, doc_types):
     Returns set of columns that are being searched and highlights
     """
 
-    return {}, {}
+    return set(), {}
 
 
 def list_visible_columns_for_schemas(request, schemas):
