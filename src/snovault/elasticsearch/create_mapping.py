@@ -33,8 +33,7 @@ log = logging.getLogger(__name__)
 META_MAPPING = {
     '_all': {
         'enabled': False,
-        'analyzer': 'snovault_index_analyzer',
-        'search_analyzer': 'snovault_search_analyzer'
+        'analyzer': 'snovault_search_analyzer'
     },
     'dynamic_templates': [
         {
@@ -176,6 +175,25 @@ def index_settings():
                         'type': 'nGram',
                         'min_gram': 1,
                         'max_gram': 33
+                    },
+                    'english_stop': {
+                        'type': 'stop',
+                        'stopwords': '_english_'
+                    },
+                    'english_stemmer': {
+                        'type': 'stemmer',
+                        'language': 'english'
+                    },
+                    'english_possessive_stemmer': {
+                        'type': 'stemmer',
+                        'language': 'possessive_english'
+                    },
+                    'delimiter': {
+                        'type': 'word_delimiter',
+                        'catenate_all': True,
+                        'preserve_original': True,
+                        'stem_english_possessive': True,
+                        'split_on_numerics': False
                     }
                 },
                 'analyzer': {
@@ -184,8 +202,12 @@ def index_settings():
                         'tokenizer': 'whitespace',
                         'char_filter': 'html_strip',
                         'filter': [
-                            'standard',
+                            'english_possessive_stemmer',
                             'lowercase',
+                            'english_stop',
+                            'english_stemmer',
+                            'asciifolding',
+                            'delimiter'
                         ]
                     },
                     'snovault_index_analyzer': {
@@ -193,9 +215,12 @@ def index_settings():
                         'tokenizer': 'whitespace',
                         'char_filter': 'html_strip',
                         'filter': [
-                            'standard',
+                            'english_possessive_stemmer',
                             'lowercase',
+                            'english_stop',
+                            'english_stemmer',
                             'asciifolding',
+                            'delimiter',
                             'substring'
                         ]
                     },
@@ -203,9 +228,12 @@ def index_settings():
                         'type': 'custom',
                         'tokenizer': 'whitespace',
                         'filter': [
-                            'standard',
+                            'english_possessive_stemmer',
                             'lowercase',
-                            'asciifolding'
+                            'english_stop',
+                            'english_stemmer',
+                            'asciifolding',
+                            'delimiter'
                         ]
                     },
                     'snovault_path_analyzer': {
@@ -247,8 +275,7 @@ def es_mapping(mapping):
     return {
         '_all': {
             'enabled': True,
-            'analyzer': 'snovault_index_analyzer',
-            'search_analyzer': 'snovault_search_analyzer'
+            'analyzer': 'snovault_search_analyzer'
         },
         'dynamic_templates': [
             {

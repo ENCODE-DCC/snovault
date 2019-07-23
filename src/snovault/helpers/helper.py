@@ -157,15 +157,7 @@ def get_search_fields(request, doc_types):
     Returns set of columns that are being searched and highlights
     """
 
-    fields = {'uuid', 'unique_keys.*'}
-    highlights = {}
-    types = request.registry[TYPES]
-    for doc_type in doc_types:
-        type_info = types[doc_type]
-        for value in type_info.schema.get('boost_values', ()):
-            fields.add('embedded.' + value)
-            highlights['embedded.' + value] = {}
-    return list(fields), highlights
+    return [], {}
 
 
 def list_visible_columns_for_schemas(request, schemas):
