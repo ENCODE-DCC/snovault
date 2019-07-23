@@ -200,7 +200,7 @@ def index_settings():
                     'default': {
                         'type': 'custom',
                         'tokenizer': 'whitespace',
-                        'char_filter': 'html_strip',
+                        'char_filter': ['html_strip', 'comma_strip'],
                         'filter': [
                             'english_possessive_stemmer',
                             'lowercase',
@@ -213,7 +213,7 @@ def index_settings():
                     'snovault_index_analyzer': {
                         'type': 'custom',
                         'tokenizer': 'whitespace',
-                        'char_filter': 'html_strip',
+                        'char_filter': ['html_strip', 'comma_strip'],
                         'filter': [
                             'english_possessive_stemmer',
                             'lowercase',
@@ -227,6 +227,7 @@ def index_settings():
                     'snovault_search_analyzer': {
                         'type': 'custom',
                         'tokenizer': 'whitespace',
+                        'char_filter': ['html_strip', 'comma_strip'],
                         'filter': [
                             'english_possessive_stemmer',
                             'lowercase',
@@ -246,6 +247,14 @@ def index_settings():
                     'snovault_path_tokenizer': {
                         'type': 'path_hierarchy',
                         'reverse': True
+                    }
+                },
+                'char_filter': {
+                    'comma_strip': {
+                        'type': 'mapping',
+                        'mappings': [
+                            ',=>'
+                        ]
                     }
                 }
             }
