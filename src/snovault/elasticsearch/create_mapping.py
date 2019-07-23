@@ -202,8 +202,12 @@ def index_settings():
                         'tokenizer': 'whitespace',
                         'char_filter': 'html_strip',
                         'filter': [
-                            'standard',
+                            'english_possessive_stemmer',
                             'lowercase',
+                            'english_stop',
+                            'english_stemmer',
+                            'asciifolding',
+                            'delimiter'
                         ]
                     },
                     'snovault_index_analyzer': {
