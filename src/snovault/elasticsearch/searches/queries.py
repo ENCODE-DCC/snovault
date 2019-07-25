@@ -242,7 +242,6 @@ class AbstractQueryFactory:
             ).items()
         ]
 
-
     def _make_must_equal_terms_query(self, field, terms, **kwargs):
         return Q(
             TERMS,
@@ -487,7 +486,7 @@ class AbstractQueryFactory:
             subaggregation = subaggregation(
                 field=self._map_param_key_to_elasticsearch_field(facet_name),
                 exclude=facet_options.get(EXCLUDE, []),
-                #TODO: size should be defined in schema instead of long keyword.
+                # TODO: size should be defined in schema instead of long keyword.
                 size=3000 if facet_options.get(LENGTH) == LONG else 200
             )
             agg = self._make_filter_and_subaggregation(
@@ -499,7 +498,6 @@ class AbstractQueryFactory:
                 subaggregation=subaggregation
             )
             self._get_or_create_search().aggs.bucket(facet_options.get(TITLE), agg)
-            
 
     def add_post_filters(self):
         '''
