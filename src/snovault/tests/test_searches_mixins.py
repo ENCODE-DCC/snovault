@@ -2,7 +2,7 @@ import pytest
 
 
 @pytest.fixture
-def actual_query():
+def raw_query():
     return {
         'query': {
             'bool': {
@@ -292,108 +292,185 @@ def raw_response():
                     },
                     '_type': 'snowflake',
                     '_score': 1.5281246
-                },
-                '_shards': {
+                }
+            ],
+            '_shards': {
                     'skipped': 0,
                     'total': 85,
                     'successful': 85,
                     'failed': 0
+            },
+            'aggregations': {
+                'Lab': {
+                    'lab-title': {
+                        'sum_other_doc_count': 0,
+                        'doc_count_error_upper_bound': 0,
+                        'buckets': [
+                            {'key': 'J. Michael Cherry, Stanford', 'doc_count': 35}
+                        ]
+                    },
+                    'doc_count': 35
                 },
-                'aggregations': {
-                    'Lab': {
-                        'lab-title': {
-                            'sum_other_doc_count': 0,
-                            'doc_count_error_upper_bound': 0,
-                            'buckets': [
-                                {'key': 'J. Michael Cherry, Stanford', 'doc_count': 35}
-                            ]
-                        },
-                        'doc_count': 35
+                'Snowflake status': {
+                    'status': {
+                        'sum_other_doc_count': 0,
+                        'doc_count_error_upper_bound': 0,
+                        'buckets': [
+                            {'key': 'released', 'doc_count': 21},
+                            {'key': 'in progress', 'doc_count': 11},
+                            {'key': 'revoked', 'doc_count': 2},
+                            {'key': 'deleted', 'doc_count': 1}
+                        ]
                     },
-                    'Snowflake status': {
-                        'status': {
-                            'sum_other_doc_count': 0,
-                            'doc_count_error_upper_bound': 0,
-                            'buckets': [
-                                {'key': 'released', 'doc_count': 21},
-                                {'key': 'in progress', 'doc_count': 11},
-                                {'key': 'revoked', 'doc_count': 2},
-                                {'key': 'deleted', 'doc_count': 1}
-                            ]
-                        },
-                        'doc_count': 35
+                    'doc_count': 35
+                },
+                'Audit category: ERROR': {
+                    'audit-ERROR-category': {
+                        'sum_other_doc_count': 0,
+                        'doc_count_error_upper_bound': 0,
+                        'buckets': []
                     },
-                    'Audit category: ERROR': {
-                        'audit-ERROR-category': {
-                            'sum_other_doc_count': 0,
-                            'doc_count_error_upper_bound': 0,
-                            'buckets': []
-                        },
-                        'doc_count': 35
+                    'doc_count': 35
+                },
+                'Data Type': {
+                    'type': {
+                        'sum_other_doc_count': 0,
+                        'doc_count_error_upper_bound': 0,
+                        'buckets': [
+                            {'key': 'Snowflake', 'doc_count': 35}
+                        ]
                     },
-                    'Data Type': {
-                        'type': {
-                            'sum_other_doc_count': 0,
-                            'doc_count_error_upper_bound': 0,
-                            'buckets': [
-                                {'key': 'Snowflake', 'doc_count': 35}
-                            ]
-                        },
-                        'doc_count': 35
+                    'doc_count': 35
+                },
+                'Snowflake type': {
+                    'type': {
+                        'sum_other_doc_count': 0,
+                        'doc_count_error_upper_bound': 0,
+                        'buckets': [
+                            {'key': 'Item', 'doc_count': 35},
+                            {'key': 'Snowflake', 'doc_count': 35}
+                        ]
                     },
-                    'Snowflake type': {
-                        'type': {
-                            'sum_other_doc_count': 0,
-                            'doc_count_error_upper_bound': 0,
-                            'buckets': [
-                                {'key': 'Item', 'doc_count': 35},
-                                {'key': 'Snowflake', 'doc_count': 35}
-                            ]
-                        },
-                        'doc_count': 35
-                    },
-                    'Audit category: NOT COMPLIANT': {
-                        'doc_count': 35,
-                        'audit-NOT_COMPLIANT-category': {
-                            'sum_other_doc_count': 0,
-                            'doc_count_error_upper_bound': 0,
-                            'buckets': []
-                        }
-                    },
-                    'Audit category: WARNING': {
-                        'doc_count': 35,
-                        'audit-WARNING-category': {
-                            'sum_other_doc_count': 0,
-                            'doc_count_error_upper_bound': 0,
-                            'buckets': []
-                        }
+                    'doc_count': 35
+                },
+                'Audit category: NOT COMPLIANT': {
+                    'doc_count': 35,
+                    'audit-NOT_COMPLIANT-category': {
+                        'sum_other_doc_count': 0,
+                        'doc_count_error_upper_bound': 0,
+                        'buckets': []
+                    }
+                },
+                'Audit category: WARNING': {
+                    'doc_count': 35,
+                    'audit-WARNING-category': {
+                        'sum_other_doc_count': 0,
+                        'doc_count_error_upper_bound': 0,
+                        'buckets': []
                     }
                 }
             }
+        }
+    }
+
 
 @pytest.fixture
-def basic_search_query_with_facets(actual_query):
+def basic_search_query_factory_with_facets(raw_query, dummy_request):
+    from pyramid.testing import DummyResource
+    from pyramid.security import Allow
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
     from elasticsearch_dsl import Search
-    s = Search().from_dict(actual_query)
-    return s
+    dummy_request.environ['REMOTE_USER'] = 'TEST_SUBMITTER'
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&assembly=GRCh38&biosample_ontology.classification=primary+cell'
+        '&target.label=H3K27me3&biosample_ontology.classification%21=cell+line'
+        '&biosample_ontology.term_name%21=naive+thymus-derived+CD4-positive%2C+alpha-beta+T+cell'
+        '&limit=10&status=released&searchTerm=chip-seq&sort=date_created&sort=-files.file_size'
+        '&field=@id&field=accession'
+    )
+    dummy_request.context = DummyResource()
+    dummy_request.context.__acl__ = lambda: [(Allow, 'group.submitter', 'search_audit')]
+    params_parser = ParamsParser(dummy_request)
+    bsq = BasicSearchQueryFactoryWithFacets(params_parser)
+    bsq.search = Search().from_dict(raw_query)
+    return bsq
+
 
 @pytest.fixture
-def basic_query_response_with_facets(basic_search_query_with_facets):
+def basic_query_response_with_facets(raw_response, basic_search_query_factory_with_facets):
     from snovault.elasticsearch.searches.responses import BasicQueryResponseWithFacets
-    from elasticsearch_dsl import Search
     bqr = BasicQueryResponseWithFacets(
-        results=basic_search_query_with_facets,
-        query_builder={}
+        results=raw_response,
+        query_builder=basic_search_query_factory_with_facets
     )
     return bqr
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_aggregations():
+def test_searches_mixins_aggs_to_facets_mixin_get_aggregations(basic_query_response_with_facets):
     assert False
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_facets():
-    assert False
+def test_searches_mixins_aggs_to_facets_mixin_get_facets(basic_query_response_with_facets):
+    expected = {
+        'type': {
+            'exclude': ['Item'],
+            'title': 'Data Type'
+        },
+        'audit.INTERNAL_ACTION.category': {
+            'title': 'Audit category: DCC ACTION'
+        },
+        'audit.NOT_COMPLIANT.category': {
+            'title': 'Audit category: NOT COMPLIANT'
+        },
+        'name': {
+            'title': 'Name'
+        },
+        'audit.ERROR.category': {
+            'title': 'Audit category: ERROR'
+        },
+        'audit.WARNING.category': {
+            'title': 'Audit category: WARNING'
+        },
+        'status': {
+            'title': 'Status'
+        }
+    }
+    assert basic_query_response_with_facets._get_facets() == expected
+
+
+def test_searches_mixins_aggs_to_facets_mixin_get_facets_called_once(mocker, dummy_request):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
+    from pyramid.testing import DummyResource
+    from pyramid.security import Allow
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['REMOTE_USER'] = 'TEST_SUBMITTER'
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&assembly=GRCh38&biosample_ontology.classification=primary+cell'
+        '&target.label=H3K27me3&biosample_ontology.classification%21=cell+line'
+        '&biosample_ontology.term_name%21=naive+thymus-derived+CD4-positive%2C+alpha-beta+T+cell'
+        '&limit=10&status=released&searchTerm=chip-seq&sort=date_created&sort=-files.file_size'
+        '&field=@id&field=accession'
+    )
+    dummy_request.context = DummyResource()
+    dummy_request.context.__acl__ = lambda: [(Allow, 'group.submitter', 'search_audit')]
+    params_parser = ParamsParser(dummy_request)
+    afm = AggsToFacetsMixin()
+    bsq = BasicSearchQueryFactoryWithFacets(params_parser)
+    afm.query_builder = bsq
+    mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_get_facets')
+    facets = {'test': 1}
+    BasicSearchQueryFactoryWithFacets._get_facets.return_value = facets.items()
+    f = afm._get_facets()
+    assert f == facets
+    assert BasicSearchQueryFactoryWithFacets._get_facets.call_count == 1
+    f = afm._get_facets()
+    assert f == facets
+    # Test lru_cache.
+    assert BasicSearchQueryFactoryWithFacets._get_facets.call_count == 1
 
 
 def test_searches_mixins_aggs_to_facets_mixin_get_facet_name():
