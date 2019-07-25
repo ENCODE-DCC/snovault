@@ -408,6 +408,26 @@ def basic_query_response_with_facets(raw_response, basic_search_query_factory_wi
     return bqr
 
 
+@pytest.fixture
+def parsed_params(dummy_request):
+    from pyramid.testing import DummyResource
+    from pyramid.security import Allow
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['REMOTE_USER'] = 'TEST_SUBMITTER'
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&assembly=GRCh38&biosample_ontology.classification=primary+cell'
+        '&target.label=H3K27me3&biosample_ontology.classification%21=cell+line'
+        '&biosample_ontology.term_name%21=naive+thymus-derived+CD4-positive%2C+alpha-beta+T+cell'
+        '&limit=10&status=released&searchTerm=chip-seq&sort=date_created&sort=-files.file_size'
+        '&field=@id&field=accession'
+    )
+    dummy_request.context = DummyResource()
+    dummy_request.context.__acl__ = lambda: [(Allow, 'group.submitter', 'search_audit')]
+    params_parser = ParamsParser(dummy_request)
+    return params_parser
+
+
 def test_searches_mixins_aggs_to_facets_mixin_get_aggregations(basic_query_response_with_facets):
     assert False
 
@@ -440,26 +460,11 @@ def test_searches_mixins_aggs_to_facets_mixin_get_facets(basic_query_response_wi
     assert basic_query_response_with_facets._get_facets() == expected
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_facets_called_once(mocker, dummy_request):
+def test_searches_mixins_aggs_to_facets_mixin_get_facets_called_once(mocker, parsed_params):
     from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
     from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
-    from pyramid.testing import DummyResource
-    from pyramid.security import Allow
-    from snovault.elasticsearch.searches.parsers import ParamsParser
-    dummy_request.environ['REMOTE_USER'] = 'TEST_SUBMITTER'
-    dummy_request.environ['QUERY_STRING'] = (
-        'type=TestingSearchSchema&assay_title=Histone+ChIP-seq&award.project=Roadmap'
-        '&assembly=GRCh38&biosample_ontology.classification=primary+cell'
-        '&target.label=H3K27me3&biosample_ontology.classification%21=cell+line'
-        '&biosample_ontology.term_name%21=naive+thymus-derived+CD4-positive%2C+alpha-beta+T+cell'
-        '&limit=10&status=released&searchTerm=chip-seq&sort=date_created&sort=-files.file_size'
-        '&field=@id&field=accession'
-    )
-    dummy_request.context = DummyResource()
-    dummy_request.context.__acl__ = lambda: [(Allow, 'group.submitter', 'search_audit')]
-    params_parser = ParamsParser(dummy_request)
     afm = AggsToFacetsMixin()
-    bsq = BasicSearchQueryFactoryWithFacets(params_parser)
+    bsq = BasicSearchQueryFactoryWithFacets(parsed_params)
     afm.query_builder = bsq
     mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_get_facets')
     facets = {'test': 1}
@@ -474,15 +479,30 @@ def test_searches_mixins_aggs_to_facets_mixin_get_facets_called_once(mocker, dum
 
 
 def test_searches_mixins_aggs_to_facets_mixin_get_facet_name():
-    assert False
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    afm = AggsToFacetsMixin()
+    assert afm._get_facet_name('target') == 'target'
+    assert afm._get_facet_name('experiment.library') == 'experiment-library'
+    assert afm._get_facet_name('experiment.library.biosample') == 'experiment-library-biosample'
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_facet_title():
-    assert False
+def test_searches_mixins_aggs_to_facets_mixin_get_facet_title(basic_query_response_with_facets):
+    assert basic_query_response_with_facets._get_facet_title('type') == 'Data Type'
+    assert basic_query_response_with_facets._get_facet_title('status') == 'Status'
+    assert basic_query_response_with_facets._get_facet_title('audit.WARNING.category') == 'Audit category: WARNING'
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_facet_type():
-    assert False
+def test_searches_mixins_aggs_to_facets_mixin_get_facet_type(basic_query_response_with_facets, mocker):
+    assert basic_query_response_with_facets._get_facet_type('status') == 'terms'
+    from snovault.elasticsearch.searches.responses import BasicQueryResponseWithFacets
+    mocker.patch.object(BasicQueryResponseWithFacets, '_get_facets')
+    BasicQueryResponseWithFacets._get_facets.return_value = {
+        'status': {
+            'title': 'Status',
+            'type': 'exists'
+        }
+    }
+    assert basic_query_response_with_facets._get_facet_type('status') == 'exists'
 
 
 def test_searches_mixins_aggs_to_facets_mixin_parse_aggregation_bucket_to_list():
