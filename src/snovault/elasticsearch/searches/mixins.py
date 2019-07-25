@@ -85,8 +85,11 @@ class AggsToFacetsMixin:
         if facet.get(TERMS):
             self.facets.append(facet)
 
-    def _format_aggregations(self):
+    def _clear_facets(self):
         self.facets = []
+
+    def _format_aggregations(self):
+        self._clear_facets()
         for facet_name in self._get_facets():
             self._format_aggregation(facet_name)
 
