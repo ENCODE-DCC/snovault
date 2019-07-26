@@ -2,7 +2,167 @@ import pytest
 
 
 @pytest.fixture
-def raw_query():
+def raw_snowflakes_query():
+    return {
+        '_source': ['embedded.*'],
+        'aggs': {
+            'Snowflake type': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.@type': ['Snowflake']}}
+                        ]
+                    }
+                },
+                'aggs': {
+                    'type': {
+                        'terms': {
+                            'field': 'embedded.@type',
+                            'size': 200,
+                            'exclude': []
+                        }
+                    }
+                }
+            },
+            'Audit category: WARNING': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.@type': ['Snowflake']}}
+                        ]
+                    }
+                },
+                'aggs': {
+                    'audit-WARNING-category': {
+                        'terms': {
+                            'field': 'audit.WARNING.category',
+                            'size': 200,
+                            'exclude': []
+                        }
+                    }
+                }
+            },
+            'Data Type': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.@type': ['Snowflake']}}
+                        ]
+                    }
+                },
+                'aggs': {
+                    'type': {
+                        'terms': {
+                            'field': 'embedded.@type',
+                            'size': 200,
+                            'exclude': ['Item']
+                        }
+                    }
+                }
+            },
+            'Audit category: ERROR': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.@type': ['Snowflake']}}
+                        ]
+                    }
+                },
+                'aggs': {
+                    'audit-ERROR-category': {
+                        'terms': {
+                            'field': 'audit.ERROR.category',
+                            'size': 200,
+                            'exclude': []
+                        }
+                    }
+                }
+            },
+            'Audit category: NOT COMPLIANT': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.@type': ['Snowflake']}}]
+                    }
+                },
+                'aggs': {
+                    'audit-NOT_COMPLIANT-category': {
+                        'terms': {
+                            'field': 'audit.NOT_COMPLIANT.category',
+                            'size': 200,
+                            'exclude': []
+                        }
+                    }
+                }
+            },
+            'Snowflake status': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.@type': ['Snowflake']}}
+                        ]
+                    }
+                },
+                'aggs': {
+                    'status': {
+                        'terms': {
+                            'field': 'embedded.status',
+                            'size': 200,
+                            'exclude': []
+                        }
+                    }
+                }
+            },
+            'Lab': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.@type': ['Snowflake']}}
+                        ]
+                    }
+                },
+                'aggs': {
+                    'lab-title': {
+                        'terms': {
+                            'field': 'embedded.lab.title',
+                            'size': 200,
+                            'exclude': []
+                        }
+                    }
+                }
+            }
+        },
+        'query': {
+            'bool': {
+                'must': [
+                    {
+                        'terms': {
+                            'principals_allowed.view': [
+                                'system.Authenticated',
+                                'group.admin',
+                                'system.Everyone',
+                                'remoteuser.TEST'
+                            ]
+                        }
+                    },
+                    {
+                        'terms': {
+                            'embedded.@type': ['Snowflake']}
+                    }
+                ]
+            }
+        },
+        'post_filter': {
+            'bool': {
+                'must': [
+                    {'terms': {'embedded.@type': ['Snowflake']}}]
+            }
+        }
+    }
+
+
+@pytest.fixture
+def raw_snovault_query():
     return {
         'query': {
             'bool': {
@@ -385,40 +545,6 @@ def raw_response():
 
 
 @pytest.fixture
-def basic_search_query_factory_with_facets(raw_query, dummy_request):
-    from pyramid.testing import DummyResource
-    from pyramid.security import Allow
-    from snovault.elasticsearch.searches.parsers import ParamsParser
-    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
-    from elasticsearch_dsl import Search
-    dummy_request.environ['REMOTE_USER'] = 'TEST_SUBMITTER'
-    dummy_request.environ['QUERY_STRING'] = (
-        'type=TestingSearchSchema&assay_title=Histone+ChIP-seq&award.project=Roadmap'
-        '&assembly=GRCh38&biosample_ontology.classification=primary+cell'
-        '&target.label=H3K27me3&biosample_ontology.classification%21=cell+line'
-        '&biosample_ontology.term_name%21=naive+thymus-derived+CD4-positive%2C+alpha-beta+T+cell'
-        '&limit=10&status=released&searchTerm=chip-seq&sort=date_created&sort=-files.file_size'
-        '&field=@id&field=accession'
-    )
-    dummy_request.context = DummyResource()
-    dummy_request.context.__acl__ = lambda: [(Allow, 'group.submitter', 'search_audit')]
-    params_parser = ParamsParser(dummy_request)
-    bsq = BasicSearchQueryFactoryWithFacets(params_parser)
-    bsq.search = Search().from_dict(raw_query)
-    return bsq
-
-
-@pytest.fixture
-def basic_query_response_with_facets(raw_response, basic_search_query_factory_with_facets):
-    from snovault.elasticsearch.searches.responses import BasicQueryResponseWithFacets
-    bqr = BasicQueryResponseWithFacets(
-        results=raw_response,
-        query_builder=basic_search_query_factory_with_facets
-    )
-    return bqr
-
-
-@pytest.fixture
 def parsed_params(dummy_request):
     from pyramid.testing import DummyResource
     from pyramid.security import Allow
@@ -438,8 +564,41 @@ def parsed_params(dummy_request):
     return params_parser
 
 
+@pytest.fixture
+def basic_search_query_factory_with_facets(raw_query, raw_response, parsed_params):
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
+    from elasticsearch_dsl import Search
+    bsq = BasicSearchQueryFactoryWithFacets(parsed_params)
+    bsq.search = Search().from_dict(raw_query)
+    return bsq
+
+
+@pytest.fixture
+def basic_query_response_with_facets(raw_response, basic_search_query_factory_with_facets):
+    from snovault.elasticsearch.searches.responses import BasicQueryResponseWithFacets
+    from elasticsearch_dsl.response import Response, AggResponse
+    basic_search_query_factory_with_facets.search._response = Response(
+        basic_search_query_factory_with_facets.search,
+        raw_response
+    )
+    ar = AggResponse(
+        basic_search_query_factory_with_facets.search.aggs,
+        basic_search_query_factory_with_facets.search,
+        raw_response['hits']['aggregations']
+    )
+    print([a for a in ar])
+    bqr = BasicQueryResponseWithFacets(
+        results=basic_search_query_factory_with_facets.search._response,
+        query_builder=basic_search_query_factory_with_facets
+    )
+    return bqr
+
+
 def test_searches_mixins_aggs_to_facets_mixin_get_aggregations(basic_query_response_with_facets):
-    assert False
+    print(basic_query_response_with_facets.results)
+    print(basic_query_response_with_facets.results._d_)
+    print(basic_query_response_with_facets.results._aggs)
+    assert basic_query_response_with_facets._get_aggregations() == {}
 
 
 def test_searches_mixins_aggs_to_facets_mixin_get_facets(basic_query_response_with_facets):
@@ -528,14 +687,14 @@ def test_searches_mixins_aggs_to_facets_mixin_parse_aggregation_bucket_to_list(r
     assert len(actual) == len(expected)
 
 
+def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_result(raw_response):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    afm = AggsToFacetsMixin()
+
+
 def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_bucket(raw_response):
     from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
     afm = AggsToFacetsMixin()
-    assert False
-
-
-
-def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_result():
     assert False
 
 
