@@ -368,6 +368,16 @@ def raw_response():
                         'doc_count_error_upper_bound': 0,
                         'buckets': []
                     }
+                },
+                'is_restricted': {
+                    'buckets': {
+                        'no': {
+                            'doc_count': 19908
+                        },
+                        'yes': {
+                            'doc_count': 1053
+                        }
+                    }
                 }
             }
         }
@@ -489,7 +499,9 @@ def test_searches_mixins_aggs_to_facets_mixin_get_facet_name():
 def test_searches_mixins_aggs_to_facets_mixin_get_facet_title(basic_query_response_with_facets):
     assert basic_query_response_with_facets._get_facet_title('type') == 'Data Type'
     assert basic_query_response_with_facets._get_facet_title('status') == 'Status'
-    assert basic_query_response_with_facets._get_facet_title('audit.WARNING.category') == 'Audit category: WARNING'
+    assert basic_query_response_with_facets._get_facet_title(
+        'audit.WARNING.category'
+    ) == 'Audit category: WARNING'
 
 
 def test_searches_mixins_aggs_to_facets_mixin_get_facet_type(basic_query_response_with_facets, mocker):
@@ -505,15 +517,25 @@ def test_searches_mixins_aggs_to_facets_mixin_get_facet_type(basic_query_respons
     assert basic_query_response_with_facets._get_facet_type('status') == 'exists'
 
 
-def test_searches_mixins_aggs_to_facets_mixin_parse_aggregation_bucket_to_list():
+def test_searches_mixins_aggs_to_facets_mixin_parse_aggregation_bucket_to_list(raw_response):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    afm = AggsToFacetsMixin()
+    expected = [{'doc_count': 1053, 'key': 'yes'}, {'key': 'no', 'doc_count': 19908}]
+    actual = afm._parse_aggregation_bucket_to_list(
+        raw_response['hits']['aggregations']['is_restricted']['buckets']
+    )
+    assert all([e in actual for e in expected])
+    assert len(actual) == len(expected)
+
+
+def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_bucket(raw_response):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    afm = AggsToFacetsMixin()
     assert False
+
 
 
 def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_result():
-    assert False
-
-
-def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_bucket():
     assert False
 
 
