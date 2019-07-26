@@ -571,6 +571,8 @@ def parsed_params(dummy_request):
         '&assembly=GRCh38&biosample_ontology.classification=primary+cell'
         '&target.label=H3K27me3&biosample_ontology.classification%21=cell+line'
         '&biosample_ontology.term_name%21=naive+thymus-derived+CD4-positive%2C+alpha-beta+T+cell'
+        '&file_type=bam&file_type=bigwig&file_type!=fastq&biosample.genetic_modifications=*'
+        '&biosample.treatments!=ethanol&biosample.treatments!=methanol&restricted!=*'
         '&limit=10&status=released&searchTerm=chip-seq&sort=date_created&sort=-files.file_size'
         '&field=@id&field=accession'
     )
@@ -801,7 +803,6 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregation(
     from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
     mocker.patch.object(AggsToFacetsMixin, '_get_facets')
     AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
-    basic_query_response_with_facets._clear_facets()
     basic_query_response_with_facets._format_aggregation('status')
     expected = [
         {
@@ -884,6 +885,36 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
         assert e['appended'] == a['appended']
 
 
+def test_searches_mixins_aggs_to_facets_mixin_add_fake_facets(
+    basic_query_response_with_facets,
+    mocker,
+    snowflakes_facets
+):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    mocker.patch.object(AggsToFacetsMixin, '_get_facets')
+    AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
+    print(basic_query_response_with_facets._get_aggregations())
+    print(basic_query_response_with_facets.query_builder._get_filters())
+    print(
+        basic_query_response_with_facets.query_builder.params_parser.split_filters_by_must_and_exists(
+            params=basic_query_response_with_facets.query_builder._get_post_filters()
+        )
+    )
+    assert False
+
+
+def test_searches_mixins_aggs_to_facets_mixin_get_fake_facets():
+    assert False
+
+
+def test_searches_mixins_aggs_to_facets_mixin_make_fake_term():
+    assert False
+
+
+def test_searches_mixins_aggs_to_facets_mixin_make_fake_terms():
+    assert False
+
+
 def test_searches_mixins_aggs_to_facets_mixin_to_facets(
     basic_query_response_with_facets,
     mocker,
@@ -896,8 +927,10 @@ def test_searches_mixins_aggs_to_facets_mixin_to_facets(
     actual = basic_query_response_with_facets.facets
     assert len(actual) == 3
 
-
-def test_searches_mixins_hits_to_graph_mixin_to_graph(basic_query_response_with_facets, raw_response):
+def test_searches_mixins_hits_to_graph_mixin_to_graph(
+        basic_query_response_with_facets,
+        raw_response
+):
     r = basic_query_response_with_facets.to_graph()
     assert len(r) == len(raw_response['hits']['hits'])
     assert all(['accession' in x for x in r])
