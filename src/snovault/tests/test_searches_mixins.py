@@ -712,15 +712,55 @@ def test_searches_mixins_aggs_to_facets_mixin_parse_aggregation_bucket_to_list(r
     assert len(actual) == len(expected)
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_result(raw_response):
+def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_result(
+        basic_query_response_with_facets,
+        mocker,
+        snowflakes_facets
+):
     from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
-    afm = AggsToFacetsMixin()
+    mocker.patch.object(AggsToFacetsMixin, '_get_facets')
+    AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
+    expected = {
+        'doc_count': 35,
+        'status': {
+            'buckets': [
+                {'doc_count': 21, 'key': 'released'},
+                {'doc_count': 11, 'key': 'in progress'},
+                {'doc_count': 2, 'key': 'revoked'},
+                {'doc_count': 1, 'key': 'deleted'}
+            ],
+            'doc_count_error_upper_bound': 0,
+            'sum_other_doc_count': 0
+        }
+    }
+    actual = basic_query_response_with_facets._get_aggregation_result('status')
+    assert all([e in actual['status']['buckets'] for e in expected['status']['buckets']])
+    assert len(expected['status']['buckets']) == len(actual['status']['buckets'])
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_bucket(raw_response):
+def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_bucket(
+        basic_query_response_with_facets,
+        mocker,
+        snowflakes_facets
+):
     from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
-    afm = AggsToFacetsMixin()
-    assert False
+    mocker.patch.object(AggsToFacetsMixin, '_get_facets')
+    AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
+    expected = [
+        {'doc_count': 21, 'key': 'released'},
+        {'doc_count': 11, 'key': 'in progress'},
+        {'doc_count': 2, 'key': 'revoked'},
+        {'doc_count': 1, 'key': 'deleted'}
+    ]
+    actual = basic_query_response_with_facets._get_aggregation_bucket('status')
+    assert all([e in actual for e in expected])
+    assert len(expected) == len(actual)
+    expected = [
+        {'key': 'J. Michael Cherry, Stanford', 'doc_count': 35}
+    ]
+    actual = basic_query_response_with_facets._get_aggregation_bucket('lab.title')
+    assert all([e in actual for e in expected])
+    assert len(expected) == len(actual)
 
 
 def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_total():
