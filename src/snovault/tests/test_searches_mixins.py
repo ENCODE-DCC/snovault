@@ -610,6 +610,10 @@ def basic_query_response_with_facets(raw_response, basic_search_query_factory_wi
     return bqr
 
 
+def test_searches_mixins_aggs_to_facets_mixin_get_total(basic_query_response_with_facets):
+    assert basic_query_response_with_facets._get_total() == 2
+
+
 def test_searches_mixins_aggs_to_facets_mixin_get_aggregations(
         basic_query_response_with_facets,
         raw_response,

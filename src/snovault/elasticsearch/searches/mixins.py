@@ -18,6 +18,9 @@ class AggsToFacetsMixin:
     def __init__(self):
         self.facets = []
 
+    def _get_total(self):
+        return len(self.results)
+
     def _get_aggregations(self):
         return self.results.aggs.to_dict()
 
