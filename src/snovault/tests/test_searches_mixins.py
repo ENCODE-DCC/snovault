@@ -789,8 +789,38 @@ def test_searches_mixins_aggs_to_facets_mixin_aggregation_is_appeneded(
     assert basic_query_response_with_facets._aggregation_is_appeneded('new_filter')
 
 
-def test_searches_mixins_aggs_to_facets_mixin_format_aggregation():
-    assert False
+def test_searches_mixins_aggs_to_facets_mixin_format_aggregation(
+        basic_query_response_with_facets,
+        mocker,
+        snowflakes_facets
+):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    mocker.patch.object(AggsToFacetsMixin, '_get_facets')
+    AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
+    basic_query_response_with_facets._clear_facets()
+    basic_query_response_with_facets._format_aggregation('status')
+    expected = [
+        {
+            'terms': [
+                {'key': 'released', 'doc_count': 21},
+                {'key': 'in progress', 'doc_count': 11},
+                {'key': 'revoked', 'doc_count': 2},
+                {'key': 'deleted', 'doc_count': 1}
+            ],
+            'total': 35,
+            'field': 'status',
+            'appended': False,
+            'type': 'terms',
+            'title': 'Snowflake status'
+        }
+    ]
+    actual = basic_query_response_with_facets.facets
+    assert all([e in actual[0]['terms'] for e in expected[0]['terms']])
+    assert expected[0]['total'] == actual[0]['total']
+    assert expected[0]['field'] == actual[0]['field']
+    assert expected[0]['title'] == actual[0]['title']
+    assert expected[0]['type'] == actual[0]['type']
+    assert expected[0]['appended'] == actual[0]['appended']
 
 
 def test_searches_mixins_aggs_to_facets_mixin_format_aggregations():
