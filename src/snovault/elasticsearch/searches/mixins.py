@@ -73,7 +73,7 @@ class AggsToFacetsMixin:
             facet_name
         ).get(DOC_COUNT)
 
-    def _aggregation_is_appeneded(self, facet_name):
+    def _aggregation_is_appended(self, facet_name):
         return self._get_facet_title(facet_name) not in self._get_aggregations()
 
     def _format_aggregation(self, facet_name):
@@ -83,13 +83,10 @@ class AggsToFacetsMixin:
             TERMS: self._get_aggregation_bucket(facet_name),
             TOTAL: self._get_aggregation_total(facet_name),
             TYPE_KEY: self._get_facet_type(facet_name),
-            APPENDED: self._aggregation_is_appeneded(facet_name)
+            APPENDED: self._aggregation_is_appended(facet_name)
         }
         if facet.get(TERMS):
             self.facets.append(facet)
-
-    def _clear_facets(self):
-        self.facets = []
 
     def _format_aggregations(self):
         self._clear_facets()
