@@ -16,15 +16,11 @@ from .interfaces import TYPE_KEY
 
 class AggsToFacetsMixin:
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.facets = []
         self.fake_terms = defaultdict(list)
-
-    def _clear_facets(self):
-        self.facets = []
-
-    def _clear_fake_terms(self):
-        self.fake_terms = defaultdict(list)
+        self.fake_facets = []
 
     def _get_total(self):
         return len(self.results)
@@ -108,8 +104,8 @@ class AggsToFacetsMixin:
 
 class HitsToGraphMixin:
 
-    def __init__(self):
-        pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def to_graph(self):
         return [

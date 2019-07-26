@@ -38,7 +38,8 @@ class QueryResponse:
     Holds results and allows mixin of aggregation and hits formatters.
     '''
 
-    def __init__(self, results, query_builder):
+    def __init__(self, results, query_builder, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.results = results
         self.query_builder = query_builder
 
@@ -46,4 +47,4 @@ class QueryResponse:
 class BasicQueryResponseWithFacets(QueryResponse, HitsToGraphMixin, AggsToFacetsMixin):
 
     def __init__(self, results, query_builder, *args, **kwargs):
-        super().__init__(results, query_builder)
+        super().__init__(results, query_builder, *args, **kwargs)
