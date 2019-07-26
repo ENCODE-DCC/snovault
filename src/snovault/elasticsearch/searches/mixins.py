@@ -6,6 +6,7 @@ from .interfaces import BUCKETS
 from .interfaces import DASH
 from .interfaces import DOC_COUNT
 from .interfaces import FIELD_KEY
+from .interfaces import IS_EQUAL
 from .interfaces import KEY
 from .interfaces import PERIOD
 from .interfaces import TERMS
@@ -77,6 +78,9 @@ class AggsToFacetsMixin:
             facet_name
         ).get(DOC_COUNT)
 
+    def _get_fake_facets(self):
+        pass
+
     def _aggregation_is_appended(self, facet_name):
         return self._get_facet_title(facet_name) not in self._get_aggregations()
 
@@ -93,9 +97,44 @@ class AggsToFacetsMixin:
             self.facets.append(facet)
 
     def _format_aggregations(self):
-        self._clear_facets()
         for facet_name in self._get_facets():
             self._format_aggregation(facet_name)
+
+    def _make_fake_term(self, param_key, param_value, is_equal):
+        fake_term = {
+            KEY: param_value,
+            IS_EQUAL: is_equal
+        }
+        self.fake_terms[param_key].append(fake_term)
+
+    def _make_fake_terms(self, params, is_equal):
+        for p in params:
+            self._make_fake_term(
+                param_key=p[0],
+                param_value=p[1],
+                is_equal=is_equal
+            )
+
+    def _make_fake_facet(self):
+        fake_facet = {
+        }
+        self.fake_facets.append(fake_facet)
+
+    def _make_fake_facets(self):
+        fake_facets = self._get_fake_facets()
+        must, must_not, exists, not_exists = self.query_builder.params_parser.split_filters_by_must_and_exists(
+            params=fake_facets
+        )
+        self._make_fake_terms(
+            params=must + exists,
+            is_equal='true'
+        )
+        self._make_fake_terms(
+            params=self.query_builder.params_parser.remove_not_flag(
+                params=must_not + not_exists
+            ),
+            is_equal='false'
+        )
 
     def to_facets(self):
         self._format_aggregations()
