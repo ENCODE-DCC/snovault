@@ -880,9 +880,20 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
         assert e['appended'] == a['appended']
 
 
-def test_searches_mixins_aggs_to_facets_mixin_to_facets():
-    assert False
+def test_searches_mixins_aggs_to_facets_mixin_to_facets(
+    basic_query_response_with_facets,
+    mocker,
+    snowflakes_facets
+):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    mocker.patch.object(AggsToFacetsMixin, '_get_facets')
+    AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
+    basic_query_response_with_facets.to_facets()
+    actual = basic_query_response_with_facets.facets
+    assert len(actual) == 3
 
 
-def test_searches_mixins_hits_to_graph_mixin_to_graph():
-    assert False
+def test_searches_mixins_hits_to_graph_mixin_to_graph(basic_query_response_with_facets, raw_response):
+    r = basic_query_response_with_facets.to_graph()
+    assert len(r) == len(raw_response['hits']['hits'])
+    assert all(['accession' in x for x in r])
