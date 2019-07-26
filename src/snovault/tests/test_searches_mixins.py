@@ -776,8 +776,17 @@ def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_total(
     assert basic_query_response_with_facets._get_aggregation_total('type') == 35
 
 
-def test_searches_mixins_aggs_to_facets_mixin_aggregation_is_appeneded():
-    assert False
+def test_searches_mixins_aggs_to_facets_mixin_aggregation_is_appeneded(
+        basic_query_response_with_facets,
+        mocker,
+        snowflakes_facets
+):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    mocker.patch.object(AggsToFacetsMixin, '_get_facets')
+    AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
+    assert not basic_query_response_with_facets._aggregation_is_appeneded('status')
+    assert not basic_query_response_with_facets._aggregation_is_appeneded('lab.title')
+    assert basic_query_response_with_facets._aggregation_is_appeneded('new_filter')
 
 
 def test_searches_mixins_aggs_to_facets_mixin_format_aggregation():
