@@ -823,8 +823,61 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregation(
     assert expected[0]['appended'] == actual[0]['appended']
 
 
-def test_searches_mixins_aggs_to_facets_mixin_format_aggregations():
-    assert False
+def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
+    basic_query_response_with_facets,
+    mocker,
+    snowflakes_facets
+):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    mocker.patch.object(AggsToFacetsMixin, '_get_facets')
+    AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
+    basic_query_response_with_facets._format_aggregations()
+    expected = [
+        {
+            'field': 'status',
+            'terms': [
+                {'doc_count': 21, 'key': 'released'},
+                {'doc_count': 11, 'key': 'in progress'},
+                {'doc_count': 2, 'key': 'revoked'},
+                {'doc_count': 1, 'key': 'deleted'}
+            ],
+            'appended': False,
+            'title': 'Snowflake status',
+            'total': 35,
+            'type': 'terms'
+        },
+        {
+            'field': 'lab.title',
+            'terms': [
+                {'doc_count': 35, 'key': 'J. Michael Cherry, Stanford'}
+            ],
+            'appended': False,
+            'title': 'Lab',
+            'total': 35,
+            'type': 'terms'
+        },
+        {
+            'field': 'type',
+            'terms': [
+                {'doc_count': 35, 'key': 'Item'},
+                {'doc_count': 35, 'key': 'Snowflake'}
+            ],
+            'appended': False,
+            'title': 'Snowflake type',
+            'total': 35,
+            'type': 'terms'
+        }
+    ]
+    actual = basic_query_response_with_facets.facets
+    assert len(expected) == len(actual)
+    for e in expected:
+        a = [a for a in actual if e['title'] == a['title']][0]
+        assert all([e in a['terms'] for e in a['terms']])
+        assert e['total'] == a['total']
+        assert e['field'] == a['field']
+        assert e['title'] == a['title']
+        assert e['type'] == a['type']
+        assert e['appended'] == a['appended']
 
 
 def test_searches_mixins_aggs_to_facets_mixin_to_facets():
