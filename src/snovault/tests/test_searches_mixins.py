@@ -1,6 +1,22 @@
 import pytest
 
 
+@pytest.fixture()
+def snowflakes_facets():
+    return {
+        k: v
+        for k, v in [
+                ('type', {'title': 'Data Type', 'exclude': ['Item']}),
+                ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
+                ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
+                ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
+                ('status', {'title': 'Snowflake status'}),
+                ('type', {'title': 'Snowflake type'}),
+                ('lab.title', {'title': 'Lab'})
+        ]
+    }
+
+
 @pytest.fixture
 def raw_snowflakes_query():
     return {
@@ -565,11 +581,11 @@ def parsed_params(dummy_request):
 
 
 @pytest.fixture
-def basic_search_query_factory_with_facets(raw_query, raw_response, parsed_params):
+def basic_search_query_factory_with_facets(raw_snowflakes_query, parsed_params):
     from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
     from elasticsearch_dsl import Search
     bsq = BasicSearchQueryFactoryWithFacets(parsed_params)
-    bsq.search = Search().from_dict(raw_query)
+    bsq.search = Search().from_dict(raw_snowflakes_query)
     return bsq
 
 
@@ -586,7 +602,7 @@ def basic_query_response_with_facets(raw_response, basic_search_query_factory_wi
         basic_search_query_factory_with_facets.search,
         raw_response['hits']['aggregations']
     )
-    print([a for a in ar])
+    basic_search_query_factory_with_facets.search._response._aggs = ar
     bqr = BasicQueryResponseWithFacets(
         results=basic_search_query_factory_with_facets.search._response,
         query_builder=basic_search_query_factory_with_facets
@@ -594,11 +610,20 @@ def basic_query_response_with_facets(raw_response, basic_search_query_factory_wi
     return bqr
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_aggregations(basic_query_response_with_facets):
-    print(basic_query_response_with_facets.results)
-    print(basic_query_response_with_facets.results._d_)
-    print(basic_query_response_with_facets.results._aggs)
-    assert basic_query_response_with_facets._get_aggregations() == {}
+def test_searches_mixins_aggs_to_facets_mixin_get_aggregations(
+        basic_query_response_with_facets,
+        raw_response,
+        snowflakes_facets
+):
+    expected = raw_response['hits']['aggregations']
+    actual = basic_query_response_with_facets._get_aggregations()
+    for k in expected:
+        assert k in actual
+    for k, v in snowflakes_facets.items():
+        assert (
+            len(expected[v.get('title')][basic_query_response_with_facets._get_facet_name(k)]['buckets'])
+            == len(actual[v.get('title')][basic_query_response_with_facets._get_facet_name(k)]['buckets'])
+        )
 
 
 def test_searches_mixins_aggs_to_facets_mixin_get_facets(basic_query_response_with_facets):
