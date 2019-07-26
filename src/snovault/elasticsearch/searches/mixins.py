@@ -1,3 +1,4 @@
+from collections import defaultdict
 from functools import lru_cache
 
 from .interfaces import APPENDED
@@ -17,6 +18,13 @@ class AggsToFacetsMixin:
 
     def __init__(self):
         self.facets = []
+        self.fake_terms = defaultdict(list)
+
+    def _clear_facets(self):
+        self.facets = []
+
+    def _clear_fake_terms(self):
+        self.fake_terms = defaultdict(list)
 
     def _get_total(self):
         return len(self.results)
