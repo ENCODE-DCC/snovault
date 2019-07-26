@@ -35,7 +35,7 @@ class AggsToFacetsMixin:
         return facet_name.replace(PERIOD, DASH)
 
     def _get_facet_title(self, facet_name):
-        return self._get_facets().get(facet_name, {}).get(TITLE)
+        return self._get_facets().get(facet_name, {}).get(TITLE, facet_name)
 
     def _get_facet_type(self, facet_name):
         return self._get_facets().get(facet_name, {}).get(TYPE_KEY, TERMS)
@@ -61,7 +61,7 @@ class AggsToFacetsMixin:
     def _get_aggregation_bucket(self, facet_name):
         aggregation_bucket = self._get_aggregation_result(
             facet_name
-        ).get(self._get_facet_name(facet_name), {}).get(BUCKETS)
+        ).get(self._get_facet_name(facet_name), {}).get(BUCKETS, [])
         if isinstance(aggregation_bucket, dict):
             aggregation_bucket = self._parse_aggregation_bucket_to_list(
                 aggregation_bucket
