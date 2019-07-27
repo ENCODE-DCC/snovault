@@ -119,18 +119,7 @@ class AggsToFacetsMixin:
                 is_equal=is_equal
             )
 
-    def _make_fake_facet(self, facet_name, terms):
-        fake_facet = {
-            FIELD_KEY: facet_name,
-            TITLE: self._get_facet_title(facet_name),
-            TERMS: terms,
-            APPENDED: JS_TRUE,
-            TOTAL: self._get_total()
-        }
-        self.fake_facets.append(fake_facet)
-
-    def _make_fake_facets(self):
-        fake_facets = self._get_fake_facets()
+    def _make_fake_buckets_from_fake_facets(self, fake_facets):
         must, must_not, exists, not_exists = self.query_builder.params_parser.split_filters_by_must_and_exists(
             params=fake_facets
         )
@@ -144,6 +133,20 @@ class AggsToFacetsMixin:
             ),
             is_equal=JS_FALSE
         )
+
+    def _make_fake_facet(self, facet_name, terms):
+        fake_facet = {
+            FIELD_KEY: facet_name,
+            TITLE: self._get_facet_title(facet_name),
+            TERMS: terms,
+            APPENDED: JS_TRUE,
+            TOTAL: self._get_total()
+        }
+        self.fake_facets.append(fake_facet)
+
+    def _make_fake_facets(self):
+        fake_facets = self._get_fake_facets()
+        self._make_fake_buckets_from_fake_facets(fake_facets)
         for facet_name, terms in self.fake_buckets:
             self._make_fake_facet(facet_name, terms)
 
