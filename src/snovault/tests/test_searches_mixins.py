@@ -921,6 +921,7 @@ def test_searches_mixins_aggs_to_facets_mixin_to_facets(
     actual = basic_query_response_with_facets.facets
     assert len(actual) == 3
 
+
 def test_searches_mixins_hits_to_graph_mixin_to_graph(
         basic_query_response_with_facets,
         raw_response
