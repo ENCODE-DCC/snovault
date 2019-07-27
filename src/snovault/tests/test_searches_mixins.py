@@ -922,19 +922,81 @@ def test_searches_mixins_aggs_to_facets_mixin_make_fake_bucket():
 
 
 def test_searches_mixins_aggs_to_facets_mixin_make_fake_buckets():
-    assert False
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    am = AggsToFacetsMixin()
+    am._make_fake_buckets(
+        params=[('status', 'released'), ('treated', '*'), ('biosample.organism', 'human')],
+        is_equal='true'
+    )
+    actual = dict(am.fake_buckets)
+    expected = {
+        'biosample.organism': [
+            {'key': 'human', 'isEqual': 'true'}
+        ],
+        'status': [
+            {'key': 'released', 'isEqual': 'true'}
+        ],
+        'treated': [
+            {'key': '*', 'isEqual': 'true'}
+        ]
+    }
+    assert actual == expected
 
 
-def test_searches_mixins_aggs_to_facets_mixin_make_fake_buckets_from_fake_facets():
-    assert False
+def test_searches_mixins_aggs_to_facets_mixin_make_fake_buckets_from_fake_facet(
+        basic_query_response_with_facets
+):
+    basic_query_response_with_facets._make_fake_buckets_from_fake_facets(
+        [
+            ('status', 'released'),
+            ('status', 'in progress'),
+            ('status!', 'archived'),
+            ('file_format', '*'),
+            ('restricted!', '*'),
+        ]
+    )
+    expected = {
+        'file_format': [
+            {'key': '*', 'isEqual': 'true'}
+        ],
+        'status': [
+            {'key': 'released', 'isEqual': 'true'},
+            {'key': 'in progress', 'isEqual': 'true'},
+            {'key': 'archived', 'isEqual': 'false'}
+        ],
+        'restricted': [
+            {'key': '*', 'isEqual': 'false'}
+        ]
+    }
+    actual = dict(basic_query_response_with_facets.fake_buckets)
+    for x in expected.keys():
+        assert all([te in actual.get(x) for te in expected.get(x)])
+        assert len(actual.get(x)) == len(expected.get(x))
 
 
-def test_searches_mixins_aggs_to_facets_mixin_make_fake_facet():
-    assert False
+def test_searches_mixins_aggs_to_facets_mixin_make_fake_facet(basic_query_response_with_facets):
+    basic_query_response_with_facets._make_fake_facet('target.name', [{'key': '*', 'isEqual': 'true'}])
+    assert basic_query_response_with_facets.fake_facets[0] == {
+        'field': 'target.name',
+        'appended': 'true',
+        'title': 'target.name',
+        'total': 2,
+        'terms': [
+            {'key': '*', 'isEqual': 'true'}
+        ]
+    }
 
 
-def test_searches_mixins_aggs_to_facets_mixin_make_fake_facets():
-    assert False
+def test_searches_mixins_aggs_to_facets_mixin_make_fake_facets(
+    basic_query_response_with_facets,
+    mocker,
+    snowflakes_facets
+):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    mocker.patch.object(AggsToFacetsMixin, '_get_facets')
+    AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
+    basic_query_response_with_facets._make_fake_facets()
+    assert len(basic_query_response_with_facets.fake_facets) == 10
 
 
 def test_searches_mixins_aggs_to_facets_mixin_to_facets(
