@@ -136,13 +136,13 @@ class AggsToFacetsMixin:
         )
         self._make_fake_buckets(
             params=must + exists,
-            is_equal='true'
+            is_equal=JS_TRUE
         )
         self._make_fake_buckets(
             params=self.query_builder.params_parser.remove_not_flag(
                 params=must_not + not_exists
             ),
-            is_equal='false'
+            is_equal=JS_FALSE
         )
         for facet_name, terms in self.fake_buckets:
             self._make_fake_facet(facet_name, terms)
