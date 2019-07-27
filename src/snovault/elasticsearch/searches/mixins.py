@@ -40,6 +40,9 @@ class AggsToFacetsMixin:
             for k, v in self.query_builder._get_facets()
         }
 
+    def _get_post_filters(self):
+        return self.query_builder._get_post_filters()
+
     def _get_facet_name(self, facet_name):
         return facet_name.replace(PERIOD, DASH)
 
@@ -83,7 +86,14 @@ class AggsToFacetsMixin:
         ).get(DOC_COUNT)
 
     def _get_fake_facets(self):
-        pass
+        facet_keys = [
+            k
+            for k in self._get_facets()
+        ]
+        return self.query_builder.params_parser.get_not_keys_filters(
+            not_keys=facet_keys,
+            params=self._get_post_filters()
+        )
 
     def _aggregation_is_appended(self, facet_name):
         return self._get_facet_title(facet_name) not in self._get_aggregations()
@@ -147,12 +157,13 @@ class AggsToFacetsMixin:
     def _make_fake_facets(self):
         fake_facets = self._get_fake_facets()
         self._make_fake_buckets_from_fake_facets(fake_facets)
-        for facet_name, terms in self.fake_buckets:
+        for facet_name, terms in self.fake_buckets.items():
             self._make_fake_facet(facet_name, terms)
 
     def to_facets(self):
         self._format_aggregations()
-        return self.facets
+        self._make_fake_facets()
+        return self.facets + self.fake_facets
 
 
 class HitsToGraphMixin:

@@ -814,7 +814,7 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregation(
             ],
             'total': 35,
             'field': 'status',
-            'appended': False,
+            'appended': 'false',
             'type': 'terms',
             'title': 'Snowflake status'
         }
@@ -846,7 +846,7 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
                 {'doc_count': 2, 'key': 'revoked'},
                 {'doc_count': 1, 'key': 'deleted'}
             ],
-            'appended': False,
+            'appended': 'false',
             'title': 'Snowflake status',
             'total': 35,
             'type': 'terms'
@@ -856,7 +856,7 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
             'terms': [
                 {'doc_count': 35, 'key': 'J. Michael Cherry, Stanford'}
             ],
-            'appended': False,
+            'appended': 'false',
             'title': 'Lab',
             'total': 35,
             'type': 'terms'
@@ -867,7 +867,7 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
                 {'doc_count': 35, 'key': 'Item'},
                 {'doc_count': 35, 'key': 'Snowflake'}
             ],
-            'appended': False,
+            'appended': 'false',
             'title': 'Snowflake type',
             'total': 35,
             'type': 'terms'
@@ -885,8 +885,33 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
         assert e['appended'] == a['appended']
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_fake_facets():
-    assert False
+def test_searches_mixins_aggs_to_facets_mixin_get_fake_facets(
+    basic_query_response_with_facets,
+    mocker,
+    snowflakes_facets
+):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    mocker.patch.object(AggsToFacetsMixin, '_get_facets')
+    AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
+    expected = [
+        ('assay_title', 'Histone ChIP-seq'),
+        ('award.project', 'Roadmap'),
+        ('assembly', 'GRCh38'),
+        ('biosample_ontology.classification', 'primary cell'),
+        ('target.label', 'H3K27me3'),
+        ('biosample_ontology.classification!', 'cell line'),
+        ('biosample_ontology.term_name!', 'naive thymus-derived CD4-positive, alpha-beta T cell'),
+        ('file_type', 'bam'),
+        ('file_type', 'bigwig'),
+        ('file_type!', 'fastq'),
+        ('biosample.genetic_modifications', '*'),
+        ('biosample.treatments!', 'ethanol'),
+        ('biosample.treatments!', 'methanol'),
+        ('restricted!', '*')
+    ]
+    actual = basic_query_response_with_facets._get_fake_facets()
+    assert all([e in actual for e in expected])
+    assert len(actual) == len(expected)
 
 
 def test_searches_mixins_aggs_to_facets_mixin_make_fake_bucket():
@@ -917,9 +942,8 @@ def test_searches_mixins_aggs_to_facets_mixin_to_facets(
     from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
     mocker.patch.object(AggsToFacetsMixin, '_get_facets')
     AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
-    basic_query_response_with_facets.to_facets()
-    actual = basic_query_response_with_facets.facets
-    assert len(actual) == 3
+    actual = basic_query_response_with_facets.to_facets()
+    assert len(actual) == 13
 
 
 def test_searches_mixins_hits_to_graph_mixin_to_graph(
