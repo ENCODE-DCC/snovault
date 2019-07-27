@@ -885,24 +885,6 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
         assert e['appended'] == a['appended']
 
 
-def test_searches_mixins_aggs_to_facets_mixin_add_fake_facets(
-    basic_query_response_with_facets,
-    mocker,
-    snowflakes_facets
-):
-    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
-    mocker.patch.object(AggsToFacetsMixin, '_get_facets')
-    AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
-    print(basic_query_response_with_facets._get_aggregations())
-    print(basic_query_response_with_facets.query_builder._get_filters())
-    print(
-        basic_query_response_with_facets.query_builder.params_parser.split_filters_by_must_and_exists(
-            params=basic_query_response_with_facets.query_builder._get_post_filters()
-        )
-    )
-    assert False
-
-
 def test_searches_mixins_aggs_to_facets_mixin_get_fake_facets():
     assert False
 
@@ -911,7 +893,19 @@ def test_searches_mixins_aggs_to_facets_mixin_make_fake_bucket():
     assert False
 
 
-def test_searches_mixins_aggs_to_facets_mixin_make_fake_bucket():
+def test_searches_mixins_aggs_to_facets_mixin_make_fake_buckets():
+    assert False
+
+
+def test_searches_mixins_aggs_to_facets_mixin_make_fake_buckets_from_fake_facets():
+    assert False
+
+
+def test_searches_mixins_aggs_to_facets_mixin_make_fake_facet():
+    assert False
+
+
+def test_searches_mixins_aggs_to_facets_mixin_make_fake_facets():
     assert False
 
 
