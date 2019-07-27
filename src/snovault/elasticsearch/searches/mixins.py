@@ -6,7 +6,9 @@ from .interfaces import BUCKETS
 from .interfaces import DASH
 from .interfaces import DOC_COUNT
 from .interfaces import FIELD_KEY
-from .interfaces import IS_EQUAL
+from .interfaces import JS_IS_EQUAL
+from .interfaces import JS_TRUE
+from .interfaces import JS_FALSE
 from .interfaces import KEY
 from .interfaces import PERIOD
 from .interfaces import TERMS
@@ -20,12 +22,14 @@ class AggsToFacetsMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.facets = []
-        self.fake_terms = defaultdict(list)
+        self.fake_buckets = defaultdict(list)
         self.fake_facets = []
 
+    @lru_cache()
     def _get_total(self):
         return len(self.results)
 
+    @lru_cache()
     def _get_aggregations(self):
         return self.results.aggs.to_dict()
 
@@ -91,7 +95,7 @@ class AggsToFacetsMixin:
             TERMS: self._get_aggregation_bucket(facet_name),
             TOTAL: self._get_aggregation_total(facet_name),
             TYPE_KEY: self._get_facet_type(facet_name),
-            APPENDED: self._aggregation_is_appended(facet_name)
+            APPENDED: JS_FALSE
         }
         if facet.get(TERMS):
             self.facets.append(facet)
@@ -100,23 +104,28 @@ class AggsToFacetsMixin:
         for facet_name in self._get_facets():
             self._format_aggregation(facet_name)
 
-    def _make_fake_term(self, param_key, param_value, is_equal):
+    def _make_fake_bucket(self, param_key, param_value, is_equal):
         fake_term = {
             KEY: param_value,
-            IS_EQUAL: is_equal
+            JS_IS_EQUAL: is_equal
         }
-        self.fake_terms[param_key].append(fake_term)
+        self.fake_buckets[param_key].append(fake_term)
 
-    def _make_fake_terms(self, params, is_equal):
+    def _make_fake_buckets(self, params, is_equal):
         for p in params:
-            self._make_fake_term(
+            self._make_fake_bucket(
                 param_key=p[0],
                 param_value=p[1],
                 is_equal=is_equal
             )
 
-    def _make_fake_facet(self):
+    def _make_fake_facet(self, facet_name, terms):
         fake_facet = {
+            FIELD_KEY: facet_name,
+            TITLE: self._get_facet_title(facet_name),
+            TERMS: terms,
+            APPENDED: JS_TRUE,
+            TOTAL: self._get_total()
         }
         self.fake_facets.append(fake_facet)
 
@@ -125,16 +134,18 @@ class AggsToFacetsMixin:
         must, must_not, exists, not_exists = self.query_builder.params_parser.split_filters_by_must_and_exists(
             params=fake_facets
         )
-        self._make_fake_terms(
+        self._make_fake_buckets(
             params=must + exists,
             is_equal='true'
         )
-        self._make_fake_terms(
+        self._make_fake_buckets(
             params=self.query_builder.params_parser.remove_not_flag(
                 params=must_not + not_exists
             ),
             is_equal='false'
         )
+        for facet_name, terms in self.fake_buckets:
+            self._make_fake_facet(facet_name, terms)
 
     def to_facets(self):
         self._format_aggregations()

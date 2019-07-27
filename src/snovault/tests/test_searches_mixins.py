@@ -907,11 +907,11 @@ def test_searches_mixins_aggs_to_facets_mixin_get_fake_facets():
     assert False
 
 
-def test_searches_mixins_aggs_to_facets_mixin_make_fake_term():
+def test_searches_mixins_aggs_to_facets_mixin_make_fake_bucket():
     assert False
 
 
-def test_searches_mixins_aggs_to_facets_mixin_make_fake_terms():
+def test_searches_mixins_aggs_to_facets_mixin_make_fake_bucket():
     assert False
 
 
