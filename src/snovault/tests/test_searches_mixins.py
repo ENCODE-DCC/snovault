@@ -915,7 +915,10 @@ def test_searches_mixins_aggs_to_facets_mixin_get_fake_facets(
 
 
 def test_searches_mixins_aggs_to_facets_mixin_make_fake_bucket():
-    assert False
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    am = AggsToFacetsMixin()
+    am._make_fake_bucket('target.name', 'ctcf', 'false')
+    assert am.fake_buckets['target.name'][0] == {'key': 'ctcf', 'isEqual': 'false'}
 
 
 def test_searches_mixins_aggs_to_facets_mixin_make_fake_buckets():
