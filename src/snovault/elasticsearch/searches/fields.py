@@ -5,6 +5,7 @@ from .interfaces import AT_ID
 from .interfaces import AT_CONTEXT
 from .interfaces import AT_TYPE
 from .interfaces import JSONLD_CONTEXT
+from .interfaces import TOTAL
 from .queries import BasicSearchQueryFactoryWithFacets
 from .responses import BasicQueryResponseWithFacets
 
@@ -56,7 +57,8 @@ class BasicSearchWithFacetsResponseField(ResponseField):
         self.response.update(
             {
                 GRAPH: self.results.to_graph(),
-                FACETS: self.results.to_facets()
+                FACETS: self.results.to_facets(),
+                TOTAL: self.results.results.hits.total
             }
         )
 

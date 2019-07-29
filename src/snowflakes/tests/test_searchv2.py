@@ -18,6 +18,7 @@ def test_searchv2_view(workbook, testapp):
     assert r.json['@id'] == '/searchv2/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
     assert r.json['@context'] == '/terms/'
     assert r.json['@type'] == ['Search']
+    assert r.json['total'] == 1
 
 
 def test_searchv2_view_no_type(workbook, testapp):
