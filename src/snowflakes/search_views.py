@@ -3,8 +3,11 @@ from pyramid.view import view_config
 
 from snovault.elasticsearch.searches.interfaces import SEARCH_TITLE
 from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
+from snovault.elasticsearch.searches.fields import ContextResponseField
+from snovault.elasticsearch.searches.fields import IDResponseField
 from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
 from snovault.elasticsearch.searches.fields import TitleResponseField
+from snovault.elasticsearch.searches.fields import TypeResponseField
 from snovault.elasticsearch.searches.parsers import ParamsParser
 from snovault.elasticsearch.searches.responses import FieldedResponse
 
@@ -28,8 +31,17 @@ DEFAULT_ITEM_TYPES = [
 def searchv2(context, request):
     fr = FieldedResponse(
         response_fields=[
+            ContextResponseField(
+                request=request
+            ),
+            IDResponseField(
+                request=request
+            ),
             TitleResponseField(
                 title=SEARCH_TITLE
+            ),
+            TypeResponseField(
+                at_type=[SEARCH_TITLE]
             ),
             BasicSearchWithFacetsResponseField(
                 params_parser=ParamsParser(request),
