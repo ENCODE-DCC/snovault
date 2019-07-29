@@ -80,12 +80,14 @@ def test_searches_queries_abstract_query_factory_get_principals(params_parser):
     principals = aq._get_principals()
     assert principals == ['system.Everyone']
 
+
 def test_searches_queries_abstract_query_factory_get_registered_types(params_parser_snovault_types):
     from snovault.typeinfo import TypesTool
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
     registered_types = aq._get_registered_types()
     assert isinstance(registered_types, TypesTool)
+
 
 def test_searches_queries_abstract_query_factory_get_schema_for_item_type(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
@@ -112,7 +114,7 @@ def test_searches_queries_abstract_query_factory_get_invalid_item_types(params_p
     invalid_types = aq._get_invalid_item_types(item_types)
     assert not invalid_types
 
-    
+
 def test_searches_queries_abstract_query_factory_validate_item_types(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
@@ -150,7 +152,7 @@ def test_searches_queries_abstract_query_factory_get_default_item_types(params_p
     default_item_types = aq._get_default_item_types()
     assert not default_item_types
 
-    
+
 def test_searches_queries_abstract_query_factory_get_default_item_types_mode_picker(dummy_request):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from snovault.elasticsearch.searches.parsers import ParamsParser
@@ -260,6 +262,7 @@ def test_searches_queries_abstract_query_factory_get_sort(params_parser):
         ('sort', '-files.file_size')
     ]
 
+
 def test_searches_queries_abstract_query_factory_get_one_value(dummy_request):
     from pyramid.httpexceptions import HTTPBadRequest
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
@@ -322,6 +325,7 @@ def test_searches_queries_abstract_query_factory_get_search_fields(params_parser
                 '*.submitted_file_name'
         ]
     )
+
 
 def test_searches_queries_abstract_query_factory_get_search_fields_mode_picker(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
@@ -417,7 +421,6 @@ def test_searches_queries_abstract_query_factory_get_facets(params_parser_snovau
         facets=[]
     )
     assert aq._get_facets() == []
-    
 
 
 def test_searches_queries_abstract_query_factory_get_facet_size(params_parser):
@@ -861,6 +864,7 @@ def test_searches_queries_abstract_query_factory_make_field_must_exist_query(par
         }
     }
 
+
 def test_searches_queries_abstract_query_factory_make_field_must_exist_queries_from_params(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
@@ -989,6 +993,7 @@ def test_searches_queries_abstract_query_factory_map_params_to_elasticsearch_fie
         ('embedded.file_size', '12'),
         ('embedded.@type', 'TestingSearchSchema')
     ]
+
 
 def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
@@ -2211,7 +2216,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_and_post_filte
         e in actual_query['post_filter']['bool']['must']
         for e in expected_query['post_filter']['bool']['must']
     )
-    
+
 
 def test_searches_queries_abstract_query_factory_add_source(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
