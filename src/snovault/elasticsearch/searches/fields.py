@@ -1,6 +1,10 @@
 from .interfaces import FACETS
 from .interfaces import GRAPH
 from .interfaces import TITLE
+from .interfaces import AT_ID
+from .interfaces import AT_CONTEXT
+from .interfaces import AT_TYPE
+from .interfaces import JSONLD_CONTEXT
 from .queries import BasicSearchQueryFactoryWithFacets
 from .responses import BasicQueryResponseWithFacets
 
@@ -95,4 +99,40 @@ class TitleResponseField(ResponseField):
     def render(self):
         return {
             TITLE: self.title
+        }
+
+
+class TypeResponseField(ResponseField):
+
+    def __init__(self, *args, **kwargs):
+        self.at_type = kwargs.pop('at_type', None)
+        super().__init__(*args, **kwargs)
+
+    def render(self):
+        return {
+            AT_TYPE: self.at_type
+        }
+
+
+class ContextResponseField(ResponseField):
+
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop('request', None)
+        super().__init__(*args, **kwargs)
+
+    def render(self):
+        return {
+            AT_CONTEXT: self.request.route_path(JSONLD_CONTEXT)
+        }
+
+
+class IDResponseField(ResponseField):
+
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop('request', None)
+        super().__init__(*args, **kwargs)
+
+    def render(self):
+        return {
+            AT_ID: self.request.path_qs
         }

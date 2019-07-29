@@ -72,3 +72,27 @@ def test_searches_fields_title_field_title_value():
     tf = TitleResponseField(title='Search')
     rtf = tf.render()
     assert rtf == {'title': 'Search'}
+
+
+def test_searches_fields_type_response_field():
+    from snovault.elasticsearch.searches.fields import TypeResponseField
+    tr = TypeResponseField(at_type=['Snowflake'])
+    assert isinstance(tr, TypeResponseField)
+    assert tr.render() == {'@type': ['Snowflake']}
+
+
+def test_searches_fields_context_response_field(dummy_request):
+    from snovault.elasticsearch.searches.fields import ContextResponseField
+    cr = ContextResponseField(request=dummy_request)
+    assert isinstance(cr, ContextResponseField)
+    assert cr.render() == {'@context': '/terms/'}
+
+
+def test_searches_fields_id_response_field(dummy_request):
+    from snovault.elasticsearch.searches.fields import IDResponseField
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+    )
+    ir = IDResponseField(request=dummy_request)
+    assert isinstance(ir, IDResponseField)
+    assert ir.render() == {'@id': '/dummy?type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'}
