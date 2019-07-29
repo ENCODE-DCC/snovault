@@ -1,6 +1,5 @@
 import pytest
 
-
 # Use workbook fixture from BDD tests (including elasticsearch)
 from .features.conftest import app_settings, app, workbook
 from webob.multidict import MultiDict
@@ -16,6 +15,9 @@ def test_searchv2_view(workbook, testapp):
     assert r.json['@graph'][0]['status'] == 'deleted'
     assert 'Snowflake' in r.json['@graph'][0]['@type']
     assert len(r.json['facets']) == 5
+    assert r.json['@id'] == '/searchv2/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
+    assert r.json['@context'] == '/terms/'
+    assert r.json['@type'] == ['Search']
 
 
 def test_searchv2_view_no_type(workbook, testapp):
