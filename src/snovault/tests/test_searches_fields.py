@@ -3,8 +3,15 @@ import pytest
 
 @pytest.fixture()
 def dummy_parent(dummy_request):
+    from pyramid.testing import DummyResource
+    from pyramid.security import Allow
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.interfaces import ELASTIC_SEARCH
+    from elasticsearch import Elasticsearch
+    dummy_request.registry[ELASTIC_SEARCH] = Elasticsearch()
+    dummy_request.context = DummyResource()
+    dummy_request.context.__acl__ = lambda: [(Allow, 'group.submitter', 'search_audit')]
     class DummyParent():
         def __init__(self):
             self._meta = {}
@@ -44,21 +51,42 @@ def test_searches_fields_basic_search_response_field_init():
     assert isinstance(brf, BasicSearchWithFacetsResponseField)
 
 
-def test_searches_fields_basic_search_response_build_query():
+def test_searches_fields_basic_search_response_build_query(dummy_parent):
+    from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
+    from elasticsearch_dsl import Search
+    brf = BasicSearchWithFacetsResponseField()
+    brf.parent = dummy_parent
+    brf._build_query()
+    assert isinstance(brf.query, Search)
+
+
+def test_searches_fields_basic_search_response_register_query(dummy_parent):
+    from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
+    brf = BasicSearchWithFacetsResponseField()
+    brf.parent = dummy_parent
+    brf._build_query()
+    assert isinstance(brf.query_builder, BasicSearchQueryFactoryWithFacets)
+    brf._register_query()
+    assert isinstance(brf.get_query_builder(), BasicSearchQueryFactoryWithFacets)
+
+
+def test_searches_fields_basic_search_response_execute_query(dummy_parent, mocker):
+    from elasticsearch_dsl import Search
+    mocker.patch.object(Search, 'execute')
+    Search.execute.return_value = []
     from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
     brf = BasicSearchWithFacetsResponseField()
-    assert False
+    brf.parent = dummy_parent
+    brf._build_query()
+    brf._execute_query()
+    assert Search.execute.call_count == 1
 
 
-def test_searches_fields_basic_search_response_execute_query():
+def test_searches_fields_basic_search_response_format_results_query(dummy_parent):
     from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
     brf = BasicSearchWithFacetsResponseField()
-    assert False
-
-
-def test_searches_fields_basic_search_response_format_results_query():
-    from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
-    brf = BasicSearchWithFacetsResponseField()
+    brf.parent = dummy_parent
     assert False
 
 
