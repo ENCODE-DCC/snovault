@@ -1,3 +1,4 @@
+ALL = 'all'
 AND = 'AND'
 AND_JOIN = ' AND '
 AND_NOT_JOIN = ' AND NOT '
