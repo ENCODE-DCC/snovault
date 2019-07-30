@@ -183,28 +183,33 @@ def test_searches_fields_notification_response_field_init(dummy_parent):
     from snovault.elasticsearch.searches.fields import NotificationResponseField
     nr = NotificationResponseField()
     assert isinstance(nr, NotificationResponseField)
-    assert False
 
 
 def test_searches_fields_notification_response_field_results_found(dummy_parent):
     from snovault.elasticsearch.searches.fields import NotificationResponseField
     nr = NotificationResponseField()
-    assert isinstance(nr, NotificationResponseField)
-    assert False
+    nr.parent = dummy_parent
+    assert not nr._results_found()
+    nr.parent.response.update({'total': 0})
+    assert not nr._results_found()
+    nr.parent.response.update({'total': 150})
+    assert nr._results_found()
 
 
 def test_searches_fields_notification_response_field_set_notification(dummy_parent):
     from snovault.elasticsearch.searches.fields import NotificationResponseField
     nr = NotificationResponseField()
-    assert isinstance(nr, NotificationResponseField)
-    assert False
+    nr.parent = dummy_parent
+    assert 'notification' not in nr.response
+    nr._set_notification('lots of results')
+    assert nr.response['notification'] == 'lots of results'
 
 
 def test_searches_fields_notification_response_field_set_status_code(dummy_parent):
     from snovault.elasticsearch.searches.fields import NotificationResponseField
     nr = NotificationResponseField()
-    assert isinstance(nr, NotificationResponseField)
-    assert False
+    nr.parent = dummy_parent
+    assert nr.parent._meta['params_parser']._request.response.status_code == 200
+    nr._set_status_code(404)
+    assert nr.parent._meta['params_parser']._request.response.status_code == 404
 
-
-    
