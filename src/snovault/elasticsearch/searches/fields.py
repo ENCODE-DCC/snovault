@@ -3,12 +3,16 @@ from .interfaces import AT_ID
 from .interfaces import AT_CONTEXT
 from .interfaces import AT_TYPE
 from .interfaces import FACETS
+from .interfaces import FIELD_KEY
+from .interfaces import FILTERS
 from .interfaces import GRAPH
 from .interfaces import JSONLD_CONTEXT
 from .interfaces import LIMIT_KEY
 from .interfaces import NO_RESULTS_FOUND
 from .interfaces import NOTIFICATION
+from .interfaces import REMOVE
 from .interfaces import SUCCESS
+from .interfaces import TERM
 from .interfaces import TITLE
 from .interfaces import TOTAL
 from .queries import BasicSearchQueryFactoryWithFacets
@@ -224,4 +228,44 @@ class NotificationResponseField(ResponseField):
         else:
             self._set_notification(NO_RESULTS_FOUND)
             self._set_status_code(404)
+        return self.response
+
+
+class FiltersResponseField(ResponseField):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.filters = []
+
+    def _get_filters_and_search_terms_from_query_string(self):
+        return (
+            self.get_query_builder()._get_post_filters()
+            + self.get_params_parser().get_search_term_filters()
+        )
+
+    def _get_path_qs_without_filter(self, key, value):
+        remove_qs = self.get_params_parser().get_query_string(
+            params=self.get_params_parser().remove_key_and_value_pair_from_filters(
+                key=key,
+                value=value
+            )
+        )
+        return self.get_request().path + '?' + remove_qs
+
+    def _make_filter(self, key, value):
+        filter_entry = {
+            FIELD_KEY: key,
+            TERM: value,
+            REMOVE: self._get_path_qs_without_filter(key, value)
+        }
+        self.filters.append(filter_entry)
+
+    def _make_filters(self):
+        for key, value in self._get_filters_and_search_terms_from_query_string():
+            self._make_filter(key, value)
+        self.response[FILTERS] = self.filters
+
+    def render(self, *args, **kwargs):
+        self.parent = kwargs.get('parent')
+        self._make_filters()
         return self.response

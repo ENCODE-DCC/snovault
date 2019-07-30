@@ -212,3 +212,111 @@ def test_searches_fields_notification_response_field_set_status_code(dummy_paren
     nr._set_status_code(404)
     assert nr.parent._meta['params_parser']._request.response.status_code == 404
 
+
+def test_searches_fields_filters_response_field_init(dummy_parent):
+    from snovault.elasticsearch.searches.fields import FiltersResponseField
+    frf = FiltersResponseField()
+    assert isinstance(frf, FiltersResponseField)
+
+
+def test_searches_fields_filters_response_field_get_filters_and_search_terms_from_query_string(dummy_parent):
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*&searchTerm=ctcf'
+    )
+    from snovault.elasticsearch.searches.fields import FiltersResponseField
+    frf = FiltersResponseField()
+    frf.parent = dummy_parent
+    expected = [
+        ('assay_title', 'Histone ChIP-seq'),
+        ('award.project', 'Roadmap'),
+        ('restricted!', '*'),
+        ('type', 'Experiment'),
+        ('searchTerm', 'ctcf')
+    ]
+    actual = frf._get_filters_and_search_terms_from_query_string()
+    assert len(actual) == len(expected)
+    assert all([e in actual for e in expected])
+
+
+def test_searches_fields_filters_response_field_get_path_qs_without_filter(dummy_parent):
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*&searchTerm=ctcf'
+    )
+    from snovault.elasticsearch.searches.fields import FiltersResponseField
+    frf = FiltersResponseField()
+    frf.parent = dummy_parent
+    assert frf._get_path_qs_without_filter('type', 'Experiment') == (
+        '/dummy?assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=all'
+        '&frame=embedded&restricted%21=%2A&searchTerm=ctcf'
+    )
+    assert frf._get_path_qs_without_filter('searchTerm', 'ctcf') == (
+        '/dummy?type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=all'
+        '&frame=embedded&restricted%21=%2A'
+    )
+    assert frf._get_path_qs_without_filter('searchTerm', 'ctcaf') == (
+        '/dummy?type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=all'
+        '&frame=embedded&restricted%21=%2A&searchTerm=ctcf'
+    )
+    assert frf._get_path_qs_without_filter('restricted!', '*') == (
+        '/dummy?type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=all'
+        '&frame=embedded&searchTerm=ctcf'
+    )
+
+
+def test_searches_fields_filters_response_field_make_filter(dummy_parent):
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*&searchTerm=ctcf'
+    )
+    from snovault.elasticsearch.searches.fields import FiltersResponseField
+    frf = FiltersResponseField()
+    frf.parent = dummy_parent
+    frf._make_filter('type', 'Experiment')
+    assert frf.filters[0] == {
+        'field': 'type',
+        'remove': '/dummy?assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=all&frame=embedded&restricted%21=%2A&searchTerm=ctcf',
+        'term': 'Experiment'
+    }
+
+
+def test_searches_fields_filters_response_field_make_filters(dummy_parent):
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*&searchTerm=ctcf'
+    )
+    from snovault.elasticsearch.searches.fields import FiltersResponseField
+    frf = FiltersResponseField()
+    frf.parent = dummy_parent
+    frf._make_filters()
+    expected = [
+        {
+            'remove': '/dummy?type=Experiment&award.project=Roadmap&limit=all&frame=embedded&restricted%21=%2A&searchTerm=ctcf',
+            'field': 'assay_title',
+            'term': 'Histone ChIP-seq'
+        },
+        {
+            'remove': '/dummy?type=Experiment&assay_title=Histone+ChIP-seq&limit=all&frame=embedded&restricted%21=%2A&searchTerm=ctcf',
+            'field': 'award.project',
+            'term': 'Roadmap'
+        },
+        {
+            'remove': '/dummy?type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=all&frame=embedded&searchTerm=ctcf',
+            'field': 'restricted!',
+            'term': '*'
+        },
+        {
+            'remove': '/dummy?assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=all&frame=embedded&restricted%21=%2A&searchTerm=ctcf',
+            'field': 'type',
+            'term': 'Experiment'
+        },
+        {
+            'remove': '/dummy?type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=all&frame=embedded&restricted%21=%2A',
+            'field': 'searchTerm',
+            'term': 'ctcf'
+        }
+    ]
+    actual = frf.filters
+    assert len(actual) == len(expected)
+    assert all([e in actual for e in expected])
