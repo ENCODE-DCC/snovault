@@ -21,6 +21,13 @@ def test_searchv2_view(workbook, testapp):
     assert r.json['total'] == 1
 
 
+def test_searchv2_view_values(workbook, testapp):
+    r = testapp.get(
+        '/searchv2/?status=released'
+    )
+    print(r.json)
+
+
 def test_searchv2_view_no_type(workbook, testapp):
     r = testapp.get('/searchv2/')
     print(r.json)
