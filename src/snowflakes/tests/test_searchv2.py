@@ -27,9 +27,8 @@ def test_searchv2_view_values(workbook, testapp):
     r = testapp.get(
         '/searchv2/?status=released'
     )
-    assert r.json['all'] == '/searchv2/status=released&limit=all'
+    assert r.json['all'] == '/searchv2/?status=released&limit=all'
     assert r.json['notification'] == 'Success'
-    print(r.json)
 
 
 def test_searchv2_view_values_no_results(workbook, testapp):
@@ -43,11 +42,9 @@ def test_searchv2_view_values_no_results(workbook, testapp):
 
 def test_searchv2_view_no_type(workbook, testapp):
     r = testapp.get('/searchv2/')
-    print(r.json)
-    assert False
+    assert 'total' in r.json
 
 
 def test_searchv2_view_raw_response(workbook, testapp):
     r = testapp.get('/searchv2_raw/?type=Snowflake')
-    print(r.json)
-    assert False
+    assert 'hits' in r.json
