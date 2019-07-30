@@ -4,8 +4,11 @@ from .interfaces import AT_CONTEXT
 from .interfaces import AT_TYPE
 from .interfaces import FACETS
 from .interfaces import GRAPH
-from .interfaces import LIMIT_KEY
 from .interfaces import JSONLD_CONTEXT
+from .interfaces import LIMIT_KEY
+from .interfaces import NO_RESULTS_FOUND
+from .interfaces import NOTIFICATION
+from .interfaces import SUCCESS
 from .interfaces import TITLE
 from .interfaces import TOTAL
 from .queries import BasicSearchQueryFactoryWithFacets
@@ -189,4 +192,30 @@ class AllResponseField(ResponseField):
     def render(self, *args, **kwargs):
         self.parent = kwargs.get('parent')
         self._maybe_add_all()
+        return self.response
+
+
+class NotificationResponseField(ResponseField):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _results_found(self):
+        if self.parent.response.get('total'):
+            return True
+        return False
+
+    def _set_notification(self, message):
+        self.response[NOTIFICATION] = message
+
+    def _set_status_code(self, status_code):
+        self.get_request().response.status_code = status_code
+
+    def render(self, *args, **kwargs):
+        self.parent = kwargs.get('parent')
+        if self._results_found():
+            self._set_notification(SUCCESS)
+        else:
+            self._set_notification(NO_RESULTS_FOUND)
+            self._set_status_code(404)
         return self.response

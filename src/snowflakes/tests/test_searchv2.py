@@ -19,6 +19,8 @@ def test_searchv2_view(workbook, testapp):
     assert r.json['@context'] == '/terms/'
     assert r.json['@type'] == ['Search']
     assert r.json['total'] == 1
+    assert r.json['notification'] == 'Success'
+    assert r.status_code == 200
 
 
 def test_searchv2_view_values(workbook, testapp):
@@ -26,7 +28,17 @@ def test_searchv2_view_values(workbook, testapp):
         '/searchv2/?status=released'
     )
     assert r.json['all'] == '/searchv2/status=released&limit=all'
+    assert r.json['notification'] == 'Success'
     print(r.json)
+
+
+def test_searchv2_view_values_no_results(workbook, testapp):
+    r = testapp.get(
+        '/searchv2/?status=released&?type=Sno',
+        status=404
+    )
+    assert r.json['notification'] == 'No results found'
+    assert r.status_code == 404
 
 
 def test_searchv2_view_no_type(workbook, testapp):

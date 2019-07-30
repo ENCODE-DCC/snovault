@@ -6,6 +6,7 @@ from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponse
 from snovault.elasticsearch.searches.fields import AllResponseField
 from snovault.elasticsearch.searches.fields import ContextResponseField
 from snovault.elasticsearch.searches.fields import IDResponseField
+from snovault.elasticsearch.searches.fields import NotificationResponseField
 from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
 from snovault.elasticsearch.searches.fields import TitleResponseField
 from snovault.elasticsearch.searches.fields import TypeResponseField
@@ -30,6 +31,8 @@ DEFAULT_ITEM_TYPES = [
 
 @view_config(route_name='searchv2', request_method='GET', permission='search')
 def searchv2(context, request):
+    # Note the order of rendering matters for some fields, e.g. AllResponseField and
+    # NotificationResponseField depend on results from BasicQueryResponseWithFacets.
     fr = FieldedResponse(
         _meta={
             'params_parser': ParamsParser(request)
@@ -46,7 +49,8 @@ def searchv2(context, request):
             BasicSearchWithFacetsResponseField(
                 default_item_types=DEFAULT_ITEM_TYPES
             ),
-            AllResponseField()
+            AllResponseField(),
+            NotificationResponseField()
         ]
     )
     return fr.render()

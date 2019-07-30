@@ -131,3 +131,33 @@ def test_searches_fields_all_response_field(dummy_parent):
     assert isinstance(ar, AllResponseField)
     assert False
 
+
+def test_searches_fields_notification_response_field_init(dummy_parent):
+    from snovault.elasticsearch.searches.fields import NotificationResponseField
+    nr = NotificationResponseField()
+    assert isinstance(nr, NotificationResponseField)
+    assert False
+
+
+def test_searches_fields_notification_response_field_results_found(dummy_parent):
+    from snovault.elasticsearch.searches.fields import NotificationResponseField
+    nr = NotificationResponseField()
+    assert isinstance(nr, NotificationResponseField)
+    assert False
+
+
+def test_searches_fields_notification_response_field_set_notification(dummy_parent):
+    from snovault.elasticsearch.searches.fields import NotificationResponseField
+    nr = NotificationResponseField()
+    assert isinstance(nr, NotificationResponseField)
+    assert False
+
+
+def test_searches_fields_notification_response_field_set_status_code(dummy_parent):
+    from snovault.elasticsearch.searches.fields import NotificationResponseField
+    nr = NotificationResponseField()
+    assert isinstance(nr, NotificationResponseField)
+    assert False
+
+
+    
