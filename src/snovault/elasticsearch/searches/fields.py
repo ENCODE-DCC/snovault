@@ -26,14 +26,20 @@ class ResponseField:
         self.response = {}
         self.parent = None
 
-    def get_params_parser(self):
+    def _get_meta_field(self, meta_field):
         if self.parent:
-            return self.parent._meta.get('params_parser')
+            return self.parent._meta.get(meta_field)
+
+    def get_params_parser(self):
+        return self._get_meta_field('params_parser')
 
     def get_request(self):
         params_parser = self.get_params_parser()
         if params_parser:
             return params_parser._request
+
+    def get_query_builder(self):
+        return self._get_meta_field('query_builder')
 
     def render(self, *args, **kwargs):
         '''
@@ -182,10 +188,10 @@ class AllResponseField(ResponseField):
         limit = self.get_params_parser().param_values_to_list(
             params=self._get_limit()
         )
-        if limit and limit[0] < self.parent.response.get(TOTAL, 0):
+        if limit and int(limit[0]) < self.parent.response.get(TOTAL, 0):
             self.response.update(
                 {
-                    ALL: self.get_request().path + self._get_qs_with_limit_all()
+                    ALL: self.get_request().path + '?' + self._get_qs_with_limit_all()
                 }
             )
 

@@ -4,12 +4,16 @@ import pytest
 @pytest.fixture()
 def dummy_parent(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     class DummyParent():
         def __init__(self):
             self._meta = {}
+            self.response = {}
     dp = DummyParent()
+    pp = ParamsParser(dummy_request)
     dp._meta = {
-        'params_parser': ParamsParser(dummy_request)
+        'params_parser': pp,
+        'query_builder': AbstractQueryFactory(pp)
     }
     return dp
 
@@ -125,11 +129,54 @@ def test_searches_fields_id_response_field(dummy_parent):
     }
 
 
-def test_searches_fields_all_response_field(dummy_parent):
+def test_searches_fields_all_response_field_init(dummy_parent):
     from snovault.elasticsearch.searches.fields import AllResponseField
     ar = AllResponseField()
     assert isinstance(ar, AllResponseField)
-    assert False
+
+
+def test_searches_fields_all_response_field_get_limit(dummy_parent):
+    from snovault.elasticsearch.searches.fields import AllResponseField
+    ar = AllResponseField()
+    ar.parent = dummy_parent
+    assert ar._get_limit() == [('limit', 25)]
+    ar.parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=99'
+    )
+    assert ar._get_limit() == [('limit', '99')]
+
+
+def test_searches_fields_all_response_field_get_qs_with_limit_all(dummy_parent):
+    from snovault.elasticsearch.searches.fields import AllResponseField
+    ar = AllResponseField()
+    ar.parent = dummy_parent
+    ar.parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=99'
+    )
+    assert ar._get_qs_with_limit_all() == (
+        'type=Experiment&assay_title=Histone+ChIP-seq'
+        '&award.project=Roadmap&limit=all'
+    )
+
+
+def test_searches_fields_all_response_field_maybe_add_all(dummy_parent):
+    from snovault.elasticsearch.searches.fields import AllResponseField
+    ar = AllResponseField()
+    ar.parent = dummy_parent
+    ar._maybe_add_all()
+    assert 'all' not in ar.response
+    ar.parent.response.update({'total': 150})
+    ar._maybe_add_all()
+    assert 'all' in ar.response
+    assert ar.response['all'] == '/dummy?limit=all'
+    ar.parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=99'
+    )
+    ar._maybe_add_all()
+    assert ar.response['all'] == (
+        '/dummy?type=Experiment&assay_title=Histone+ChIP-seq'
+        '&award.project=Roadmap&limit=all'
+    )
 
 
 def test_searches_fields_notification_response_field_init(dummy_parent):
