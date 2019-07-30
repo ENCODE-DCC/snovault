@@ -3,7 +3,7 @@ from pyramid.view import view_config
 
 from snovault.elasticsearch.searches.interfaces import SEARCH_TITLE
 from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
-from snovault.elasticsearch.searches.fields import AllResponeField
+from snovault.elasticsearch.searches.fields import AllResponseField
 from snovault.elasticsearch.searches.fields import ContextResponseField
 from snovault.elasticsearch.searches.fields import IDResponseField
 from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
@@ -40,7 +40,7 @@ def searchv2(context, request):
             IDResponseField(),
             TitleResponseField(title=SEARCH_TITLE),
             TypeResponseField(at_type=[SEARCH_TITLE]),
-            AllResponeField()
+            AllResponseField()
         ]
     )
     return fr.render()

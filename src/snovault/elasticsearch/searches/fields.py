@@ -37,7 +37,7 @@ class ResponseField:
         Should implement field-specific logic and return dictionary
         with keys/values to update response.
         '''
-        self.parent = kwargs.get('parent')
+        raise NotImplementedError
 
 
 class BasicSearchWithFacetsResponseField(ResponseField):
@@ -80,7 +80,7 @@ class BasicSearchWithFacetsResponseField(ResponseField):
         )
 
     def render(self, *args, **kwargs):
-        super().render(*args, **kwargs)
+        self.parent = kwargs.get('parent')
         self._build_query()
         self._register_query()
         self._execute_query()
@@ -105,7 +105,7 @@ class RawSearchWithAggsResponseField(BasicSearchWithFacetsResponseField):
         )
 
     def render(self, *args, **kwargs):
-        super().render(*args, **kwargs)
+        self.parent = kwargs.get('parent')
         self._build_query()
         self._execute_query()
         self._format_results()
@@ -142,7 +142,7 @@ class ContextResponseField(ResponseField):
         super().__init__(*args, **kwargs)
 
     def render(self, *args, **kwargs):
-        super().render(*args, **kwargs)
+        self.parent = kwargs.get('parent')
         return {
             AT_CONTEXT: self.get_request().route_path(JSONLD_CONTEXT)
         }
@@ -154,13 +154,13 @@ class IDResponseField(ResponseField):
         super().__init__(*args, **kwargs)
 
     def render(self, *args, **kwargs):
-        super().render(*args, **kwargs)
+        self.parent = kwargs.get('parent')
         return {
             AT_ID: self.get_request().path_qs
         }
 
 
-class AllResponeField(ResponseField):
+class AllResponseField(ResponseField):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -187,6 +187,6 @@ class AllResponeField(ResponseField):
             )
 
     def render(self, *args, **kwargs):
-        super().render(*args, **kwargs)
+        self.parent = kwargs.get('parent')
         self._maybe_add_all()
         return self.response
