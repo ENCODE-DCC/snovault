@@ -20,6 +20,18 @@ def test_searches_fields_response_field_init():
     assert isinstance(rf, ResponseField)
 
 
+def test_searches_fields_response_field_get_params_parser():
+    from snovault.elasticsearch.searches.fields import ResponseField
+    rf = ResponseField()
+    assert False
+
+
+def test_searches_fields_response_field_get_request():
+    from snovault.elasticsearch.searches.fields import ResponseField
+    rf = ResponseField()
+    assert False
+
+
 def test_searches_fields_basic_search_response_field_init():
     from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
     brf = BasicSearchWithFacetsResponseField()
