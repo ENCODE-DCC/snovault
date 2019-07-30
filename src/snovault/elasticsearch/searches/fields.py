@@ -1,10 +1,13 @@
-from .interfaces import FACETS
-from .interfaces import GRAPH
-from .interfaces import TITLE
+from .decorators import assert_one_or_none_returned
+from .interfaces import ALL
 from .interfaces import AT_ID
 from .interfaces import AT_CONTEXT
 from .interfaces import AT_TYPE
+from .interfaces import FACETS
+from .interfaces import GRAPH
+from .interfaces import LIMIT_KEY
 from .interfaces import JSONLD_CONTEXT
+from .interfaces import TITLE
 from .interfaces import TOTAL
 from .queries import BasicSearchQueryFactoryWithFacets
 from .responses import BasicQueryResponseWithFacets
@@ -19,13 +22,20 @@ class ResponseField:
         self.args = args
         self.kwargs = kwargs
         self.response = {}
+        self.parent = None
 
-    def render(self):
+    def get_params_parser(self):
+        return self.parent._meta.get('params_parser')
+
+    def get_request(self):
+        return self.get_params_parser()._request
+
+    def render(self, *args, **kwargs):
         '''
         Should implement field-specific logic and return dictionary
         with keys/values to update response.
         '''
-        raise NotImplementedError
+        self.parent = kwargs.get('parent')
 
 
 class BasicSearchWithFacetsResponseField(ResponseField):
@@ -34,7 +44,6 @@ class BasicSearchWithFacetsResponseField(ResponseField):
     '''
 
     def __init__(self, *args, **kwargs):
-        self.params_parser = kwargs.pop('params_parser', None)
         super().__init__(*args, **kwargs)
         self.query_builder = None
         self.query = None
@@ -42,10 +51,16 @@ class BasicSearchWithFacetsResponseField(ResponseField):
 
     def _build_query(self):
         self.query_builder = BasicSearchQueryFactoryWithFacets(
-            params_parser=self.params_parser,
+            params_parser=self.get_params_parser(),
             **self.kwargs
         )
         self.query = self.query_builder.build_query()
+
+    def _register_query(self):
+        '''
+        Adds to parent _meta in case other fields need to use.
+        '''
+        self.parent._meta['query_builder'] = self.query_builder
 
     def _execute_query(self):
         self.results = BasicQueryResponseWithFacets(
@@ -62,8 +77,10 @@ class BasicSearchWithFacetsResponseField(ResponseField):
             }
         )
 
-    def render(self):
+    def render(self, *args, **kwargs):
+        super().render(*args, **kwargs)
         self._build_query()
+        self._register_query()
         self._execute_query()
         self._format_results()
         return self.response
@@ -85,7 +102,8 @@ class RawSearchWithAggsResponseField(BasicSearchWithFacetsResponseField):
             self.results.to_dict()
         )
 
-    def render(self):
+    def render(self, *args, **kwargs):
+        super().render(*args, **kwargs)
         self._build_query()
         self._execute_query()
         self._format_results()
@@ -98,7 +116,7 @@ class TitleResponseField(ResponseField):
         self.title = kwargs.pop('title', None)
         super().__init__(*args, **kwargs)
 
-    def render(self):
+    def render(self, *args, **kwargs):
         return {
             TITLE: self.title
         }
@@ -110,7 +128,7 @@ class TypeResponseField(ResponseField):
         self.at_type = kwargs.pop('at_type', None)
         super().__init__(*args, **kwargs)
 
-    def render(self):
+    def render(self, *args, **kwargs):
         return {
             AT_TYPE: self.at_type
         }
@@ -119,22 +137,54 @@ class TypeResponseField(ResponseField):
 class ContextResponseField(ResponseField):
 
     def __init__(self, *args, **kwargs):
-        self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
-    def render(self):
+    def render(self, *args, **kwargs):
+        super().render(*args, **kwargs)
         return {
-            AT_CONTEXT: self.request.route_path(JSONLD_CONTEXT)
+            AT_CONTEXT: self.get_request().route_path(JSONLD_CONTEXT)
         }
 
 
 class IDResponseField(ResponseField):
 
     def __init__(self, *args, **kwargs):
-        self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
 
-    def render(self):
+    def render(self, *args, **kwargs):
+        super().render(*args, **kwargs)
         return {
-            AT_ID: self.request.path_qs
+            AT_ID: self.get_request().path_qs
         }
+
+
+class AllResponeField(ResponseField):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _get_limit(self):
+        return self.parent._meta['query_builder']._get_limit()
+
+    def _get_qs_with_limit_all(self):
+        return self.get_query_string(
+            params=self.get_params_parser().get_not_keys_filters(
+                not_keys=[LIMIT_KEY]
+            ) + [(LIMIT_KEY, ALL)]
+        )
+
+    def _maybe_add_all(self):
+        limit = self.get_params_parser().param_values_to_list(
+            params=self._get_limit()
+        )
+        if limit and limit[0] < self.parent_response.get(TOTAL, 0):
+            self.response.update(
+                {
+                    ALL: self.get_request().path + self._get_qs_with_limit_all()
+                }
+            )
+
+    def render(self, *args, **kwargs):
+        super().render(*args, **kwargs)
+        self._maybe_add_all()
+        return self.response
