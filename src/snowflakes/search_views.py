@@ -35,11 +35,17 @@ def searchv2(context, request):
             'params_parser': ParamsParser(request)
         },
         response_fields=[
-            BasicSearchWithFacetsResponseField(default_item_types=DEFAULT_ITEM_TYPES),
-            ContextResponseField(),
+            TitleResponseField(
+                title=SEARCH_TITLE
+            ),
+            TypeResponseField(
+                at_type=[SEARCH_TITLE]
+            ),
             IDResponseField(),
-            TitleResponseField(title=SEARCH_TITLE),
-            TypeResponseField(at_type=[SEARCH_TITLE]),
+            ContextResponseField(),
+            BasicSearchWithFacetsResponseField(
+                default_item_types=DEFAULT_ITEM_TYPES
+            ),
             AllResponseField()
         ]
     )
