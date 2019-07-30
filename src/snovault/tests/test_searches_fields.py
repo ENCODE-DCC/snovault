@@ -24,16 +24,18 @@ def test_searches_fields_response_field_init():
     assert isinstance(rf, ResponseField)
 
 
-def test_searches_fields_response_field_get_params_parser():
+def test_searches_fields_response_field_get_params_parser(dummy_parent):
     from snovault.elasticsearch.searches.fields import ResponseField
-    rf = ResponseField()
-    assert False
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    rf = ResponseField(parent=dummy_parent)
+    assert isinstance(rf.get_params_parser(), ParamsParser)
 
 
-def test_searches_fields_response_field_get_request():
+def test_searches_fields_response_field_get_request(dummy_parent):
     from snovault.elasticsearch.searches.fields import ResponseField
-    rf = ResponseField()
-    assert False
+    from pyramid.request import Request
+    rf = ResponseField(parent=dummy_parent)
+    assert isinstance(rf.get_request(), Request)
 
 
 def test_searches_fields_basic_search_response_field_init():
