@@ -1,6 +1,19 @@
 import pytest
 
 
+@pytest.fixture()
+def dummy_parent(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    class DummyParent():
+        def __init__(self):
+            self._meta = {}
+    dp = DummyParent()
+    dp._meta = {
+        'params_parser': ParamsParser(dummy_request)
+    }
+    return dp
+
+
 def test_searches_fields_response_field_init():
     from snovault.elasticsearch.searches.fields import ResponseField
     rf = ResponseField()
@@ -81,18 +94,20 @@ def test_searches_fields_type_response_field():
     assert tr.render() == {'@type': ['Snowflake']}
 
 
-def test_searches_fields_context_response_field(dummy_request):
+def test_searches_fields_context_response_field(dummy_parent):
     from snovault.elasticsearch.searches.fields import ContextResponseField
-    cr = ContextResponseField(request=dummy_request)
+    cr = ContextResponseField()
     assert isinstance(cr, ContextResponseField)
-    assert cr.render() == {'@context': '/terms/'}
+    assert cr.render(parent=dummy_parent) == {'@context': '/terms/'}
 
 
-def test_searches_fields_id_response_field(dummy_request):
+def test_searches_fields_id_response_field(dummy_parent):
     from snovault.elasticsearch.searches.fields import IDResponseField
-    dummy_request.environ['QUERY_STRING'] = (
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
         'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
     )
-    ir = IDResponseField(request=dummy_request)
+    ir = IDResponseField()
     assert isinstance(ir, IDResponseField)
-    assert ir.render() == {'@id': '/dummy?type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'}
+    assert ir.render(parent=dummy_parent) == {
+        '@id': '/dummy?type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+    }
