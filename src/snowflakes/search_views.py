@@ -1,10 +1,10 @@
 from pyramid.view import view_config
 
-
 from snovault.elasticsearch.searches.interfaces import SEARCH_TITLE
-from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import AllResponseField
+from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import ContextResponseField
+from snovault.elasticsearch.searches.fields import FiltersResponseField
 from snovault.elasticsearch.searches.fields import IDResponseField
 from snovault.elasticsearch.searches.fields import NotificationResponseField
 from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
@@ -50,7 +50,8 @@ def searchv2(context, request):
                 default_item_types=DEFAULT_ITEM_TYPES
             ),
             AllResponseField(),
-            NotificationResponseField()
+            NotificationResponseField(),
+            FiltersResponseField()
         ]
     )
     return fr.render()

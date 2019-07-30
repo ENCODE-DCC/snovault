@@ -20,6 +20,7 @@ def test_searchv2_view(workbook, testapp):
     assert r.json['@type'] == ['Search']
     assert r.json['total'] == 1
     assert r.json['notification'] == 'Success'
+    assert len(r.json['filters']) == 4
     assert r.status_code == 200
 
 
@@ -29,6 +30,7 @@ def test_searchv2_view_values(workbook, testapp):
     )
     assert r.json['all'] == '/searchv2/?status=released&limit=all'
     assert r.json['notification'] == 'Success'
+    assert r.json['filters'][0] == {'field': 'status', 'remove': '/searchv2/', 'term': 'released'}
 
 
 def test_searchv2_view_values_no_results(workbook, testapp):
@@ -43,6 +45,8 @@ def test_searchv2_view_values_no_results(workbook, testapp):
 def test_searchv2_view_no_type(workbook, testapp):
     r = testapp.get('/searchv2/')
     assert 'total' in r.json
+    assert 'filters' in r.json
+    assert len(r.json['filters']) == 0
 
 
 def test_searchv2_view_raw_response(workbook, testapp):

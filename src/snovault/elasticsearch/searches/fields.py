@@ -250,7 +250,10 @@ class FiltersResponseField(ResponseField):
                 value=value
             )
         )
-        return self.get_request().path + '?' + remove_qs
+        if remove_qs:
+            return self.get_request().path + '?' + remove_qs
+        else:
+            return self.get_request().path
 
     def _make_filter(self, key, value):
         filter_entry = {
