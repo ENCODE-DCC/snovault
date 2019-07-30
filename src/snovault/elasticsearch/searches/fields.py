@@ -1,4 +1,3 @@
-from .decorators import assert_one_or_none_returned
 from .interfaces import ALL
 from .interfaces import AT_ID
 from .interfaces import AT_CONTEXT
@@ -25,10 +24,13 @@ class ResponseField:
         self.parent = None
 
     def get_params_parser(self):
-        return self.parent._meta.get('params_parser')
+        if self.parent:
+            return self.parent._meta.get('params_parser')
 
     def get_request(self):
-        return self.get_params_parser()._request
+        params_parser = self.get_params_parser()
+        if params_parser:
+            return params_parser._request
 
     def render(self, *args, **kwargs):
         '''
