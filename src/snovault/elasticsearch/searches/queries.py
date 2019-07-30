@@ -1,7 +1,6 @@
 from elasticsearch_dsl import A
 from elasticsearch_dsl import Q
 from elasticsearch_dsl import Search
-from itertools import chain
 from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.interfaces import TYPES
