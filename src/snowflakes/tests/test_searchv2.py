@@ -25,6 +25,7 @@ def test_searchv2_view_values(workbook, testapp):
     r = testapp.get(
         '/searchv2/?status=released'
     )
+    assert r.json['all'] == '/searchv2/status=released&limit=all'
     print(r.json)
 
 

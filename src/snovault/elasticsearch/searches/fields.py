@@ -169,7 +169,7 @@ class AllResponeField(ResponseField):
         return self.parent._meta['query_builder']._get_limit()
 
     def _get_qs_with_limit_all(self):
-        return self.get_query_string(
+        return self.get_params_parser().get_query_string(
             params=self.get_params_parser().get_not_keys_filters(
                 not_keys=[LIMIT_KEY]
             ) + [(LIMIT_KEY, ALL)]
@@ -179,7 +179,7 @@ class AllResponeField(ResponseField):
         limit = self.get_params_parser().param_values_to_list(
             params=self._get_limit()
         )
-        if limit and limit[0] < self.parent_response.get(TOTAL, 0):
+        if limit and limit[0] < self.parent.response.get(TOTAL, 0):
             self.response.update(
                 {
                     ALL: self.get_request().path + self._get_qs_with_limit_all()

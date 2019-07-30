@@ -111,3 +111,11 @@ def test_searches_fields_id_response_field(dummy_parent):
     assert ir.render(parent=dummy_parent) == {
         '@id': '/dummy?type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
     }
+
+
+def test_searches_fields_all_response_field(dummy_parent):
+    from snovault.elasticsearch.searches.fields import AllResponseField
+    ar = AllResponseField()
+    assert isinstance(ar, AllResponseField)
+    assert False
+
