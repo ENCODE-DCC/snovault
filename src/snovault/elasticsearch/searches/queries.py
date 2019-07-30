@@ -27,6 +27,7 @@ from .interfaces import FACETS
 from .interfaces import FILTERS
 from .interfaces import GROUP_SUBMITTER
 from .interfaces import ITEM
+from .interfaces import LIMIT_KEY
 from .interfaces import LENGTH
 from .interfaces import LONG
 from .interfaces import NOT_JOIN
@@ -164,7 +165,7 @@ class AbstractQueryFactory:
 
     @assert_one_or_none_returned(error_message='Invalid to specify multiple limit parameters:')
     def _get_limit(self):
-        return self.params_parser.get_limit()
+        return self.params_parser.get_limit() or [(LIMIT_KEY, 25)]
 
     @assert_one_or_none_returned(error_message='Invalid to specify multiple mode parameters:')
     def _get_mode(self):
