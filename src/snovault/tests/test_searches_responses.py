@@ -25,8 +25,12 @@ def test_searches_responses_fielded_response_validate_response_fields():
 
 
 def test_searches_responses_query_response_init():
-    assert False
+    from snovault.elasticsearch.searches.responses import QueryResponse
+    qr = QueryResponse([], [])
+    assert isinstance(qr, QueryResponse)
 
 
-def test_searches_responses_basic_query_response_with_facets():
-    assert False
+def test_searches_responses_basic_query_response_with_facets_init():
+    from snovault.elasticsearch.searches.responses import BasicQueryResponseWithFacets
+    bqr = BasicQueryResponseWithFacets([], [])
+    assert isinstance(bqr, BasicQueryResponseWithFacets)

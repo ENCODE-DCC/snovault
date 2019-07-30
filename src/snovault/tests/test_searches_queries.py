@@ -117,10 +117,13 @@ def test_searches_queries_abstract_query_factory_get_invalid_item_types(params_p
 
 def test_searches_queries_abstract_query_factory_validate_item_types(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.exceptions import HTTPBadRequest
     aq = AbstractQueryFactory(params_parser_snovault_types)
     item_types = ['TestingSearchSchema']
     aq._validate_item_types(item_types)
-    assert False
+    item_types = ['Sno']
+    with pytest.raises(HTTPBadRequest):
+        aq._validate_item_types(item_types)
 
 
 def test_searches_queries_abstract_query_factory_normalize_item_types(params_parser_snovault_types):
@@ -129,7 +132,9 @@ def test_searches_queries_abstract_query_factory_normalize_item_types(params_par
     item_types = ['TestingSearchSchema']
     normalized_item_types = aq._normalize_item_types(item_types=item_types)
     assert normalized_item_types == item_types
-    assert False
+    item_types = ['testing_search_schema']
+    normalized_item_types = aq._normalize_item_types(item_types=item_types)
+    assert normalized_item_types == ['TestingSearchSchema']
 
 
 def test_searches_queries_abstract_query_factory_get_default_item_types(params_parser):
