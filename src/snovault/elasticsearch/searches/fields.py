@@ -169,8 +169,9 @@ class AllResponseField(ResponseField):
         return self.parent._meta['query_builder']._get_limit()
 
     def _get_qs_with_limit_all(self):
-        return self.get_params_parser().get_query_string(
-            params=self.get_params_parser().get_not_keys_filters(
+        params_parser = self.get_params_parser()
+        return params_parser.get_query_string(
+            params=params_parser.get_not_keys_filters(
                 not_keys=[LIMIT_KEY]
             ) + [(LIMIT_KEY, ALL)]
         )
