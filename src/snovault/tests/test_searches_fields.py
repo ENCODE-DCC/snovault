@@ -83,41 +83,10 @@ def test_searches_fields_basic_search_response_execute_query(dummy_parent, mocke
     assert Search.execute.call_count == 1
 
 
-def test_searches_fields_basic_search_response_format_results_query(dummy_parent):
-    from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
-    brf = BasicSearchWithFacetsResponseField()
-    brf.parent = dummy_parent
-    assert False
-
-
-def test_searches_fields_basic_search_response_render():
-    from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
-    brf = BasicSearchWithFacetsResponseField()
-    assert False
-
-
 def test_searches_fields_raw_search_with_aggs_response_field_init():
     from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
     rs = RawSearchWithAggsResponseField()
     assert isinstance(rs, RawSearchWithAggsResponseField)
-
-
-def test_searches_fields_raw_search_with_aggs_response_field_execute_query():
-    from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
-    rs = RawSearchWithAggsResponseField()
-    assert False
-
-
-def test_searches_fields_raw_search_with_aggs_response_field_format_results():
-    from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
-    rs = RawSearchWithAggsResponseField()
-    assert False
-
-
-def test_searches_fields_raw_search_with_aggs_response_field_render():
-    from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
-    rs = RawSearchWithAggsResponseField()
-    assert False
 
 
 def test_searches_fields_title_response_field_init():
