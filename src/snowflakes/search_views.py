@@ -3,6 +3,7 @@ from pyramid.view import view_config
 
 from snovault.elasticsearch.searches.interfaces import SEARCH_TITLE
 from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
+from snovault.elasticsearch.searches.fields import AllResponeField
 from snovault.elasticsearch.searches.fields import ContextResponseField
 from snovault.elasticsearch.searches.fields import IDResponseField
 from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
@@ -30,23 +31,16 @@ DEFAULT_ITEM_TYPES = [
 @view_config(route_name='searchv2', request_method='GET', permission='search')
 def searchv2(context, request):
     fr = FieldedResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
         response_fields=[
-            ContextResponseField(
-                request=request
-            ),
-            IDResponseField(
-                request=request
-            ),
-            TitleResponseField(
-                title=SEARCH_TITLE
-            ),
-            TypeResponseField(
-                at_type=[SEARCH_TITLE]
-            ),
-            BasicSearchWithFacetsResponseField(
-                params_parser=ParamsParser(request),
-                default_item_types=DEFAULT_ITEM_TYPES
-            )
+            BasicSearchWithFacetsResponseField(default_item_types=DEFAULT_ITEM_TYPES),
+            ContextResponseField(),
+            IDResponseField(),
+            TitleResponseField(title=SEARCH_TITLE),
+            TypeResponseField(at_type=[SEARCH_TITLE]),
+            AllResponeField()
         ]
     )
     return fr.render()
@@ -55,9 +49,11 @@ def searchv2(context, request):
 @view_config(route_name='searchv2_raw', request_method='GET', permission='search')
 def searchv2_raw(context, request):
     fr = FieldedResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
         response_fields=[
             RawSearchWithAggsResponseField(
-                params_parser=ParamsParser(request),
                 default_item_types=DEFAULT_ITEM_TYPES
             )
         ]
