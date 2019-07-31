@@ -275,7 +275,7 @@ class FiltersResponseField(ResponseField):
         return self.response
 
 
-class ClearFilterResponseField(ResponseField):
+class ClearFiltersResponseField(ResponseField):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
