@@ -2,6 +2,7 @@ from .interfaces import ALL
 from .interfaces import AT_ID
 from .interfaces import AT_CONTEXT
 from .interfaces import AT_TYPE
+from .interfaces import CLEAR_FILTERS
 from .interfaces import FACETS
 from .interfaces import FIELD_KEY
 from .interfaces import FILTERS
@@ -244,6 +245,7 @@ class FiltersResponseField(ResponseField):
         )
 
     def _get_path_qs_without_filter(self, key, value):
+        path = self.get_request().path
         remove_qs = self.get_params_parser().get_query_string(
             params=self.get_params_parser().remove_key_and_value_pair_from_filters(
                 key=key,
@@ -251,9 +253,8 @@ class FiltersResponseField(ResponseField):
             )
         )
         if remove_qs:
-            return self.get_request().path + '?' + remove_qs
-        else:
-            return self.get_request().path
+            path += '?' + remove_qs
+        return path
 
     def _make_filter(self, key, value):
         filter_entry = {
@@ -271,4 +272,33 @@ class FiltersResponseField(ResponseField):
     def render(self, *args, **kwargs):
         self.parent = kwargs.get('parent')
         self._make_filters()
+        return self.response
+
+
+class ClearFilterResponseField(ResponseField):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _get_search_term_or_types_from_query_string(self):
+        params_parser = self.get_params_parser()
+        return params_parser.get_search_term_filters() or params_parser.get_type_filters()
+
+    def _get_path_qs_with_no_filters(self):
+        path = self.get_request().path
+        no_filters_qs = self.get_params_parser().get_query_string(
+            params=self._get_search_term_or_types_from_query_string()
+        )
+        if no_filters_qs:
+            path += '?' + no_filters_qs
+        return path
+
+    def _add_clear_filters(self):
+        self.response = {
+            CLEAR_FILTERS: self._get_path_qs_with_no_filters()
+        }
+
+    def render(self, *args, **kwargs):
+        self.parent = kwargs.get('parent')
+        self._add_clear_filters()
         return self.response

@@ -320,3 +320,45 @@ def test_searches_fields_filters_response_field_make_filters(dummy_parent):
     actual = frf.filters
     assert len(actual) == len(expected)
     assert all([e in actual for e in expected])
+
+
+def test_searches_fields_clear_filter_response_field_get_search_term_or_types_from_query_string(dummy_parent):
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*&searchTerm=ctcf'
+    )
+    from snovault.elasticsearch.searches.fields import ClearFilterResponseField
+    cfr = ClearFilterResponseField()
+    cfr.parent = dummy_parent
+    search_term_or_types = cfr._get_search_term_or_types_from_query_string()
+    assert search_term_or_types == [('searchTerm', 'ctcf')]
+    cfr.parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*'
+    )
+    search_term_or_types = cfr._get_search_term_or_types_from_query_string()
+    assert search_term_or_types == [('type', 'Experiment')]
+
+
+def test_searches_fields_clear_filter_response_field_get_path_qs_with_no_filters(dummy_parent):
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*&searchTerm=ctcf'
+    )
+    from snovault.elasticsearch.searches.fields import ClearFilterResponseField
+    cfr = ClearFilterResponseField()
+    cfr.parent = dummy_parent
+    path = cfr._get_path_qs_with_no_filters()
+    assert path == '/dummy?searchTerm=ctcf'
+
+
+def test_searches_fields_clear_filter_response_field_add_clear_filters(dummy_parent):
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*'
+    )
+    from snovault.elasticsearch.searches.fields import ClearFilterResponseField
+    cfr = ClearFilterResponseField()
+    cfr.parent = dummy_parent
+    cfr._add_clear_filters()
+    assert cfr.response['clear_filters'] == '/dummy?type=Experiment'
