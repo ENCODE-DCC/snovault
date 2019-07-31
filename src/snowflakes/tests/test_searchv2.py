@@ -22,6 +22,7 @@ def test_searchv2_view(workbook, testapp):
     assert r.json['notification'] == 'Success'
     assert len(r.json['filters']) == 4
     assert r.status_code == 200
+    assert r.json['clear_filters'] == '/searchv2/?type=Snowflake'
 
 
 def test_searchv2_view_values(workbook, testapp):
@@ -31,6 +32,7 @@ def test_searchv2_view_values(workbook, testapp):
     assert r.json['all'] == '/searchv2/?status=released&limit=all'
     assert r.json['notification'] == 'Success'
     assert r.json['filters'][0] == {'field': 'status', 'remove': '/searchv2/', 'term': 'released'}
+    assert r.json['clear_filters'] == '/searchv2/'
 
 
 def test_searchv2_view_values_no_results(workbook, testapp):
