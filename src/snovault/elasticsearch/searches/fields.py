@@ -190,10 +190,11 @@ class AllResponseField(ResponseField):
         )
 
     def _maybe_add_all(self):
-        limit = self.get_params_parser().param_values_to_list(
-            params=self._get_limit()
-        )
-        if limit and int(limit[0]) < self.parent.response.get(TOTAL, 0):
+        conditions = [
+            not self.get_query_builder()._limit_is_all(),
+            self.get_query_builder()._get_int_limit_value_or_default() < self.parent.response.get(TOTAL, 0)
+        ]
+        if all(conditions):
             self.response.update(
                 {
                     ALL: self.get_request().path + '?' + self._get_qs_with_limit_all()
