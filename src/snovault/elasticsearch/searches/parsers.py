@@ -274,7 +274,7 @@ class ParamsParser:
         if len(values) >= 1:
             return values[0]
 
-    def _coerce_value_to_int_or_return_none(self, value):
+    def coerce_value_to_int_or_return_none(self, value):
         try:
             return int(value)
         except ValueError:

@@ -699,9 +699,9 @@ def test_searches_parsers_params_parser_params_coerce_value_to_int_or_return_non
         'frame=embedded&status!=submitted&type=File&sort=date_created'
     )
     p = ParamsParser(dummy_request)
-    assert p._coerce_value_to_int_or_return_none('12') == 12
-    assert p._coerce_value_to_int_or_return_none(12) == 12
-    assert p._coerce_value_to_int_or_return_none('all') is None
+    assert p.coerce_value_to_int_or_return_none('12') == 12
+    assert p.coerce_value_to_int_or_return_none(12) == 12
+    assert p.coerce_value_to_int_or_return_none('all') is None
 
 
 def test_searches_parsers_params_parser_group_values_by_key(dummy_request):
