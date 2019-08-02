@@ -171,8 +171,13 @@ class HitsToGraphMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def _get_results(self):
+        if self.query_builder._should_scan_over_results():
+            return self.results._search.scan()
+        return self.results
+
     def to_graph(self):
         return [
             r.embedded.to_dict()
-            for r in self.results
+            for r in self._get_results()
         ]
