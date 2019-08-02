@@ -56,3 +56,5 @@ BASE_AUDIT_FACETS = [
 INTERNAL_AUDIT_FACETS = [
     ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
 ]
+
+MAX_ES_RESULTS_WINDOW = 9999
