@@ -11,7 +11,9 @@ from .defaults import BASE_AUDIT_FACETS
 from .defaults import BASE_FIELD_FACETS
 from .defaults import BASE_SEARCH_FIELDS
 from .defaults import INTERNAL_AUDIT_FACETS
+from .defaults import MAX_ES_RESULTS_WINDOW
 from .defaults import NOT_FILTERS
+from .interfaces import ALL
 from .interfaces import AND
 from .interfaces import AND_JOIN
 from .interfaces import AND_NOT_JOIN
@@ -162,10 +164,50 @@ class AbstractQueryFactory:
 
     def _get_sort(self):
         return self.params_parser.get_sort()
+  
+    def _get_default_limit(self):
+        return [(LIMIT_KEY, 25)]
 
     @assert_one_or_none_returned(error_message='Invalid to specify multiple limit parameters:')
     def _get_limit(self):
-        return self.params_parser.get_limit() or [(LIMIT_KEY, 25)]
+        return self.params_parser.get_limit() or self._get_default_limit()
+
+    def _get_limit_value(self):
+        return self.params_parser.get_one_value(
+            params=self._get_limit()
+        )
+
+    def _limit_is_all(self):
+        limit = self._get_limit_value()
+        return isinstance(limit, str) and limit == ALL
+
+    def _limit_is_over_maximum_window(self):
+        limit = self._get_limit_value()
+        return isinstance(limit, int) and limit  > MAX_ES_RESULTS_WINDOW
+
+    def _should_scan_over_results(self):
+        conditions = [
+            self._limit_is_all(),
+            self._limit_is_over_maximum_window()
+        ]
+        if any(conditions):
+            return True
+        return False
+
+    def _get_int_limit_value_or_default(self):
+        '''
+        In the case limit is not all we want to return a valid integer,
+        either from user or from default.
+        '''
+        return self.params_parser.coerce_value_to_int_or_return_none(
+            self.params_parser.get_one_value(
+                params=self._get_limit()
+            )
+        ) or self.params_parser.coerce_value_to_int_or_return_none(
+            self.params_parser.get_one_value(
+                params=self._get_default_limit()
+            )
+        )
 
     @assert_one_or_none_returned(error_message='Invalid to specify multiple mode parameters:')
     def _get_mode(self):
@@ -519,6 +561,10 @@ class AbstractQueryFactory:
             }
         )
 
+    def add_slice(self):
+        end = self._get_int_limit_value_or_default()
+        self.search = self._get_or_create_search()[:end]
+
     def build_query(self):
         '''
         Public method to be implemented by children.
@@ -536,6 +582,7 @@ class BasicSearchQueryFactory(AbstractQueryFactory):
         self.add_filters()
         self.add_post_filters()
         self.add_source()
+        self.add_slice()
         return self.search
 
 
