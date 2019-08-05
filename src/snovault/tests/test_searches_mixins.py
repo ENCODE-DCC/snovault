@@ -1034,6 +1034,3 @@ def test_searches_mixins_hits_to_graph_mixin_to_graph(
     r = basic_query_response_with_facets.to_graph()
     assert len(r) == len(raw_response['hits']['hits'])
     assert all(['accession' in x for x in r])
-
-
-
