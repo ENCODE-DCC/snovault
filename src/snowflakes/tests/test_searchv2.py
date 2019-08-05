@@ -60,11 +60,18 @@ def test_searchv2_view_values(workbook, testapp):
 
 def test_searchv2_view_values_no_results(workbook, testapp):
     r = testapp.get(
-        '/searchv2/?status=released&?type=Sno',
+        '/searchv2/?status=current&type=Snowflake',
         status=404
     )
     assert r.json['notification'] == 'No results found'
-    assert r.status_code == 404
+
+
+def test_searchv2_view_values_bad_type(workbook, testapp):
+    r = testapp.get(
+        '/searchv2/?status=released&type=Sno',
+        status=400
+    )
+    r.json['description'] == "Invalid types: ['Sno']"
 
 
 def test_searchv2_view_no_type(workbook, testapp):

@@ -120,10 +120,10 @@ def test_searches_queries_abstract_query_factory_validate_item_types(params_pars
     from pyramid.exceptions import HTTPBadRequest
     aq = AbstractQueryFactory(params_parser_snovault_types)
     item_types = ['TestingSearchSchema']
-    aq._validate_item_types(item_types)
+    aq.validate_item_types(item_types)
     item_types = ['Sno']
     with pytest.raises(HTTPBadRequest):
-        aq._validate_item_types(item_types)
+        aq.validate_item_types(item_types)
 
 
 def test_searches_queries_abstract_query_factory_normalize_item_types(params_parser_snovault_types):

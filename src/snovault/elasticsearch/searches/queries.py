@@ -96,10 +96,6 @@ class AbstractQueryFactory:
             if item_type not in registered_types
         ]
 
-    @assert_none_returned(error_message='Invalid types:')
-    def _validate_item_types(self, item_types):
-        return self._get_invalid_item_types(item_types)
-
     def _normalize_item_types(self, item_types):
         registered_types = self._get_registered_types()
         return [
@@ -490,6 +486,14 @@ class AbstractQueryFactory:
             )
         )
 
+    @assert_none_returned(error_message='Invalid types:')
+    def validate_item_types(self, item_types=[]):
+        return self._get_invalid_item_types(
+            item_types or self.params_parser.param_values_to_list(
+                params=self._get_item_types()
+            )
+        )
+
     def add_query_string_query(self):
         query = self._get_query()
         if query:
@@ -585,6 +589,7 @@ class BasicSearchQueryFactory(AbstractQueryFactory):
         super().__init__(params_parser, *args, **kwargs)
 
     def build_query(self):
+        self.validate_item_types()
         self.add_query_string_query()
         self.add_filters()
         self.add_post_filters()
