@@ -1013,12 +1013,18 @@ def test_searches_mixins_aggs_to_facets_mixin_to_facets(
 
 def test_searches_mixins_hits_to_graph_mixin_get_results(
         basic_query_response_with_facets,
-        raw_response
+        raw_response,
+        mocker
 ):
     from elasticsearch_dsl.response import Response
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
     res = basic_query_response_with_facets._get_results()
     assert isinstance(res, Response)
-    assert False
+    mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_should_scan_over_results')
+    BasicSearchQueryFactoryWithFacets._should_scan_over_results.return_value = True
+    from types import GeneratorType
+    res = basic_query_response_with_facets._get_results()
+    assert isinstance(res, GeneratorType)
 
 
 def test_searches_mixins_hits_to_graph_mixin_to_graph(
