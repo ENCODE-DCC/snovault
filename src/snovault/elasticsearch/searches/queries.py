@@ -111,8 +111,20 @@ class AbstractQueryFactory:
             return [ITEM]
         return self.kwargs.get('default_item_types', [])
 
+    def _wildcard_in_item_types(self, item_types):
+        wildcard_types = self.params_parser.get_filters_by_condition(
+                key_and_value_condition=lambda k, v: k == TYPE_KEY and v == WILDCARD,
+                params=item_types
+        )
+        if wildcard_types:
+            return True
+        return False
+
     def _get_item_types(self):
-        return self.params_parser.get_type_filters()
+        item_types = self.params_parser.get_type_filters()
+        if self._wildcard_in_item_types(item_types):
+            return [(TYPE_KEY, ITEM)]
+        return item_types
 
     def _show_internal_audits(self):
         conditions = [

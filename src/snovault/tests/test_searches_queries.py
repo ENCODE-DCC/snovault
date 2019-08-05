@@ -65,6 +65,14 @@ def test_searches_queries_abstract_query_factory_get_index(params_parser):
     assert aq._get_index() == RESOURCES_INDEX
 
 
+def test_searches_queries_abstract_query_factory_wildcard_in_item_types(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    assert not aq._wildcard_in_item_types([('type', 'Experiment'), ('type!', 'File')])
+    assert aq._wildcard_in_item_types([('type', 'Experiment'), ('type', '*')])
+    assert aq._wildcard_in_item_types([('type', '*')])
+
+
 def test_searches_queries_abstract_query_factory_get_item_types(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
