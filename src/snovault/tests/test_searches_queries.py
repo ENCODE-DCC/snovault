@@ -145,6 +145,23 @@ def test_searches_queries_abstract_query_factory_normalize_item_types(params_par
     assert normalized_item_types == ['TestingSearchSchema']
 
 
+def test_searches_queries_abstract_query_factory_validated_query_string_query(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.exceptions import HTTPBadRequest
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    assert aq._validated_query_string_query('ctcf') == 'ctcf'
+    assert aq._validated_query_string_query(
+        '@type:Experiment date_created:[01-01-2018 TO 01-02-2018]'
+    ) == 'embedded.@type:Experiment embedded.date_created:[01-01-2018 TO 01-02-2018]'
+    assert aq._validated_query_string_query(
+        '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (@type:File)'
+    ) == '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (embedded.@type:File)'
+    special_chars = '&& || > < ! ( ) { } [ ] ^ " ~ \ :'
+    for c in special_chars.split(' '):
+        with pytest.raises(HTTPBadRequest):
+            aq._validated_query_string_query(c)
+
+
 def test_searches_queries_abstract_query_factory_get_default_item_types(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(
@@ -227,11 +244,37 @@ def test_searches_queries_abstract_query_factory_get_default_and_maybe_item_face
     assert all(e in actual for e in expected)
 
 
-def test_searches_queries_abstract_query_factory_get_query(params_parser):
+def test_searches_queries_abstract_query_factory_get_query(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
     search_terms = aq._get_query()
     assert search_terms == '(chip-seq)'
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&frame=object&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_query() is None
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&searchTerm=cherry'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_query() == '(cherry)'
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&advancedQuery=cherry'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_query() == '(cherry)'
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&advancedQuery=@type:Experiment date_created:[01-01-2018 TO 01-02-2018'
+        '&searchTerm=ctcf'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_query() == '(ctcf) AND (@type:Experiment date_created:[01-01-2018 TO 01-02-2018)'
 
 
 def test_searches_queries_abstract_query_factory_get_filters(params_parser):

@@ -1,3 +1,4 @@
+ADVANCED_QUERY_KEY = 'advancedQuery'
 ALL = 'all'
 AND = 'AND'
 AND_JOIN = ' AND '

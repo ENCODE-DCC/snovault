@@ -166,6 +166,55 @@ def test_searches_parsers_params_parser_get_must_not_match_search_term_filters(d
     ]
 
 
+def test_searches_parsers_params_parser_get_advanced_query_filters_empty(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&field=status&type!=Item'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_advanced_query_filters() == []
+
+
+def test_searches_parsers_params_parser_get_advanced_query_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&field=status&type!=Item'
+        '&advancedQuery=my+favorite+experiment&searchTerm=my+other+experiment'
+        '&searchTerm!=whatever'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_advanced_query_filters() == [
+        ('advancedQuery', 'my favorite experiment')
+    ]
+
+
+def test_searches_parsers_params_parser_get_must_match_advanced_query_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&field=status&type!=Item'
+        '&advancedQuery=date_created:[01/01/2018 TO 01/02/2019]'
+        '&advancedQuery=@type:Experiment date_released:[2009-01-01 TO 2019-12-31]'
+        '&searchTerm=whatever'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_must_match_advanced_query_filters() == [
+        ('advancedQuery', 'date_created:[01/01/2018 TO 01/02/2019]'),
+        ('advancedQuery', '@type:Experiment date_released:[2009-01-01 TO 2019-12-31]')
+    ]
+
+
+def test_searches_parsers_params_parser_get_must_not_match_advanced_query_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&field=status&type!=Item'
+        '&advancedQuery!=whatever'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_must_not_match_advanced_query_filters() == [
+        ('advancedQuery!', 'whatever')
+    ]
+
+
 def test_searches_parsers_params_parser_get_field_filters(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (

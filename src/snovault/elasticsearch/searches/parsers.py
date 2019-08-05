@@ -1,6 +1,7 @@
 from urllib.parse import urlencode
 from collections import defaultdict
 
+from .interfaces import ADVANCED_QUERY_KEY
 from .interfaces import FIELD_KEY
 from .interfaces import FRAME_KEY
 from .interfaces import LIMIT_KEY
@@ -218,6 +219,26 @@ class ParamsParser:
     def get_must_not_match_search_term_filters(self, params=None):
         return self.get_must_not_match_filters(
             params=self.get_search_term_filters(
+                params=params
+            )
+        )
+
+    def get_advanced_query_filters(self, params=None):
+        return self.get_key_filters(
+            key=ADVANCED_QUERY_KEY,
+            params=params
+        )
+
+    def get_must_match_advanced_query_filters(self, params=None):
+        return self.get_must_match_filters(
+            params=self.get_advanced_query_filters(
+                params=params
+            )
+        )
+
+    def get_must_not_match_advanced_query_filters(self, params=None):
+        return self.get_must_not_match_filters(
+            params=self.get_advanced_query_filters(
                 params=params
             )
         )

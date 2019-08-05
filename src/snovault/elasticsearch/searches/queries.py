@@ -1,6 +1,10 @@
 from elasticsearch_dsl import A
 from elasticsearch_dsl import Q
 from elasticsearch_dsl import Search
+from antlr4 import IllegalStateException
+from lucenequery import dialects
+from lucenequery.prefixfields import prefixfields
+from pyramid.httpexceptions import HTTPBadRequest
 from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.interfaces import TYPES
@@ -103,6 +107,14 @@ class AbstractQueryFactory:
             for item_type in item_types
         ]
 
+    def _validated_query_string_query(self, query):
+        try:
+            query = prefixfields(EMBEDDED, query, dialects.elasticsearch)
+        except IllegalStateException:
+            msg = "Invalid query: {}".format(query)
+            raise HTTPBadRequest(explanation=msg)
+        return query.getText()
+    
     def _get_default_item_types(self):
         mode = self.params_parser.get_one_value(
             params=self._get_mode()
@@ -159,9 +171,17 @@ class AbstractQueryFactory:
         return facets
 
     def _get_query(self):
+        must = (
+            self.params_parser.get_must_match_search_term_filters()
+            + self.params_parser.get_must_match_advanced_query_filters()
+        )
+        must_not = (
+            self.params_parser.get_must_not_match_search_term_filters()
+            + self.params_parser.get_must_not_match_advanced_query_filters()
+        )
         return self._combine_search_term_queries(
-            must_match_filters=self.params_parser.get_must_match_search_term_filters(),
-            must_not_match_filters=self.params_parser.get_must_not_match_search_term_filters()
+            must_match_filters=must,
+            must_not_match_filters=must_not
         )
 
     def _get_filters(self):
@@ -509,6 +529,7 @@ class AbstractQueryFactory:
     def add_query_string_query(self):
         query = self._get_query()
         if query:
+            query = self._validated_query_string_query(query)
             self.search = self._get_or_create_search().query(
                 self._make_query_string_query(
                     query=query,
