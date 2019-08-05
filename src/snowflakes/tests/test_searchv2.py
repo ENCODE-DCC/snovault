@@ -71,7 +71,13 @@ def test_searchv2_view_values_bad_type(workbook, testapp):
         '/searchv2/?status=released&type=Sno',
         status=400
     )
-    r.json['description'] == "Invalid types: ['Sno']"
+    assert r.json['description'] == "Invalid types: ['Sno']"
+    r = testapp.get(
+        '/searchv2/?status=released&type=Sno&type=Flake',
+        status=400
+    )
+    
+    assert r.json['description'] == "Invalid types: ['Sno', 'Flake']"
 
 
 def test_searchv2_view_no_type(workbook, testapp):
