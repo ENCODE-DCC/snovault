@@ -88,9 +88,17 @@ def test_searchv2_view_values_item_wildcard(workbook, testapp):
     assert r.json['total'] >= 172
 
 
-def test_searchv2_view_values_invalid_searchterm(workbook, testapp):
+def test_searchv2_view_values_invalid_search_term(workbook, testapp):
     r = testapp.get(
         '/searchv2/?searchTerm=[',
+        status=400
+    )
+    assert r.json['description'] == 'Invalid query: ([)'
+
+
+def test_searchv2_view_values_invalid_advanced_query(workbook, testapp):
+    r = testapp.get(
+        '/searchv2/?advancedQuery=[',
         status=400
     )
     assert r.json['description'] == 'Invalid query: ([)'
