@@ -313,6 +313,120 @@ def test_searches_queries_abstract_query_factory_get_limit(params_parser):
     ]
 
 
+def test_searches_queries_abstract_query_factory_get_default_limit(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    default_limit = aq._get_default_limit()
+    assert default_limit == [('limit', 25)]
+
+
+def test_searches_queries_abstract_query_factory_get_limit_value(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    limit = aq._get_limit_value()
+    assert limit == 10
+
+
+def test_searches_queries_abstract_query_factory_limit_is_all(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    aq = AbstractQueryFactory(params_parser)
+    assert not aq._limit_is_all()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=all&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._limit_is_all()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=blah&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert not aq._limit_is_all()
+
+
+def test_searches_queries_abstract_query_factory_limit_is_over_maximum_window(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    aq = AbstractQueryFactory(params_parser)
+    assert not aq._limit_is_over_maximum_window()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=all&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert not aq._limit_is_over_maximum_window()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=1000&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert not aq._limit_is_over_maximum_window()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10000&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._limit_is_over_maximum_window()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=blah&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert not aq._limit_is_over_maximum_window()
+
+
+def test_searches_queries_abstract_query_factory_should_scan_over_results(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    aq = AbstractQueryFactory(params_parser)
+    assert not aq._should_scan_over_results()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=100000&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._should_scan_over_results()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=all&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._should_scan_over_results()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=blah&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert not aq._should_scan_over_results()
+
+
+def test_searches_queries_abstract_query_factory_get_int_limit_value_or_default(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    aq = AbstractQueryFactory(params_parser)
+    limit = aq._get_int_limit_value_or_default()
+    assert limit == 10
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=all&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    limit = aq._get_int_limit_value_or_default()
+    assert limit == 25
+
+
 def test_searches_queries_abstract_query_factory_get_search_fields(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
@@ -2228,6 +2342,13 @@ def test_searches_queries_abstract_query_factory_add_source(params_parser):
     aq = AbstractQueryFactory(params_parser)
     aq.add_source()
     assert aq.search.to_dict() == {'_source': ['embedded.*'], 'query': {'match_all': {}}}
+
+
+def test_searches_queries_abstract_query_factory_add_slice(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_slice()
+    assert aq.search.to_dict() == {'from': 0, 'size': 10, 'query': {'match_all': {}}}
 
 
 def test_searches_queries_abstract_query_factory_subaggregation_factory(params_parser_snovault_types):

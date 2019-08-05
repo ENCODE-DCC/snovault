@@ -274,11 +274,16 @@ class ParamsParser:
         if len(values) >= 1:
             return values[0]
 
-    def coerce_value_to_int_or_return_none(self, value):
+    def maybe_int(self, value):
         try:
             return int(value)
         except ValueError:
-            pass
+            return value
+
+    def coerce_value_to_int_or_return_none(self, value):
+        value = self.maybe_int(value)
+        if isinstance(value, int):
+            return value
 
     def split_filters_by_must_and_exists(self, params=None):
         '''

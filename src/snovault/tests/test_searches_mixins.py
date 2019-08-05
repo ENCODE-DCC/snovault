@@ -1011,6 +1011,16 @@ def test_searches_mixins_aggs_to_facets_mixin_to_facets(
     assert len(actual) == 13
 
 
+def test_searches_mixins_hits_to_graph_mixin_get_results(
+        basic_query_response_with_facets,
+        raw_response
+):
+    from elasticsearch_dsl.response import Response
+    res = basic_query_response_with_facets._get_results()
+    assert isinstance(res, Response)
+    assert False
+
+
 def test_searches_mixins_hits_to_graph_mixin_to_graph(
         basic_query_response_with_facets,
         raw_response
@@ -1018,3 +1028,6 @@ def test_searches_mixins_hits_to_graph_mixin_to_graph(
     r = basic_query_response_with_facets.to_graph()
     assert len(r) == len(raw_response['hits']['hits'])
     assert all(['accession' in x for x in r])
+
+
+

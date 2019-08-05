@@ -173,26 +173,29 @@ class AbstractQueryFactory:
         return self.params_parser.get_limit() or self._get_default_limit()
 
     def _get_limit_value(self):
-        return self.params_parser.get_one_value(
-            params=self._get_limit()
+        return self.params_parser.maybe_int(
+            self.params_parser.get_one_value(
+                params=self._get_limit()
+            )
         )
 
     def _limit_is_all(self):
-        limit = self._get_limit_value()
-        return isinstance(limit, str) and limit == ALL
+        return self._get_limit_value() == ALL
 
     def _limit_is_over_maximum_window(self):
-        limit = self._get_limit_value()
-        return isinstance(limit, int) and limit  > MAX_ES_RESULTS_WINDOW
+        limit = self.params_parser.coerce_value_to_int_or_return_none(
+            self._get_limit_value()
+        )
+        if limit:
+            return limit > MAX_ES_RESULTS_WINDOW
+        return False
 
     def _should_scan_over_results(self):
         conditions = [
             self._limit_is_all(),
             self._limit_is_over_maximum_window()
         ]
-        if any(conditions):
-            return True
-        return False
+        return any(conditions)
 
     def _get_int_limit_value_or_default(self):
         '''
@@ -562,6 +565,10 @@ class AbstractQueryFactory:
         )
 
     def add_slice(self):
+        '''
+        If limit=all we return default slice for the aggregations/total
+        and scan over results in response mixin to_graph method.
+        '''
         end = self._get_int_limit_value_or_default()
         self.search = self._get_or_create_search()[:end]
 
