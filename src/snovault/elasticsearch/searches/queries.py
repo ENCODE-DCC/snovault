@@ -119,12 +119,12 @@ class AbstractQueryFactory:
         return self.params_parser.get_type_filters()
 
     def _show_internal_audits(self):
-        if all([
-                self.params_parser._request.has_permission(SEARCH_AUDIT),
-                GROUP_SUBMITTER in self._get_principals()
-        ]):
-            return True
-        return False
+        conditions = [
+            self.params_parser._request.has_permission(SEARCH_AUDIT),
+            GROUP_SUBMITTER in self._get_principals()
+            
+        ]
+        return all(conditions)
 
     def _get_audit_facets(self):
         if self._show_internal_audits():
