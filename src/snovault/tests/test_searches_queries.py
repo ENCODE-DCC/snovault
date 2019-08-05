@@ -485,14 +485,7 @@ def test_searches_queries_abstract_query_factory_get_search_fields(params_parser
     assert all(
         f in search_fields
         for f in [
-                'embedded.status',
-                '*.md5sum',
-                '_all',
-                'unique_keys.*',
-                'embedded.accession',
-                'embedded.label',
-                '*.uuid',
-                '*.submitted_file_name'
+                '_all'
         ]
     )
 
@@ -507,14 +500,7 @@ def test_searches_queries_abstract_query_factory_get_search_fields_mode_picker(d
     aq = AbstractQueryFactory(params_parser)
     search_fields = aq._get_search_fields()
     assert set(search_fields) == set([
-        '*.uuid',
-        '*.md5sum',
-        'embedded.accession',
-        'embedded.status',
-        'embedded.label',
-        '_all',
-        '*.submitted_file_name',
-        'unique_keys.*'
+        '_all'
     ])
 
 
@@ -1180,11 +1166,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_re
             'query_string': {
                 'default_operator': 'AND',
                 'fields': [
-                    '_all',
-                    '*.uuid',
-                    '*.md5sum',
-                    '*.submitted_file_name',
-                    'unique_keys.*'
+                    '_all'
                 ],
                 'query': '(chip-seq)'
             }
@@ -1219,14 +1201,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_typ
             'query_string': {
                 'default_operator': 'AND',
                 'fields': [
-                    '_all',
-                    '*.uuid',
-                    '*.md5sum',
-                    '*.submitted_file_name',
-                    'unique_keys.*',
-                    'embedded.accession',
-                    'embedded.label',
-                    'embedded.status'
+                    '_all'
                 ],
                 'query': '(chip-seq)'
             }
@@ -1266,14 +1241,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_def
             'query_string': {
                 'default_operator': 'AND',
                 'fields': [
-                    '_all',
-                    '*.uuid',
-                    '*.md5sum',
-                    '*.submitted_file_name',
-                    'unique_keys.*',
-                    'embedded.accession',
-                    'embedded.label',
-                    'embedded.status',
+                    '_all'
                 ],
                 'query': '(chip-seq)'
             }
@@ -1884,11 +1852,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_re
             'query_string': {
                 'default_operator': 'AND',
                 'fields': [
-                    '_all',
-                    '*.uuid',
-                    '*.md5sum',
-                    '*.submitted_file_name',
-                    'unique_keys.*'
+                    '_all'
                 ],
                 'query': '(chip-seq)'
             }
@@ -1923,14 +1887,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_typ
             'query_string': {
                 'default_operator': 'AND',
                 'fields': [
-                    '_all',
-                    '*.uuid',
-                    '*.md5sum',
-                    '*.submitted_file_name',
-                    'unique_keys.*',
-                    'embedded.accession',
-                    'embedded.status',
-                    'embedded.label'
+                    '_all'
                 ],
                 'query': '(chip-seq)'
             }
@@ -1970,14 +1927,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_def
             'query_string': {
                 'default_operator': 'AND',
                 'fields': [
-                    '_all',
-                    '*.uuid',
-                    '*.md5sum',
-                    '*.submitted_file_name',
-                    'unique_keys.*',
-                    'embedded.accession',
-                    'embedded.status',
-                    'embedded.label'
+                    '_all'
                 ],
                 'query': '(chip-seq)'
             }

@@ -25,11 +25,7 @@ FREE_TEXT_QUERIES = [
 NOT_FILTERS = OPTIONAL_PARAMS + FREE_TEXT_QUERIES
 
 BASE_SEARCH_FIELDS = [
-    '_all',
-    '*.uuid',
-    '*.md5sum',
-    '*.submitted_file_name',
-    'unique_keys.*',
+    '_all'
 ]
 
 BASE_RETURN_FIELDS = [

@@ -245,20 +245,7 @@ class AbstractQueryFactory:
         return self.params_parser.get_mode()
 
     def _get_search_fields(self):
-        search_fields = set()
-        search_fields.update(BASE_SEARCH_FIELDS)
-        item_types = (
-            self.params_parser.param_values_to_list(self._get_item_types())
-            or self._get_default_item_types()
-        )
-        for item_type in item_types:
-            search_fields.update(
-                self._prefix_values(
-                    EMBEDDED,
-                    self._get_boost_values_for_item_type(item_type).keys()
-                )
-            )
-        return list(search_fields)
+        return BASE_SEARCH_FIELDS
 
     def _get_return_fields(self):
         return [EMBEDDED + WILDCARD]
