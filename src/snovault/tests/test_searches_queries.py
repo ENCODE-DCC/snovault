@@ -243,7 +243,9 @@ def test_searches_queries_abstract_query_factory_get_default_facets(params_parse
         params_parser
     )
     assert aq._get_default_facets() == [
-        ('type', {'title': 'Data Type', 'exclude': ['Item']}),
+        ('type', {'title': 'Data Type', 'exclude': ['Item']})
+    ]
+    assert aq._get_audit_facets() == [
         ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
         ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
         ('audit.WARNING.category', {'title': 'Audit category: WARNING'})

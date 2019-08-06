@@ -169,13 +169,13 @@ class AbstractQueryFactory:
 
     def _get_audit_facets(self):
         if self._show_internal_audits():
-            return BASE_AUDIT_FACETS + INTERNAL_AUDIT_FACETS
-        return BASE_AUDIT_FACETS
+            return BASE_AUDIT_FACETS.copy() + INTERNAL_AUDIT_FACETS.copy()
+        return BASE_AUDIT_FACETS.copy()
 
     def _get_default_facets(self):
         return self.kwargs.get(
             'default_facets',
-            BASE_FIELD_FACETS
+            BASE_FIELD_FACETS.copy()
         )
 
     def _get_default_and_maybe_item_facets(self):
@@ -281,7 +281,7 @@ class AbstractQueryFactory:
         return self.params_parser.get_field_filters()
 
     def _get_search_fields(self):
-        return BASE_SEARCH_FIELDS
+        return BASE_SEARCH_FIELDS.copy()
 
     def _get_return_fields_from_field_params(self, fields):
         return self._prefix_values(
