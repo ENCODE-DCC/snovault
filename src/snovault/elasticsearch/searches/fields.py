@@ -246,6 +246,7 @@ class FiltersResponseField(ResponseField):
         return (
             self.get_query_builder()._get_post_filters()
             + self.get_params_parser().get_search_term_filters()
+            + self.get_params_parser().get_advanced_query_filters()
         )
 
     def _get_path_qs_without_filter(self, key, value):
