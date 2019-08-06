@@ -232,20 +232,16 @@ class AbstractQueryFactory:
         ]
         return any(conditions)
 
-    def _get_int_limit_value_or_default(self):
-        '''
-        In the case limit is not all we want to return a valid integer,
-        either from user or from default.
-        '''
-        return self.params_parser.coerce_value_to_int_or_return_none(
-            self.params_parser.get_one_value(
-                params=self._get_limit()
-            )
-        ) or self.params_parser.coerce_value_to_int_or_return_none(
-            self.params_parser.get_one_value(
-                params=self._get_default_limit()
-            )
+    def _get_bounded_int_limit_value_or_default(self):
+        user_limit = self.params_parser.coerce_value_to_int_or_return_none(
+            self._get_limit_value()
         )
+        default_limit = self.params_parser.get_one_value(
+            params=self._get_default_limit()
+        )
+        if self._should_scan_over_results():
+            return default_limit
+        return user_limit or default_limit
 
     @assert_one_or_none_returned(error_message='Invalid to specify multiple mode parameters:')
     def _get_mode(self):
@@ -640,10 +636,11 @@ class AbstractQueryFactory:
 
     def add_slice(self):
         '''
-        If limit=all we return default slice for the aggregations/total
-        and scan over results in response mixin to_graph method.
+        If limit=all or limit > MAX_ES_RESULTS_WINDOW we return 
+        default slice for the aggregations/total and scan over results
+        in response mixin to_graph method.
         '''
-        end = self._get_int_limit_value_or_default()
+        end = self._get_bounded_int_limit_value_or_default()
         self.search = self._get_or_create_search()[:end]
 
     def build_query(self):

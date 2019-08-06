@@ -475,11 +475,11 @@ def test_searches_queries_abstract_query_factory_should_scan_over_results(params
     assert not aq._should_scan_over_results()
 
 
-def test_searches_queries_abstract_query_factory_get_int_limit_value_or_default(params_parser, dummy_request):
+def test_searches_queries_abstract_query_factory_get_bounded_int_limit_value_or_default(params_parser, dummy_request):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from snovault.elasticsearch.searches.parsers import ParamsParser
     aq = AbstractQueryFactory(params_parser)
-    limit = aq._get_int_limit_value_or_default()
+    limit = aq._get_bounded_int_limit_value_or_default()
     assert limit == 10
     dummy_request.environ['QUERY_STRING'] = (
         'type=TestingSearchSchema&status=released'
@@ -487,7 +487,7 @@ def test_searches_queries_abstract_query_factory_get_int_limit_value_or_default(
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    limit = aq._get_int_limit_value_or_default()
+    limit = aq._get_bounded_int_limit_value_or_default()
     assert limit == 25
 
 
