@@ -262,19 +262,22 @@ class AbstractQueryFactory:
     def _get_search_fields(self):
         return BASE_SEARCH_FIELDS
 
+    def _get_return_fields_from_field_params(self, fields):
+        return (
+            BASE_RETURN_FIELDS
+            + self._prefix_values(
+                EMBEDDED,
+                self.params_parser.param_values_to_list(
+                    params=fields
+                )
+            )
+        )
+
     @deduplicate
     def _get_return_fields(self):
         fields = self._get_fields()
         if fields:
-            return (
-                BASE_RETURN_FIELDS
-                + self._prefix_values(
-                    EMBEDDED,
-                    self.params_parser.param_values_to_list(
-                        params=fields
-                    )
-                )
-            )
+            return self._get_return_fields_from_field_params(fields)
         frame = self._get_frame_value()
         if frame in DEFAULT_FRAMES:
             return [frame + PERIOD + WILDCARD]

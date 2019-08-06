@@ -565,6 +565,19 @@ def test_searches_queries_abstract_query_factory_get_fields(params_parser, dummy
         ('field', 'lab.name')
     ]
 
+def test_searches_queries_abstract_query_factory_get_return_fields_from_field_params(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    fields = [('field', '@id'), ('field', 'accession'), ('field', 'status')]
+    print(aq._get_return_fields_from_field_params(fields))
+    assert aq._get_return_fields_from_field_params(fields) == [
+        'embedded.@id',
+        'embedded.@type',
+        'embedded.@id',
+        'embedded.accession',
+        'embedded.status'
+    ]
 
 def test_searches_queries_abstract_query_factory_get_return_fields(params_parser, dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
