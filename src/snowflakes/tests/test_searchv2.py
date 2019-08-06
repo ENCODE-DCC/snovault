@@ -109,15 +109,14 @@ def test_searchv2_view_embedded_frame(workbook, testapp):
     r = testapp.get(
         '/searchv2/?type=Snowflake&frame=embedded'
     )
-    print(r.json)
-    assert False
+    assert r.json['@graph'][0]['lab']['name']
 
 
 def test_searchv2_view_object_frame(workbook, testapp):
     r = testapp.get(
         '/searchv2/?type=Snowflake&frame=object'
     )
-    res = r.json['@graph']
+    res = r.json['@graph'][0]
     assert all(
         [
             x in res

@@ -5,6 +5,7 @@ from snovault.elasticsearch.searches.fields import AllResponseField
 from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import ClearFiltersResponseField
 from snovault.elasticsearch.searches.fields import ContextResponseField
+from snovault.elasticsearch.searches.fields import DebugQueryResponseField
 from snovault.elasticsearch.searches.fields import FiltersResponseField
 from snovault.elasticsearch.searches.fields import IDResponseField
 from snovault.elasticsearch.searches.fields import NotificationResponseField
@@ -53,7 +54,8 @@ def searchv2(context, request):
             AllResponseField(),
             NotificationResponseField(),
             FiltersResponseField(),
-            ClearFiltersResponseField()
+            ClearFiltersResponseField(),
+            DebugQueryResponseField()
         ]
     )
     return fr.render()
