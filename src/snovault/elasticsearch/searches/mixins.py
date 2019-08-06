@@ -1,4 +1,5 @@
 from collections import defaultdict
+from collections import OrderedDict
 from functools import lru_cache
 
 
@@ -37,10 +38,9 @@ class AggsToFacetsMixin:
 
     @lru_cache()
     def _get_facets(self):
-        return {
-            k: v
-            for k, v in self.query_builder._get_facets()
-        }
+        return OrderedDict(
+            self.query_builder._get_facets()
+        )
 
     def _get_post_filters(self):
         return self.query_builder._get_post_filters()
