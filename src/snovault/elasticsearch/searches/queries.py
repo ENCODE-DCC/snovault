@@ -175,7 +175,7 @@ class AbstractQueryFactory:
     def _get_default_facets(self):
         return self.kwargs.get(
             'default_facets',
-            BASE_FIELD_FACETS + self._get_audit_facets()
+            BASE_FIELD_FACETS
         )
 
     def _get_default_and_maybe_item_facets(self):
@@ -189,6 +189,8 @@ class AbstractQueryFactory:
                     item_type_values[0]
                 )
             )
+        # Add these at end.
+        facets.extend(self._get_audit_facets())
         return facets
 
     def _get_query(self):
