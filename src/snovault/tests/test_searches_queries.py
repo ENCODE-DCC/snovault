@@ -629,7 +629,6 @@ def test_searches_queries_abstract_query_factory_get_return_fields(params_parser
         'embedded.*',
         'audit.*',
     ]
-    print(aq._get_return_fields())
     actual = aq._get_return_fields()
     assert all([e in actual for e in expected])
     assert len(expected) == len(actual)

@@ -104,6 +104,27 @@ def test_searchv2_view_values_invalid_advanced_query(workbook, testapp):
     assert r.json['description'] == 'Invalid query: ([)'
 
 
+def test_searchv2_view_embedded_frame(workbook, testapp):
+    r = testapp.get(
+        '/searchv2/?type=Snowflake&frame=embedded'
+    )
+    print(r.json)
+    assert False
+
+
+def test_searchv2_view_object_frame(workbook, testapp):
+    r = testapp.get(
+        '/searchv2/?type=Snowflake&frame=object'
+    )
+    res = r.json['@graph']
+    assert all(
+        [
+            x in res
+            for x in ['accession', '@type', '@id', 'status']
+        ]
+    )
+
+
 def test_searchv2_view_no_type(workbook, testapp):
     r = testapp.get('/searchv2/')
     assert 'total' in r.json

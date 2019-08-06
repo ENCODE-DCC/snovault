@@ -176,8 +176,17 @@ class HitsToGraphMixin:
             return self.results._search.scan()
         return self.results
 
+    def _unlayer(self, hit_dict):
+        '''
+        Removes embedded.*, object.*, audit.* etc. prefix from results.
+        '''
+        r = {}
+        for k, v in hit_dict.items():
+            r.update(v)
+        return r
+
     def to_graph(self):
         return [
-            r.embedded.to_dict()
+            self._unlayer(r.to_dict())
             for r in self._get_results()
         ]

@@ -1027,6 +1027,26 @@ def test_searches_mixins_hits_to_graph_mixin_get_results(
     assert isinstance(res, GeneratorType)
 
 
+def test_searches_mixins_hits_to_graph_mixin_unlayer(basic_query_response_with_facets):
+    hit_dict = {
+        'embedded': {
+            'accession': 'ENCFF123ABC',
+            '@type': 'Experiment'
+        },
+        'audit': {
+            'audit-internal-warning': {'description': 'abc'}
+        }
+    }
+    r = basic_query_response_with_facets._unlayer(hit_dict)
+    assert r == {
+        '@type': 'Experiment',
+        'accession': 'ENCFF123ABC',
+        'audit-internal-warning': {
+            'description': 'abc'
+        }
+    }
+
+
 def test_searches_mixins_hits_to_graph_mixin_to_graph(
         basic_query_response_with_facets,
         raw_response
