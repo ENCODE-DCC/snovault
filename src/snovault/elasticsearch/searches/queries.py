@@ -214,13 +214,18 @@ class AbstractQueryFactory:
             )
         )
 
+    def _get_int_limit_value(self):
+        return self.params_parser.coerce_value_to_int_or_return_none(
+            self._get_limit_value()
+        ) or self.params_parser.get_one_value(
+            params=self._get_default_limit()
+        )
+
     def _limit_is_all(self):
         return self._get_limit_value() == ALL
 
     def _limit_is_over_maximum_window(self):
-        limit = self.params_parser.coerce_value_to_int_or_return_none(
-            self._get_limit_value()
-        )
+        limit = self._get_int_limit_value()
         if limit:
             return limit > MAX_ES_RESULTS_WINDOW
         return False
@@ -233,15 +238,12 @@ class AbstractQueryFactory:
         return any(conditions)
 
     def _get_bounded_int_limit_value_or_default(self):
-        user_limit = self.params_parser.coerce_value_to_int_or_return_none(
-            self._get_limit_value()
-        )
         default_limit = self.params_parser.get_one_value(
             params=self._get_default_limit()
         )
         if self._should_scan_over_results():
             return default_limit
-        return user_limit or default_limit
+        return self._get_int_limit_value()
 
     @assert_one_or_none_returned(error_message='Invalid to specify multiple mode parameters:')
     def _get_mode(self):

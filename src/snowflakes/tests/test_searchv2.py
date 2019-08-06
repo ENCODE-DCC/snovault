@@ -47,6 +47,11 @@ def test_searchv2_view_with_limit(workbook, testapp):
     )
     assert len(r.json['@graph']) == 35
     assert 'all' not in r.json
+    r = testapp.get(
+        '/searchv2/?type=Snowflake&limit=100000'
+    )
+    assert len(r.json['@graph']) == 35
+    assert 'all' not in r.json
 
 
 def test_searchv2_view_values(workbook, testapp):

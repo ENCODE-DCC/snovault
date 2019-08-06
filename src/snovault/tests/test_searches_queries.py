@@ -391,6 +391,33 @@ def test_searches_queries_abstract_query_factory_get_limit_value(params_parser):
     assert limit == 10
 
 
+def test_searches_queries_abstract_query_factory_get_int_limit_value(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_int_limit_value() == 10
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=30000'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_int_limit_value() == 30000
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=blah'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_int_limit_value() == 25
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_int_limit_value() == 25
+
+
 def test_searches_queries_abstract_query_factory_limit_is_all(params_parser, dummy_request):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from snovault.elasticsearch.searches.parsers import ParamsParser
