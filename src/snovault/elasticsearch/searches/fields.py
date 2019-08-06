@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from .interfaces import ALL
 from .interfaces import AT_ID
 from .interfaces import AT_CONTEXT
@@ -262,11 +264,13 @@ class FiltersResponseField(ResponseField):
         return path
 
     def _make_filter(self, key, value):
-        filter_entry = {
-            FIELD_KEY: key,
-            TERM: value,
-            REMOVE: self._get_path_qs_without_filter(key, value)
-        }
+        filter_entry = OrderedDict(
+            {
+                FIELD_KEY: key,
+                TERM: value,
+                REMOVE: self._get_path_qs_without_filter(key, value)
+            }
+        )
         self.filters.append(filter_entry)
 
     def _make_filters(self):
