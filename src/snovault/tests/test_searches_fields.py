@@ -396,3 +396,13 @@ def test_searches_fields_debug_query_response_field(dummy_parent):
     r = dbr.render(parent=dummy_parent)
     assert 'query' in r['debug']['raw_query']
     assert 'post_filter' in r['debug']['raw_query']
+
+
+def test_searches_fields_clear_filter_response_field_add_clear_filters(dummy_parent):
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema'
+    )
+    from snovault.elasticsearch.searches.fields import ColumnsResponseField
+    crf = ColumnsResponseField()
+    r = crf.render(parent=dummy_parent)
+    assert r['columns'] == {'accession': {'title': 'Accession'}, 'status': {'title': 'Status'}}

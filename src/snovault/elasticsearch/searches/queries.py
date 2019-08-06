@@ -99,6 +99,15 @@ class AbstractQueryFactory:
     def _get_columns_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(COLUMNS, {})
 
+    def _get_columns_for_item_types(self, item_types=None):
+        columns = {}
+        item_type_values = item_types or self.params_parser.param_values_to_list(
+            params=self._get_item_types()
+        )
+        for item_type in item_type_values:
+            columns.update(self._get_columns_for_item_type(item_type))
+        return columns
+
     def _get_invalid_item_types(self, item_types):
         registered_types = self._get_registered_types()
         return [
@@ -281,12 +290,7 @@ class AbstractQueryFactory:
         )
 
     def _get_return_fields_from_schema_columns(self):
-        columns = {}
-        item_type_values = self.params_parser.param_values_to_list(
-            params=self._get_item_types()
-        )
-        for item_type in item_type_values:
-            columns.update(self._get_columns_for_item_type(item_type))
+        columns = self._get_columns_for_item_types()
         return self._prefix_values(
             EMBEDDED,
             [c for c in columns]

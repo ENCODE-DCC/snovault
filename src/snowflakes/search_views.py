@@ -4,6 +4,7 @@ from snovault.elasticsearch.searches.interfaces import SEARCH_TITLE
 from snovault.elasticsearch.searches.fields import AllResponseField
 from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import ClearFiltersResponseField
+from snovault.elasticsearch.searches.fields import ColumnsResponseField
 from snovault.elasticsearch.searches.fields import ContextResponseField
 from snovault.elasticsearch.searches.fields import DebugQueryResponseField
 from snovault.elasticsearch.searches.fields import FiltersResponseField
@@ -55,6 +56,7 @@ def searchv2(context, request):
             NotificationResponseField(),
             FiltersResponseField(),
             ClearFiltersResponseField(),
+            ColumnsResponseField(),
             DebugQueryResponseField()
         ]
     )

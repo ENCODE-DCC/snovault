@@ -24,6 +24,7 @@ def test_searchv2_view(workbook, testapp):
     assert r.status_code == 200
     assert r.json['clear_filters'] == '/searchv2/?type=Snowflake'
     assert 'debug' not in r.json
+    assert 'columns' in r.json
 
 
 def test_searchv2_view_with_limit(workbook, testapp):

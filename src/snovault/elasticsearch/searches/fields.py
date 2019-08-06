@@ -3,6 +3,7 @@ from .interfaces import AT_ID
 from .interfaces import AT_CONTEXT
 from .interfaces import AT_TYPE
 from .interfaces import CLEAR_FILTERS
+from .interfaces import COLUMNS
 from .interfaces import DEBUG_KEY
 from .interfaces import FACETS
 from .interfaces import FIELD_KEY
@@ -326,3 +327,15 @@ class DebugQueryResponseField(ResponseField):
                 }
             )
         return self.response
+
+
+class ColumnsResponseField(ResponseField):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def render(self, *args, **kwargs):
+        self.parent = kwargs.get('parent')
+        return {
+            COLUMNS: self.get_query_builder()._get_columns_for_item_types()
+        }

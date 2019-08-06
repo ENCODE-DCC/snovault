@@ -128,6 +128,18 @@ def test_searches_queries_abstract_query_factory_get_columns_for_item_type(param
     assert len(expected) == len(columns)
 
 
+def test_searches_queries_abstract_query_factory_get_columns_for_item_types(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&type=TestingSearchSchema'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    columns = aq._get_columns_for_item_types()
+    assert columns == {'accession': {'title': 'Accession'}, 'status': {'title': 'Status'}}
+
+
 def test_searches_queries_abstract_query_factory_get_invalid_item_types(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
