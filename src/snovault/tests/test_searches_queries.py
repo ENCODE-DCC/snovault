@@ -2484,11 +2484,40 @@ def test_searches_queries_abstract_query_factory_add_source_object(dummy_request
     assert len(expected) == len(actual)
 
 
-def test_searches_queries_abstract_query_factory_add_slice(params_parser):
+def test_searches_queries_abstract_query_factory_add_slice(params_parser, dummy_request):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     aq = AbstractQueryFactory(params_parser)
     aq.add_slice()
     assert aq.search.to_dict() == {'from': 0, 'size': 10, 'query': {'match_all': {}}}
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&type=TestingSearchSchema&frame=object&limit=all'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_slice()
+    assert aq.search.to_dict() == {'from': 0, 'size': 25, 'query': {'match_all': {}}}
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&type=TestingSearchSchema&frame=object&limit=3000'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_slice()
+    assert aq.search.to_dict() == {'from': 0, 'size': 3000, 'query': {'match_all': {}}}
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&type=TestingSearchSchema&frame=object&limit=blah'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_slice()
+    assert aq.search.to_dict() == {'from': 0, 'size': 25, 'query': {'match_all': {}}}
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&type=TestingSearchSchema&frame=object&limit=10000'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_slice()
+    assert aq.search.to_dict() == {'from': 0, 'size': 25, 'query': {'match_all': {}}}
 
 
 def test_searches_queries_abstract_query_factory_subaggregation_factory(params_parser_snovault_types):
