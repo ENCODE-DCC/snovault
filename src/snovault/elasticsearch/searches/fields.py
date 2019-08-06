@@ -3,6 +3,7 @@ from .interfaces import AT_ID
 from .interfaces import AT_CONTEXT
 from .interfaces import AT_TYPE
 from .interfaces import CLEAR_FILTERS
+from .interfaces import DEBUG_KEY
 from .interfaces import FACETS
 from .interfaces import FIELD_KEY
 from .interfaces import FILTERS
@@ -11,6 +12,7 @@ from .interfaces import JSONLD_CONTEXT
 from .interfaces import LIMIT_KEY
 from .interfaces import NO_RESULTS_FOUND
 from .interfaces import NOTIFICATION
+from .interfaces import RAW_QUERY
 from .interfaces import REMOVE
 from .interfaces import SUCCESS
 from .interfaces import TERM
@@ -302,4 +304,25 @@ class ClearFiltersResponseField(ResponseField):
     def render(self, *args, **kwargs):
         self.parent = kwargs.get('parent')
         self._add_clear_filters()
+        return self.response
+
+
+class DebugQueryResponseField(ResponseField):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def render(self, *args, **kwargs):
+        '''
+        Returns constructed query in debug field if debug param specified.
+        '''
+        self.parent = kwargs.get('parent')
+        if self.get_params_parser().get_debug():
+            self.response.update(
+                {
+                    DEBUG_KEY: {
+                        RAW_QUERY: self.get_query_builder().search.to_dict()
+                    }
+                }
+            )
         return self.response

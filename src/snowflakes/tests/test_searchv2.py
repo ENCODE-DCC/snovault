@@ -23,6 +23,7 @@ def test_searchv2_view(workbook, testapp):
     assert len(r.json['filters']) == 4
     assert r.status_code == 200
     assert r.json['clear_filters'] == '/searchv2/?type=Snowflake'
+    assert 'debug' not in r.json
 
 
 def test_searchv2_view_with_limit(workbook, testapp):
@@ -123,6 +124,13 @@ def test_searchv2_view_object_frame(workbook, testapp):
             for x in ['accession', '@type', '@id', 'status']
         ]
     )
+
+def test_searchv2_view_debug_query(workbook, testapp):
+    r = testapp.get(
+        '/searchv2/?type=Snowflake&debug=true'
+    )
+    assert 'debug' in r.json
+    assert 'post_filter' in r.json['debug']['raw_query']
 
 
 def test_searchv2_view_no_type(workbook, testapp):

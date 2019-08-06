@@ -2,6 +2,7 @@ from urllib.parse import urlencode
 from collections import defaultdict
 
 from .interfaces import ADVANCED_QUERY_KEY
+from .interfaces import DEBUG_KEY
 from .interfaces import FIELD_KEY
 from .interfaces import FRAME_KEY
 from .interfaces import LIMIT_KEY
@@ -276,6 +277,12 @@ class ParamsParser:
     def get_mode(self, params=None):
         return self.get_key_filters(
             key=MODE_KEY,
+            params=params
+        )
+
+    def get_debug(self, params=None):
+        return self.get_key_filters(
+            key=DEBUG_KEY,
             params=params
         )
 

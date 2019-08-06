@@ -19,6 +19,7 @@ OPTIONAL_PARAMS = [
     'filterresponse',
     'remove',
     'cart',
+    'debug',
 ]
 
 FREE_TEXT_QUERIES = [

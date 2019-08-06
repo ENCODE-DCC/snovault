@@ -672,6 +672,17 @@ def test_searches_parsers_params_parser_get_mode(dummy_request):
     )[0] == 'picker'
 
 
+def test_searches_parsers_params_parser_get_debug(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'frame=embedded&status!=submitted&type=File&sort=date_created&debug=true'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_debug() == [
+        ('debug', 'true')
+    ]
+
+
 def test_searches_parsers_params_parser_param_keys_to_list(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (

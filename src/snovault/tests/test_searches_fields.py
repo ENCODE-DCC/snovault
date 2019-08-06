@@ -362,3 +362,16 @@ def test_searches_fields_clear_filter_response_field_add_clear_filters(dummy_par
     cfr.parent = dummy_parent
     cfr._add_clear_filters()
     assert cfr.response['clear_filters'] == '/dummy?type=Experiment'
+
+
+def test_searches_fields_debug_query_response_field(dummy_parent):
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*&debug=true'
+    )
+    dummy_parent._meta['query_builder'].add_post_filters()
+    from snovault.elasticsearch.searches.fields import DebugQueryResponseField
+    dbr = DebugQueryResponseField()
+    r = dbr.render(parent=dummy_parent)
+    assert 'query' in r['debug']['raw_query']
+    assert 'post_filter' in r['debug']['raw_query']
