@@ -127,8 +127,13 @@ class AbstractQueryFactory:
             params=self._get_mode()
         )
         if mode == PICKER:
-            return [ITEM]
-        return self.kwargs.get('default_item_types', [])
+            item_types = [ITEM]
+        else:
+            item_types = self.kwargs.get('default_item_types', [])
+        return [
+            (TYPE_KEY, item_type)
+            for item_type in item_types
+        ]
 
     def _wildcard_in_item_types(self, item_types):
         wildcard_types = self.params_parser.get_filters_by_condition(
@@ -195,7 +200,10 @@ class AbstractQueryFactory:
         return self.params_parser.get_not_keys_filters(not_keys=NOT_FILTERS)
 
     def _get_post_filters(self):
-        return self.kwargs.get('post_filters', self._get_filters() + self._get_item_types())
+        return self.kwargs.get(
+            'post_filters',
+            self._get_filters() + self._get_item_types() or self._get_default_item_types()
+        )
 
     def _get_sort(self):
         return self.params_parser.get_sort()
@@ -388,7 +396,9 @@ class AbstractQueryFactory:
                             params=self._get_item_types()
                         )
                     )
-                    or self._get_default_item_types()
+                    or self.params_parser.param_values_to_list(
+                        params=self._get_default_item_types()
+                    )
                 )
             )
         ]

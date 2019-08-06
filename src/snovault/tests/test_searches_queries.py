@@ -186,8 +186,8 @@ def test_searches_queries_abstract_query_factory_get_default_item_types(params_p
     )
     default_item_types = aq._get_default_item_types()
     assert default_item_types == [
-        'Snowflake',
-        'Pancake'
+        ('type', 'Snowflake'),
+        ('type', 'Pancake')
     ]
     aq = AbstractQueryFactory(
         params_parser,
@@ -208,7 +208,7 @@ def test_searches_queries_abstract_query_factory_get_default_item_types_mode_pic
         params_parser
     )
     default_item_types = aq._get_default_item_types()
-    assert default_item_types == ['Item']
+    assert default_item_types == [('type', 'Item')]
 
 
 def test_searches_queries_abstract_query_factory_get_default_facets(params_parser):
