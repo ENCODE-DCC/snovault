@@ -11,9 +11,12 @@ from snovault.interfaces import TYPES
 
 from .decorators import assert_none_returned
 from .decorators import assert_one_or_none_returned
+from .decorators import deduplicate
 from .defaults import BASE_AUDIT_FACETS
 from .defaults import BASE_FIELD_FACETS
+from .defaults import BASE_RETURN_FIELDS
 from .defaults import BASE_SEARCH_FIELDS
+from .defaults import DEFAULT_FRAMES
 from .defaults import INTERNAL_AUDIT_FACETS
 from .defaults import MAX_ES_RESULTS_WINDOW
 from .defaults import NOT_FILTERS
@@ -253,10 +256,28 @@ class AbstractQueryFactory:
             params=self._get_frame()
         )
 
+    def _get_fields(self):
+        return self.params_parser.get_field_filters()
+
     def _get_search_fields(self):
         return BASE_SEARCH_FIELDS
 
+    @deduplicate
     def _get_return_fields(self):
+        fields = self._get_fields()
+        if fields:
+            return (
+                BASE_RETURN_FIELDS
+                + self._prefix_values(
+                    EMBEDDED,
+                    self.params_parser.param_values_to_list(
+                        params=fields
+                    )
+                )
+            )
+        frame = self._get_frame_value()
+        if frame in DEFAULT_FRAMES:
+            return [frame + PERIOD + WILDCARD]
         return [EMBEDDED + WILDCARD]
 
     def _get_facets(self):

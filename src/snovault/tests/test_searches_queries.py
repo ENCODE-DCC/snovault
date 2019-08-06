@@ -546,11 +546,44 @@ def test_searches_queries_abstract_query_factory_get_search_fields_mode_picker(d
     ])
 
 
-def test_searches_queries_abstract_query_factory_get_return_fields(params_parser):
+def test_searches_queries_abstract_query_factory_get_fields(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    return_fields = aq._get_return_fields()
-    assert return_fields == [
+    assert aq._get_fields() == [
+        ('field', '@id'),
+        ('field', 'accession')
+    ]
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&field=status&field=@id&field=lab.name'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_fields() == [
+        ('field', 'status'),
+        ('field', '@id'),
+        ('field', 'lab.name')
+    ]
+
+
+def test_searches_queries_abstract_query_factory_get_return_fields(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    expected = [
+        'embedded.@id',
+        'embedded.@type',
+        'embedded.accession'
+    ]
+    actual = aq._get_return_fields()
+    assert all([e in actual for e in expected])
+    assert len(expected) == len(actual)
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&frame=embedded'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_return_fields() == [
         'embedded.*'
     ]
 
@@ -2384,7 +2417,10 @@ def test_searches_queries_abstract_query_factory_add_source(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
     aq.add_source()
-    assert aq.search.to_dict() == {'_source': ['embedded.*'], 'query': {'match_all': {}}}
+    expected = ['embedded.@id', 'embedded.@type', 'embedded.accession']
+    actual = aq.search.to_dict()['_source']
+    assert all([e in actual for e in expected])
+    assert len(expected) == len(actual)
 
 
 def test_searches_queries_abstract_query_factory_add_slice(params_parser):
