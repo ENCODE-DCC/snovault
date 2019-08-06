@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from elasticsearch_dsl import A
 from elasticsearch_dsl import Q
 from elasticsearch_dsl import Search
@@ -100,7 +101,7 @@ class AbstractQueryFactory:
         return self._get_schema_for_item_type(item_type).get(COLUMNS, {})
 
     def _get_columns_for_item_types(self, item_types=None):
-        columns = {}
+        columns = OrderedDict()
         item_type_values = item_types or self.params_parser.param_values_to_list(
             params=self._get_item_types() or self._get_default_item_types()
         )
