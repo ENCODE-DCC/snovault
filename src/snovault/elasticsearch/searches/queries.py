@@ -97,7 +97,7 @@ class AbstractQueryFactory:
         return self._get_schema_for_item_type(item_type).get(FACETS, {}).items()
 
     def _get_columns_for_item_type(self, item_type):
-        return self._get_schema_for_item_type(item_type).get(COLUMNS, {}).items()
+        return self._get_schema_for_item_type(item_type).get(COLUMNS, {})
 
     def _get_invalid_item_types(self, item_types):
         registered_types = self._get_registered_types()
@@ -267,25 +267,38 @@ class AbstractQueryFactory:
         return BASE_SEARCH_FIELDS
 
     def _get_return_fields_from_field_params(self, fields):
-        return (
-            BASE_RETURN_FIELDS
-            + self._prefix_values(
-                EMBEDDED,
-                self.params_parser.param_values_to_list(
-                    params=fields
-                )
+        return self._prefix_values(
+            EMBEDDED,
+            self.params_parser.param_values_to_list(
+                params=fields
             )
+        )
+
+    def _get_return_fields_from_schema_columns(self):
+        columns = {}
+        item_type_values = self.params_parser.param_values_to_list(
+            params=self._get_item_types()
+        )
+        for item_type in item_type_values:
+            columns.update(self._get_columns_for_item_type(item_type))
+        return self._prefix_values(
+            EMBEDDED,
+            [c for c in columns]
         )
 
     @deduplicate
     def _get_return_fields(self):
+        # Copy to avoid modifying template.
+        return_fields = BASE_RETURN_FIELDS.copy()
         fields = self._get_fields()
-        if fields:
-            return self._get_return_fields_from_field_params(fields)
         frame = self._get_frame_value()
-        if frame in DEFAULT_FRAMES:
-            return [frame + PERIOD + WILDCARD]
-        return [EMBEDDED + WILDCARD]
+        if fields:
+            return_fields.extend(self._get_return_fields_from_field_params(fields))
+        elif frame in DEFAULT_FRAMES:
+            return_fields = [frame + PERIOD + WILDCARD]
+        else:
+            return_fields.extend(self._get_return_fields_from_schema_columns())
+        return return_fields + [AUDIT + PERIOD + WILDCARD]
 
     def _get_facets(self):
         return self.kwargs.get('facets', self._get_default_and_maybe_item_facets())

@@ -119,7 +119,7 @@ def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params
 def test_searches_queries_abstract_query_factory_get_columns_for_item_type(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
-    columns = aq._get_columns_for_item_type('TestingSearchSchema')
+    columns = aq._get_columns_for_item_type('TestingSearchSchema').items()
     expected = [
         ('accession', {'title': 'Accession'}),
         ('status', {'title': 'Status'})
@@ -583,14 +583,29 @@ def test_searches_queries_abstract_query_factory_get_return_fields_from_field_pa
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
     fields = [('field', '@id'), ('field', 'accession'), ('field', 'status')]
-    print(aq._get_return_fields_from_field_params(fields))
-    assert aq._get_return_fields_from_field_params(fields) == [
-        'embedded.@id',
-        'embedded.@type',
+    expected = [
         'embedded.@id',
         'embedded.accession',
         'embedded.status'
     ]
+    actual = aq._get_return_fields_from_field_params(fields)
+    assert all([e in actual for e in expected])
+    assert len(expected) == len(actual)
+
+
+def test_searches_queries_abstract_query_factory_get_return_fields_from_schema_columns(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&type=TestingSearchSchema'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    expected = ['embedded.status', 'embedded.status']
+    actual = aq._get_return_fields_from_schema_columns()
+    assert all([e in actual for e in expected])
+    assert len(expected) == len(actual)
+
 
 def test_searches_queries_abstract_query_factory_get_return_fields(params_parser, dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
@@ -599,7 +614,8 @@ def test_searches_queries_abstract_query_factory_get_return_fields(params_parser
     expected = [
         'embedded.@id',
         'embedded.@type',
-        'embedded.accession'
+        'embedded.accession',
+        'audit.*'
     ]
     actual = aq._get_return_fields()
     assert all([e in actual for e in expected])
@@ -609,9 +625,14 @@ def test_searches_queries_abstract_query_factory_get_return_fields(params_parser
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    assert aq._get_return_fields() == [
-        'embedded.*'
+    expected = [
+        'embedded.*',
+        'audit.*',
     ]
+    print(aq._get_return_fields())
+    actual = aq._get_return_fields()
+    assert all([e in actual for e in expected])
+    assert len(expected) == len(actual)
 
 
 def test_searches_queries_abstract_query_factory_combine_search_term_queries(dummy_request):
@@ -2443,7 +2464,7 @@ def test_searches_queries_abstract_query_factory_add_source(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
     aq.add_source()
-    expected = ['embedded.@id', 'embedded.@type', 'embedded.accession']
+    expected = ['embedded.@id', 'embedded.@type', 'embedded.accession', 'audit.*']
     actual = aq.search.to_dict()['_source']
     assert all([e in actual for e in expected])
     assert len(expected) == len(actual)
