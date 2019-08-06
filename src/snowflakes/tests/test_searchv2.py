@@ -142,12 +142,12 @@ def test_searchv2_view_no_type(workbook, testapp):
     r = testapp.get('/searchv2/')
     assert 'total' in r.json
     assert 'filters' in r.json
-    assert len(r.json['filters']) == 5
+    assert len(r.json['filters']) == 0
 
 
 def test_searchv2_view_no_type_debug(workbook, testapp):
     r = testapp.get('/searchv2/?debug=true')
-    assert 'must' in r.json['debug']['raw_query']['post_filter']['bool']
+    assert not r.json['debug']['raw_query']['post_filter']['bool']
 
 
 def test_searchv2_view_raw_response(workbook, testapp):
