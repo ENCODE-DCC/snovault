@@ -1,3 +1,7 @@
+from .interfaces import EMBEDDED_FRAME
+from .interfaces import OBJECT_FRAME
+
+
 OPTIONAL_PARAMS = [
     'type',
     'limit',
@@ -54,3 +58,8 @@ INTERNAL_AUDIT_FACETS = [
 ]
 
 MAX_ES_RESULTS_WINDOW = 9999
+
+DEFAULT_FRAMES = [
+    EMBEDDED_FRAME,
+    OBJECT_FRAME
+]

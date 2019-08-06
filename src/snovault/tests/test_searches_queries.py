@@ -478,6 +478,48 @@ def test_searches_queries_abstract_query_factory_get_int_limit_value_or_default(
     assert limit == 25
 
 
+def test_searches_queries_abstract_query_factory_get_frame(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.exceptions import HTTPBadRequest
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&frame=object&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_frame() == [('frame', 'object')]
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&frame=embedded&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_frame() == [('frame', 'embedded')]
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&frame=embedded&frame=object'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    with pytest.raises(HTTPBadRequest):
+         aq._get_frame()
+
+
+def test_searches_queries_abstract_query_factory_get_frame_value(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&frame=object&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_frame_value() == 'object'
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_frame_value() is None
+
+
 def test_searches_queries_abstract_query_factory_get_search_fields(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)

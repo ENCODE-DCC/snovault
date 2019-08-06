@@ -244,6 +244,15 @@ class AbstractQueryFactory:
     def _get_mode(self):
         return self.params_parser.get_mode()
 
+    @assert_one_or_none_returned(error_message='Invalid to specify multiple frame parameters:')
+    def _get_frame(self):
+        return self.params_parser.get_frame()
+
+    def _get_frame_value(self):
+        return self.params_parser.get_one_value(
+            params=self._get_frame()
+        )
+
     def _get_search_fields(self):
         return BASE_SEARCH_FIELDS
 
