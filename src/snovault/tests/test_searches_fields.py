@@ -164,10 +164,15 @@ def test_searches_fields_all_response_field_maybe_add_all(dummy_parent):
     ar.parent = dummy_parent
     ar._maybe_add_all()
     assert 'all' not in ar.response
+    ar = AllResponseField()
+    ar.parent = dummy_parent
     ar.parent.response.update({'total': 150})
     ar._maybe_add_all()
     assert 'all' in ar.response
     assert ar.response['all'] == '/dummy?limit=all'
+    ar = AllResponseField()
+    ar.parent = dummy_parent
+    ar.parent.response.update({'total': 150})
     ar.parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
         'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=99'
     )
@@ -176,6 +181,22 @@ def test_searches_fields_all_response_field_maybe_add_all(dummy_parent):
         '/dummy?type=Experiment&assay_title=Histone+ChIP-seq'
         '&award.project=Roadmap&limit=all'
     )
+    ar = AllResponseField()
+    ar.parent = dummy_parent
+    ar.parent.response.update({'total': 150})
+    ar.parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=all'
+    )
+    ar._maybe_add_all()
+    assert 'all' not in ar.response
+    ar = AllResponseField()
+    ar.parent = dummy_parent
+    ar.parent.response.update({'total': 150})
+    ar.parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap&limit=200'
+    )
+    ar._maybe_add_all()
+    assert 'all' not in ar.response
 
 
 def test_searches_fields_notification_response_field_init(dummy_parent):
