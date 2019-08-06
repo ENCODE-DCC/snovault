@@ -2470,6 +2470,21 @@ def test_searches_queries_abstract_query_factory_add_source(params_parser):
     assert len(expected) == len(actual)
 
 
+def test_searches_queries_abstract_query_factory_add_source_object(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&type=TestingSearchSchema&frame=object'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_source()
+    expected = ['object.*', 'audit.*']
+    actual = aq.search.to_dict()['_source']
+    assert all([e in actual for e in expected])
+    assert len(expected) == len(actual)
+
+
 def test_searches_queries_abstract_query_factory_add_slice(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
