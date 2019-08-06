@@ -113,6 +113,19 @@ def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params
         ('status', {'title': 'Status'})
     ]
     assert all(e in facets for e in expected)
+    assert len(expected) == len(facets)
+
+
+def test_searches_queries_abstract_query_factory_get_columns_for_item_type(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    columns = aq._get_columns_for_item_type('TestingSearchSchema')
+    expected = [
+        ('accession', {'title': 'Accession'}),
+        ('status', {'title': 'Status'})
+    ]
+    assert all(e in columns for e in expected)
+    assert len(expected) == len(columns)
 
 
 def test_searches_queries_abstract_query_factory_get_invalid_item_types(params_parser_snovault_types):

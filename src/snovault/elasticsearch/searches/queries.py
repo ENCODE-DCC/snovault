@@ -27,6 +27,7 @@ from .interfaces import AND_NOT_JOIN
 from .interfaces import AUDIT
 from .interfaces import BOOL
 from .interfaces import BOOST_VALUES
+from .interfaces import COLUMNS
 from .interfaces import DASH
 from .interfaces import EMBEDDED
 from .interfaces import EMBEDDED_TYPE
@@ -94,6 +95,9 @@ class AbstractQueryFactory:
 
     def _get_facets_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(FACETS, {}).items()
+
+    def _get_columns_for_item_type(self, item_type):
+        return self._get_schema_for_item_type(item_type).get(COLUMNS, {}).items()
 
     def _get_invalid_item_types(self, item_types):
         registered_types = self._get_registered_types()
