@@ -102,7 +102,7 @@ class AbstractQueryFactory:
     def _get_columns_for_item_types(self, item_types=None):
         columns = {}
         item_type_values = item_types or self.params_parser.param_values_to_list(
-            params=self._get_item_types()
+            params=self._get_item_types() or self._get_default_item_types()
         )
         for item_type in item_type_values:
             columns.update(self._get_columns_for_item_type(item_type))
