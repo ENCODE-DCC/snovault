@@ -1,3 +1,4 @@
+from .interfaces import AUDIT
 from .interfaces import EMBEDDED_FRAME
 from .interfaces import OBJECT_FRAME
 
@@ -63,4 +64,8 @@ MAX_ES_RESULTS_WINDOW = 9999
 DEFAULT_FRAMES = [
     EMBEDDED_FRAME,
     OBJECT_FRAME
+]
+
+KEEP_LAYERED_FIELDS = [
+    AUDIT
 ]

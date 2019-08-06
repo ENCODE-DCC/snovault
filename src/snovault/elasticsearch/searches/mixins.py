@@ -1,6 +1,8 @@
 from collections import defaultdict
 from functools import lru_cache
 
+
+from .defaults import KEEP_LAYERED_FIELDS
 from .interfaces import APPENDED
 from .interfaces import BUCKETS
 from .interfaces import DASH
@@ -176,13 +178,16 @@ class HitsToGraphMixin:
             return self.results._search.scan()
         return self.results
 
-    def _unlayer(self, hit_dict):
+    def _unlayer(self, hit_dict, keep_layered=KEEP_LAYERED_FIELDS):
         '''
-        Removes embedded.*, object.*, audit.* etc. prefix from results.
+        Removes embedded.* and object.* prefix from results but keeps audit.* prefix.
         '''
         r = {}
         for k, v in hit_dict.items():
-            r.update(v)
+            if k in keep_layered:
+                r.update({k: v})
+            else:
+                r.update(v)
         return r
 
     def to_graph(self):

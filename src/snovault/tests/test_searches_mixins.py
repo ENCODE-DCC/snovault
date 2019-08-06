@@ -1041,8 +1041,10 @@ def test_searches_mixins_hits_to_graph_mixin_unlayer(basic_query_response_with_f
     assert r == {
         '@type': 'Experiment',
         'accession': 'ENCFF123ABC',
-        'audit-internal-warning': {
-            'description': 'abc'
+        'audit': {
+            'audit-internal-warning': {
+                'description': 'abc'
+            }
         }
     }
 
