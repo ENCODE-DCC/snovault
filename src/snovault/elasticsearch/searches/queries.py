@@ -306,7 +306,7 @@ class AbstractQueryFactory:
         fields = self._get_fields()
         frame = self._get_frame_value()
         if fields:
-            return_fields.extend(self._get_return_fields_from_field_params(fields))
+            return return_fields + self._get_return_fields_from_field_params(fields)
         elif frame in DEFAULT_FRAMES:
             return_fields = [frame + PERIOD + WILDCARD]
         else:

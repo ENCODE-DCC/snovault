@@ -655,8 +655,7 @@ def test_searches_queries_abstract_query_factory_get_return_fields(params_parser
     expected = [
         'embedded.@id',
         'embedded.@type',
-        'embedded.accession',
-        'audit.*'
+        'embedded.accession'
     ]
     actual = aq._get_return_fields()
     assert all([e in actual for e in expected])
@@ -2504,7 +2503,7 @@ def test_searches_queries_abstract_query_factory_add_source(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
     aq.add_source()
-    expected = ['embedded.@id', 'embedded.@type', 'embedded.accession', 'audit.*']
+    expected = ['embedded.@id', 'embedded.@type', 'embedded.accession']
     actual = aq.search.to_dict()['_source']
     assert all([e in actual for e in expected])
     assert len(expected) == len(actual)
