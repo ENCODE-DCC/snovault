@@ -188,7 +188,7 @@ class HitsToGraphMixin:
                 r.update({k: v})
             else:
                 r.update(v)
-        return r
+        return OrderedDict(sorted(r.items()))
 
     def to_graph(self):
         return [
