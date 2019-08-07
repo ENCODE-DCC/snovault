@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from .decorators import remove_from_return
 from .mixins import AggsToFacetsMixin
 from .mixins import HitsToGraphMixin
@@ -31,7 +33,7 @@ class FieldedResponse:
         '''
         for f in self.response_fields:
             self.response.update(f.render(parent=self))
-        return self.response
+        return OrderedDict(sorted(self.response.items()))
 
 
 class QueryResponse:
