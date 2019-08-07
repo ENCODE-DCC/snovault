@@ -35,7 +35,7 @@ DEFAULT_ITEM_TYPES = [
 @view_config(route_name='searchv2', request_method='GET', permission='search')
 def searchv2(context, request):
     # Note the order of rendering matters for some fields, e.g. AllResponseField and
-    # NotificationResponseField depend on results from BasicQueryResponseWithFacets.
+    # NotificationResponseField depend on results from BasicSearchWithFacetsResponseField.
     fr = FieldedResponse(
         _meta={
             'params_parser': ParamsParser(request)
