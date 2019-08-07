@@ -431,7 +431,7 @@ class AbstractQueryFactory:
             exclude=exclude
         )
 
-    def _make_exists_aggregation(self, field):
+    def _make_exists_aggregation(self, field, **kwargs):
         return A(
             FILTERS,
             filters={
