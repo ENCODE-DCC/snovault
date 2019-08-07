@@ -2,7 +2,6 @@ from collections import defaultdict
 from collections import OrderedDict
 from functools import lru_cache
 
-
 from .defaults import KEEP_LAYERED_FIELDS
 from .interfaces import APPENDED
 from .interfaces import BUCKETS
