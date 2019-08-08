@@ -22,6 +22,7 @@ from .interfaces import SUCCESS
 from .interfaces import TERM
 from .interfaces import TITLE
 from .interfaces import TOTAL
+from .queries import BasicSearchQueryFactory
 from .queries import BasicSearchQueryFactoryWithFacets
 from .responses import BasicQueryResponseWithFacets
 from .responses import RawQueryResponseWithAggs
@@ -61,9 +62,10 @@ class ResponseField:
         raise NotImplementedError
 
 
-class BasicSearchWithFacetsResponseField(ResponseField):
+class BasicSearchResponseField(ResponseField):
     '''
-    Returns formatted results from ES query.
+    Builds faster query (no aggregations) and returns formatted hits.
+    For use when aggregations are not needed.
     '''
 
     def __init__(self, *args, **kwargs):
@@ -73,7 +75,7 @@ class BasicSearchWithFacetsResponseField(ResponseField):
         self.results = None
 
     def _build_query(self):
-        self.query_builder = BasicSearchQueryFactoryWithFacets(
+        self.query_builder = BasicSearchQueryFactory(
             params_parser=self.get_params_parser(),
             **self.kwargs
         )
@@ -94,9 +96,7 @@ class BasicSearchWithFacetsResponseField(ResponseField):
     def _format_results(self):
         self.response.update(
             {
-                GRAPH: self.results.to_graph(),
-                FACETS: self.results.to_facets(),
-                TOTAL: self.results.results.hits.total
+                GRAPH: self.results.to_graph()
             }
         )
 
@@ -109,9 +109,36 @@ class BasicSearchWithFacetsResponseField(ResponseField):
         return self.response
 
 
+class BasicSearchWithFacetsResponseField(BasicSearchResponseField):
+    '''
+    Like BasicSearchResponseField but builds query with aggregations and renders
+    facets and other frontend fields. This is the standard search result response.
+    '''
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _build_query(self):
+        self.query_builder = BasicSearchQueryFactoryWithFacets(
+            params_parser=self.get_params_parser(),
+            **self.kwargs
+        )
+        self.query = self.query_builder.build_query()
+
+    def _format_results(self):
+        self.response.update(
+            {
+                GRAPH: self.results.to_graph(),
+                FACETS: self.results.to_facets(),
+                TOTAL: self.results.results.hits.total
+            }
+        )
+
+
 class RawSearchWithAggsResponseField(BasicSearchWithFacetsResponseField):
     '''
-    Returns raw results from ES query.
+    Like BasicSearchWithFacetsResponseField but returns raw results from ES query.
+    Useful for debugging/building frontend views that are less reliant on backend logic.
     '''
 
     def __init__(self, *args, **kwargs):
@@ -134,11 +161,7 @@ class RawSearchWithAggsResponseField(BasicSearchWithFacetsResponseField):
             self.response[HITS][HITS] = self.results.to_graph()
 
     def render(self, *args, **kwargs):
-        self.parent = kwargs.get('parent')
-        self._build_query()
-        self._register_query()
-        self._execute_query()
-        self._format_results()
+        super().render(*args, **kwargs)
         self._maybe_scan_over_results()
         return self.response
 

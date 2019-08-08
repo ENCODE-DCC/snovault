@@ -2,6 +2,7 @@ from pyramid.view import view_config
 
 from snovault.elasticsearch.searches.interfaces import SEARCH_TITLE
 from snovault.elasticsearch.searches.fields import AllResponseField
+from snovault.elasticsearch.searches.fields import BasicSearchResponseField
 from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import ClearFiltersResponseField
 from snovault.elasticsearch.searches.fields import ColumnsResponseField
@@ -20,6 +21,7 @@ from snovault.elasticsearch.searches.responses import FieldedResponse
 def includeme(config):
     config.add_route('searchv2', '/searchv2{slash:/?}')
     config.add_route('searchv2_raw', '/searchv2_raw{slash:/?}')
+    config.add_route('searchv2_quick', '/searchv2_quick{slash:/?}')
     config.scan(__name__)
 
 
@@ -71,6 +73,21 @@ def searchv2_raw(context, request):
         },
         response_fields=[
             RawSearchWithAggsResponseField(
+                default_item_types=DEFAULT_ITEM_TYPES
+            )
+        ]
+    )
+    return fr.render()
+
+
+@view_config(route_name='searchv2_quick', request_method='GET', permission='search')
+def searchv2_quick(context, request):
+    fr = FieldedResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
+        response_fields=[
+            BasicSearchResponseField(
                 default_item_types=DEFAULT_ITEM_TYPES
             )
         ]

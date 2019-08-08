@@ -149,7 +149,7 @@ def test_searchv2_view_no_type_debug(workbook, testapp):
     assert not r.json['debug']['raw_query']['post_filter']['bool']
 
 
-def test_searchv2_view_raw_response(workbook, testapp):
+def test_searchv2_raw_view_raw_response(workbook, testapp):
     r = testapp.get('/searchv2_raw/?type=Snowflake')
     assert 'hits' in r.json
     assert 'aggregations' in r.json
@@ -158,7 +158,29 @@ def test_searchv2_view_raw_response(workbook, testapp):
     assert 'took' in r.json
 
 
-def test_searchv2_view_raw_response_limit_all(workbook, testapp):
+def test_searchv2_raw_view_raw_response_limit_all(workbook, testapp):
     r = testapp.get('/searchv2_raw/?type=*&limit=all')
     assert 'hits' in r.json
     assert len(r.json['hits']['hits']) > 170
+
+
+def test_searchv2_quick_view_limit_all(workbook, testapp):
+    r = testapp.get('/searchv2_quick/?type=*&limit=all')
+    assert '@graph' in r.json
+    assert len(r.json['@graph']) > 170
+    assert '@id' in r.json['@graph'][0]
+    assert len(r.json.keys()) == 1
+
+
+def test_searchv2_quick_view_one_item(workbook, testapp):
+    r = testapp.get(
+        '/searchv2_quick/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
+    )
+    assert len(r.json['@graph']) == 1
+
+
+def test_searchv2_quick_view_specify_field(workbook, testapp):
+    r = testapp.get('/searchv2_quick/?type=Snowflake&field=@id')
+    assert '@id' in r.json['@graph'][0]
+    assert '@type' in r.json['@graph'][0]
+    assert len(r.json['@graph'][0].keys()) == 2
