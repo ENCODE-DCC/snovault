@@ -612,6 +612,27 @@ def basic_query_response_with_facets(raw_response, basic_search_query_factory_wi
     return bqr
 
 
+@pytest.fixture
+def raw_query_response_with_facets(raw_response, basic_search_query_factory_with_facets):
+    from snovault.elasticsearch.searches.responses import RawQueryResponseWithAggs
+    from elasticsearch_dsl.response import Response, AggResponse
+    basic_search_query_factory_with_facets.search._response = Response(
+        basic_search_query_factory_with_facets.search,
+        raw_response
+    )
+    ar = AggResponse(
+        basic_search_query_factory_with_facets.search.aggs,
+        basic_search_query_factory_with_facets.search,
+        raw_response['hits']['aggregations']
+    )
+    basic_search_query_factory_with_facets.search._response._aggs = ar
+    rqr = RawQueryResponseWithAggs(
+        results=basic_search_query_factory_with_facets.search._response,
+        query_builder=basic_search_query_factory_with_facets
+    )
+    return rqr
+
+
 def test_searches_mixins_aggs_to_facets_mixin_get_total(basic_query_response_with_facets):
     assert basic_query_response_with_facets._get_total() == 2
 
@@ -1056,3 +1077,15 @@ def test_searches_mixins_hits_to_graph_mixin_to_graph(
     r = basic_query_response_with_facets.to_graph()
     assert len(r) == len(raw_response['hits']['hits'])
     assert all(['accession' in x for x in r])
+
+
+def test_searches_mixins_raw_hits_to_graph_mixin_init():
+    from snovault.elasticsearch.searches.mixins import RawHitsToGraphMixin
+    rm = RawHitsToGraphMixin()
+    assert isinstance(rm, RawHitsToGraphMixin)
+
+
+def test_searches_mixins_raw_hits_to_graph_mixin_to_graph(raw_query_response_with_facets):
+    r = raw_query_response_with_facets.to_graph()
+    assert len(r) == 2
+    assert 'embedded' in r[0]

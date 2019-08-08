@@ -83,7 +83,6 @@ def test_searchv2_view_values_bad_type(workbook, testapp):
         '/searchv2/?status=released&type=Sno&type=Flake',
         status=400
     )
-    
     assert r.json['description'] == "Invalid types: ['Sno', 'Flake']"
 
 
@@ -153,3 +152,13 @@ def test_searchv2_view_no_type_debug(workbook, testapp):
 def test_searchv2_view_raw_response(workbook, testapp):
     r = testapp.get('/searchv2_raw/?type=Snowflake')
     assert 'hits' in r.json
+    assert 'aggregations' in r.json
+    assert '_shards' in r.json
+    assert 'timed_out' in r.json
+    assert 'took' in r.json
+
+
+def test_searchv2_view_raw_response_limit_all(workbook, testapp):
+    r = testapp.get('/searchv2_raw/?type=*&limit=all')
+    assert 'hits' in r.json
+    assert len(r.json['hits']['hits']) > 170

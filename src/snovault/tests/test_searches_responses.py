@@ -34,3 +34,9 @@ def test_searches_responses_basic_query_response_with_facets_init():
     from snovault.elasticsearch.searches.responses import BasicQueryResponseWithFacets
     bqr = BasicQueryResponseWithFacets([], [])
     assert isinstance(bqr, BasicQueryResponseWithFacets)
+
+
+def test_searches_responses_raw_query_response_with_aggs_init():
+    from snovault.elasticsearch.searches.responses import RawQueryResponseWithAggs
+    rqr = RawQueryResponseWithAggs([], [])
+    assert isinstance(rqr, RawQueryResponseWithAggs)

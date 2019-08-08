@@ -194,3 +194,18 @@ class HitsToGraphMixin:
             self._unlayer(r.to_dict())
             for r in self._get_results()
         ]
+
+
+class RawHitsToGraphMixin(HitsToGraphMixin):
+    '''
+    Like HitsToGraphMixin but renders raw hit.
+    '''
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def to_graph(self):
+        return [
+            r.to_dict()
+            for r in self._get_results()
+        ]

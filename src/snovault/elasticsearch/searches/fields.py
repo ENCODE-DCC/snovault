@@ -11,6 +11,7 @@ from .interfaces import FACETS
 from .interfaces import FIELD_KEY
 from .interfaces import FILTERS
 from .interfaces import GRAPH
+from .interfaces import HITS
 from .interfaces import JSONLD_CONTEXT
 from .interfaces import LIMIT_KEY
 from .interfaces import NO_RESULTS_FOUND
@@ -23,6 +24,7 @@ from .interfaces import TITLE
 from .interfaces import TOTAL
 from .queries import BasicSearchQueryFactoryWithFacets
 from .responses import BasicQueryResponseWithFacets
+from .responses import RawQueryResponseWithAggs
 
 
 class ResponseField:
@@ -116,18 +118,28 @@ class RawSearchWithAggsResponseField(BasicSearchWithFacetsResponseField):
         super().__init__(*args, **kwargs)
 
     def _execute_query(self):
-        self.results = self.query.execute()
+        self.results = RawQueryResponseWithAggs(
+            results=self.query.execute(),
+            query_builder=self.query_builder
+        )
 
     def _format_results(self):
         self.response.update(
-            self.results.to_dict()
+            self.results.results.to_dict()
         )
+
+    def _maybe_scan_over_results(self):
+        # Required if ES didn't return all the hits in one response.
+        if self.query_builder._should_scan_over_results():
+            self.response[HITS][HITS] = self.results.to_graph()
 
     def render(self, *args, **kwargs):
         self.parent = kwargs.get('parent')
         self._build_query()
+        self._register_query()
         self._execute_query()
         self._format_results()
+        self._maybe_scan_over_results()
         return self.response
 
 

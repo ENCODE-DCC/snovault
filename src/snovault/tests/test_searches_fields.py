@@ -89,6 +89,29 @@ def test_searches_fields_raw_search_with_aggs_response_field_init():
     assert isinstance(rs, RawSearchWithAggsResponseField)
 
 
+def test_searches_fields_raw_search_with_aggs_response_field_maybe_scan_over_results(dummy_parent, mocker):
+    from snovault.elasticsearch.searches.fields import BasicSearchQueryFactoryWithFacets
+    from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
+    from snovault.elasticsearch.searches.mixins import RawHitsToGraphMixin
+    from snovault.elasticsearch.searches.responses import RawQueryResponseWithAggs
+    rs = RawSearchWithAggsResponseField()
+    rs.parent = dummy_parent
+    rs._build_query()
+    rs.results = RawQueryResponseWithAggs(
+        results={},
+        query_builder={}
+    )
+    rs.response = {'hits': {'hits': []}}
+    mocker.patch.object(RawHitsToGraphMixin, 'to_graph')
+    mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_should_scan_over_results')
+    BasicSearchQueryFactoryWithFacets._should_scan_over_results.return_value = False
+    rs._maybe_scan_over_results()
+    assert RawHitsToGraphMixin.to_graph.call_count == 0
+    BasicSearchQueryFactoryWithFacets._should_scan_over_results.return_value = True
+    rs._maybe_scan_over_results()
+    assert RawHitsToGraphMixin.to_graph.call_count == 1
+
+
 def test_searches_fields_title_response_field_init():
     from snovault.elasticsearch.searches.fields import TitleResponseField
     tf = TitleResponseField()
