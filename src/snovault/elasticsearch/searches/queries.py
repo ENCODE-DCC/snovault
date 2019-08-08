@@ -146,13 +146,11 @@ class AbstractQueryFactory:
         ]
 
     def _wildcard_in_item_types(self, item_types):
-        wildcard_types = self.params_parser.get_filters_by_condition(
-                key_and_value_condition=lambda k, v: k == TYPE_KEY and v == WILDCARD,
-                params=item_types
+        return self.params_parser.is_param(
+            TYPE_KEY,
+            WILDCARD,
+            params=item_types
         )
-        if wildcard_types:
-            return True
-        return False
 
     def _get_item_types(self):
         item_types = self.params_parser.get_type_filters()
