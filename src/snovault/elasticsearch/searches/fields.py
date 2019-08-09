@@ -42,7 +42,7 @@ class ResponseField:
         self.args = args
         self.kwargs = kwargs
         self.response = {}
-        self.parent = kwargs.get('parent')
+        self.parent = None
 
     def _get_meta_field(self, meta_field):
         if self.parent:
