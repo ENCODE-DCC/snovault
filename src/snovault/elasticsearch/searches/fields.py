@@ -28,7 +28,7 @@ from .interfaces import TITLE
 from .interfaces import TOTAL
 from .queries import BasicSearchQueryFactory
 from .queries import BasicSearchQueryFactoryWithFacets
-from .queries import BasicReportQueryFactoryWithFacet
+from .queries import BasicReportQueryFactoryWithFacets
 from .responses import BasicQueryResponseWithFacets
 from .responses import RawQueryResponseWithAggs
 
@@ -172,7 +172,7 @@ class BasicReportWithFacetsResponseField(BasicSearchWithFacetsResponseField):
     '''
 
     def _build_query(self):
-        self.query_builder = BasicReportQueryFactoryWithFacet(
+        self.query_builder = BasicReportQueryFactoryWithFacets(
             params_parser=self.get_params_parser(),
             **self.kwargs
         )

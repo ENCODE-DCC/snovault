@@ -759,7 +759,7 @@ class BasicSearchQueryFactoryWithFacets(BasicSearchQueryFactory):
         return self.search
 
 
-class BasicReportQueryFactoryWithFacet(BasicSearchQueryFactoryWithFacets):
+class BasicReportQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
     '''
     Like BasicSearchQueryFactoryWithFacets but makes sure single item type
     without subtypes is specified.
