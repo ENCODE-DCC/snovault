@@ -123,6 +123,21 @@ def test_searches_fields_basic_search_with_facets_response_execute_query(dummy_p
     assert Search.execute.call_count == 1
 
 
+def test_searches_fields_basic_report_with_facets_response_build_query(dummy_parent):
+    from snovault.elasticsearch.searches.fields import BasicReportWithFacetsResponseField
+    from snovault.elasticsearch.searches.queries import BasicReportQueryFactoryWithFacet
+    from elasticsearch_dsl import Search
+    brf = BasicReportWithFacetsResponseField()
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*&searchTerm=ctcf'
+    )
+    brf.parent = dummy_parent
+    brf._build_query()
+    assert isinstance(brf.query, Search)
+    assert isinstance(brf.query_builder, BasicReportQueryFactoryWithFacet)
+
+
 def test_searches_fields_raw_search_with_aggs_response_field_init():
     from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
     rs = RawSearchWithAggsResponseField()
