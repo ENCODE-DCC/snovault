@@ -43,6 +43,22 @@ def test_searches_decorators_assert_one_or_none_returned():
         dummy_func([('one', 'two'), ('one', 'three')])
 
 
+def test_searches_decorators_assert_one_returned():
+    from snovault.elasticsearch.searches.decorators import assert_one_returned
+    @assert_one_returned(error_message='Need one value')
+    def dummy_func(values):
+        return values
+    with pytest.raises(HTTPBadRequest):
+        dummy_func([]) == []
+    assert dummy_func([1]) == [1]
+    assert dummy_func(['one']) == ['one']
+    assert dummy_func([('one', 'two')]) == [('one', 'two')]
+    with pytest.raises(HTTPBadRequest):
+        dummy_func([1, 2])
+    with pytest.raises(HTTPBadRequest):
+        dummy_func([('one', 'two'), ('one', 'three')])
+
+
 def test_searches_decorators_deduplicate():
     from snovault.elasticsearch.searches.decorators import deduplicate
     def dummy_func(values):
