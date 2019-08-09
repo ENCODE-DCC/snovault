@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from snovault.elasticsearch.create_mapping import TEXT_FIELDS
 
 from .interfaces import ALL
 from .interfaces import AT_ID
@@ -14,6 +15,7 @@ from .interfaces import GRAPH
 from .interfaces import HITS
 from .interfaces import JSONLD_CONTEXT
 from .interfaces import LIMIT_KEY
+from .interfaces import NON_SORTABLE
 from .interfaces import NO_RESULTS_FOUND
 from .interfaces import NOTIFICATION
 from .interfaces import RAW_QUERY
@@ -387,4 +389,16 @@ class ColumnsResponseField(ResponseField):
         self.parent = kwargs.get('parent')
         return {
             COLUMNS: self.get_query_builder()._get_columns_for_item_types()
+        }
+
+
+class NonSortableResponseField(ResponseField):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def render(self, *args, **kwargs):
+        self.parent = kwargs.get('parent')
+        return {
+            NON_SORTABLE: TEXT_FIELDS
         }

@@ -206,3 +206,4 @@ def test_reportv2_view(workbook, testapp):
     assert r.json['clear_filters'] == '/reportv2/?type=Snowflake'
     assert 'debug' not in r.json
     assert 'columns' in r.json
+    assert 'non_sortable' in r.json
