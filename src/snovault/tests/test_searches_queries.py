@@ -104,6 +104,25 @@ def test_searches_queries_abstract_query_factory_get_schema_for_item_type(params
     assert isinstance(schema, dict)
 
 
+def test_searches_queries_abstract_query_factory_get_subtypes_for_item_type(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    subtypes = aq._get_subtypes_for_item_type('TestingSearchSchema')
+    assert subtypes == ['TestingSearchSchema']
+    subtypes = aq._get_subtypes_for_item_type('Item')
+    print(subtypes)
+    assert sorted(subtypes) == sorted([
+        'TestingServerDefault',
+        'TestingPostPutPatch',
+        'TestingDependencies',
+        'TestingLinkTarget',
+        'TestingLinkSource',
+        'TestingSearchSchema',
+        'TestingDownload',
+        'TestingBadAccession'
+    ])
+
+
 def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
