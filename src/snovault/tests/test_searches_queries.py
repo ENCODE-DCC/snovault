@@ -340,7 +340,6 @@ def test_searches_queries_abstract_query_factory_get_sort(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
     sort_by = aq._get_sort()
-    print(aq._get_sort())
     assert sort_by == [
         {'embedded.date_created': {'order': 'asc', 'unmapped_type': 'keyword'}},
         {'embedded.files.file_size': {'order': 'desc', 'unmapped_type': 'keyword'}}
