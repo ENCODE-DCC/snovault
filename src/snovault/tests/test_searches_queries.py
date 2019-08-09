@@ -2761,14 +2761,14 @@ def test_searches_queries_abstract_query_factory_build_query():
         aq.build_query()
 
 
-def test_searches_builders_basic_search_query_factory_init(params_parser):
+def test_searches_queries_basic_search_query_factory_init(params_parser):
     from snovault.elasticsearch.searches.queries import BasicSearchQueryFactory
     bsqf = BasicSearchQueryFactory(params_parser)
     assert isinstance(bsqf, BasicSearchQueryFactory)
     assert bsqf.params_parser == params_parser
 
 
-def test_searches_builders_basic_search_query_factory_build_query(dummy_request):
+def test_searches_queries_basic_search_query_factory_build_query(dummy_request):
     from snovault.elasticsearch.searches.queries import BasicSearchQueryFactory
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from pyramid.testing import DummyResource
@@ -2813,14 +2813,14 @@ def test_searches_builders_basic_search_query_factory_build_query(dummy_request)
     assert all(e in actual_must for e in expected_must)
 
 
-def test_searches_builders_basic_search_query_factory_with_facets_init(params_parser):
+def test_searches_queries_basic_search_query_factory_with_facets_init(params_parser):
     from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
     bsqf = BasicSearchQueryFactoryWithFacets(params_parser)
     assert isinstance(bsqf, BasicSearchQueryFactoryWithFacets)
     assert bsqf.params_parser == params_parser
 
 
-def test_searches_builders_basic_search_query_factory_with_facets_build_query(dummy_request):
+def test_searches_queries_basic_search_query_factory_with_facets_build_query(dummy_request):
     from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from pyramid.testing import DummyResource
