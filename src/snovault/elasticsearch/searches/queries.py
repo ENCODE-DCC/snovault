@@ -705,7 +705,7 @@ class AbstractQueryFactory:
     def add_source(self):
         self.search = self._get_or_create_search().extra(
             **{
-                _SOURCE: self._get_return_fields()
+                _SOURCE: sorted(self._get_return_fields())
             }
         )
 
