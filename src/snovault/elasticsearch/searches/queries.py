@@ -20,6 +20,7 @@ from .defaults import BASE_RETURN_FIELDS
 from .defaults import BASE_SEARCH_FIELDS
 from .defaults import DEFAULT_FRAMES
 from .defaults import DEFAULT_SORT
+from .defaults import DEFAULT_SORT_OPTIONS
 from .defaults import INTERNAL_AUDIT_FACETS
 from .defaults import MAX_ES_RESULTS_WINDOW
 from .defaults import NOT_FILTERS
@@ -27,11 +28,13 @@ from .interfaces import ALL
 from .interfaces import AND
 from .interfaces import AND_JOIN
 from .interfaces import AND_NOT_JOIN
+from .interfaces import ASC
 from .interfaces import AUDIT
 from .interfaces import BOOL
 from .interfaces import BOOST_VALUES
 from .interfaces import COLUMNS
 from .interfaces import DASH
+from .interfaces import DESC
 from .interfaces import EMBEDDED
 from .interfaces import EMBEDDED_TYPE
 from .interfaces import EXCLUDE
@@ -46,6 +49,7 @@ from .interfaces import LENGTH
 from .interfaces import LONG
 from .interfaces import NOT_JOIN
 from .interfaces import NO
+from .interfaces import ORDER
 from .interfaces import PERIOD
 from .interfaces import PICKER
 from .interfaces import PRINCIPALS_ALLOWED_VIEW
@@ -220,11 +224,34 @@ class AbstractQueryFactory:
             self._get_filters() + self._get_item_types()
         )
 
+    def _make_sort_key(self, key, prefix=EMBEDDED):
+        return self._prefix_value(prefix, key)
+
+    def _make_sort_value(self, order):
+        sort_value = DEFAULT_SORT_OPTIONS.copy()
+        sort_value[ORDER] = order
+        return sort_value
+
+    def _make_sort_key_and_value(self, key):
+        if key.startswith(DASH):
+            k, order = key[1:], DESC
+        else:
+            k, order = key, ASC
+        return {
+            self._make_sort_key(k): self._make_sort_value(order)
+        }
+
     def _get_default_sort(self):
-        return DEFAULT_SORT.copy()
+        if self._should_add_default_sort():
+            return DEFAULT_SORT.copy()
 
     def _get_sort(self):
-        return self.params_parser.get_sort()
+        return [
+            self._make_sort_key_and_value(key)
+            for key in self.params_parser.param_values_to_list(
+                    params=self.params_parser.get_sort()
+            )
+        ]
 
     def _get_default_from(self):
         return [(FROM_KEY, 0)]
@@ -279,7 +306,7 @@ class AbstractQueryFactory:
         ]
         return any(conditions)
 
-    def _should_add_sort(self):
+    def _should_add_default_sort(self):
         conditions = [
             not self.params_parser.get_search_term_filters(),
             not self.params_parser.get_advanced_query_filters()
@@ -692,15 +719,10 @@ class AbstractQueryFactory:
         self.search = self._get_or_create_search()[:end]
 
     def add_sort(self):
-        if self._should_add_sort():
+        sort_by = self._get_sort() or self._get_default_sort()
+        if sort_by:
             self.search = self._get_or_create_search().sort(
-                *[
-                    {
-                        self._prefix_value(EMBEDDED, k): v
-                        for k, v in x.items()
-                    }
-                    for x in self._get_default_sort()
-                ]
+                *sort_by
             )
 
     def build_query(self):

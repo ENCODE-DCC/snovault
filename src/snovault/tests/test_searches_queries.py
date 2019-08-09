@@ -340,26 +340,26 @@ def test_searches_queries_abstract_query_factory_get_sort(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
     sort_by = aq._get_sort()
+    print(aq._get_sort())
     assert sort_by == [
-        ('sort', 'date_created'),
-        ('sort', '-files.file_size')
+        {'embedded.date_created': {'order': 'asc', 'unmapped_type': 'keyword'}},
+        {'embedded.files.file_size': {'order': 'desc', 'unmapped_type': 'keyword'}}
     ]
 
 
 def test_searches_queries_abstract_query_factory_get_one_value(dummy_request):
-    from pyramid.httpexceptions import HTTPBadRequest
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=TestingSearchSchema&status=released'
-        '&sort=age&sort=color&field=@id&mode=picker&field=accession'
+        '&from=10&sort=color&field=@id&mode=picker&field=accession'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     value = aq.params_parser.get_one_value(
-        params=aq._get_sort()
+        params=aq._get_from()
     )
-    assert value == 'age'
+    assert value == '10'
     value = aq.params_parser.get_one_value(
         params=[]
     )
