@@ -110,7 +110,6 @@ def test_searches_queries_abstract_query_factory_get_subtypes_for_item_type(para
     subtypes = aq._get_subtypes_for_item_type('TestingSearchSchema')
     assert subtypes == ['TestingSearchSchema']
     subtypes = aq._get_subtypes_for_item_type('Item')
-    print(subtypes)
     assert sorted(subtypes) == sorted([
         'TestingServerDefault',
         'TestingPostPutPatch',
@@ -354,6 +353,48 @@ def test_searches_queries_abstract_query_factory_get_post_filters(params_parser)
         ('type', 'Experiment')
     ]
 
+def test_searches_queries_abstract_query_factory_should_add_default_sort(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&limit=50&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._should_add_default_sort()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released&searchTerm=ctcf'
+        '&limit=10&limit=50&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert not aq._should_add_default_sort()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released&advancedQuery=ctcf'
+        '&limit=10&limit=50&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert not aq._should_add_default_sort()
+  
+
+
+def test_searches_queries_abstract_query_factory_get_default_sort(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&limit=50&field=@id&mode=picker&mode=chair&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_default_sort() == [
+        {'embedded.date_created': {'order': 'desc', 'unmapped_type': 'keyword'}},
+        {'embedded.label': {'order': 'desc', 'unmapped_type': 'keyword'}},
+        {'embedded.uuid': {'order': 'desc', 'unmapped_type': 'keyword'}}
+    ]
+
 
 def test_searches_queries_abstract_query_factory_get_sort(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
@@ -363,6 +404,27 @@ def test_searches_queries_abstract_query_factory_get_sort(params_parser):
         {'embedded.date_created': {'order': 'asc', 'unmapped_type': 'keyword'}},
         {'embedded.files.file_size': {'order': 'desc', 'unmapped_type': 'keyword'}}
     ]
+
+
+def test_searches_queries_abstract_query_factory_make_sort_key(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._make_sort_key('status') == 'embedded.status'
+    assert aq._make_sort_key('internal_warning', prefix='audit.') == 'audit.internal_warning'
+
+
+def test_searches_queries_abstract_query_factory_make_sort_value(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._make_sort_value('desc') == {'order': 'desc', 'unmapped_type': 'keyword'}
+    assert aq._make_sort_value('asc') == {'order': 'asc', 'unmapped_type': 'keyword'}
+
+
+def test_searches_queries_abstract_query_factory_make_sort_key_and_value(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._make_sort_key_and_value('status') == {'embedded.status': {'order': 'asc', 'unmapped_type': 'keyword'}}
+    assert aq._make_sort_key_and_value('-file_type') == {'embedded.file_type': {'order': 'desc', 'unmapped_type': 'keyword'}}
 
 
 def test_searches_queries_abstract_query_factory_get_one_value(dummy_request):
