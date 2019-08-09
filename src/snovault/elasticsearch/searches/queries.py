@@ -734,6 +734,14 @@ class BasicReportQueryFactoryWithFacet(BasicSearchQueryFactoryWithFacets):
             )
         )
 
+    def add_slice(self):
+        '''
+        Report frontend passes from and size parameters to paginate.
+        '''
+        start = self._get_int_from_value()
+        end = self._get_bounded_int_limit_value_or_default()
+        self.search = self._get_or_create_search()[start:start + end]
+
     def build_query(self):
         self.validate_item_types()
         self.validate_item_type_subtypes()
