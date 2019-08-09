@@ -476,7 +476,7 @@ def test_searches_fields_debug_query_response_field(dummy_parent):
     assert 'post_filter' in r['debug']['raw_query']
 
 
-def test_searches_fields_clear_filter_response_field_add_clear_filters(dummy_parent):
+def test_searches_fields_column_response_field(dummy_parent):
     dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
         'type=TestingSearchSchema'
     )
@@ -484,3 +484,33 @@ def test_searches_fields_clear_filter_response_field_add_clear_filters(dummy_par
     crf = ColumnsResponseField()
     r = crf.render(parent=dummy_parent)
     assert r['columns'] == {'accession': {'title': 'Accession'}, 'status': {'title': 'Status'}}
+
+
+def test_searches_fields_non_sortable_response_field(dummy_parent):
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema'
+    )
+    from snovault.elasticsearch.searches.fields import NonSortableResponseField
+    nrf = NonSortableResponseField()
+    r = nrf.render(parent=dummy_parent)
+    assert r['non_sortable'] == ['pipeline_error_detail', 'description', 'notes']
+
+
+def test_searches_fields_sort_response_field_remove_prefix(dummy_parent):
+    from snovault.elasticsearch.searches.fields import SortResponseField
+    srf = SortResponseField()
+    rp = srf._remove_prefix([{'embedded.x': {'order': 'desc'}}, {'embedded.y': {'order': 'asc'}}])
+    assert rp == {'x': {'order': 'desc'}, 'y': {'order': 'asc'}}
+
+
+def test_searches_fields_sort_response_field_maybe_add_sort(dummy_parent):
+    from snovault.elasticsearch.searches.fields import SortResponseField
+    from elasticsearch_dsl import Search
+    s = Search().from_dict(
+        {'query': {'match_all': {}}, 'sort': [{'embedded.y': {'order': 'desc'}}]}
+    )
+    dummy_parent._meta['query_builder'].search = s
+    srf = SortResponseField()
+    srf.parent = dummy_parent
+    srf._maybe_add_sort()
+    assert dict(srf.response['sort']) == {'y': {'order': 'desc'}}
