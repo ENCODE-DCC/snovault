@@ -69,3 +69,9 @@ DEFAULT_FRAMES = [
 KEEP_LAYERED_FIELDS = [
     AUDIT
 ]
+
+DEFAULT_SORT = [
+    {'date_created': {'order': 'desc', 'unmapped_type': 'keyword'}},
+    {'label': {'order': 'desc', 'unmapped_type': 'keyword'}},
+    {'uuid': {'order': 'desc', 'unmapped_type': 'keyword'}}
+]

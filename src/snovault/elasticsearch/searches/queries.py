@@ -19,6 +19,7 @@ from .defaults import BASE_FIELD_FACETS
 from .defaults import BASE_RETURN_FIELDS
 from .defaults import BASE_SEARCH_FIELDS
 from .defaults import DEFAULT_FRAMES
+from .defaults import DEFAULT_SORT
 from .defaults import INTERNAL_AUDIT_FACETS
 from .defaults import MAX_ES_RESULTS_WINDOW
 from .defaults import NOT_FILTERS
@@ -219,6 +220,9 @@ class AbstractQueryFactory:
             self._get_filters() + self._get_item_types()
         )
 
+    def _get_default_sort(self):
+        return DEFAULT_SORT.copy()
+
     def _get_sort(self):
         return self.params_parser.get_sort()
 
@@ -274,6 +278,13 @@ class AbstractQueryFactory:
             self._limit_is_over_maximum_window()
         ]
         return any(conditions)
+
+    def _should_add_sort(self):
+        conditions = [
+            not self.params_parser.get_search_term_filters(),
+            not self.params_parser.get_advanced_query_filters()
+        ]
+        return all(conditions)
 
     def _get_bounded_int_limit_value_or_default(self):
         default_limit = self.params_parser.get_one_value(
@@ -680,6 +691,18 @@ class AbstractQueryFactory:
         end = self._get_bounded_int_limit_value_or_default()
         self.search = self._get_or_create_search()[:end]
 
+    def add_sort(self):
+        if self._should_add_sort():
+            self.search = self._get_or_create_search().sort(
+                *[
+                    {
+                        self._prefix_value(EMBEDDED, k): v
+                        for k, v in x.items()
+                    }
+                    for x in self._get_default_sort()
+                ]
+            )
+
     def build_query(self):
         '''
         Public method to be implemented by children.
@@ -699,6 +722,7 @@ class BasicSearchQueryFactory(AbstractQueryFactory):
         self.add_post_filters()
         self.add_source()
         self.add_slice()
+        self.add_sort()
         return self.search
 
 
