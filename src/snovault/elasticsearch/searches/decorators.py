@@ -35,6 +35,13 @@ def assert_one_or_none_returned(error_message):
     )
 
 
+def assert_one_returned(error_message):
+    return assert_condition_returned(
+        condition=lambda result: len(result) != 1,
+        error_message=error_message
+    )
+
+
 def deduplicate(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -62,4 +69,3 @@ def remove_from_return(keys=[], values=[]):
             return r
         return wrapper
     return remove_from_return_decorator
-        

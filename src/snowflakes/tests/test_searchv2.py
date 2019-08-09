@@ -184,3 +184,25 @@ def test_searchv2_quick_view_specify_field(workbook, testapp):
     assert '@id' in r.json['@graph'][0]
     assert '@type' in r.json['@graph'][0]
     assert len(r.json['@graph'][0].keys()) == 2
+
+
+def test_reportv2_view(workbook, testapp):
+    r = testapp.get(
+        '/reportv2/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
+    )
+    assert r.json['title'] == 'Report'
+    assert len(r.json['@graph']) == 1
+    assert r.json['@graph'][0]['accession'] == 'SNOFL000LSQ'
+    assert r.json['@graph'][0]['status'] == 'deleted'
+    assert 'Snowflake' in r.json['@graph'][0]['@type']
+    assert len(r.json['facets']) == 5
+    assert r.json['@id'] == '/reportv2/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
+    assert r.json['@context'] == '/terms/'
+    assert r.json['@type'] == ['Report']
+    assert r.json['total'] == 1
+    assert r.json['notification'] == 'Success'
+    assert len(r.json['filters']) == 4
+    assert r.status_code == 200
+    assert r.json['clear_filters'] == '/reportv2/?type=Snowflake'
+    assert 'debug' not in r.json
+    assert 'columns' in r.json

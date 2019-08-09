@@ -24,6 +24,7 @@ from .interfaces import TITLE
 from .interfaces import TOTAL
 from .queries import BasicSearchQueryFactory
 from .queries import BasicSearchQueryFactoryWithFacets
+from .queries import BasicReportQueryFactoryWithFacet
 from .responses import BasicQueryResponseWithFacets
 from .responses import RawQueryResponseWithAggs
 
@@ -115,9 +116,6 @@ class BasicSearchWithFacetsResponseField(BasicSearchResponseField):
     facets and other frontend fields. This is the standard search result response.
     '''
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def _build_query(self):
         self.query_builder = BasicSearchQueryFactoryWithFacets(
             params_parser=self.get_params_parser(),
@@ -141,9 +139,6 @@ class RawSearchWithAggsResponseField(BasicSearchWithFacetsResponseField):
     Useful for debugging/building frontend views that are less reliant on backend logic.
     '''
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def _execute_query(self):
         self.results = RawQueryResponseWithAggs(
             results=self.query.execute(),
@@ -164,6 +159,20 @@ class RawSearchWithAggsResponseField(BasicSearchWithFacetsResponseField):
         super().render(*args, **kwargs)
         self._maybe_scan_over_results()
         return self.response
+
+
+class BasicReportWithFacetsResponseField(BasicSearchWithFacetsResponseField):
+    '''
+    Like BasicSearchWithFacetsResponseField but uses BasicReportQueryFactoryWithFacet
+    query builder.
+    '''
+
+    def _build_query(self):
+        self.query_builder = BasicReportQueryFactoryWithFacet(
+            params_parser=self.get_params_parser(),
+            **self.kwargs
+        )
+        self.query = self.query_builder.build_query()
 
 
 class TitleResponseField(ResponseField):

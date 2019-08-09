@@ -11,6 +11,7 @@ from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.interfaces import TYPES
 
 from .decorators import assert_none_returned
+from .decorators import assert_one_returned
 from .decorators import assert_one_or_none_returned
 from .decorators import deduplicate
 from .defaults import BASE_AUDIT_FACETS
@@ -91,6 +92,9 @@ class AbstractQueryFactory:
     def _get_schema_for_item_type(self, item_type):
         return self._get_registered_types()[item_type].schema
 
+    def _get_subtypes_for_item_type(self, item_type):
+        return self._get_registered_types()[item_type].subtypes
+
     def _get_boost_values_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(BOOST_VALUES, {})
 
@@ -131,7 +135,7 @@ class AbstractQueryFactory:
             msg = "Invalid query: {}".format(query)
             raise HTTPBadRequest(explanation=msg)
         return query.getText()
-    
+
     def _get_default_item_types(self):
         mode = self.params_parser.get_one_value(
             params=self._get_mode()
@@ -162,7 +166,6 @@ class AbstractQueryFactory:
         conditions = [
             self.params_parser._request.has_permission(SEARCH_AUDIT),
             GROUP_SUBMITTER in self._get_principals()
-            
         ]
         return all(conditions)
 
@@ -217,7 +220,7 @@ class AbstractQueryFactory:
 
     def _get_sort(self):
         return self.params_parser.get_sort()
-  
+
     def _get_default_limit(self):
         return [(LIMIT_KEY, 25)]
 
@@ -653,7 +656,7 @@ class AbstractQueryFactory:
 
     def add_slice(self):
         '''
-        If limit=all or limit > MAX_ES_RESULTS_WINDOW we return 
+        If limit=all or limit > MAX_ES_RESULTS_WINDOW we return
         default slice for the aggregations/total and scan over results
         in response mixin to_graph method.
         '''
@@ -691,3 +694,29 @@ class BasicSearchQueryFactoryWithFacets(BasicSearchQueryFactory):
         super().build_query()
         self.add_aggregations_and_aggregation_filters()
         return self.search
+
+
+class BasicReportQueryFactoryWithFacet(BasicSearchQueryFactoryWithFacets):
+    '''
+    Like BasicSearchQueryFactoryWithFacets but makes sure single item type
+    without subtypes is specified.
+    '''
+
+    def __init__(self, params_parser, *args, **kwargs):
+        super().__init__(params_parser, *args, **kwargs)
+
+    @assert_one_returned(error_message='Report view requires specifying a single type:')
+    def _get_item_types(self):
+        return super()._get_item_types()
+
+    @assert_one_or_none_returned(error_message='Report view requires a type with no child types:')
+    def validate_item_type_subtypes(self):
+        return self._get_subtypes_for_item_type(
+            self.params_parser.get_one_value(
+                params=self._get_item_types()
+            )
+        )
+
+    def build_query(self):
+        self.validate_item_type_subtypes()
+        return super().build_query()

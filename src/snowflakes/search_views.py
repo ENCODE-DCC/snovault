@@ -1,9 +1,11 @@
 from pyramid.view import view_config
 
+from snovault.elasticsearch.searches.interfaces import REPORT_TITLE
 from snovault.elasticsearch.searches.interfaces import SEARCH_TITLE
 from snovault.elasticsearch.searches.fields import AllResponseField
 from snovault.elasticsearch.searches.fields import BasicSearchResponseField
 from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
+from snovault.elasticsearch.searches.fields import BasicReportWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import ClearFiltersResponseField
 from snovault.elasticsearch.searches.fields import ColumnsResponseField
 from snovault.elasticsearch.searches.fields import ContextResponseField
@@ -22,6 +24,7 @@ def includeme(config):
     config.add_route('searchv2', '/searchv2{slash:/?}')
     config.add_route('searchv2_raw', '/searchv2_raw{slash:/?}')
     config.add_route('searchv2_quick', '/searchv2_quick{slash:/?}')
+    config.add_route('reportv2', '/reportv2{slash:/?}')
     config.scan(__name__)
 
 
@@ -90,6 +93,33 @@ def searchv2_quick(context, request):
             BasicSearchResponseField(
                 default_item_types=DEFAULT_ITEM_TYPES
             )
+        ]
+    )
+    return fr.render()
+
+
+@view_config(route_name='reportv2', request_method='GET', permission='search')
+def reportv2(context, request):
+    fr = FieldedResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
+        response_fields=[
+            TitleResponseField(
+                title=REPORT_TITLE
+            ),
+            TypeResponseField(
+                at_type=[REPORT_TITLE]
+            ),
+            IDResponseField(),
+            ContextResponseField(),
+            BasicReportWithFacetsResponseField(),
+            AllResponseField(),
+            NotificationResponseField(),
+            FiltersResponseField(),
+            ClearFiltersResponseField(),
+            ColumnsResponseField(),
+            DebugQueryResponseField()
         ]
     )
     return fr.render()
