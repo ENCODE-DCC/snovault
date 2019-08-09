@@ -37,6 +37,7 @@ from .interfaces import EXCLUDE
 from .interfaces import EXISTS
 from .interfaces import FACETS
 from .interfaces import FILTERS
+from .interfaces import FROM_KEY
 from .interfaces import GROUP_SUBMITTER
 from .interfaces import ITEM
 from .interfaces import LIMIT_KEY
@@ -220,6 +221,22 @@ class AbstractQueryFactory:
 
     def _get_sort(self):
         return self.params_parser.get_sort()
+
+    def _get_default_from(self):
+        return [(FROM_KEY, 0)]
+
+    @assert_one_or_none_returned(error_message='Invalid to specify multiple from parameters:')
+    def _get_from(self):
+        return self.params_parser.get_from() or self._get_default_from()
+
+    def _get_int_from_value(self):
+        return self.params_parser.coerce_value_to_int_or_return_none(
+            self.params_parser.get_one_value(
+                params=self._get_from()
+            )
+        ) or self.params_parser.get_one_value(
+            params=self._get_default_from()
+        )
 
     def _get_default_limit(self):
         return [(LIMIT_KEY, 25)]
@@ -718,5 +735,6 @@ class BasicReportQueryFactoryWithFacet(BasicSearchQueryFactoryWithFacets):
         )
 
     def build_query(self):
+        self.validate_item_types()
         self.validate_item_type_subtypes()
         return super().build_query()

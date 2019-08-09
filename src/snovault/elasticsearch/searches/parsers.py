@@ -4,12 +4,12 @@ from collections import defaultdict
 from .interfaces import ADVANCED_QUERY_KEY
 from .interfaces import DEBUG_KEY
 from .interfaces import FIELD_KEY
+from .interfaces import FROM_KEY
 from .interfaces import FRAME_KEY
 from .interfaces import LIMIT_KEY
 from .interfaces import MODE_KEY
 from .interfaces import NOT_FLAG
 from .interfaces import SEARCH_TERM_KEY
-from .interfaces import SIZE_KEY
 from .interfaces import SORT_KEY
 from .interfaces import TYPE_KEY
 from .interfaces import WILDCARD
@@ -250,9 +250,9 @@ class ParamsParser:
             params=params
         )
 
-    def get_size(self, params=None):
+    def get_from(self, params=None):
         return self.get_key_filters(
-            key=SIZE_KEY,
+            key=FROM_KEY,
             params=params
         )
 

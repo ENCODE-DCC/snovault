@@ -382,6 +382,55 @@ def test_searches_queries_abstract_query_factory_assert_one_or_none(dummy_reques
         aq._get_limit()
 
 
+def test_searches_queries_abstract_query_factory_get_from(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&from=300'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    from_ = aq.params_parser.param_values_to_list(aq._get_from())
+    assert from_ == [
+        '300'
+    ]
+
+
+def test_searches_queries_abstract_query_factory_get_default_from(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&from=300'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    default_from = aq._get_default_from()
+    assert default_from == [('from', 0)]
+
+
+def test_searches_queries_abstract_query_factory_get_int_from_value(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_int_from_value() == 0
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&from=50'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_int_from_value() == 50
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&from=blah'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_int_from_value() == 0
+
+
 def test_searches_queries_abstract_query_factory_get_limit(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
