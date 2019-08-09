@@ -744,7 +744,6 @@ class BasicSearchQueryFactory(AbstractQueryFactory):
         self.add_post_filters()
         self.add_source()
         self.add_slice()
-        self.add_sort()
         return self.search
 
 
@@ -756,6 +755,7 @@ class BasicSearchQueryFactoryWithFacets(BasicSearchQueryFactory):
     def build_query(self):
         super().build_query()
         self.add_aggregations_and_aggregation_filters()
+        self.add_sort()
         return self.search
 
 
