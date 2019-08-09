@@ -15,6 +15,7 @@ from snovault.elasticsearch.searches.fields import IDResponseField
 from snovault.elasticsearch.searches.fields import NotificationResponseField
 from snovault.elasticsearch.searches.fields import NonSortableResponseField
 from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
+from snovault.elasticsearch.searches.fields import SortResponseField
 from snovault.elasticsearch.searches.fields import TitleResponseField
 from snovault.elasticsearch.searches.fields import TypeResponseField
 from snovault.elasticsearch.searches.parsers import ParamsParser
@@ -63,6 +64,7 @@ def searchv2(context, request):
             FiltersResponseField(),
             ClearFiltersResponseField(),
             ColumnsResponseField(),
+            SortResponseField(),
             DebugQueryResponseField()
         ]
     )
@@ -121,6 +123,7 @@ def reportv2(context, request):
             ClearFiltersResponseField(),
             ColumnsResponseField(),
             NonSortableResponseField(),
+            SortResponseField(),
             DebugQueryResponseField()
         ]
     )

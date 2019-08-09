@@ -8,6 +8,7 @@ from .interfaces import AT_TYPE
 from .interfaces import CLEAR_FILTERS
 from .interfaces import COLUMNS
 from .interfaces import DEBUG_KEY
+from .interfaces import EMBEDDED
 from .interfaces import FACETS
 from .interfaces import FIELD_KEY
 from .interfaces import FILTERS
@@ -20,6 +21,7 @@ from .interfaces import NO_RESULTS_FOUND
 from .interfaces import NOTIFICATION
 from .interfaces import RAW_QUERY
 from .interfaces import REMOVE
+from .interfaces import SORT_KEY
 from .interfaces import SUCCESS
 from .interfaces import TERM
 from .interfaces import TITLE
@@ -402,3 +404,35 @@ class NonSortableResponseField(ResponseField):
         return {
             NON_SORTABLE: TEXT_FIELDS
         }
+
+
+class SortResponseField(ResponseField):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _get_sort_from_query(self):
+        return self.get_query_builder().search._sort
+
+    def _remove_prefix(self, sort_by, prefix=EMBEDDED):
+        return OrderedDict(
+            [
+                (k.replace(prefix, ''), v)
+                for sort in sort_by
+                for k, v in sort.items()
+            ]
+        )
+
+    def _maybe_add_sort(self):
+        sort_by = self._get_sort_from_query()
+        if sort_by:
+            self.response.update(
+                {
+                    SORT_KEY: self._remove_prefix(sort_by)
+                }
+            )
+
+    def render(self, *args, **kwargs):
+        self.parent = kwargs.get('parent')
+        self._maybe_add_sort()
+        return self.response

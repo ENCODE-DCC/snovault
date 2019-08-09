@@ -25,6 +25,7 @@ def test_searchv2_view(workbook, testapp):
     assert r.json['clear_filters'] == '/searchv2/?type=Snowflake'
     assert 'debug' not in r.json
     assert 'columns' in r.json
+    assert 'sort' in r.json
 
 
 def test_searchv2_view_with_limit(workbook, testapp):
@@ -207,3 +208,4 @@ def test_reportv2_view(workbook, testapp):
     assert 'debug' not in r.json
     assert 'columns' in r.json
     assert 'non_sortable' in r.json
+    assert 'sort' in r.json
