@@ -3024,3 +3024,151 @@ def test_searches_queries_basic_report_query_factory_with_facets_init(params_par
     brqf = BasicReportQueryFactoryWithFacets(params_parser)
     assert isinstance(brqf, BasicReportQueryFactoryWithFacets)
     assert brqf.params_parser == params_parser
+
+
+def test_searches_queries_basic_report_query_factory_with_facets_get_item_types(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicReportQueryFactoryWithFacets
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.exceptions import HTTPBadRequest
+    brqf = BasicReportQueryFactoryWithFacets(params_parser)
+    item_types = brqf._get_item_types()
+    assert item_types == [
+        ('type', 'Experiment')
+    ]
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&type=Experiment&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    brqf = BasicReportQueryFactoryWithFacets(params_parser)
+    with pytest.raises(HTTPBadRequest):
+        brqf._get_item_types()
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    brqf = BasicReportQueryFactoryWithFacets(params_parser)
+    with pytest.raises(HTTPBadRequest):
+        brqf._get_item_types()
+
+
+def test_searches_queries_basic_report_query_factory_with_facets_validate_item_type_subtypes(dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicReportQueryFactoryWithFacets
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.exceptions import HTTPBadRequest
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    brqf = BasicReportQueryFactoryWithFacets(params_parser)
+    brqf.validate_item_type_subtypes()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Item&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    brqf = BasicReportQueryFactoryWithFacets(params_parser)
+    with pytest.raises(HTTPBadRequest):
+        brqf.validate_item_type_subtypes()
+
+
+def test_searches_queries_basic_report_query_factory_with_facets_add_slice(dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicReportQueryFactoryWithFacets
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    brqf = BasicReportQueryFactoryWithFacets(params_parser)
+    brqf.add_slice()
+    q = brqf.search.to_dict()
+    assert q['from'] == 0
+    assert q['size'] == 10
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=100&from=25&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    brqf = BasicReportQueryFactoryWithFacets(params_parser)
+    brqf.add_slice()
+    q = brqf.search.to_dict()
+    assert q['from'] == 25
+    assert q['size'] == 100
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=all&from=25&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    brqf = BasicReportQueryFactoryWithFacets(params_parser)
+    brqf.add_slice()
+    q = brqf.search.to_dict()
+    assert q['from'] == 25
+    assert q['size'] == 25
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&from=25&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    brqf = BasicReportQueryFactoryWithFacets(params_parser)
+    brqf.add_slice()
+    q = brqf.search.to_dict()
+    assert q['from'] == 25
+    assert q['size'] == 25
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    brqf = BasicReportQueryFactoryWithFacets(params_parser)
+    brqf.add_slice()
+    q = brqf.search.to_dict()
+    assert q['from'] == 0
+    assert q['size'] == 25
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=9999&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    brqf = BasicReportQueryFactoryWithFacets(params_parser)
+    brqf.add_slice()
+    q = brqf.search.to_dict()
+    assert q['from'] == 0
+    assert q['size'] == 9999
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10000&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    brqf = BasicReportQueryFactoryWithFacets(params_parser)
+    brqf.add_slice()
+    q = brqf.search.to_dict()
+    assert q['from'] == 0
+    assert q['size'] == 25
+
+
+def test_searches_queries_basic_report_query_factory_with_facets_build_query(dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicReportQueryFactoryWithFacets
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.testing import DummyResource
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    params_parser._request.context = DummyResource()
+    brqf = BasicReportQueryFactoryWithFacets(params_parser)
+    q = brqf.build_query()
+    q = q.to_dict()
+    assert q['size'] == 10
+    assert q['from'] == 0
+    assert 'aggs' in q
+    assert q['query']['bool']
+    assert q['_source'] == ['embedded.@id', 'embedded.@type', 'embedded.accession']
+    assert q['sort'] == [
+        {'embedded.date_created': {'order': 'desc', 'unmapped_type': 'keyword'}},
+        {'embedded.label': {'order': 'desc', 'unmapped_type': 'keyword'}},
+        {'embedded.uuid': {'order': 'desc', 'unmapped_type': 'keyword'}}
+    ]
