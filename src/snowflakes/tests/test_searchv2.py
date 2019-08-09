@@ -209,3 +209,60 @@ def test_reportv2_view(workbook, testapp):
     assert 'columns' in r.json
     assert 'non_sortable' in r.json
     assert 'sort' in r.json
+
+
+def test_reportv2_view_with_limit(workbook, testapp):
+    r = testapp.get(
+        '/reportv2/?type=Snowflake&limit=5'
+    )
+    assert len(r.json['@graph']) == 5
+    assert 'all' in r.json
+    r = testapp.get(
+        '/reportv2/?type=Snowflake&limit=26'
+    )
+    assert len(r.json['@graph']) == 26
+    assert 'all' in r.json
+    r = testapp.get(
+        '/reportv2/?type=Snowflake&limit=all'
+    )
+    assert len(r.json['@graph']) == 35
+    assert 'all' not in r.json
+    r = testapp.get(
+        '/reportv2/?type=Snowflake&limit=35'
+    )
+    assert len(r.json['@graph']) == 35
+    assert 'all' not in r.json
+    r = testapp.get(
+        '/reportv2/?type=Snowflake&limit=100000'
+    )
+    assert len(r.json['@graph']) == 35
+    assert 'all' not in r.json
+
+
+def test_reportv2_view_values_bad_type(workbook, testapp):
+    r = testapp.get(
+        '/reportv2/?status=released&type=Sno',
+        status=400
+    )
+    assert r.json['description'] == "Invalid types: ['Sno']"
+    r = testapp.get(
+        '/reportv2/?status=released&type=Sno&type=Flake',
+        status=400
+    )
+    assert r.json['description'] == "Report view requires specifying a single type: [('type', 'Sno'), ('type', 'Flake')]"
+
+
+def test_reportv2_view_values_single_subtype(workbook, testapp):
+    r = testapp.get(
+        '/reportv2/?status=released&type=Item',
+        status=400
+    )
+    assert 'Report view requires a type with no child types:' in r.json['description']
+
+
+def test_reportv2_view_values_no_type(workbook, testapp):
+    r = testapp.get(
+        '/reportv2/?status=released',
+        status=400
+    )
+    assert r.json['description'] == "Report view requires specifying a single type: []"
