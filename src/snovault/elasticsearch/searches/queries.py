@@ -869,8 +869,8 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
         '''
         Returns (top-level name, nested terms aggregations) from list of field names.
         '''
-        names_and_aggregations = self._make_list_of_name_and_subagg_tuples(names)
         dummy_agg = None
+        names_and_aggregations = self._make_list_of_name_and_subagg_tuples(names)
         for name, agg in names_and_aggregations:
             if dummy_agg is None:
                 dummy_agg = agg
