@@ -47,6 +47,7 @@ from .interfaces import ITEM
 from .interfaces import LIMIT_KEY
 from .interfaces import LENGTH
 from .interfaces import LONG
+from .interfaces import MATRIX
 from .interfaces import NOT_JOIN
 from .interfaces import NO
 from .interfaces import ORDER
@@ -95,11 +96,17 @@ class AbstractQueryFactory:
     def _get_registered_types(self):
         return self.params_parser._request.registry[TYPES]
 
+    def _get_factory_for_item_type(self, item_type):
+        return self._get_registered_types()[item_type].factory
+
     def _get_schema_for_item_type(self, item_type):
         return self._get_registered_types()[item_type].schema
 
     def _get_subtypes_for_item_type(self, item_type):
         return self._get_registered_types()[item_type].subtypes
+
+    def _get_matrix_for_item_type(self, item_type):
+        return getattr(self._get_factory_for_item_type(item_type), MATRIX, {})
 
     def _get_boost_values_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(BOOST_VALUES, {})
@@ -792,3 +799,13 @@ class BasicReportQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
         self.validate_item_types()
         self.validate_item_type_subtypes()
         return super().build_query()
+
+
+class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
+    '''
+    Like BasicSearchQueryFactoryWithFacets but sets size to zero and adds a
+    subaggregation to calculate values in the matrix.
+    '''
+
+    def __init__(self, params_parser, *args, **kwargs):
+        super().__init__(params_parser, *args, **kwargs)

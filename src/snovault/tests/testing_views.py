@@ -176,7 +176,6 @@ class TestingSearchSchema(Item):
             'label': {
                 'type': 'string',
             }
-            
         },
         'additionalProperties': False,
         'facets': {
@@ -202,6 +201,14 @@ class TestingSearchSchema(Item):
         }
     }
     audit_inherit = ['*']
+    matrix = {
+        'x': {
+            'group_by': 'label'
+        },
+        'y': {
+            'group_by': ['status', 'name']
+        }
+    }
 
 
 @collection(

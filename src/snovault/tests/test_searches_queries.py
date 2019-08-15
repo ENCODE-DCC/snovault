@@ -97,6 +97,13 @@ def test_searches_queries_abstract_query_factory_get_registered_types(params_par
     assert isinstance(registered_types, TypesTool)
 
 
+def test_searches_queries_abstract_query_factory_get_factory_for_item_type(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    factory = aq._get_factory_for_item_type('TestingSearchSchema')
+    assert factory.item_type == 'testing_search_schema'
+
+
 def test_searches_queries_abstract_query_factory_get_schema_for_item_type(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
@@ -120,6 +127,23 @@ def test_searches_queries_abstract_query_factory_get_subtypes_for_item_type(para
         'TestingDownload',
         'TestingBadAccession'
     ])
+
+
+def test_searches_queries_abstract_query_factory_get_matrix_for_item_type(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    matrix = aq._get_matrix_for_item_type('TestingSearchSchema')
+    assert 'x' in matrix
+    assert 'y' in matrix
+    assert 'group_by' in matrix['x']
+    assert 'group_by' in matrix['y']
+
+
+def test_searches_queries_abstract_query_factory_get_matrix_for_item_type_with_no_matrix(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    matrix = aq._get_matrix_for_item_type('TestingPostPutPatch')
+    assert matrix == {}
 
 
 def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params_parser_snovault_types):
@@ -3253,3 +3277,10 @@ def test_searches_queries_basic_report_query_factory_with_facets_build_query(dum
         {'embedded.label': {'order': 'desc', 'unmapped_type': 'keyword'}},
         {'embedded.uuid': {'order': 'desc', 'unmapped_type': 'keyword'}}
     ]
+
+
+def test_searches_queries_basic_matrix_query_factory_with_facets_init(params_parser):
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
+    assert isinstance(bmqf, BasicMatrixQueryFactoryWithFacets)
+    assert bmqf.params_parser == params_parser
