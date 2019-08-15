@@ -42,6 +42,13 @@ def assert_one_returned(error_message):
     )
 
 
+def assert_something_returned(error_message):
+    return assert_condition_returned(
+        condition=lambda result: len(result) == 0,
+        error_message=error_message
+    )
+
+
 def deduplicate(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
