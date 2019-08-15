@@ -129,23 +129,6 @@ def test_searches_queries_abstract_query_factory_get_subtypes_for_item_type(para
     ])
 
 
-def test_searches_queries_abstract_query_factory_get_matrix_for_item_type(params_parser_snovault_types):
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser_snovault_types)
-    matrix = aq._get_matrix_for_item_type('TestingSearchSchema')
-    assert 'x' in matrix
-    assert 'y' in matrix
-    assert 'group_by' in matrix['x']
-    assert 'group_by' in matrix['y']
-
-
-def test_searches_queries_abstract_query_factory_get_matrix_for_item_type_with_no_matrix(params_parser_snovault_types):
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser_snovault_types)
-    matrix = aq._get_matrix_for_item_type('TestingPostPutPatch')
-    assert matrix == {}
-
-
 def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
@@ -3284,3 +3267,160 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_init(params_par
     bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
     assert isinstance(bmqf, BasicMatrixQueryFactoryWithFacets)
     assert bmqf.params_parser == params_parser
+
+
+def test_searches_queries_basic_matrix_query_factory_with_facets_get_matrix_for_item_type(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser_snovault_types)
+    matrix = bmqf._get_matrix_for_item_type('TestingSearchSchema')
+    assert 'x' in matrix
+    assert 'y' in matrix
+    assert 'group_by' in matrix['x']
+    assert 'group_by' in matrix['y']
+
+
+def test_searches_queries_basic_matrix_query_factory_with_facets_get_matrix_definition_name(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser_snovault_types)
+    assert bmqf._get_matrix_definition_name() == 'matrix'
+    bmqf = BasicMatrixQueryFactoryWithFacets(
+        params_parser_snovault_types,
+        matrix_definition_name='new_matrix'
+    )
+    assert bmqf._get_matrix_definition_name() == 'new_matrix'
+
+
+def test_searches_queries_basic_matrix_query_factory_with_facets_get_matrix_for_item_type_with_no_matrix(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    from pyramid.exceptions import HTTPBadRequest
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser_snovault_types)
+    with pytest.raises(HTTPBadRequest):
+        bmqf._get_matrix_for_item_type('TestingPostPutPatch')
+
+
+def test_searches_queries_basic_matrix_query_factory_with_facets_get_item_types(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.exceptions import HTTPBadRequest
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
+    item_types = bmqf._get_item_types()
+    assert item_types == [
+        ('type', 'Experiment')
+    ]
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&type=Experiment&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
+    with pytest.raises(HTTPBadRequest):
+        bmqf._get_item_types()
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
+    with pytest.raises(HTTPBadRequest):
+        bmqf._get_item_types()
+
+
+def test_searches_queries_basic_matrix_query_factory_with_facets_get_group_by_fields_by_item_type_and_value(params_parser):
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    from pyramid.exceptions import HTTPBadRequest
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
+    assert bmqf._get_group_by_fields_by_item_type_and_value('TestingSearchSchema', 'x') == ['label']
+    assert bmqf._get_group_by_fields_by_item_type_and_value('TestingSearchSchema', 'y') == ['status', 'name']
+    with pytest.raises(HTTPBadRequest):
+        # No matrix defined.
+        bmqf._get_group_by_fields_by_item_type_and_value('TestingPostPutPatch', 'y') == []
+
+
+def test_searches_queries_basic_matrix_query_factory_with_facets_get_x_group_by_fields(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
+    assert bmqf._get_x_group_by_fields() == ['label']
+
+
+def test_searches_queries_basic_matrix_query_factory_with_facets_get_y_group_by_fields(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
+    assert isinstance(bmqf, BasicMatrixQueryFactoryWithFacets)
+    assert bmqf._get_y_group_by_fields() == ['status', 'name']
+
+
+def test_searches_queries_basic_matrix_query_factory_with_facets_make_list_of_name_and_subagg_tuples(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl.aggs import Terms
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
+    nat = bmqf._make_list_of_name_and_subagg_tuples(['file_type', 'lab.name'])
+    assert nat[0][0] == 'file_type'
+    assert nat[1][0] == 'lab.name'
+    assert isinstance(nat[0][1], Terms)
+    assert isinstance(nat[1][1], Terms)
+    assert nat[0][1].to_dict() == {
+        'terms': {
+            'exclude': [],
+            'field': 'embedded.file_type',
+            'size': 999999
+        }
+    }
+
+
+def test_searches_queries_basic_matrix_query_factory_with_facets_make_subaggregation_from_names(params_parser):
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
+    name, subaggs = bmqf._make_subaggregation_from_names(['biosample_term_name', 'biosample_title', 'assay_title'])
+    assert name == 'biosample_term_name'
+    expected = {
+        'aggs': {
+            'biosample_title': {
+                'aggs': {
+                    'assay_title': {
+                        'terms': {
+                            'field': 'embedded.assay_title',
+                            'size': 999999,
+                            'exclude': []
+                        }
+                    }
+                },
+                'terms': {
+                    'field': 'embedded.biosample_title',
+                    'size': 999999,
+                    'exclude': []
+                }
+            }
+        },
+        'terms': {
+            'field': 'embedded.biosample_term_name',
+            'size': 999999,
+            'exclude': []
+        }
+    }
+    actual = subaggs.to_dict()
+    assert expected == actual
+    name, subaggs = bmqf._make_subaggregation_from_names(['assay_title'])
+    assert name == 'assay_title'
+    assert subaggs.to_dict() == {
+        'terms': {
+            'exclude': [],
+            'field':
+            'embedded.assay_title',
+            'size': 999999
+        }
+    }
+    name, subaggs = bmqf._make_subaggregation_from_names([])
+    assert name is None
+    assert subaggs is None

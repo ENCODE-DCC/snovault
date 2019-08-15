@@ -13,6 +13,7 @@ from snovault.interfaces import TYPES
 from .decorators import assert_none_returned
 from .decorators import assert_one_returned
 from .decorators import assert_one_or_none_returned
+from .decorators import assert_something_returned
 from .decorators import deduplicate
 from .defaults import BASE_AUDIT_FACETS
 from .defaults import BASE_FIELD_FACETS
@@ -42,6 +43,7 @@ from .interfaces import EXISTS
 from .interfaces import FACETS
 from .interfaces import FILTERS
 from .interfaces import FROM_KEY
+from .interfaces import GROUP_BY
 from .interfaces import GROUP_SUBMITTER
 from .interfaces import ITEM
 from .interfaces import LIMIT_KEY
@@ -50,6 +52,7 @@ from .interfaces import LONG
 from .interfaces import MATRIX
 from .interfaces import NOT_JOIN
 from .interfaces import NO
+from .interfaces import NO_LIMIT
 from .interfaces import ORDER
 from .interfaces import PERIOD
 from .interfaces import PICKER
@@ -61,6 +64,8 @@ from .interfaces import TITLE
 from .interfaces import TERMS
 from .interfaces import TYPE_KEY
 from .interfaces import WILDCARD
+from .interfaces import X
+from .interfaces import Y
 from .interfaces import YES
 
 
@@ -104,9 +109,6 @@ class AbstractQueryFactory:
 
     def _get_subtypes_for_item_type(self, item_type):
         return self._get_registered_types()[item_type].subtypes
-
-    def _get_matrix_for_item_type(self, item_type):
-        return getattr(self._get_factory_for_item_type(item_type), MATRIX, {})
 
     def _get_boost_values_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(BOOST_VALUES, {})
@@ -538,8 +540,8 @@ class AbstractQueryFactory:
                 param_value
             )
 
-    def _subaggregation_factory(self, facet_option_type):
-        if facet_option_type == EXISTS:
+    def _subaggregation_factory(self, aggregation_type):
+        if aggregation_type == EXISTS:
             return self._make_exists_aggregation
         return self._make_terms_aggregation
 
@@ -804,8 +806,95 @@ class BasicReportQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
 class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
     '''
     Like BasicSearchQueryFactoryWithFacets but sets size to zero and adds a
-    subaggregation to calculate values in the matrix.
+    filter aggregation with a nested subaggregation to calculate values in the matrix.
     '''
 
     def __init__(self, params_parser, *args, **kwargs):
         super().__init__(params_parser, *args, **kwargs)
+
+    @assert_one_returned(error_message='Matrix view requires specifying a single type:')
+    def _get_item_types(self):
+        return super()._get_item_types()
+
+    def _get_matrix_definition_name(self):
+        '''
+        Can add new groupby definitions to item type and pass name in here.
+        '''
+        return self.kwargs.get('matrix_definition_name') or MATRIX
+
+    @assert_something_returned(error_message='Item type does not have requested view defined:')
+    def _get_matrix_for_item_type(self, item_type):
+        return getattr(
+            self._get_factory_for_item_type(item_type),
+            self._get_matrix_definition_name(),
+            {}
+        )
+
+    def _get_group_by_fields_by_item_type_and_value(self, item_type, value):
+        group_by = self._get_matrix_for_item_type(item_type).get(value, {}).get(GROUP_BY, {})
+        if not isinstance(group_by, list):
+            return [group_by]
+        return group_by
+
+    def _get_x_group_by_fields(self):
+        return self._get_group_by_fields_by_item_type_and_value(
+            self.params_parser.get_one_value(
+                self._get_item_types()
+            ),
+            X
+        )
+
+    def _get_y_group_by_fields(self):
+        return self._get_group_by_fields_by_item_type_and_value(
+            self.params_parser.get_one_value(
+                self._get_item_types()
+            ),
+            Y
+        )
+
+    def _make_list_of_name_and_subagg_tuples(self, names, aggregation_type=TERMS):
+        subaggregation = self._subaggregation_factory(aggregation_type)
+        return [
+            (
+                name,
+                subaggregation(
+                    field=self._map_param_key_to_elasticsearch_field(name),
+                    size=NO_LIMIT
+                )
+            )
+            for name in names
+        ]
+
+    def _make_subaggregation_from_names(self, names):
+        '''
+        Returns (top-level name, nested terms aggregations) from list of field names.
+        '''
+        names_and_aggregations = self._make_list_of_name_and_subagg_tuples(names)
+        dummy_agg = None
+        for name, agg in names_and_aggregations:
+            if dummy_agg is None:
+                dummy_agg = agg
+            else:
+                dummy_agg = dummy_agg.bucket(name, agg)
+        if names_and_aggregations:
+            # The subaggregations have been accumulated on first agg in list.
+            return names_and_aggregations[0][0], names_and_aggregations[0][1]
+        return None, None
+
+    def add_matrix_aggregations(self):
+        pass
+
+    def add_slice(self):
+        '''
+        We just want aggregations not hits.
+        '''
+        self.search = self._get_or_create_search()[0]
+
+    def build_query(self):
+        self.validate_item_types()
+        self.add_query_string_query()
+        self.add_filters()
+        self.add_post_filters()
+        self.add_slice()
+        self.add_aggregations_and_aggregation_filters()
+        return self.search
