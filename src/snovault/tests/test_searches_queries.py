@@ -119,9 +119,7 @@ def test_searches_queries_abstract_query_factory_get_index_variations(dummy_requ
         ]
     )
     assert aq._get_index() == [
-        'testing_search_schema',
-        'testing_post_put_patch',
-        'testing_download'
+        'snovault-resources'
     ]
     dummy_request.environ['QUERY_STRING'] = (
         '&type=Item&status=released&limit=10'
