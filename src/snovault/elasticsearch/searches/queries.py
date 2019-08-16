@@ -33,6 +33,7 @@ from .interfaces import ASC
 from .interfaces import AUDIT
 from .interfaces import BOOL
 from .interfaces import BOOST_VALUES
+from .interfaces import COLLECTION_NAME
 from .interfaces import COLUMNS
 from .interfaces import DASH
 from .interfaces import DESC
@@ -110,6 +111,16 @@ class AbstractQueryFactory:
     def _get_subtypes_for_item_type(self, item_type):
         return self._get_registered_types()[item_type].subtypes
 
+    def _get_name_for_item_type(self, item_type):
+        return self._get_registered_types()[item_type].name
+
+    def _get_collection_name_for_item_type(self, item_type):
+        return getattr(
+            self._get_registered_types()[item_type],
+            COLLECTION_NAME,
+            None
+        )
+
     def _get_boost_values_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(BOOST_VALUES, {})
 
@@ -137,10 +148,16 @@ class AbstractQueryFactory:
         ]
 
     def _normalize_item_types(self, item_types):
-        registered_types = self._get_registered_types()
         return [
-            registered_types[item_type].name
+            self._get_name_for_item_type(item_type)
             for item_type in item_types
+        ]
+
+    def _get_collection_names_for_item_types(self, item_types):
+        return [
+            self._get_collection_name_for_item_type(item_type)
+            for item_type in item_types
+            if self._get_collection_name_for_item_type(item_type)
         ]
 
     def _validated_query_string_query(self, query):

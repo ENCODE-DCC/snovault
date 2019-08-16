@@ -129,6 +129,18 @@ def test_searches_queries_abstract_query_factory_get_subtypes_for_item_type(para
     ])
 
 
+def test_searches_queries_abstract_query_factory_get_name_for_item_type(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    assert aq._get_name_for_item_type('TestingSearchSchema') == 'TestingSearchSchema'
+
+
+def test_searches_queries_abstract_query_factory_get_collection_name_for_item_type(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    assert aq._get_collection_name_for_item_type('TestingSearchSchema') == 'testing_search_schema'
+
+
 def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
@@ -193,6 +205,21 @@ def test_searches_queries_abstract_query_factory_normalize_item_types(params_par
     item_types = ['testing_search_schema']
     normalized_item_types = aq._normalize_item_types(item_types=item_types)
     assert normalized_item_types == ['TestingSearchSchema']
+
+
+def test_searches_queries_abstract_query_factory_get_collection_names_for_item_types(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    assert aq._get_collection_names_for_item_types(['TestingSearchSchema']) == ['testing_search_schema']
+    assert aq._get_collection_names_for_item_types(['Item']) == []
+    assert aq._get_collection_names_for_item_types(
+        [
+            'TestingSearchSchema',
+            'Item',
+            'TestingPostPutPatch'
+        ]
+    ) == ['testing_search_schema', 'testing_post_put_patch']
+
 
 
 def test_searches_queries_abstract_query_factory_validated_query_string_query(params_parser_snovault_types):
