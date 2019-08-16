@@ -74,6 +74,14 @@ class Snowset(Item):
 class Snowball(Snowset):
     item_type = 'snowball'
     schema = load_schema('snowflakes:schemas/snowball.json')
+    matrix = {
+        'x': {
+            'group_by': 'snowflakes.type'
+        },
+        'y': {
+            'group_by': ['award.rfa', 'lab.title']
+        }
+    }
 
 
 @collection(
