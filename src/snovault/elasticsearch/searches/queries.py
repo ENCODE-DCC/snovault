@@ -919,4 +919,5 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
         self.add_post_filters()
         self.add_slice()
         self.add_aggregations_and_aggregation_filters()
+        self.add_matrix_aggregations()
         return self.search

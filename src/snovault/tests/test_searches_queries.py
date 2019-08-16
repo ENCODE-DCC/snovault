@@ -3435,7 +3435,7 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_add_matrix_aggr
     )
     bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
     bmqf.add_matrix_aggregations()
-    expecte = {
+    expected = {
         'aggs': {
             'y': {
                 'aggs': {
@@ -3523,6 +3523,7 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_add_matrix_aggr
         }
     }
     actual = bmqf.search.to_dict()
+    assert all([e in actual for e in expected])
     assert actual['aggs']['y']['aggs']['status']['terms']['field'] == 'embedded.status'
     assert actual['aggs']['y']['aggs']['status']['terms']['size'] == 999999
     assert actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']['field'] == 'embedded.name'
