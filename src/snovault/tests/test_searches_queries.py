@@ -69,6 +69,88 @@ def test_searches_queries_abstract_query_factory_get_index(params_parser, mocker
     assert aq._get_index() == RESOURCES_INDEX
 
 
+def test_searches_queries_abstract_query_factory_get_index_variations(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_index() == ['testing_search_schema']
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&type=TestingPostPutPatch&status=released'
+        '&limit=10&field=@id&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_index() == ['testing_search_schema', 'testing_post_put_patch']
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Item&status=released'
+        '&limit=10&field=@id&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_index() == ['snovault-resources']
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Item&type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_index() == ['snovault-resources']
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&limit=10'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_index() == ['snovault-resources']
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&limit=10'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(
+        params_parser,
+        default_item_types=[
+            'TestingSearchSchema',
+            'TestingPostPutPatch',
+            'TestingDownload'
+        ]
+    )
+    assert aq._get_index() == [
+        'testing_search_schema',
+        'testing_post_put_patch',
+        'testing_download'
+    ]
+    dummy_request.environ['QUERY_STRING'] = (
+        '&type=Item&status=released&limit=10'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(
+        params_parser,
+        default_item_types=[
+            'TestingSearchSchema',
+            'TestingPostPutPatch',
+            'TestingDownload'
+        ]
+    )
+    assert aq._get_index() == ['snovault-resources']
+    dummy_request.environ['QUERY_STRING'] = (
+        '&type=TestingSearchSchema&status=released&limit=10'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(
+        params_parser,
+        default_item_types=[
+            'TestingSearchSchema',
+            'TestingPostPutPatch',
+            'TestingDownload'
+        ]
+    )
+    assert aq._get_index() == ['testing_search_schema']
+
+
 def test_searches_queries_abstract_query_factory_wildcard_in_item_types(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)

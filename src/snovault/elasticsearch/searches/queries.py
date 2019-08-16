@@ -95,7 +95,7 @@ class AbstractQueryFactory:
 
     def _get_index(self):
         if self._should_search_over_all_indices():
-            return RESOURCES_INDEX
+            return [RESOURCES_INDEX]
         return self._get_collection_names_for_item_types(
             self.params_parser.param_values_to_list(
                 params=self._get_item_types()
@@ -349,11 +349,13 @@ class AbstractQueryFactory:
         return all(conditions)
 
     def _should_search_over_all_indices(self):
+        item_types = self._get_item_types() or self._get_default_item_types()
         conditions = [
+            not item_types,
             self.params_parser.is_param(
                 TYPE_KEY,
                 ITEM,
-                params=self._get_item_types() or self._get_default_item_types()
+                params=item_types
             )
             
         ]
