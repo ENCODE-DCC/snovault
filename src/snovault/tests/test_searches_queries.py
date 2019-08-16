@@ -3435,7 +3435,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_make_subaggrega
 
 def test_searches_queries_basic_matrix_query_factory_with_facets_add_matrix_aggregations(params_parser, dummy_request):
     from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
-    from elasticsearch_dsl.aggs import Terms
     dummy_request.environ['QUERY_STRING'] = (
         'type=TestingSearchSchema&status=released'
         '&limit=10&field=@id&field=accession&mode=picker'
@@ -3541,3 +3540,220 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_add_matrix_aggr
     assert actual['aggs']['x']['aggs']['label']['terms']['size'] == 999999
     assert len(actual['aggs']['y']['filter']['bool']['must']) == 2
     assert len(actual['aggs']['x']['filter']['bool']['must']) == 2
+
+
+def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(params_parser, dummy_request):
+    from pyramid.testing import DummyResource
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    dummy_request.context = DummyResource({})
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
+    bmqf.build_query()
+    expected = {
+        'post_filter': {
+            'bool': {
+                'must': [
+                    {'terms': {'embedded.status': ['released']}},
+                    {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                ]
+            }
+        },
+        'aggs': {
+            'Data Type': {
+                'aggs': {
+                    'type': {
+                        'terms': {
+                            'exclude': [
+                                'Item'
+                            ],
+                            'size': 200,
+                            'field': 'embedded.@type'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}}
+                        ]
+                    }
+                }
+            },
+            'y': {
+                'aggs': {
+                    'status': {
+                        'aggs': {
+                            'name': {
+                                'aggs': {
+                                    'label': {
+                                        'terms': {
+                                            'exclude': [],
+                                            'size': 999999,
+                                            'field': 'embedded.label'
+                                        }
+                                    }
+                                },
+                                'terms': {
+                                    'exclude': [],
+                                    'size': 999999,
+                                    'field': 'embedded.name'
+                                }
+                            }
+                        },
+                        'terms': {
+                            'exclude': [],
+                            'size': 999999,
+                            'field': 'embedded.status'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                        ]
+                    }
+                }
+            },
+            'Audit category: NOT COMPLIANT': {
+                'aggs': {
+                    'audit-NOT_COMPLIANT-category': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 200,
+                            'field':
+                            'audit.NOT_COMPLIANT.category'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                        ]
+                    }
+                }
+            },
+            'Audit category: ERROR': {
+                'aggs': {
+                    'audit-ERROR-category': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 200,
+                            'field': 'audit.ERROR.category'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                        ]
+                    }
+                }
+            },
+            'Status': {
+                'aggs': {
+                    'status': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 200,
+                            'field':
+                            'embedded.status'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}
+                            }
+                        ]
+                    }
+                }
+            },
+            'Audit category: WARNING': {
+                'aggs': {
+                    'audit-WARNING-category': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 200,
+                            'field': 'audit.WARNING.category'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                        ]
+                    }
+                }
+            },
+            'Name': {
+                'aggs': {
+                    'name': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 200,
+                            'field': 'embedded.name'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                        ]
+                    }
+                }
+            },
+            'x': {
+                'aggs': {
+                    'label': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 999999,
+                            'field': 'embedded.label'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                        ]
+                    }
+                }
+            }
+        },
+        'from': 0,
+        'query': {
+            'bool': {
+                'filter': [
+                    {
+                        'bool': {
+                            'must': [
+                                {'terms': {'principals_allowed.view': ['system.Everyone']}},
+                                {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        'size': 0
+    }
+    actual = bmqf.search.to_dict()
+    assert set(actual.keys()) == set(expected.keys())
+    assert set(actual['aggs'].keys()) == set(expected['aggs'].keys())
+    assert actual['size'] == 0
