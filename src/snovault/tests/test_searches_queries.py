@@ -3382,7 +3382,7 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_make_list_of_na
 def test_searches_queries_basic_matrix_query_factory_with_facets_make_subaggregation_from_names(params_parser):
     from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
     bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
-    name, subaggs = bmqf._make_subaggregation_from_names(['biosample_term_name', 'biosample_title', 'assay_title'])
+    name, subagg = bmqf._make_subaggregation_from_names(['biosample_term_name', 'biosample_title', 'assay_title'])
     assert name == 'biosample_term_name'
     expected = {
         'aggs': {
@@ -3409,11 +3409,11 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_make_subaggrega
             'exclude': []
         }
     }
-    actual = subaggs.to_dict()
+    actual = subagg.to_dict()
     assert expected == actual
-    name, subaggs = bmqf._make_subaggregation_from_names(['assay_title'])
+    name, subagg = bmqf._make_subaggregation_from_names(['assay_title'])
     assert name == 'assay_title'
-    assert subaggs.to_dict() == {
+    assert subagg.to_dict() == {
         'terms': {
             'exclude': [],
             'field':
@@ -3421,6 +3421,115 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_make_subaggrega
             'size': 999999
         }
     }
-    name, subaggs = bmqf._make_subaggregation_from_names([])
+    name, subagg = bmqf._make_subaggregation_from_names([])
     assert name is None
-    assert subaggs is None
+    assert subagg is None
+
+
+def test_searches_queries_basic_matrix_query_factory_with_facets_add_matrix_aggregations(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl.aggs import Terms
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
+    bmqf.add_matrix_aggregations()
+    expecte = {
+        'aggs': {
+            'y': {
+                'aggs': {
+                    'status': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 999999,
+                            'field': 'embedded.status'
+                        },
+                        'aggs': {
+                            'name': {
+                                'terms': {
+                                    'exclude': [],
+                                    'size': 999999,
+                                    'field': 'embedded.name'
+                                },
+                                'aggs': {
+                                    'label': {
+                                        'terms': {
+                                            'exclude': [],
+                                            'size': 999999,
+                                            'field': 'embedded.label'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {
+                                'terms': {
+                                    'embedded.status': [
+                                        'released'
+                                    ]
+                                }
+                            },
+                            {
+                                'terms': {
+                                    'embedded.@type': [
+                                        'TestingSearchSchema'
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            'x': {
+                'aggs': {
+                    'label': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 999999,
+                            'field': 'embedded.label'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {
+                                'terms': {
+                                    'embedded.status': [
+                                        'released'
+                                    ]
+                                }
+                            },
+                            {
+                                'terms': {
+                                    'embedded.@type': [
+                                        'TestingSearchSchema'
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        'query': {
+            'match_all': {}
+        }
+    }
+    actual = bmqf.search.to_dict()
+    assert actual['aggs']['y']['aggs']['status']['terms']['field'] == 'embedded.status'
+    assert actual['aggs']['y']['aggs']['status']['terms']['size'] == 999999
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']['field'] == 'embedded.name'
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']['size'] == 999999
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']['field'] == 'embedded.label'
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']['size'] == 999999
+    assert actual['aggs']['x']['aggs']['label']['terms']['field'] == 'embedded.label'
+    assert actual['aggs']['x']['aggs']['label']['terms']['size'] == 999999
+    assert len(actual['aggs']['y']['filter']['bool']['must']) == 2
+    assert len(actual['aggs']['x']['filter']['bool']['must']) == 2
