@@ -463,7 +463,10 @@ def test_searches_fields_clear_filter_response_field_add_clear_filters(dummy_par
     assert cfr.response['clear_filters'] == '/dummy?type=Experiment'
 
 
-def test_searches_fields_debug_query_response_field(dummy_parent):
+def test_searches_fields_debug_query_response_field(dummy_parent, mocker):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
         'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
         '&limit=all&frame=embedded&restricted!=*&debug=true'

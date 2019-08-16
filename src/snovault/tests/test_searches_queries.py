@@ -37,8 +37,10 @@ def test_searches_queries_abstract_query_factory_init():
     assert isinstance(aq, AbstractQueryFactory)
 
 
-def test_searches_queries_abstract_query_factory_get_or_create_search(params_parser):
+def test_searches_queries_abstract_query_factory_get_or_create_search(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     from elasticsearch_dsl import Search
     aq = AbstractQueryFactory(params_parser)
     assert aq.search is None
@@ -58,9 +60,11 @@ def test_searches_queries_abstract_query_factory_get_client(params_parser):
     assert isinstance(c, Elasticsearch)
 
 
-def test_searches_queries_abstract_query_factory_get_index(params_parser):
+def test_searches_queries_abstract_query_factory_get_index(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from snovault.elasticsearch.interfaces import RESOURCES_INDEX
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     assert aq._get_index() == RESOURCES_INDEX
 
@@ -679,6 +683,35 @@ def test_searches_queries_abstract_query_factory_should_scan_over_results(params
     assert not aq._should_scan_over_results()
 
 
+def test_searches_queries_abstract_query_factory_should_search_over_all_indices(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert not aq._should_search_over_all_indices()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Item&status=released'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._should_search_over_all_indices()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Item&type=TestingSearchSchema&status=released'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._should_search_over_all_indices()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingPostPutPatch&type=TestingSearchSchema&status=released'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert not aq._should_search_over_all_indices()
+
+
 def test_searches_queries_abstract_query_factory_get_bounded_int_limit_value_or_default(params_parser, dummy_request):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from snovault.elasticsearch.searches.parsers import ParamsParser
@@ -986,8 +1019,10 @@ def test_searches_queries_abstract_query_factory_prefix_values(params_parser):
     ) == ['embedded.uuid', 'embedded.status', 'embedded.@type']
 
 
-def test_searches_queries_abstract_query_factory_make_bool_filter_query(params_parser):
+def test_searches_queries_abstract_query_factory_make_bool_filter_query(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     bf = aq._make_bool_query(
         filter=[
@@ -1079,8 +1114,10 @@ def test_searches_queries_abstract_query_factory_make_bool_filter_query_must_and
     }
 
 
-def test_searches_queries_abstract_query_factory_make_bool_filter_and_query_context(params_parser):
+def test_searches_queries_abstract_query_factory_make_bool_filter_and_query_context(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     bf = aq._make_bool_query(
         filter=[
@@ -2283,8 +2320,10 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_no_searc
     assert aq.search is None
 
 
-def test_searches_queries_abstract_query_factory_add_must_equal_terms_filter(params_parser):
+def test_searches_queries_abstract_query_factory_add_must_equal_terms_filter(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_must_equal_terms_filter(
         field='status',
@@ -2308,8 +2347,10 @@ def test_searches_queries_abstract_query_factory_add_must_equal_terms_filter(par
     }
 
 
-def test_searches_queries_abstract_query_factory_add_must_equal_terms_post_filter(params_parser):
+def test_searches_queries_abstract_query_factory_add_must_equal_terms_post_filter(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_must_equal_terms_post_filter(
         field='status',
@@ -2324,8 +2365,10 @@ def test_searches_queries_abstract_query_factory_add_must_equal_terms_post_filte
     }
 
 
-def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_post_filter(params_parser):
+def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_post_filter(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_must_not_equal_terms_post_filter(
         field='status',
@@ -2344,8 +2387,10 @@ def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_post_f
     }
 
 
-def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_filter(params_parser):
+def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_filter(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_must_not_equal_terms_filter(
         field='status',
@@ -2375,8 +2420,10 @@ def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_filter
     }
 
 
-def test_searches_queries_abstract_query_factory_add_field_must_exist_filter(params_parser):
+def test_searches_queries_abstract_query_factory_add_field_must_exist_filter(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_field_must_exist_filter(
         'embedded.status'
@@ -2390,8 +2437,10 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_filter(par
     }
 
 
-def test_searches_queries_abstract_query_factory_add_field_must_exist_post_filter(params_parser):
+def test_searches_queries_abstract_query_factory_add_field_must_exist_post_filter(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_field_must_exist_post_filter(
         'embedded.status'
@@ -2409,8 +2458,10 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_post_filte
     }
 
 
-def test_searches_queries_abstract_query_factory_add_field_must_exist_filter_multiple(params_parser):
+def test_searches_queries_abstract_query_factory_add_field_must_exist_filter_multiple(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_field_must_exist_filter(
         'embedded.status'
@@ -2430,8 +2481,10 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_filter_mul
     }
 
 
-def test_searches_queries_abstract_query_factory_add_field_must_not_exist_filter(params_parser):
+def test_searches_queries_abstract_query_factory_add_field_must_not_exist_filter(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_field_must_not_exist_filter(
         'embedded.file_size'
@@ -2445,8 +2498,10 @@ def test_searches_queries_abstract_query_factory_add_field_must_not_exist_filter
     }
 
 
-def test_searches_queries_abstract_query_factory_add_field_must_not_exist_post_filter(params_parser):
+def test_searches_queries_abstract_query_factory_add_field_must_not_exist_post_filter(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_field_must_not_exist_post_filter(
         'embedded.file_size'
@@ -2464,8 +2519,10 @@ def test_searches_queries_abstract_query_factory_add_field_must_not_exist_post_f
     }
 
 
-def test_searches_queries_abstract_query_factory_add_field_must_and_must_not_exist_filter(params_parser):
+def test_searches_queries_abstract_query_factory_add_field_must_and_must_not_exist_filter(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_field_must_exist_filter(
         'embedded.status'
@@ -2485,8 +2542,10 @@ def test_searches_queries_abstract_query_factory_add_field_must_and_must_not_exi
     }
 
 
-def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_parser):
+def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_terms_aggregation('Statuses', 'embedded.status', size=10)
     assert aq.search.to_dict() == {
@@ -2503,8 +2562,10 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_pa
     }
 
 
-def test_searches_queries_abstract_query_factory_add_terms_aggregation_with_exclusion(params_parser):
+def test_searches_queries_abstract_query_factory_add_terms_aggregation_with_exclusion(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_terms_aggregation('Statuses', 'embedded.status', exclude=['Item'])
     assert aq.search.to_dict() == {
@@ -2521,8 +2582,10 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation_with_excl
     }
 
 
-def test_searches_queries_abstract_query_factory_add_exists_aggregation(params_parser):
+def test_searches_queries_abstract_query_factory_add_exists_aggregation(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_exists_aggregation('Processed file', 'embedded.derived_from')
     assert aq.search.to_dict() == {
@@ -2554,8 +2617,10 @@ def test_searches_queries_abstract_query_factory_add_exists_aggregation(params_p
     }
 
 
-def test_searches_queries_abstract_query_factory_add_filters(params_parser):
+def test_searches_queries_abstract_query_factory_add_filters(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq.add_filters()
     assert aq.search.to_dict() == {
@@ -2576,8 +2641,10 @@ def test_searches_queries_abstract_query_factory_add_filters(params_parser):
     }
 
 
-def test_searches_queries_abstract_query_factory_add_post_filters(params_parser):
+def test_searches_queries_abstract_query_factory_add_post_filters(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq.add_post_filters()
     actual_must = aq.search.to_dict()['post_filter']['bool']['must']
@@ -2669,9 +2736,11 @@ def test_searches_queries_abstract_query_factory_add_query_string_and_post_filte
     )
 
 
-def test_searches_queries_abstract_query_factory_add_source(params_parser):
+def test_searches_queries_abstract_query_factory_add_source(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq.add_source()
     expected = ['embedded.@id', 'embedded.@type', 'embedded.accession']
     actual = aq.search.to_dict()['_source']
@@ -2694,9 +2763,11 @@ def test_searches_queries_abstract_query_factory_add_source_object(dummy_request
     assert len(expected) == len(actual)
 
 
-def test_searches_queries_abstract_query_factory_add_slice(params_parser, dummy_request):
+def test_searches_queries_abstract_query_factory_add_slice(params_parser, dummy_request, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from snovault.elasticsearch.searches.parsers import ParamsParser
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq.add_slice()
     assert aq.search.to_dict() == {'from': 0, 'size': 10, 'query': {'match_all': {}}}

@@ -94,7 +94,16 @@ class AbstractQueryFactory:
         return self.kwargs.get('client') or self.params_parser._request.registry[ELASTIC_SEARCH]
 
     def _get_index(self):
-        return RESOURCES_INDEX
+        if self._should_search_over_all_indices():
+            return RESOURCES_INDEX
+        return self._get_collection_names_for_item_types(
+            self.params_parser.param_values_to_list(
+                params=self._get_item_types()
+            )
+            or self.params_parser.param_values_to_list(
+                params=self._get_default_item_types()
+            )
+        )
 
     def _get_principals(self):
         return self.params_parser._request.effective_principals
@@ -338,6 +347,17 @@ class AbstractQueryFactory:
             not self.params_parser.get_advanced_query_filters()
         ]
         return all(conditions)
+
+    def _should_search_over_all_indices(self):
+        conditions = [
+            self.params_parser.is_param(
+                TYPE_KEY,
+                ITEM,
+                params=self._get_item_types() or self._get_default_item_types()
+            )
+            
+        ]
+        return any(conditions)
 
     def _get_bounded_int_limit_value_or_default(self):
         default_limit = self.params_parser.get_one_value(
