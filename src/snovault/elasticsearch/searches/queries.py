@@ -659,10 +659,10 @@ class AbstractQueryFactory:
         '''
         These filters apply to the entire aggregation and result context.
         '''
-        self.search = self._get_or_create_search().query(
-            self._make_bool_query(
-                must=self._make_default_filters()
-            )
+        self.search = self._get_or_create_search().filter(
+                self._make_bool_query(
+                    must=self._make_default_filters()
+                )
         )
 
     def add_aggregations_and_aggregation_filters(self):
