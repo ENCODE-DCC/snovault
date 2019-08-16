@@ -514,3 +514,23 @@ def test_searches_fields_sort_response_field_maybe_add_sort(dummy_parent):
     srf.parent = dummy_parent
     srf._maybe_add_sort()
     assert dict(srf.response['sort']) == {'y': {'order': 'desc'}}
+
+
+def test_searches_fields_raw_matrix_with_aggs_response_field_init():
+    from snovault.elasticsearch.searches.fields import RawMatrixWithAggsResponseField
+    rm = RawMatrixWithAggsResponseField()
+    assert isinstance(rm, RawMatrixWithAggsResponseField)
+
+
+def test_searches_fields_raw_matrix_with_aggs_response_field_build_query(dummy_parent):
+    from snovault.elasticsearch.searches.fields import RawMatrixWithAggsResponseField
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl import Search
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    rmf = RawMatrixWithAggsResponseField()
+    rmf.parent = dummy_parent
+    rmf._build_query()
+    assert isinstance(rmf.query, Search)
+    assert isinstance(rmf.query_builder, BasicMatrixQueryFactoryWithFacets)

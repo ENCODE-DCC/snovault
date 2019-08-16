@@ -26,6 +26,7 @@ from .interfaces import SUCCESS
 from .interfaces import TERM
 from .interfaces import TITLE
 from .interfaces import TOTAL
+from .queries import BasicMatrixQueryFactoryWithFacets
 from .queries import BasicSearchQueryFactory
 from .queries import BasicSearchQueryFactoryWithFacets
 from .queries import BasicReportQueryFactoryWithFacets
@@ -177,6 +178,27 @@ class BasicReportWithFacetsResponseField(BasicSearchWithFacetsResponseField):
             **self.kwargs
         )
         self.query = self.query_builder.build_query()
+
+
+class RawMatrixWithAggsResponseField(BasicSearchResponseField):
+    '''
+    Matrix has no hits so just returns raw aggregations.
+    '''
+
+    def _build_query(self):
+        self.query_builder = BasicMatrixQueryFactoryWithFacets(
+            params_parser=self.get_params_parser(),
+            **self.kwargs
+        )
+        self.query = self.query_builder.build_query()
+
+    def _execute_query(self):
+        self.results = self.query.execute()
+
+    def _format_results(self):
+        self.response.update(
+            self.results.to_dict()
+        )
 
 
 class TitleResponseField(ResponseField):
