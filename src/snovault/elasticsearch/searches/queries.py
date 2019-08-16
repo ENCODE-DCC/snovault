@@ -881,6 +881,14 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
             return names_and_aggregations[0][0], names_and_aggregations[0][1]
         return None, None
 
+    def _get_group_by_names(self):
+        x_group_by = self._get_x_group_by_fields()
+        y_group_by = self._get_y_group_by_fields()
+        return [
+            (X, x_group_by),
+            (Y, y_group_by + x_group_by)
+        ]
+
     def add_matrix_aggregations(self):
         must, must_not, exists, not_exists = self._make_split_filter_queries(
             params=self._get_post_filters()
@@ -889,12 +897,7 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
             must=must + exists,
             must_not=must_not + not_exists
         )
-        x_group_by = self._get_x_group_by_fields()
-        y_group_by = self._get_y_group_by_fields()
-        group_by_names = [
-            (X, x_group_by),
-            (Y, y_group_by + x_group_by)
-        ]
+        group_by_names = self._get_group_by_names()
         for axis, names in group_by_names:
             title, subaggregation = self._make_subaggregation_from_names(
                 names

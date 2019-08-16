@@ -3433,6 +3433,17 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_make_subaggrega
     assert subagg is None
 
 
+def test_searches_queries_basic_matrix_query_factory_with_facets_get_group_by_names(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    bmqf = BasicMatrixQueryFactoryWithFacets(params_parser)
+    group_by_names = bmqf._get_group_by_names()
+    assert group_by_names == [('x', ['label']), ('y', ['status', 'name', 'label'])]
+
+
 def test_searches_queries_basic_matrix_query_factory_with_facets_add_matrix_aggregations(params_parser, dummy_request):
     from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
     dummy_request.environ['QUERY_STRING'] = (
