@@ -265,4 +265,51 @@ def test_reportv2_view_values_no_type(workbook, testapp):
         '/reportv2/?status=released',
         status=400
     )
-    assert r.json['description'] == "Report view requires specifying a single type: []"
+    assert r.json['description'] == 'Report view requires specifying a single type: []'
+
+
+def test_matrixv2_raw_view_raw_response(workbook, testapp):
+    r = testapp.get('/matrixv2_raw/?type=Snowball')
+    assert 'hits' in r.json
+    assert r.json['hits']['total'] >= 22
+    assert len(r.json['hits']['hits']) == 0
+    assert 'aggregations' in r.json
+    assert 'x' in r.json['aggregations']
+    assert 'y' in r.json['aggregations']
+    assert 'snowflakes.type' in r.json['aggregations']['x']
+    assert 'award.rfa' in r.json['aggregations']['y']
+    assert '_shards' in r.json
+    assert 'timed_out' in r.json
+    assert 'took' in r.json
+
+
+def test_matrixv2_raw_view_no_matrix_defined(workbook, testapp):
+    r = testapp.get(
+        '/matrixv2_raw/?type=Snowflake',
+        status=400
+    )
+    assert r.json['description'] == 'Item type does not have requested view defined: {}'
+
+
+def test_matrixv2_raw_view_invalid_type(workbook, testapp):
+    r = testapp.get(
+        '/matrixv2_raw/?type=Sno',
+        status=400
+    )
+    assert r.json['description'] == "Invalid types: ['Sno']"
+
+
+def test_matrixv2_raw_view_mutiple_types(workbook, testapp):
+    r = testapp.get(
+        '/matrixv2_raw/?type=Snowflake&type=Snowball',
+        status=400
+    )
+    assert 'Matrix view requires specifying a single type' in r.json['description']
+
+
+def test_matrixv2_raw_view_no_types(workbook, testapp):
+    r = testapp.get(
+        '/matrixv2_raw/',
+        status=400
+    )
+    assert r.json['description'] == 'Matrix view requires specifying a single type: []'

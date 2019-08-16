@@ -14,6 +14,7 @@ from snovault.elasticsearch.searches.fields import FiltersResponseField
 from snovault.elasticsearch.searches.fields import IDResponseField
 from snovault.elasticsearch.searches.fields import NotificationResponseField
 from snovault.elasticsearch.searches.fields import NonSortableResponseField
+from snovault.elasticsearch.searches.fields import RawMatrixWithAggsResponseField
 from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
 from snovault.elasticsearch.searches.fields import SortResponseField
 from snovault.elasticsearch.searches.fields import TitleResponseField
@@ -27,6 +28,7 @@ def includeme(config):
     config.add_route('searchv2_raw', '/searchv2_raw{slash:/?}')
     config.add_route('searchv2_quick', '/searchv2_quick{slash:/?}')
     config.add_route('reportv2', '/reportv2{slash:/?}')
+    config.add_route('matrixv2_raw', '/matrixv2_raw{slash:/?}')
     config.scan(__name__)
 
 
@@ -125,6 +127,21 @@ def reportv2(context, request):
             NonSortableResponseField(),
             SortResponseField(),
             DebugQueryResponseField()
+        ]
+    )
+    return fr.render()
+
+
+@view_config(route_name='matrixv2_raw', request_method='GET', permission='search')
+def matrixv2_raw(context, request):
+    fr = FieldedResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
+        response_fields=[
+            RawMatrixWithAggsResponseField(
+                default_item_types=DEFAULT_ITEM_TYPES
+            )
         ]
     )
     return fr.render()
