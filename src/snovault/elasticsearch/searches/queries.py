@@ -910,7 +910,7 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
         '''
         We just want aggregations not hits.
         '''
-        self.search = self._get_or_create_search()[0]
+        self.search = self._get_or_create_search()[0:0]
 
     def build_query(self):
         self.validate_item_types()
