@@ -313,3 +313,10 @@ def test_matrixv2_raw_view_no_types(workbook, testapp):
         status=400
     )
     assert r.json['description'] == 'Matrix view requires specifying a single type: []'
+
+
+def test_matrixv2_response(workbook, testapp):
+    r = testapp.get('/matrixv2/?type=Snowball')
+    assert 'aggregations' not in r.json
+    assert 'facets' in r.json
+    assert 'total' in r.json

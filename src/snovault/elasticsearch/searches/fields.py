@@ -30,6 +30,7 @@ from .queries import BasicMatrixQueryFactoryWithFacets
 from .queries import BasicSearchQueryFactory
 from .queries import BasicSearchQueryFactoryWithFacets
 from .queries import BasicReportQueryFactoryWithFacets
+from .responses import BasicMatrixResponseWithFacets
 from .responses import BasicQueryResponseWithFacets
 from .responses import RawQueryResponseWithAggs
 
@@ -198,6 +199,26 @@ class RawMatrixWithAggsResponseField(BasicSearchResponseField):
     def _format_results(self):
         self.response.update(
             self.results.to_dict()
+        )
+
+
+class BasicMatrixWithFacetsResponseField(RawMatrixWithAggsResponseField):
+    '''
+    Like RawMatrixWithAggsResponseField but formats facets and matrix.
+    '''
+
+    def _execute_query(self):
+        self.results = BasicMatrixResponseWithFacets(
+            results=self.query.execute(),
+            query_builder=self.query_builder
+        )
+
+    def _format_results(self):
+        self.response.update(
+            {
+                FACETS: self.results.to_facets(),
+                TOTAL: self.results.results.hits.total
+            }
         )
 
 

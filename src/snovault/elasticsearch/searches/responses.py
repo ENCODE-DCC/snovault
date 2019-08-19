@@ -56,3 +56,8 @@ class BasicQueryResponseWithFacets(QueryResponse, HitsToGraphMixin, AggsToFacets
 class RawQueryResponseWithAggs(QueryResponse, RawHitsToGraphMixin):
     def __init__(self, results, query_builder, *args, **kwargs):
         super().__init__(results, query_builder, *args, **kwargs)
+
+
+class BasicMatrixResponseWithFacets(QueryResponse, AggsToFacetsMixin):
+    def __init__(self, results, query_builder, *args, **kwargs):
+        super().__init__(results, query_builder, *args, **kwargs)

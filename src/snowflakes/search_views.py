@@ -3,6 +3,7 @@ from pyramid.view import view_config
 from snovault.elasticsearch.searches.interfaces import REPORT_TITLE
 from snovault.elasticsearch.searches.interfaces import SEARCH_TITLE
 from snovault.elasticsearch.searches.fields import AllResponseField
+from snovault.elasticsearch.searches.fields import BasicMatrixWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import BasicSearchResponseField
 from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import BasicReportWithFacetsResponseField
@@ -29,6 +30,7 @@ def includeme(config):
     config.add_route('searchv2_quick', '/searchv2_quick{slash:/?}')
     config.add_route('reportv2', '/reportv2{slash:/?}')
     config.add_route('matrixv2_raw', '/matrixv2_raw{slash:/?}')
+    config.add_route('matrixv2', '/matrixv2{slash:/?}')
     config.scan(__name__)
 
 
@@ -140,6 +142,21 @@ def matrixv2_raw(context, request):
         },
         response_fields=[
             RawMatrixWithAggsResponseField(
+                default_item_types=DEFAULT_ITEM_TYPES
+            )
+        ]
+    )
+    return fr.render()
+
+
+@view_config(route_name='matrixv2', request_method='GET', permission='search')
+def matrixv2(context, request):
+    fr = FieldedResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
+        response_fields=[
+            BasicMatrixWithFacetsResponseField(
                 default_item_types=DEFAULT_ITEM_TYPES
             )
         ]
