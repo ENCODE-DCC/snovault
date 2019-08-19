@@ -235,13 +235,13 @@ class AggsToMatrixMixin:
     def _add_agg_to_matrix(self, key, agg):
         self.matrix.get(key, {}).update(agg)
 
-    def _add_x_aggs_to_matrix(self):
+    def _add_x_agg_to_matrix(self):
         self._add_agg_to_matrix(
             X,
             self._get_aggregations().get(X, {})
         )
 
-    def _add_y_aggs_to_matrix(self):
+    def _add_y_agg_to_matrix(self):
         self._add_agg_to_matrix(
             Y,
             self._get_aggregations().get(Y, {})
@@ -249,8 +249,8 @@ class AggsToMatrixMixin:
 
     def _build_matrix(self):
         self._add_matrix_definition_to_matrix()
-        self._add_x_aggs_to_matrix()
-        self._add_y_aggs_to_matrix()
+        self._add_x_agg_to_matrix()
+        self._add_y_agg_to_matrix()
 
     def to_matrix(self):
         self._build_matrix()
