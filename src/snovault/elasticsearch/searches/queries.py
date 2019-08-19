@@ -356,7 +356,6 @@ class AbstractQueryFactory:
                 ITEM,
                 params=self._get_item_types() or self._get_default_item_types()
             )
-            
         ]
         return any(conditions)
 
