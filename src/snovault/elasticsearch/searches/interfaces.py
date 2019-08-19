@@ -43,6 +43,7 @@ LIMIT_KEY = 'limit'
 LENGTH = 'length'
 LONG = 'long'
 MATRIX = 'matrix'
+MATRIX_TITLE = 'Matrix'
 MODE_KEY = 'mode'
 NO = 'no'
 NO_LIMIT = 999999

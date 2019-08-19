@@ -320,3 +320,26 @@ def test_matrixv2_response(workbook, testapp):
     assert 'aggregations' not in r.json
     assert 'facets' in r.json
     assert 'total' in r.json
+    assert r.json['title'] == 'Matrix'
+    assert r.json['@type'] == ['Matrix']
+    assert r.json['clear_filters'] == '/matrixv2/?type=Snowball'
+    assert r.json['filters'] == [{'term': 'Snowball', 'remove': '/matrixv2/', 'field': 'type'}]
+    assert r.json['@id'] == '/matrixv2/?type=Snowball'
+    assert r.json['total'] >= 22
+    assert r.json['notification'] == 'Success'
+    assert r.json['title'] == 'Matrix'
+    assert 'facets' in r.json
+    assert r.json['@context'] == '/terms/'
+
+
+def test_matrixv2_response_debug(workbook, testapp):
+    r = testapp.get('/matrixv2/?type=Snowball&debug=true')
+    assert 'debug' in r.json
+
+
+def test_matrixv2_response_no_results(workbook, testapp):
+    r = testapp.get(
+        '/matrixv2/?type=Snowball&status=no_status',
+        status=404
+    )
+    assert r.json['notification'] == 'No results found'

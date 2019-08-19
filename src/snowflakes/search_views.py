@@ -1,5 +1,6 @@
 from pyramid.view import view_config
 
+from snovault.elasticsearch.searches.interfaces import MATRIX_TITLE
 from snovault.elasticsearch.searches.interfaces import REPORT_TITLE
 from snovault.elasticsearch.searches.interfaces import SEARCH_TITLE
 from snovault.elasticsearch.searches.fields import AllResponseField
@@ -156,9 +157,21 @@ def matrixv2(context, request):
             'params_parser': ParamsParser(request)
         },
         response_fields=[
+            TitleResponseField(
+                title=MATRIX_TITLE
+            ),
+            TypeResponseField(
+                at_type=[MATRIX_TITLE]
+            ),
+            IDResponseField(),
+            ContextResponseField(),
             BasicMatrixWithFacetsResponseField(
                 default_item_types=DEFAULT_ITEM_TYPES
-            )
+            ),
+            NotificationResponseField(),
+            FiltersResponseField(),
+            ClearFiltersResponseField(),
+            DebugQueryResponseField()
         ]
     )
     return fr.render()
