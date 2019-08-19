@@ -330,6 +330,12 @@ def test_matrixv2_response(workbook, testapp):
     assert r.json['title'] == 'Matrix'
     assert 'facets' in r.json
     assert r.json['@context'] == '/terms/'
+    assert 'matrix' in r.json
+    assert r.json['matrix']['x']['group_by'] == 'snowflakes.type'
+    assert r.json['matrix']['y']['group_by'] == ['award.rfa', 'lab.title']
+    assert 'buckets' in r.json['matrix']['y']['award.rfa']
+    assert 'key' in r.json['matrix']['y']['award.rfa']['buckets'][0]
+    assert 'lab.title' in r.json['matrix']['y']['award.rfa']['buckets'][0]
 
 
 def test_matrixv2_response_debug(workbook, testapp):

@@ -17,6 +17,8 @@ from .interfaces import TERMS
 from .interfaces import TITLE
 from .interfaces import TOTAL
 from .interfaces import TYPE_KEY
+from .interfaces import X
+from .interfaces import Y
 
 
 class AggsToFacetsMixin:
@@ -209,3 +211,47 @@ class RawHitsToGraphMixin(HitsToGraphMixin):
             r.to_dict()
             for r in self._get_results()
         ]
+
+
+class AggsToMatrixMixin:
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.matrix = {}
+
+    @lru_cache()
+    def _get_aggregations(self):
+        return self.results.aggs.to_dict()
+
+    def _add_matrix_definition_to_matrix(self):
+        self.matrix.update(
+            self.query_builder._get_matrix_for_item_type(
+                self.query_builder.params_parser.get_one_value(
+                    self.query_builder._get_item_types()
+                )
+            ).copy()
+        )
+
+    def _add_agg_to_matrix(self, key, agg):
+        self.matrix.get(key, {}).update(agg)
+
+    def _add_x_aggs_to_matrix(self):
+        self._add_agg_to_matrix(
+            X,
+            self._get_aggregations().get(X, {})
+        )
+
+    def _add_y_aggs_to_matrix(self):
+        self._add_agg_to_matrix(
+            Y,
+            self._get_aggregations().get(Y, {})
+        )
+
+    def _build_matrix(self):
+        self._add_matrix_definition_to_matrix()
+        self._add_x_aggs_to_matrix()
+        self._add_y_aggs_to_matrix()
+
+    def to_matrix(self):
+        self._build_matrix()
+        return self.matrix

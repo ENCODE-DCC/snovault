@@ -16,6 +16,7 @@ from .interfaces import GRAPH
 from .interfaces import HITS
 from .interfaces import JSONLD_CONTEXT
 from .interfaces import LIMIT_KEY
+from .interfaces import MATRIX
 from .interfaces import NON_SORTABLE
 from .interfaces import NO_RESULTS_FOUND
 from .interfaces import NOTIFICATION
@@ -217,6 +218,7 @@ class BasicMatrixWithFacetsResponseField(RawMatrixWithAggsResponseField):
         self.response.update(
             {
                 FACETS: self.results.to_facets(),
+                MATRIX: self.results.to_matrix(),
                 TOTAL: self.results.results.hits.total
             }
         )
