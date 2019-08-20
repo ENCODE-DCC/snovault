@@ -539,6 +539,40 @@ def test_searches_fields_raw_matrix_with_aggs_response_field_build_query(dummy_p
     assert isinstance(rmf.query_builder, BasicMatrixQueryFactoryWithFacets)
 
 
+def test_searches_fields_basic_matrix_with_facets_response_field_init():
+    from snovault.elasticsearch.searches.fields import BasicMatrixWithFacetsResponseField
+    bmwf = BasicMatrixWithFacetsResponseField()
+    assert isinstance(bmwf, BasicMatrixWithFacetsResponseField)
+
+
+def test_searches_fields_basic_matrix_with_facets_response_field_build_query(dummy_parent):
+    from snovault.elasticsearch.searches.fields import BasicMatrixWithFacetsResponseField
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl import Search
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    bmwf = BasicMatrixWithFacetsResponseField()
+    bmwf.parent = dummy_parent
+    bmwf._build_query()
+    assert isinstance(bmwf.query, Search)
+    assert isinstance(bmwf.query_builder, BasicMatrixQueryFactoryWithFacets)
+
+
+def test_searches_fields_basic_matrix_with_facets_response_field_execute_query(dummy_parent, mocker):
+    from snovault.elasticsearch.searches.fields import BasicMatrixWithFacetsResponseField
+    from elasticsearch_dsl import Search
+    mocker.patch.object(Search, 'execute')
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    bmwf = BasicMatrixWithFacetsResponseField()
+    bmwf.parent = dummy_parent
+    bmwf._build_query()
+    bmwf._execute_query()
+    assert Search.execute.call_count == 1
+
+
 def test_searches_fields_search_base_get_search_base(dummy_parent):
     from snovault.elasticsearch.searches.fields import SearchBaseResponseField
     dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
