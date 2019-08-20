@@ -537,3 +537,29 @@ def test_searches_fields_raw_matrix_with_aggs_response_field_build_query(dummy_p
     rmf._build_query()
     assert isinstance(rmf.query, Search)
     assert isinstance(rmf.query_builder, BasicMatrixQueryFactoryWithFacets)
+
+
+def test_searches_fields_search_base_get_search_base(dummy_parent):
+    from snovault.elasticsearch.searches.fields import SearchBaseResponseField
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    sb = SearchBaseResponseField()
+    sb.parent = dummy_parent
+    assert sb._get_search_base() == '/search/?type=TestingSearchSchema&status=released'
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        ''
+    )
+    sb = SearchBaseResponseField()
+    sb.parent = dummy_parent
+    assert sb._get_search_base() == '/search/'
+
+
+def test_searches_fields_search_base_render(dummy_parent):
+    from snovault.elasticsearch.searches.fields import SearchBaseResponseField
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    sb = SearchBaseResponseField()
+    sb.parent = dummy_parent
+    assert sb.render() == {'search_base': '/search/?type=TestingSearchSchema&status=released'}

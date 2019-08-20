@@ -22,6 +22,8 @@ from .interfaces import NO_RESULTS_FOUND
 from .interfaces import NOTIFICATION
 from .interfaces import RAW_QUERY
 from .interfaces import REMOVE
+from .interfaces import SEARCH_BASE
+from .interfaces import SEARCH_PATH
 from .interfaces import SORT_KEY
 from .interfaces import SUCCESS
 from .interfaces import TERM
@@ -481,3 +483,25 @@ class SortResponseField(ResponseField):
         self.parent = kwargs.get('parent')
         self._maybe_add_sort()
         return self.response
+
+
+class SearchBaseResponseField(ResponseField):
+    '''
+    Used for redirecting from matrix page to search page.
+    (Same query_string, different path.)
+    '''
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _get_search_base(self):
+        search_base = SEARCH_PATH
+        qs = self.get_request().query_string
+        if qs:
+            search_base += '?' + qs
+        return search_base
+
+    def render(self, *args, **kwargs):
+        return {
+            SEARCH_BASE: self._get_search_base()
+        }
