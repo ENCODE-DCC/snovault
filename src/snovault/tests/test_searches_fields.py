@@ -561,5 +561,6 @@ def test_searches_fields_search_base_render(dummy_parent):
         'type=TestingSearchSchema&status=released'
     )
     sb = SearchBaseResponseField()
-    sb.parent = dummy_parent
-    assert sb.render() == {'search_base': '/search/?type=TestingSearchSchema&status=released'}
+    assert sb.render(
+        parent=dummy_parent
+    ) == {'search_base': '/search/?type=TestingSearchSchema&status=released'}

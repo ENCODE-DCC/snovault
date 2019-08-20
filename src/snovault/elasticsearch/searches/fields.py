@@ -502,6 +502,7 @@ class SearchBaseResponseField(ResponseField):
         return search_base
 
     def render(self, *args, **kwargs):
+        self.parent = kwargs.get('parent')
         return {
             SEARCH_BASE: self._get_search_base()
         }
