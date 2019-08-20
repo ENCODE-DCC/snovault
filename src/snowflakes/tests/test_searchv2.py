@@ -336,6 +336,8 @@ def test_matrixv2_response(workbook, testapp):
     assert 'buckets' in r.json['matrix']['y']['award.rfa']
     assert 'key' in r.json['matrix']['y']['award.rfa']['buckets'][0]
     assert 'lab.title' in r.json['matrix']['y']['award.rfa']['buckets'][0]
+    assert 'search_base' in r.json
+    assert r.json['search_base'] == '/search/?type=Snowball'
 
 
 def test_matrixv2_response_debug(workbook, testapp):

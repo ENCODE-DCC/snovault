@@ -18,6 +18,7 @@ from snovault.elasticsearch.searches.fields import NotificationResponseField
 from snovault.elasticsearch.searches.fields import NonSortableResponseField
 from snovault.elasticsearch.searches.fields import RawMatrixWithAggsResponseField
 from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseField
+from snovault.elasticsearch.searches.fields import SearchBaseResponseField
 from snovault.elasticsearch.searches.fields import SortResponseField
 from snovault.elasticsearch.searches.fields import TitleResponseField
 from snovault.elasticsearch.searches.fields import TypeResponseField
@@ -164,6 +165,7 @@ def matrixv2(context, request):
                 at_type=[MATRIX_TITLE]
             ),
             IDResponseField(),
+            SearchBaseResponseField(),
             ContextResponseField(),
             BasicMatrixWithFacetsResponseField(
                 default_item_types=DEFAULT_ITEM_TYPES
