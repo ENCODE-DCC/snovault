@@ -40,3 +40,13 @@ def test_searches_responses_raw_query_response_with_aggs_init():
     from snovault.elasticsearch.searches.responses import RawQueryResponseWithAggs
     rqr = RawQueryResponseWithAggs([], [])
     assert isinstance(rqr, RawQueryResponseWithAggs)
+
+
+def test_searches_responses_basic_matrix_response_with_facets_init():
+    from snovault.elasticsearch.searches.responses import BasicMatrixResponseWithFacets
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    from snovault.elasticsearch.searches.mixins import AggsToMatrixMixin
+    bmr = BasicMatrixResponseWithFacets([], [])
+    assert isinstance(bmr, BasicMatrixResponseWithFacets)
+    assert isinstance(bmr, AggsToFacetsMixin)
+    assert isinstance(bmr, AggsToMatrixMixin)
