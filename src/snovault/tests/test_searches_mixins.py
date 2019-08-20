@@ -561,6 +561,716 @@ def raw_response():
 
 
 @pytest.fixture
+def raw_matrix_query():
+    return {
+        "size": 0,
+        "post_filter": {
+            "bool": {
+                "must": [
+                    {"terms": {"embedded.@type": ["Snowball"]}}
+                ]
+            }
+        },
+        "from": 0,
+        "query": {
+            "bool": {
+                "filter": [
+                    {
+                        "bool": {
+                            "must": [
+                                {"terms": {"principals_allowed.view": ["system.Everyone"]}},
+                                {"terms": {"embedded.@type": ["Snowball"]}}
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "aggs": {
+            "Project": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {"terms": {"embedded.@type": ["Snowball"]}}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "award-project": {
+                        "terms": {
+                            "field": "embedded.award.project",
+                            "exclude": [],
+                            "size": 200
+                        }
+                    }
+                }
+            },
+            "Method": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {"terms": {"embedded.@type": ["Snowball"]}}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "method": {
+                        "terms": {
+                            "field": "embedded.method",
+                            "exclude": [],
+                            "size": 200
+                        }
+                    }
+                }
+            },
+            "y": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {"terms": {"embedded.@type": ["Snowball"]}}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "award.rfa": {
+                        "terms": {
+                            "field": "embedded.award.rfa",
+                            "exclude": [],
+                            "size": 999999
+                        },
+                        "aggs": {
+                            "lab.title": {
+                                "terms": {
+                                    "field": "embedded.lab.title",
+                                    "exclude": [],
+                                    "size": 999999
+                                },
+                                "aggs": {
+                                    "snowflakes.type": {
+                                        "terms": {
+                                            "field": "embedded.snowflakes.type",
+                                            "exclude": [],
+                                            "size": 999999
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "RFA": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {"terms": {"embedded.@type": ["Snowball"]}}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "award-rfa": {
+                        "terms": {
+                            "field": "embedded.award.rfa",
+                            "exclude": [],
+                            "size": 200
+                        }
+                    }
+                }
+            },
+            "Lab": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {"terms": {"embedded.@type": ["Snowball"]}}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "lab-title": {
+                        "terms": {
+                            "field": "embedded.lab.title",
+                            "exclude": [],
+                            "size": 200
+                        }
+                    }
+                }
+            },
+            "Audit category: WARNING": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {"terms": {"embedded.@type": ["Snowball"]}}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "audit-WARNING-category": {
+                        "terms": {
+                            "field": "audit.WARNING.category",
+                            "exclude": [],
+                            "size": 200
+                        }
+                    }
+                }
+            },
+            "Flakes": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {"terms": {"embedded.@type": ["Snowball"]}}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "snowflakes-type": {
+                        "terms": {
+                            "field": "embedded.snowflakes.type",
+                            "exclude": [],
+                            "size": 200
+                        }
+                    }
+                }
+            },
+            "Snowball status": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {"terms": {"embedded.@type": ["Snowball"]}}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "status": {
+                        "terms": {
+                            "field": "embedded.status",
+                            "exclude": [],
+                            "size": 200
+                        }
+                    }
+                }
+            },
+            "x": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {"terms": {"embedded.@type": ["Snowball"]}}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "snowflakes.type": {
+                        "terms": {
+                            "field": "embedded.snowflakes.type",
+                            "exclude": [],
+                            "size": 999999
+                        }
+                    }
+                }
+            },
+            "Audit category: NOT COMPLIANT": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {"terms": {"embedded.@type": ["Snowball"]}}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "audit-NOT_COMPLIANT-category": {
+                        "terms": {
+                            "field": "audit.NOT_COMPLIANT.category",
+                            "exclude": [],
+                            "size": 200
+                        }
+                    }
+                }
+            },
+            "Date released": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {"terms": {"embedded.@type": ["Snowball"]}}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "month_released": {
+                        "terms": {
+                            "field": "embedded.month_released",
+                            "exclude": [],
+                            "size": 200
+                        }
+                    }
+                }
+            },
+            "Data Type": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {"terms": {"embedded.@type": ["Snowball"]}}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "type": {
+                        "terms": {
+                            "field": "embedded.@type",
+                            "exclude": ["Item"],
+                            "size": 200
+                        }
+                    }
+                }
+            },
+            "Audit category: ERROR": {
+                "filter": {
+                    "bool": {
+                        "must": [
+                            {"terms": {"embedded.@type": ["Snowball"]}}
+                        ]
+                    }
+                },
+                "aggs": {
+                    "audit-ERROR-category": {
+                        "terms": {
+                            "field": "audit.ERROR.category",
+                            "exclude": [],
+                            "size": 200
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+@pytest.fixture
+def raw_matrix_response():
+    return {
+        "_shards": {
+            "skipped": 0,
+            "total": 5,
+            "failed": 0,
+            "successful": 5
+        },
+        "aggregations": {
+            "Project": {
+                "doc_count": 21,
+                "award-project": {
+                    "doc_count_error_upper_bound": 0,
+                    "buckets": [
+                        {
+                            "doc_count": 20,
+                            "key": "ENCODE"
+                        },
+                        {
+                            "doc_count": 1,
+                            "key": "Roadmap"
+                        }
+                    ],
+                    "sum_other_doc_count": 0
+                }
+            },
+            "Method": {
+                "doc_count": 21,
+                "method": {
+                    "doc_count_error_upper_bound": 0,
+                    "buckets": [
+                        {
+                            "doc_count": 10,
+                            "key": "accreted"
+                        },
+                        {
+                            "doc_count": 7,
+                            "key": "hand-packed"
+                        },
+                        {
+                            "doc_count": 4,
+                            "key": "scoop-formed"
+                        }
+                    ],
+                    "sum_other_doc_count": 0
+                }
+            },
+            "RFA": {
+                "doc_count": 21,
+                "award-rfa": {
+                    "doc_count_error_upper_bound": 0,
+                    "buckets": [
+                        {
+                            "doc_count": 13,
+                            "key": "ENCODE3"
+                        },
+                        {
+                            "doc_count": 5,
+                            "key": "ENCODE2"
+                        },
+                        {
+                            "doc_count": 3,
+                            "key": "ENCODE2-Mouse"
+                        }
+                    ],
+                    "sum_other_doc_count": 0
+                }
+            },
+            "Data Type": {
+                "doc_count": 21,
+                "type": {
+                    "doc_count_error_upper_bound": 0,
+                    "buckets": [
+                        {
+                            "doc_count": 21,
+                            "key": "Snowball"
+                        },
+                        {
+                            "doc_count": 21,
+                            "key": "Snowset"
+                        }
+                    ],
+                    "sum_other_doc_count": 0
+                }
+            },
+            "Lab": {
+                "doc_count": 21,
+                "lab-title": {
+                    "doc_count_error_upper_bound": 0,
+                    "buckets": [
+                        {
+                            "doc_count": 5,
+                            "key": "Richard Myers, HAIB"
+                        },
+                        {
+                            "doc_count": 5,
+                            "key": "Robert Waterston, UW"
+                        },
+                        {
+                            "doc_count": 4,
+                            "key": "Thomas Gingeras, CSHL"
+                        },
+                        {
+                            "doc_count": 3,
+                            "key": "Sherman Weissman, Yale"
+                        },
+                        {
+                            "doc_count": 1,
+                            "key": "Ali Mortazavi, UCI"
+                        },
+                        {
+                            "doc_count": 1,
+                            "key": "Brenton Graveley, UConn"
+                        },
+                        {
+                            "doc_count": 1,
+                            "key": "Chris Burge, MIT"
+                        },
+                        {
+                            "doc_count": 1,
+                            "key": "John Stamatoyannopoulos, UW"
+                        }
+                    ],
+                    "sum_other_doc_count": 0
+                }
+            },
+            "Audit category: WARNING": {
+                "doc_count": 21,
+                "audit-WARNING-category": {
+                    "doc_count_error_upper_bound": 0,
+                    "buckets": [],
+                    "sum_other_doc_count": 0
+                }
+            },
+            "Flakes": {
+                "doc_count": 21,
+                "snowflakes-type": {
+                    "doc_count_error_upper_bound": 0,
+                    "buckets": [
+                        {
+                            "doc_count": 5,
+                            "key": "crisp"
+                        },
+                        {
+                            "doc_count": 4,
+                            "key": "slushy"
+                        },
+                        {
+                            "doc_count": 3,
+                            "key": "assymetric"
+                        },
+                        {
+                            "doc_count": 2,
+                            "key": "fluffy"
+                        },
+                        {
+                            "doc_count": 1,
+                            "key": "dry"
+                        },
+                        {
+                            "doc_count": 1,
+                            "key": "wet"
+                        }
+                    ],
+                    "sum_other_doc_count": 0
+                }
+            },
+            "y": {
+                "doc_count": 21,
+                "award.rfa": {
+                    "doc_count_error_upper_bound": 0,
+                    "buckets": [
+                        {
+                            "doc_count": 13,
+                            "lab.title": {
+                                "doc_count_error_upper_bound": 0,
+                                "buckets": [
+                                    {
+                                        "snowflakes.type": {
+                                            "doc_count_error_upper_bound": 0,
+                                            "buckets": [],
+                                            "sum_other_doc_count": 0
+                                        },
+                                        "doc_count": 5,
+                                        "key": "Robert Waterston, UW"
+                                    },
+                                    {
+                                        "snowflakes.type": {
+                                            "doc_count_error_upper_bound": 0,
+                                            "buckets": [
+                                                {
+                                                    "doc_count": 1,
+                                                    "key": "crisp"
+                                                }
+                                            ],
+                                            "sum_other_doc_count": 0
+                                        },
+                                        "doc_count": 4,
+                                        "key": "Thomas Gingeras, CSHL"
+                                    },
+                                    {
+                                        "snowflakes.type": {
+                                            "doc_count_error_upper_bound": 0,
+                                            "buckets": [],
+                                            "sum_other_doc_count": 0
+                                        },
+                                        "doc_count": 1,
+                                        "key": "Ali Mortazavi, UCI"
+                                    },
+                                    {
+                                        "snowflakes.type": {
+                                            "doc_count_error_upper_bound": 0,
+                                            "buckets": [
+                                                {
+                                                    "doc_count": 1,
+                                                    "key": "assymetric"
+                                                },
+                                                {
+                                                    "doc_count": 1,
+                                                    "key": "crisp"
+                                                },
+                                                {
+                                                    "doc_count": 1,
+                                                    "key": "slushy"
+                                                }
+                                            ],
+                                            "sum_other_doc_count": 0
+                                        },
+                                        "doc_count": 1,
+                                        "key": "Brenton Graveley, UConn"
+                                    },
+                                    {
+                                        "snowflakes.type": {
+                                            "doc_count_error_upper_bound": 0,
+                                            "buckets": [
+                                                {
+                                                    "doc_count": 1,
+                                                    "key": "dry"
+                                                }
+                                            ],
+                                            "sum_other_doc_count": 0
+                                        },
+                                        "doc_count": 1,
+                                        "key": "John Stamatoyannopoulos, UW"
+                                    },
+                                    {
+                                        "snowflakes.type": {
+                                            "doc_count_error_upper_bound": 0,
+                                            "buckets": [],
+                                            "sum_other_doc_count": 0
+                                        },
+                                        "doc_count": 1,
+                                        "key": "Richard Myers, HAIB"
+                                    }
+                                ],
+                                "sum_other_doc_count": 0
+                            },
+                            "key": "ENCODE3"
+                        },
+                        {
+                            "doc_count": 5,
+                            "lab.title": {
+                                "doc_count_error_upper_bound": 0,
+                                "buckets": [
+                                    {
+                                        "snowflakes.type": {
+                                            "doc_count_error_upper_bound": 0,
+                                            "buckets": [
+                                                {
+                                                    "doc_count": 1,
+                                                    "key": "fluffy"
+                                                },
+                                                {
+                                                    "doc_count": 1,
+                                                    "key": "wet"
+                                                }
+                                            ],
+                                            "sum_other_doc_count": 0
+                                        },
+                                        "doc_count": 4,
+                                        "key": "Richard Myers, HAIB"
+                                    },
+                                    {
+                                        "snowflakes.type": {
+                                            "doc_count_error_upper_bound": 0,
+                                            "buckets": [],
+                                            "sum_other_doc_count": 0
+                                        },
+                                        "doc_count": 1,
+                                        "key": "Chris Burge, MIT"
+                                    }
+                                ],
+                                "sum_other_doc_count": 0
+                            },
+                            "key": "ENCODE2"
+                        },
+                        {
+                            "doc_count": 3,
+                            "lab.title": {
+                                "doc_count_error_upper_bound": 0,
+                                "buckets": [
+                                    {
+                                        "snowflakes.type": {
+                                            "doc_count_error_upper_bound": 0,
+                                            "buckets": [
+                                                {
+                                                    "doc_count": 3,
+                                                    "key": "crisp"
+                                                },
+                                                {
+                                                    "doc_count": 3,
+                                                    "key": "slushy"
+                                                },
+                                                {
+                                                    "doc_count": 2,
+                                                    "key": "assymetric"
+                                                },
+                                                {
+                                                    "doc_count": 1,
+                                                    "key": "fluffy"
+                                                }
+                                            ],
+                                            "sum_other_doc_count": 0
+                                        },
+                                        "doc_count": 3,
+                                        "key": "Sherman Weissman, Yale"
+                                    }
+                                ],
+                                "sum_other_doc_count": 0
+                            },
+                            "key": "ENCODE2-Mouse"
+                        }
+                    ],
+                    "sum_other_doc_count": 0
+                }
+            },
+            "Snowball status": {
+                "doc_count": 21,
+                "status": {
+                    "doc_count_error_upper_bound": 0,
+                    "buckets": [
+                        {
+                            "doc_count": 21,
+                            "key": "released"
+                        }
+                    ],
+                    "sum_other_doc_count": 0
+                }
+            },
+            "x": {
+                "snowflakes.type": {
+                    "doc_count_error_upper_bound": 0,
+                    "buckets": [
+                        {
+                            "doc_count": 5,
+                            "key": "crisp"
+                        },
+                        {
+                            "doc_count": 4,
+                            "key": "slushy"
+                        },
+                        {
+                            "doc_count": 3,
+                            "key": "assymetric"
+                        },
+                        {
+                            "doc_count": 2,
+                            "key": "fluffy"
+                        },
+                        {
+                            "doc_count": 1,
+                            "key": "dry"
+                        },
+                        {
+                            "doc_count": 1,
+                            "key": "wet"
+                        }
+                    ],
+                    "sum_other_doc_count": 0
+                },
+                "doc_count": 21
+            },
+            "Audit category: NOT COMPLIANT": {
+                "doc_count": 21,
+                "audit-NOT_COMPLIANT-category": {
+                    "doc_count_error_upper_bound": 0,
+                    "buckets": [],
+                    "sum_other_doc_count": 0
+                }
+            },
+            "Date released": {
+                "month_released": {
+                    "doc_count_error_upper_bound": 0,
+                    "buckets": [
+                        {
+                            "doc_count": 20,
+                            "key": "January, 2016"
+                        },
+                        {
+                            "doc_count": 1,
+                            "key": "August, 2015"
+                        }
+                    ],
+                    "sum_other_doc_count": 0
+                },
+                "doc_count": 21
+            },
+            "Audit category: ERROR": {
+                "doc_count": 21,
+                "audit-ERROR-category": {
+                    "doc_count_error_upper_bound": 0,
+                    "buckets": [],
+                    "sum_other_doc_count": 0
+                }
+            }
+        },
+        "hits": {
+            "total": 21,
+            "max_score": 0,
+            "hits": []
+        },
+        "timed_out": False,
+        "took": 13
+    }
+
+
+@pytest.fixture
 def parsed_params(dummy_request):
     from pyramid.testing import DummyResource
     from pyramid.security import Allow
@@ -592,6 +1302,15 @@ def basic_search_query_factory_with_facets(raw_snowflakes_query, parsed_params):
 
 
 @pytest.fixture
+def basic_matrix_query_factory_with_facets(raw_matrix_query, parsed_params):
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl import Search
+    bmq = BasicMatrixQueryFactoryWithFacets(parsed_params)
+    bmq.search = Search().from_dict(raw_matrix_query)
+    return bmq
+
+
+@pytest.fixture
 def basic_query_response_with_facets(raw_response, basic_search_query_factory_with_facets):
     from snovault.elasticsearch.searches.responses import BasicQueryResponseWithFacets
     from elasticsearch_dsl.response import Response, AggResponse
@@ -610,6 +1329,27 @@ def basic_query_response_with_facets(raw_response, basic_search_query_factory_wi
         query_builder=basic_search_query_factory_with_facets
     )
     return bqr
+
+
+@pytest.fixture
+def basic_matrix_response_with_facets(raw_matrix_response, basic_matrix_query_factory_with_facets):
+    from snovault.elasticsearch.searches.responses import BasicMatrixResponseWithFacets
+    from elasticsearch_dsl.response import Response, AggResponse
+    basic_matrix_query_factory_with_facets.search._response = Response(
+        basic_matrix_query_factory_with_facets.search,
+        raw_matrix_response
+    )
+    ar = AggResponse(
+        basic_matrix_query_factory_with_facets.search.aggs,
+        basic_matrix_query_factory_with_facets.search,
+        raw_matrix_response['aggregations']
+    )
+    basic_matrix_query_factory_with_facets.search._response._aggs = ar
+    bmqr = BasicMatrixResponseWithFacets(
+        results=basic_matrix_query_factory_with_facets.search._response,
+        query_builder=basic_matrix_query_factory_with_facets
+    )
+    return bmqr
 
 
 @pytest.fixture
@@ -1089,3 +1829,63 @@ def test_searches_mixins_raw_hits_to_graph_mixin_to_graph(raw_query_response_wit
     r = raw_query_response_with_facets.to_graph()
     assert len(r) == 2
     assert 'embedded' in r[0]
+
+
+def test_searches_mixins_aggs_to_matrix_mixin_init():
+    from snovault.elasticsearch.searches.mixins import AggsToMatrixMixin
+    am = AggsToMatrixMixin()
+    assert isinstance(am, AggsToMatrixMixin)
+
+
+def test_searches_mixins_aggs_to_matrix_mixin_get_aggregations(basic_matrix_response_with_facets):
+    aggs = basic_matrix_response_with_facets._get_aggregations()
+    assert 'x' in aggs
+    assert 'y' in aggs
+
+
+def test_searches_mixins_aggs_to_matrix_mixin_add_matrix_definition_to_matrix(basic_matrix_response_with_facets):
+    basic_matrix_response_with_facets._add_matrix_definition_to_matrix()
+    assert basic_matrix_response_with_facets.matrix == {
+        'x': {
+            'group_by': 'label'
+        },
+        'y': {
+            'group_by': ['status', 'name']
+        }
+    }
+
+
+def test_searches_mixins_aggs_to_matrix_mixin_add_agg_to_matrix(basic_matrix_response_with_facets):
+    basic_matrix_response_with_facets._add_matrix_definition_to_matrix()
+    basic_matrix_response_with_facets._add_agg_to_matrix('x', {'subfield': {'buckets': []}})
+    assert 'subfield' in basic_matrix_response_with_facets.matrix['x']
+
+
+def test_searches_mixins_aggs_to_matrix_mixin_add_x_agg_to_matrix(basic_matrix_response_with_facets):
+    basic_matrix_response_with_facets._add_matrix_definition_to_matrix()
+    basic_matrix_response_with_facets._add_x_agg_to_matrix()
+    assert 'snowflakes.type' in basic_matrix_response_with_facets.matrix['x']
+
+
+def test_searches_mixins_aggs_to_matrix_mixin_add_y_agg_to_matrix(basic_matrix_response_with_facets):
+    basic_matrix_response_with_facets._add_matrix_definition_to_matrix()
+    basic_matrix_response_with_facets._add_y_agg_to_matrix()
+    assert 'award.rfa' in basic_matrix_response_with_facets.matrix['y']
+
+
+def test_searches_mixins_aggs_to_matrix_mixin_build_matrix(basic_matrix_response_with_facets):
+    basic_matrix_response_with_facets._build_matrix()
+    assert 'x' in basic_matrix_response_with_facets.matrix
+    assert 'y' in basic_matrix_response_with_facets.matrix
+    assert 'snowflakes.type' in basic_matrix_response_with_facets.matrix['x']
+    assert 'award.rfa' in basic_matrix_response_with_facets.matrix['y']
+
+
+def test_searches_mixins_aggs_to_matrix_mixin_to_matrix(basic_matrix_response_with_facets):
+    matrix = basic_matrix_response_with_facets.to_matrix()
+    assert 'x' in matrix
+    assert 'y' in matrix
+    assert 'snowflakes.type' in matrix['x']
+    assert 'award.rfa' in matrix['y']
+    assert len(matrix['y']['award.rfa']['buckets']) >= 3
+
