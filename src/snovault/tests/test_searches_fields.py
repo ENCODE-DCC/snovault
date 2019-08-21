@@ -439,6 +439,25 @@ def test_searches_fields_clear_filter_response_field_get_search_term_or_types_fr
     assert search_term_or_types == [('type', 'Experiment')]
 
 
+def test_searches_fields_type_only_clear_filter_response_field_get_search_term_or_types_from_query_string(dummy_parent):
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*&searchTerm=ctcf'
+    )
+    from snovault.elasticsearch.searches.fields import TypeOnlyClearFiltersResponseField
+    tcfr = TypeOnlyClearFiltersResponseField()
+    tcfr.parent = dummy_parent
+    search_term_or_types = tcfr._get_search_term_or_types_from_query_string()
+    # Matrix/report clear filters should always always returns types.
+    assert search_term_or_types == [('type', 'Experiment')]
+    tcfr.parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*'
+    )
+    search_term_or_types = tcfr._get_search_term_or_types_from_query_string()
+    assert search_term_or_types == [('type', 'Experiment')]
+
+
 def test_searches_fields_clear_filter_response_field_get_path_qs_with_no_filters(dummy_parent):
     dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
         'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'

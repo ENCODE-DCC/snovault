@@ -21,6 +21,7 @@ from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseFiel
 from snovault.elasticsearch.searches.fields import SearchBaseResponseField
 from snovault.elasticsearch.searches.fields import SortResponseField
 from snovault.elasticsearch.searches.fields import TitleResponseField
+from snovault.elasticsearch.searches.fields import TypeOnlyClearFiltersResponseField
 from snovault.elasticsearch.searches.fields import TypeResponseField
 from snovault.elasticsearch.searches.parsers import ParamsParser
 from snovault.elasticsearch.searches.responses import FieldedResponse
@@ -126,7 +127,7 @@ def reportv2(context, request):
             AllResponseField(),
             NotificationResponseField(),
             FiltersResponseField(),
-            ClearFiltersResponseField(),
+            TypeOnlyClearFiltersResponseField(),
             ColumnsResponseField(),
             NonSortableResponseField(),
             SortResponseField(),
@@ -172,7 +173,7 @@ def matrixv2(context, request):
             ),
             NotificationResponseField(),
             FiltersResponseField(),
-            ClearFiltersResponseField(),
+            TypeOnlyClearFiltersResponseField(),
             DebugQueryResponseField()
         ]
     )

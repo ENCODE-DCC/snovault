@@ -211,6 +211,12 @@ def test_reportv2_view(workbook, testapp):
     assert 'sort' in r.json
 
 
+def test_reportv2_response_with_search_term_type_only_clear_filters(workbook, testapp):
+    r = testapp.get('/reportv2/?type=Snowball&searchTerm=crisp')
+    assert 'clear_filters' in r.json
+    assert r.json['clear_filters'] == '/reportv2/?type=Snowball'
+
+
 def test_reportv2_view_with_limit(workbook, testapp):
     r = testapp.get(
         '/reportv2/?type=Snowflake&limit=5'
@@ -338,6 +344,12 @@ def test_matrixv2_response(workbook, testapp):
     assert 'lab.title' in r.json['matrix']['y']['award.rfa']['buckets'][0]
     assert 'search_base' in r.json
     assert r.json['search_base'] == '/search/?type=Snowball'
+
+
+def test_matrixv2_response_with_search_term_type_only_clear_filters(workbook, testapp):
+    r = testapp.get('/matrixv2/?type=Snowball&searchTerm=crisp')
+    assert 'clear_filters' in r.json
+    assert r.json['clear_filters'] == '/matrixv2/?type=Snowball'
 
 
 def test_matrixv2_response_debug(workbook, testapp):
