@@ -410,9 +410,8 @@ class ClearFiltersResponseField(ResponseField):
 
 class TypeOnlyClearFiltersResponseField(ClearFiltersResponseField):
     '''
-    Like ClearFiltersResponseField but always return types even if
-    searchTerm is in query string. (Current matrix/report views require a
-    type to be specified.)
+    Like ClearFiltersResponseField but always returns types even if
+    searchTerm is in query string.
     '''
 
     def _get_search_term_or_types_from_query_string(self):
