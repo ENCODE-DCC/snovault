@@ -505,7 +505,11 @@ def test_searches_fields_column_response_field(dummy_parent):
     from snovault.elasticsearch.searches.fields import ColumnsResponseField
     crf = ColumnsResponseField()
     r = crf.render(parent=dummy_parent)
-    assert r['columns'] == {'accession': {'title': 'Accession'}, 'status': {'title': 'Status'}}
+    assert r['columns'] == {
+        '@id': {'title': 'ID'},
+        'accession': {'title': 'Accession'},
+        'status': {'title': 'Status'}
+    }
 
 
 def test_searches_fields_non_sortable_response_field(dummy_parent):

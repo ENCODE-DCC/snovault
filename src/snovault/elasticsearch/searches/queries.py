@@ -16,9 +16,11 @@ from .decorators import assert_one_or_none_returned
 from .decorators import assert_something_returned
 from .decorators import deduplicate
 from .defaults import BASE_AUDIT_FACETS
+from .defaults import BASE_COLUMNS
 from .defaults import BASE_FIELD_FACETS
 from .defaults import BASE_RETURN_FIELDS
 from .defaults import BASE_SEARCH_FIELDS
+from .defaults import DEFAULT_COLUMNS
 from .defaults import DEFAULT_FRAMES
 from .defaults import DEFAULT_SORT
 from .defaults import DEFAULT_SORT_OPTIONS
@@ -140,16 +142,30 @@ class AbstractQueryFactory:
     def _get_facets_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(FACETS, {}).items()
 
+    def _get_base_columns(self):
+        return OrderedDict(BASE_COLUMNS)
+
+    def _get_default_columns_for_item_type(self, item_type):
+        properties = self._get_properties_for_item_type(item_type)
+        return {
+            k: v
+            for k, v in DEFAULT_COLUMNS.items()
+            if k in properties
+        }
+
     def _get_columns_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(COLUMNS, {})
 
     def _get_columns_for_item_types(self, item_types=None):
-        columns = OrderedDict()
+        columns = self._get_base_columns()
         item_type_values = item_types or self.params_parser.param_values_to_list(
             params=self._get_item_types() or self._get_default_item_types()
         )
         for item_type in item_type_values:
-            columns.update(self._get_columns_for_item_type(item_type))
+            columns.update(
+                self._get_columns_for_item_type(item_type)
+                or self._get_default_columns_for_item_type(item_type)
+            )
         return columns
 
     def _get_invalid_item_types(self, item_types):

@@ -39,6 +39,30 @@ BASE_RETURN_FIELDS = [
     'embedded.@type',
 ]
 
+BASE_COLUMNS = {
+    '@id': {
+        'title': 'ID'
+    }
+}
+
+DEFAULT_COLUMNS = {
+    'accession': {
+        'title': 'Accession'
+    },
+    'aliases': {
+        'title': 'Aliases'
+    },
+    'title': {
+        'title': 'Title'
+    },
+    'description': {
+        'title': 'Description'
+    },
+    'name': {
+        'title': 'Name'
+    }
+}
+
 BASE_FIELD_FACETS = [
     (
         'type',

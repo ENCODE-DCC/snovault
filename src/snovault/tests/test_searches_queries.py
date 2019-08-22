@@ -304,7 +304,11 @@ def test_searches_queries_abstract_query_factory_get_columns_for_item_types(dumm
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     columns = aq._get_columns_for_item_types()
-    assert columns == {'accession': {'title': 'Accession'}, 'status': {'title': 'Status'}}
+    assert dict(columns) == {
+        '@id': {'title': 'ID'},
+        'accession': {'title': 'Accession'},
+        'status': {'title': 'Status'}
+    }
 
 
 def test_searches_queries_abstract_query_factory_get_invalid_item_types(params_parser_snovault_types):
@@ -964,7 +968,7 @@ def test_searches_queries_abstract_query_factory_get_return_fields_from_schema_c
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    expected = ['embedded.status', 'embedded.status']
+    expected = ['embedded.@id', 'embedded.accession', 'embedded.status']
     actual = aq._get_return_fields_from_schema_columns()
     assert all([e in actual for e in expected])
     assert len(expected) == len(actual)
