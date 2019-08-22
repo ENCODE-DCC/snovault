@@ -58,6 +58,7 @@ from .interfaces import ORDER
 from .interfaces import PERIOD
 from .interfaces import PICKER
 from .interfaces import PRINCIPALS_ALLOWED_VIEW
+from .interfaces import PROPERTIES
 from .interfaces import QUERY_STRING
 from .interfaces import SEARCH_AUDIT
 from .interfaces import _SOURCE
@@ -116,6 +117,9 @@ class AbstractQueryFactory:
 
     def _get_schema_for_item_type(self, item_type):
         return self._get_registered_types()[item_type].schema
+
+    def _get_properties_for_item_type(self, item_type):
+        return self._get_schema_for_item_type(item_type).get(PROPERTIES, {})
 
     def _get_subtypes_for_item_type(self, item_type):
         return self._get_registered_types()[item_type].subtypes

@@ -195,6 +195,52 @@ def test_searches_queries_abstract_query_factory_get_schema_for_item_type(params
     assert isinstance(schema, dict)
 
 
+def test_searches_queries_abstract_query_factory_get_properties_for_item_type(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    actual = aq._get_properties_for_item_type('TestingSearchSchema')
+    expected = {
+        '@id': {
+            'notSubmittable': True,
+            'type': 'string',
+            'title': 'ID'},
+        'status': {
+            'type': 'string'
+        },
+        'accession': {
+            'type': 'string',
+            'description': '',
+            'format': 'accession',
+            'permission': 'import_items',
+            'title': 'Accession'},
+        '@type': {
+            'notSubmittable': True,
+            'type': 'array',
+            'items': {
+                'type': 'string'
+            },
+            'title': 'Type'
+        },
+        'uuid': {
+            'permission': 'import_items',
+            'format': 'uuid',
+            'type': 'string',
+            'description': 'Unique identifier',
+            'title': 'UUID',
+            'requestMethod': 'POST'
+        },
+        'name': {
+            'uniqueKey': True,
+            'type': 'string'
+        },
+        'label': {
+            'type': 'string'
+        }
+    }
+    assert set(actual.keys()) == set(expected.keys())
+    assert actual['accession']['title'] == 'Accession'
+
+
 def test_searches_queries_abstract_query_factory_get_subtypes_for_item_type(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
