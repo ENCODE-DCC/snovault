@@ -328,6 +328,16 @@ def test_searches_queries_abstract_query_factory_get_columns_for_item_types(dumm
         'accession': {'title': 'Accession'},
         'status': {'title': 'Status'}
     }
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&type=TestingPostPutPatch'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    columns = aq._get_columns_for_item_types()
+    assert dict(columns) == {
+        '@id': {'title': 'ID'},
+        'accession': {'title': 'Accession'}
+    }
 
 
 def test_searches_queries_abstract_query_factory_get_invalid_item_types(params_parser_snovault_types):
