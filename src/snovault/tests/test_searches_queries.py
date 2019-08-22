@@ -283,6 +283,25 @@ def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params
     assert len(expected) == len(facets)
 
 
+def test_searches_queries_abstract_query_factory_get_base_columns(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    assert aq._get_base_columns() == {'@id': {'title': 'ID'}}
+
+
+def test_searches_queries_abstract_query_factory_get_default_columns_for_item_type(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    assert aq._get_default_columns_for_item_type('TestingSearchSchema') == {
+        'accession': {'title': 'Accession'},
+        'name': {'title': 'Name'}
+    }
+    assert aq._get_default_columns_for_item_type('TestingPostPutPatch') == {
+        'accession': {'title': 'Accession'}
+    }
+    assert aq._get_default_columns_for_item_type('TestingDownload') == {}
+
+
 def test_searches_queries_abstract_query_factory_get_columns_for_item_type(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
