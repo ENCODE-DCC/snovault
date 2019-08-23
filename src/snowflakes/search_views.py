@@ -28,12 +28,12 @@ from snovault.elasticsearch.searches.responses import FieldedResponse
 
 
 def includeme(config):
-    config.add_route('searchv2', '/searchv2{slash:/?}')
+    config.add_route('search', '/search{slash:/?}')
     config.add_route('searchv2_raw', '/searchv2_raw{slash:/?}')
     config.add_route('searchv2_quick', '/searchv2_quick{slash:/?}')
-    config.add_route('reportv2', '/reportv2{slash:/?}')
+    config.add_route('report', '/report{slash:/?}')
     config.add_route('matrixv2_raw', '/matrixv2_raw{slash:/?}')
-    config.add_route('matrixv2', '/matrixv2{slash:/?}')
+    config.add_route('matrix', '/matrix{slash:/?}')
     config.scan(__name__)
 
 
@@ -46,8 +46,8 @@ DEFAULT_ITEM_TYPES = [
 ]
 
 
-@view_config(route_name='searchv2', request_method='GET', permission='search')
-def searchv2(context, request):
+@view_config(route_name='search', request_method='GET', permission='search')
+def search(context, request):
     # Note the order of rendering matters for some fields, e.g. AllResponseField and
     # NotificationResponseField depend on results from BasicSearchWithFacetsResponseField.
     fr = FieldedResponse(
@@ -108,8 +108,8 @@ def searchv2_quick(context, request):
     return fr.render()
 
 
-@view_config(route_name='reportv2', request_method='GET', permission='search')
-def reportv2(context, request):
+@view_config(route_name='report', request_method='GET', permission='search')
+def report(context, request):
     fr = FieldedResponse(
         _meta={
             'params_parser': ParamsParser(request)
@@ -152,8 +152,8 @@ def matrixv2_raw(context, request):
     return fr.render()
 
 
-@view_config(route_name='matrixv2', request_method='GET', permission='search')
-def matrixv2(context, request):
+@view_config(route_name='matrix', request_method='GET', permission='search')
+def matrix(context, request):
     fr = FieldedResponse(
         _meta={
             'params_parser': ParamsParser(request)
