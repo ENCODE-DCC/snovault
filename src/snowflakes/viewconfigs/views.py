@@ -35,7 +35,7 @@ def searchv1(context, request, search_type=None, views=None, return_generator=Fa
     return search.preprocess_view(views=views, search_result_actions=search_result_actions)
 
 
-@view_config(route_name='report', request_method='GET', permission='search')
+@view_config(route_name='reportv1', request_method='GET', permission='search')
 def reportv1(context, request):
     report = ReportView(context, request)
     return report.preprocess_view(views=[])
