@@ -74,6 +74,14 @@ def test_searchv2_view_values_no_results(workbook, testapp):
     assert r.json['notification'] == 'No results found'
 
 
+def test_searchv2_view_values_malformed_query_string(workbook, testapp):
+    r = testapp.get(
+        '/searchv2/?status=current&type=Snowflake&status=&format=json',
+        status=404
+    )
+    assert r.json['notification'] == 'No results found'
+
+
 def test_searchv2_view_values_bad_type(workbook, testapp):
     r = testapp.get(
         '/searchv2/?status=released&type=Sno',
