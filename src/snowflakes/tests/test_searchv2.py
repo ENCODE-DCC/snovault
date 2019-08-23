@@ -7,7 +7,7 @@ from webob.multidict import MultiDict
 
 def test_searchv2_view(workbook, testapp):
     r = testapp.get(
-        '/searchv2/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
+        '/search/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
     )
     assert r.json['title'] == 'Search'
     assert len(r.json['@graph']) == 1
@@ -15,14 +15,14 @@ def test_searchv2_view(workbook, testapp):
     assert r.json['@graph'][0]['status'] == 'deleted'
     assert 'Snowflake' in r.json['@graph'][0]['@type']
     assert len(r.json['facets']) == 5
-    assert r.json['@id'] == '/searchv2/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
+    assert r.json['@id'] == '/search/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
     assert r.json['@context'] == '/terms/'
     assert r.json['@type'] == ['Search']
     assert r.json['total'] == 1
     assert r.json['notification'] == 'Success'
     assert len(r.json['filters']) == 4
     assert r.status_code == 200
-    assert r.json['clear_filters'] == '/searchv2/?type=Snowflake'
+    assert r.json['clear_filters'] == '/search/?type=Snowflake'
     assert 'debug' not in r.json
     assert 'columns' in r.json
     assert 'sort' in r.json
@@ -30,27 +30,27 @@ def test_searchv2_view(workbook, testapp):
 
 def test_searchv2_view_with_limit(workbook, testapp):
     r = testapp.get(
-        '/searchv2/?type=Snowflake&limit=5'
+        '/search/?type=Snowflake&limit=5'
     )
     assert len(r.json['@graph']) == 5
     assert 'all' in r.json
     r = testapp.get(
-        '/searchv2/?type=Snowflake&limit=26'
+        '/search/?type=Snowflake&limit=26'
     )
     assert len(r.json['@graph']) == 26
     assert 'all' in r.json
     r = testapp.get(
-        '/searchv2/?type=Snowflake&limit=all'
+        '/search/?type=Snowflake&limit=all'
     )
     assert len(r.json['@graph']) == 35
     assert 'all' not in r.json
     r = testapp.get(
-        '/searchv2/?type=Snowflake&limit=35'
+        '/search/?type=Snowflake&limit=35'
     )
     assert len(r.json['@graph']) == 35
     assert 'all' not in r.json
     r = testapp.get(
-        '/searchv2/?type=Snowflake&limit=100000'
+        '/search/?type=Snowflake&limit=100000'
     )
     assert len(r.json['@graph']) == 35
     assert 'all' not in r.json
@@ -58,17 +58,17 @@ def test_searchv2_view_with_limit(workbook, testapp):
 
 def test_searchv2_view_values(workbook, testapp):
     r = testapp.get(
-        '/searchv2/?status=released'
+        '/search/?status=released'
     )
-    assert r.json['all'] == '/searchv2/?status=released&limit=all'
+    assert r.json['all'] == '/search/?status=released&limit=all'
     assert r.json['notification'] == 'Success'
-    assert r.json['filters'][0] == {'field': 'status', 'remove': '/searchv2/', 'term': 'released'}
-    assert r.json['clear_filters'] == '/searchv2/'
+    assert r.json['filters'][0] == {'field': 'status', 'remove': '/search/', 'term': 'released'}
+    assert r.json['clear_filters'] == '/search/'
 
 
 def test_searchv2_view_values_no_results(workbook, testapp):
     r = testapp.get(
-        '/searchv2/?status=current&type=Snowflake',
+        '/search/?status=current&type=Snowflake',
         status=404
     )
     assert r.json['notification'] == 'No results found'
@@ -76,7 +76,7 @@ def test_searchv2_view_values_no_results(workbook, testapp):
 
 def test_searchv2_view_values_malformed_query_string(workbook, testapp):
     r = testapp.get(
-        '/searchv2/?status=current&type=Snowflake&status=&format=json',
+        '/search/?status=current&type=Snowflake&status=&format=json',
         status=404
     )
     assert r.json['notification'] == 'No results found'
@@ -84,12 +84,12 @@ def test_searchv2_view_values_malformed_query_string(workbook, testapp):
 
 def test_searchv2_view_values_bad_type(workbook, testapp):
     r = testapp.get(
-        '/searchv2/?status=released&type=Sno',
+        '/search/?status=released&type=Sno',
         status=400
     )
     assert r.json['description'] == "Invalid types: ['Sno']"
     r = testapp.get(
-        '/searchv2/?status=released&type=Sno&type=Flake',
+        '/search/?status=released&type=Sno&type=Flake',
         status=400
     )
     assert r.json['description'] == "Invalid types: ['Sno', 'Flake']"
@@ -97,7 +97,7 @@ def test_searchv2_view_values_bad_type(workbook, testapp):
 
 def test_searchv2_view_values_item_wildcard(workbook, testapp):
     r = testapp.get(
-        '/searchv2/?type=*',
+        '/search/?type=*',
     )
     assert r.json['notification'] == 'Success'
     assert r.json['total'] >= 172
@@ -105,7 +105,7 @@ def test_searchv2_view_values_item_wildcard(workbook, testapp):
 
 def test_searchv2_view_values_invalid_search_term(workbook, testapp):
     r = testapp.get(
-        '/searchv2/?searchTerm=[',
+        '/search/?searchTerm=[',
         status=400
     )
     assert r.json['description'] == 'Invalid query: ([)'
@@ -113,7 +113,7 @@ def test_searchv2_view_values_invalid_search_term(workbook, testapp):
 
 def test_searchv2_view_values_invalid_advanced_query(workbook, testapp):
     r = testapp.get(
-        '/searchv2/?advancedQuery=[',
+        '/search/?advancedQuery=[',
         status=400
     )
     assert r.json['description'] == 'Invalid query: ([)'
@@ -121,14 +121,14 @@ def test_searchv2_view_values_invalid_advanced_query(workbook, testapp):
 
 def test_searchv2_view_embedded_frame(workbook, testapp):
     r = testapp.get(
-        '/searchv2/?type=Snowflake&frame=embedded'
+        '/search/?type=Snowflake&frame=embedded'
     )
     assert r.json['@graph'][0]['lab']['name']
 
 
 def test_searchv2_view_object_frame(workbook, testapp):
     r = testapp.get(
-        '/searchv2/?type=Snowflake&frame=object'
+        '/search/?type=Snowflake&frame=object'
     )
     res = r.json['@graph'][0]
     assert all(
@@ -140,21 +140,21 @@ def test_searchv2_view_object_frame(workbook, testapp):
 
 def test_searchv2_view_debug_query(workbook, testapp):
     r = testapp.get(
-        '/searchv2/?type=Snowflake&debug=true'
+        '/search/?type=Snowflake&debug=true'
     )
     assert 'debug' in r.json
     assert 'post_filter' in r.json['debug']['raw_query']
 
 
 def test_searchv2_view_no_type(workbook, testapp):
-    r = testapp.get('/searchv2/')
+    r = testapp.get('/search/')
     assert 'total' in r.json
     assert 'filters' in r.json
     assert len(r.json['filters']) == 0
 
 
 def test_searchv2_view_no_type_debug(workbook, testapp):
-    r = testapp.get('/searchv2/?debug=true')
+    r = testapp.get('/search/?debug=true')
     assert not r.json['debug']['raw_query']['post_filter']['bool']
 
 
@@ -197,7 +197,7 @@ def test_searchv2_quick_view_specify_field(workbook, testapp):
 
 def test_reportv2_view(workbook, testapp):
     r = testapp.get(
-        '/reportv2/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
+        '/report/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
     )
     assert r.json['title'] == 'Report'
     assert len(r.json['@graph']) == 1
@@ -205,14 +205,14 @@ def test_reportv2_view(workbook, testapp):
     assert r.json['@graph'][0]['status'] == 'deleted'
     assert 'Snowflake' in r.json['@graph'][0]['@type']
     assert len(r.json['facets']) == 5
-    assert r.json['@id'] == '/reportv2/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
+    assert r.json['@id'] == '/report/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
     assert r.json['@context'] == '/terms/'
     assert r.json['@type'] == ['Report']
     assert r.json['total'] == 1
     assert r.json['notification'] == 'Success'
     assert len(r.json['filters']) == 4
     assert r.status_code == 200
-    assert r.json['clear_filters'] == '/reportv2/?type=Snowflake'
+    assert r.json['clear_filters'] == '/report/?type=Snowflake'
     assert 'debug' not in r.json
     assert 'columns' in r.json
     assert 'non_sortable' in r.json
@@ -220,34 +220,34 @@ def test_reportv2_view(workbook, testapp):
 
 
 def test_reportv2_response_with_search_term_type_only_clear_filters(workbook, testapp):
-    r = testapp.get('/reportv2/?type=Snowball&searchTerm=crisp')
+    r = testapp.get('/report/?type=Snowball&searchTerm=crisp')
     assert 'clear_filters' in r.json
-    assert r.json['clear_filters'] == '/reportv2/?type=Snowball'
+    assert r.json['clear_filters'] == '/report/?type=Snowball'
 
 
 def test_reportv2_view_with_limit(workbook, testapp):
     r = testapp.get(
-        '/reportv2/?type=Snowflake&limit=5'
+        '/report/?type=Snowflake&limit=5'
     )
     assert len(r.json['@graph']) == 5
     assert 'all' in r.json
     r = testapp.get(
-        '/reportv2/?type=Snowflake&limit=26'
+        '/report/?type=Snowflake&limit=26'
     )
     assert len(r.json['@graph']) == 26
     assert 'all' in r.json
     r = testapp.get(
-        '/reportv2/?type=Snowflake&limit=all'
+        '/report/?type=Snowflake&limit=all'
     )
     assert len(r.json['@graph']) == 35
     assert 'all' not in r.json
     r = testapp.get(
-        '/reportv2/?type=Snowflake&limit=35'
+        '/report/?type=Snowflake&limit=35'
     )
     assert len(r.json['@graph']) == 35
     assert 'all' not in r.json
     r = testapp.get(
-        '/reportv2/?type=Snowflake&limit=100000'
+        '/report/?type=Snowflake&limit=100000'
     )
     assert len(r.json['@graph']) == 35
     assert 'all' not in r.json
@@ -255,12 +255,12 @@ def test_reportv2_view_with_limit(workbook, testapp):
 
 def test_reportv2_view_values_bad_type(workbook, testapp):
     r = testapp.get(
-        '/reportv2/?status=released&type=Sno',
+        '/report/?status=released&type=Sno',
         status=400
     )
     assert r.json['description'] == "Invalid types: ['Sno']"
     r = testapp.get(
-        '/reportv2/?status=released&type=Sno&type=Flake',
+        '/report/?status=released&type=Sno&type=Flake',
         status=400
     )
     assert r.json['description'] == "Report view requires specifying a single type: [('type', 'Sno'), ('type', 'Flake')]"
@@ -268,7 +268,7 @@ def test_reportv2_view_values_bad_type(workbook, testapp):
 
 def test_reportv2_view_values_single_subtype(workbook, testapp):
     r = testapp.get(
-        '/reportv2/?status=released&type=Item',
+        '/report/?status=released&type=Item',
         status=400
     )
     assert 'Report view requires a type with no child types:' in r.json['description']
@@ -276,7 +276,7 @@ def test_reportv2_view_values_single_subtype(workbook, testapp):
 
 def test_reportv2_view_values_no_type(workbook, testapp):
     r = testapp.get(
-        '/reportv2/?status=released',
+        '/report/?status=released',
         status=400
     )
     assert r.json['description'] == 'Report view requires specifying a single type: []'
@@ -330,15 +330,15 @@ def test_matrixv2_raw_view_no_types(workbook, testapp):
 
 
 def test_matrixv2_response(workbook, testapp):
-    r = testapp.get('/matrixv2/?type=Snowball')
+    r = testapp.get('/matrix/?type=Snowball')
     assert 'aggregations' not in r.json
     assert 'facets' in r.json
     assert 'total' in r.json
     assert r.json['title'] == 'Matrix'
     assert r.json['@type'] == ['Matrix']
-    assert r.json['clear_filters'] == '/matrixv2/?type=Snowball'
-    assert r.json['filters'] == [{'term': 'Snowball', 'remove': '/matrixv2/', 'field': 'type'}]
-    assert r.json['@id'] == '/matrixv2/?type=Snowball'
+    assert r.json['clear_filters'] == '/matrix/?type=Snowball'
+    assert r.json['filters'] == [{'term': 'Snowball', 'remove': '/matrix/', 'field': 'type'}]
+    assert r.json['@id'] == '/matrix/?type=Snowball'
     assert r.json['total'] >= 22
     assert r.json['notification'] == 'Success'
     assert r.json['title'] == 'Matrix'
@@ -355,19 +355,19 @@ def test_matrixv2_response(workbook, testapp):
 
 
 def test_matrixv2_response_with_search_term_type_only_clear_filters(workbook, testapp):
-    r = testapp.get('/matrixv2/?type=Snowball&searchTerm=crisp')
+    r = testapp.get('/matrix/?type=Snowball&searchTerm=crisp')
     assert 'clear_filters' in r.json
-    assert r.json['clear_filters'] == '/matrixv2/?type=Snowball'
+    assert r.json['clear_filters'] == '/matrix/?type=Snowball'
 
 
 def test_matrixv2_response_debug(workbook, testapp):
-    r = testapp.get('/matrixv2/?type=Snowball&debug=true')
+    r = testapp.get('/matrix/?type=Snowball&debug=true')
     assert 'debug' in r.json
 
 
 def test_matrixv2_response_no_results(workbook, testapp):
     r = testapp.get(
-        '/matrixv2/?type=Snowball&status=no_status',
+        '/matrix/?type=Snowball&status=no_status',
         status=404
     )
     assert r.json['notification'] == 'No results found'
