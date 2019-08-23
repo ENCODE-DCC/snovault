@@ -106,6 +106,7 @@ def main(global_config, **local_config):
         config.include('snovault.elasticsearch')
         # needed for /search/?
         config.include('snowflakes.viewconfigs.views')
+        config.include('snowflakes.search_views')
 
     config.include(static_resources)
     config.include(changelogs)
