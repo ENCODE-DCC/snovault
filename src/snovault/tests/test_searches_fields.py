@@ -364,6 +364,28 @@ def test_searches_fields_filters_response_field_get_path_qs_without_filter(dummy
     )
 
 
+def test_searches_fields_filters_response_field_get_path_qs_without_filter_malformed_query(dummy_parent):
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*&searchTerm=ctcf'
+    )
+    from snovault.elasticsearch.searches.fields import FiltersResponseField
+    frf = FiltersResponseField()
+    frf.parent = dummy_parent
+    assert frf._get_path_qs_without_filter('files.file_type', '') == (
+        '/dummy?type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted%21=%2A&searchTerm=ctcf'
+    )
+    assert frf._get_path_qs_without_filter('', '') == (
+        '/dummy?type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted%21=%2A&searchTerm=ctcf'
+    )
+    assert frf._get_path_qs_without_filter('', '*') == (
+        '/dummy?type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted%21=%2A&searchTerm=ctcf'
+    )
+
+
 def test_searches_fields_filters_response_field_make_filter(dummy_parent):
     dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
         'type=Experiment&assay_title=Histone+ChIP-seq&award.project=Roadmap'

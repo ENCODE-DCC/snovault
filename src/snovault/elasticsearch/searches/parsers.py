@@ -95,8 +95,6 @@ class ParamsParser:
         Returns all params except for the exact key and value pair.
         Used for generating the clear filter links.
         '''
-        if not key or not value:
-            raise ValueError('Must specify key and value')
         return self.get_filters_by_condition(
             key_and_value_condition=lambda k, v: not (k == key and v == value),
             params=params

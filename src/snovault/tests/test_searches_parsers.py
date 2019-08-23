@@ -535,10 +535,24 @@ def test_searches_parsers_params_parser_remove_key_and_value_pair_from_filters(d
         ('file_type!', 'bigBed tss_peak'),
         ('file_format_type', 'bed3+')
     ]
-    with pytest.raises(ValueError):
-        p.remove_key_and_value_pair_from_filters(key='type')
-    with pytest.raises(ValueError):
-        p.remove_key_and_value_pair_from_filters(value='*')
+    assert p.remove_key_and_value_pair_from_filters(key='type') == [
+        ('status', 'released'),
+        ('type', 'Biosample'),
+        ('type!', 'Experiment'),
+        ('type', '*'),
+        ('file_format!', '*'),
+        ('file_type!', 'bigBed tss_peak'),
+        ('file_format_type', 'bed3+')
+    ]
+    assert p.remove_key_and_value_pair_from_filters(value='*') == [
+        ('status', 'released'),
+        ('type', 'Biosample'),
+        ('type!', 'Experiment'),
+        ('type', '*'),
+        ('file_format!', '*'),
+        ('file_type!', 'bigBed tss_peak'),
+        ('file_format_type', 'bed3+')
+    ]
 
 
 def test_searches_parsers_params_parser_keys_filters_not_flag(dummy_request):
