@@ -825,6 +825,18 @@ class BasicSearchQueryFactoryWithFacets(BasicSearchQueryFactory):
         return self.search
 
 
+class CollectionSearchQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
+    '''
+    Like BasicSearchQueryFactoryWithFacets but only searches over context item type.
+    Provides listing view for collections.
+    '''
+    def __init__(self, params_parser, *args, **kwargs):
+        super().__init__(params_parser, *args, **kwargs)
+
+    def _get_item_types(self):
+        return [(TYPE_KEY, self.params_parser._request.context.type_info.name)]
+
+
 class BasicReportQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
     '''
     Like BasicSearchQueryFactoryWithFacets but makes sure single item type
