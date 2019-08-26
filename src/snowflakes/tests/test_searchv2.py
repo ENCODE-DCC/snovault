@@ -371,3 +371,28 @@ def test_matrixv2_response_no_results(workbook, testapp):
         status=404
     )
     assert r.json['notification'] == 'No results found'
+
+
+def test_collection_listing_es_view(workbook, testapp):
+    r = testapp.get(
+        '/snowflakes/'
+    )
+    assert '@graph' in r.json
+    assert '@id' in r.json
+    assert 'facets' in r.json
+    assert 'filters' in r.json
+    assert r.json['@type'] == ['SnowflakeCollection', 'Collection']
+    assert r.json['@context'] == '/terms/'
+
+
+def test_collection_listing_db_view(workbook, testapp):
+    r = testapp.get(
+        '/snowflakes/?datastore=database'
+    )
+    assert '@graph' in r.json
+    assert '@id' in r.json
+    assert 'facets' not in r.json
+    assert 'filters' not in r.json
+    assert r.json['@type'] == ['SnowflakeCollection', 'Collection']
+    assert r.json['@context'] == '/terms/'
+    assert r.json['description'] == 'Listing of Snowflakes'
