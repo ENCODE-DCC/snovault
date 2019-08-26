@@ -33,6 +33,7 @@ from .queries import BasicMatrixQueryFactoryWithFacets
 from .queries import BasicSearchQueryFactory
 from .queries import BasicSearchQueryFactoryWithFacets
 from .queries import BasicReportQueryFactoryWithFacets
+from .queries import CollectionSearchQueryFactoryWithFacets
 from .responses import BasicMatrixResponseWithFacets
 from .responses import BasicQueryResponseWithFacets
 from .responses import RawQueryResponseWithAggs
@@ -140,6 +141,19 @@ class BasicSearchWithFacetsResponseField(BasicSearchResponseField):
                 TOTAL: self.results.results.hits.total
             }
         )
+
+
+class CollectionSearchWithFacetsResponseField(BasicSearchWithFacetsResponseField):
+    '''
+    Like BasicSearchWithFacetsResponseField but uses CollectionSearchQueryFactoryWithFacets
+    as query builder.
+    '''
+    def _build_query(self):
+        self.query_builder = CollectionSearchQueryFactoryWithFacets(
+            params_parser=self.get_params_parser(),
+            **self.kwargs
+        )
+        self.query = self.query_builder.build_query()
 
 
 class RawSearchWithAggsResponseField(BasicSearchWithFacetsResponseField):
