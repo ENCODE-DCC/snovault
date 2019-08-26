@@ -13,9 +13,17 @@ from pyramid.view import (
     view_config,
 )
 from urllib.parse import urlencode
+from snovault.elasticsearch.searches.fields import CollectionSearchWithFacetsResponseField
+from snovault.elasticsearch.searches.fields import ClearFiltersResponseField
+from snovault.elasticsearch.searches.fields import FiltersResponseField
+from snovault.elasticsearch.searches.fields import IDResponseField
+from snovault.elasticsearch.searches.fields import NotificationResponseField
+from snovault.elasticsearch.searches.parsers import ParamsParser
+from snovault.elasticsearch.searches.responses import FieldedResponse
 from .calculated import calculate_properties
 from .etag import etag_tid
 from .interfaces import CONNECTION
+from .elasticsearch.interfaces import ELASTIC_SEARCH
 from .resources import (
     AbstractCollection,
     Item,
@@ -38,7 +46,7 @@ def remove_item_keys(item, request):
 
 
 @view_config(context=AbstractCollection, permission='list', request_method='GET',
-             name='listing')
+             name='listing_db')
 def collection_view_listing_db(context, request):
     result = {}
 
@@ -72,6 +80,25 @@ def collection_view_listing_db(context, request):
         result['all'] = '%s?%s' % (request.resource_path(context), urlencode(params))
 
     return result
+
+
+@view_config(context=AbstractCollection, permission='list', request_method='GET', name='listing')
+def collection_view_listing_es(context, request):
+    if request.datastore != ELASTIC_SEARCH:
+        return collection_view_listing_db(context, request)
+    fr = FieldedResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
+        response_fields=[
+            IDResponseField(),
+            CollectionSearchWithFacetsResponseField(),
+            NotificationResponseField(),
+            FiltersResponseField(),
+            ClearFiltersResponseField()
+        ]
+    )
+    return fr.render()
 
 
 @view_config(context=Root, request_method='GET', name='page')

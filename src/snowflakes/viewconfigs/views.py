@@ -21,14 +21,6 @@ DEFAULT_DOC_TYPES = [
 ]
 
 
-@view_config(context=AbstractCollection, permission='list', request_method='GET', name='listing')
-def collection_view_listing_es(context, request):
-    # Switch to change summary page loading options
-    if request.datastore != 'elasticsearch':
-        return collection_view_listing_db(context, request)
-    return searchv1(context, request)
-
-
 @view_config(route_name='searchv1', request_method='GET', permission='search')
 def searchv1(context, request, search_type=None, views=None, return_generator=False, search_result_actions=None):
     search = SearchView(context, request, search_type, return_generator, DEFAULT_DOC_TYPES)
