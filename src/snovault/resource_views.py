@@ -84,7 +84,7 @@ def collection_view_listing_db(context, request):
 
 @view_config(context=AbstractCollection, permission='list', request_method='GET', name='listing')
 def collection_view_listing_es(context, request):
-    if request.datastore != ELASTIC_SEARCH:
+    if not hasattr(request, 'datastore') or request.datastore != ELASTIC_SEARCH:
         return collection_view_listing_db(context, request)
     fr = FieldedResponse(
         _meta={
