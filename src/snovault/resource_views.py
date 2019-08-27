@@ -15,6 +15,7 @@ from pyramid.view import (
 from urllib.parse import urlencode
 from snovault.elasticsearch.searches.fields import AllResponseField
 from snovault.elasticsearch.searches.fields import CollectionSearchWithFacetsResponseField
+from snovault.elasticsearch.searches.fields import ColumnsResponseField
 from snovault.elasticsearch.searches.fields import ClearFiltersResponseField
 from snovault.elasticsearch.searches.fields import FiltersResponseField
 from snovault.elasticsearch.searches.fields import IDResponseField
@@ -97,7 +98,8 @@ def collection_view_listing_es(context, request):
             AllResponseField(),
             NotificationResponseField(),
             FiltersResponseField(),
-            ClearFiltersResponseField()
+            ClearFiltersResponseField(),
+            ColumnsResponseField()
         ]
     )
     return fr.render()
