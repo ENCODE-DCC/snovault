@@ -13,6 +13,7 @@ from pyramid.view import (
     view_config,
 )
 from urllib.parse import urlencode
+from snovault.elasticsearch.searches.fields import AllResponseField
 from snovault.elasticsearch.searches.fields import CollectionSearchWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import ClearFiltersResponseField
 from snovault.elasticsearch.searches.fields import FiltersResponseField
@@ -93,6 +94,7 @@ def collection_view_listing_es(context, request):
         response_fields=[
             IDResponseField(),
             CollectionSearchWithFacetsResponseField(),
+            AllResponseField(),
             NotificationResponseField(),
             FiltersResponseField(),
             ClearFiltersResponseField()
