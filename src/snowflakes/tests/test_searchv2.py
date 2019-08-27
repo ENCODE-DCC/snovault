@@ -381,6 +381,20 @@ def test_collection_listing_es_view(workbook, testapp):
     assert '@id' in r.json
     assert 'facets' in r.json
     assert 'filters' in r.json
+    assert 'all' in r.json
+    assert r.json['@type'] == ['SnowflakeCollection', 'Collection']
+    assert r.json['@context'] == '/terms/'
+
+
+def test_collection_listing_es_view_item(workbook, testapp):
+    r = testapp.get(
+        '/Snowflake'
+    )
+    r = r.follow()
+    assert '@graph' in r.json
+    assert '@id' in r.json
+    assert 'facets' in r.json
+    assert 'filters' in r.json
     assert r.json['@type'] == ['SnowflakeCollection', 'Collection']
     assert r.json['@context'] == '/terms/'
 
