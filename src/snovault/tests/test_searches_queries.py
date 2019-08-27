@@ -3371,6 +3371,17 @@ def test_searches_queries_basic_search_query_factory_with_facets_build_query(dum
     assert all(e in actual_post_filter_bool_must for e in expected_post_filter_bool_must)
 
 
+def test_searches_queries_collection_search_query_factory_with_facets_get_item_types(params_parser):
+    from snovault.elasticsearch.searches.queries import CollectionSearchQueryFactoryWithFacets
+    context = params_parser._request.registry['collections']['TestingSearchSchema']
+    params_parser._request.context = context
+    cs = CollectionSearchQueryFactoryWithFacets(params_parser)
+    item_types = cs._get_item_types()
+    assert item_types == [
+        ('type', 'TestingSearchSchema')
+    ]
+
+
 def test_searches_queries_basic_report_query_factory_with_facets_init(params_parser):
     from snovault.elasticsearch.searches.queries import BasicReportQueryFactoryWithFacets
     brqf = BasicReportQueryFactoryWithFacets(params_parser)

@@ -123,6 +123,25 @@ def test_searches_fields_basic_search_with_facets_response_execute_query(dummy_p
     assert Search.execute.call_count == 1
 
 
+def test_searches_fields_collection_search_with_facets_response_field_init():
+    from snovault.elasticsearch.searches.fields import CollectionSearchWithFacetsResponseField
+    crf = CollectionSearchWithFacetsResponseField()
+    assert isinstance(crf, CollectionSearchWithFacetsResponseField)
+
+
+def test_searches_fields_collection_search_with_facets_response_build_query(dummy_parent):
+    from snovault.elasticsearch.searches.fields import CollectionSearchWithFacetsResponseField
+    from snovault.elasticsearch.searches.fields import CollectionSearchQueryFactoryWithFacets
+    context = dummy_parent._meta['params_parser']._request.registry['collections']['TestingSearchSchema']
+    dummy_parent._meta['params_parser']._request.context = context
+    from elasticsearch_dsl import Search
+    crf = CollectionSearchWithFacetsResponseField()
+    crf.parent = dummy_parent
+    crf._build_query()
+    assert isinstance(crf.query, Search)
+    assert isinstance(crf.query_builder, CollectionSearchQueryFactoryWithFacets)
+
+
 def test_searches_fields_basic_report_with_facets_response_build_query(dummy_parent):
     from snovault.elasticsearch.searches.fields import BasicReportWithFacetsResponseField
     from snovault.elasticsearch.searches.queries import BasicReportQueryFactoryWithFacets
