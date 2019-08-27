@@ -432,6 +432,24 @@ class TypeOnlyClearFiltersResponseField(ClearFiltersResponseField):
         return self.get_params_parser().get_type_filters()
 
 
+class CollectionClearFiltersResponseField(ClearFiltersResponseField):
+    '''
+    Like ClearFiltersResponseField but redirects to search page and
+    gets item_type from collection context.
+    '''
+    def _get_search_term_or_types_from_query_string(self):
+        return self.get_query_builder()._get_item_types()
+
+    def _get_path_qs_with_no_filters(self):
+        path = SEARCH_PATH
+        no_filters_qs = self.get_params_parser().get_query_string(
+            params=self._get_search_term_or_types_from_query_string()
+        )
+        if no_filters_qs:
+            path += '?' + no_filters_qs
+        return path
+
+
 class DebugQueryResponseField(ResponseField):
 
     def __init__(self, *args, **kwargs):

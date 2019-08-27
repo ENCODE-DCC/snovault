@@ -383,6 +383,8 @@ def test_collection_listing_es_view(workbook, testapp):
     assert 'filters' in r.json
     assert 'all' in r.json
     assert 'columns' in r.json
+    assert 'clear_filters' in r.json
+    assert r.json['clear_filters'] == '/search/?type=Snowflake'
     assert r.json['@type'] == ['SnowflakeCollection', 'Collection']
     assert r.json['@context'] == '/terms/'
 
