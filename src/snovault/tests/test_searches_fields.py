@@ -523,6 +523,31 @@ def test_searches_fields_clear_filter_response_field_add_clear_filters(dummy_par
     assert cfr.response['clear_filters'] == '/dummy?type=Experiment'
 
 
+def test_searches_fields_collection_clear_filter_response_field_get_search_term_or_types_from_query_string(dummy_parent):
+    from snovault.elasticsearch.searches.queries import CollectionSearchQueryFactoryWithFacets
+    from snovault.elasticsearch.searches.fields import CollectionClearFiltersResponseField
+    context = dummy_parent._meta['params_parser']._request.registry['collections']['TestingSearchSchema']
+    dummy_parent._meta['params_parser']._request.context = context
+    dummy_parent._meta['query_builder'] = CollectionSearchQueryFactoryWithFacets(dummy_parent._meta['params_parser'])
+    ccfr = CollectionClearFiltersResponseField()
+    ccfr.parent = dummy_parent
+    assert ccfr._get_search_term_or_types_from_query_string() == [
+        ('type', 'TestingSearchSchema')
+    ]
+
+
+def test_searches_fields_collection_clear_filter_response_field_get_path_qs_with_no_filters(dummy_parent):
+    from snovault.elasticsearch.searches.queries import CollectionSearchQueryFactoryWithFacets
+    from snovault.elasticsearch.searches.fields import CollectionClearFiltersResponseField
+    context = dummy_parent._meta['params_parser']._request.registry['collections']['TestingSearchSchema']
+    dummy_parent._meta['params_parser']._request.context = context
+    dummy_parent._meta['query_builder'] = CollectionSearchQueryFactoryWithFacets(dummy_parent._meta['params_parser'])
+    ccfr = CollectionClearFiltersResponseField()
+    ccfr.parent = dummy_parent
+    assert ccfr._get_path_qs_with_no_filters() == '/search/?type=TestingSearchSchema'
+
+
+
 def test_searches_fields_debug_query_response_field(dummy_parent, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     mocker.patch.object(AbstractQueryFactory, '_get_index')
