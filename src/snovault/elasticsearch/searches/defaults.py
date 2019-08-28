@@ -31,7 +31,7 @@ FREE_TEXT_QUERIES = [
 NOT_FILTERS = OPTIONAL_PARAMS + FREE_TEXT_QUERIES
 
 BASE_SEARCH_FIELDS = [
-    '_all'
+    '_all',
 ]
 
 BASE_RETURN_FIELDS = [
@@ -80,18 +80,18 @@ BASE_AUDIT_FACETS = [
 ]
 
 INTERNAL_AUDIT_FACETS = [
-    ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'})
+    ('audit.INTERNAL_ACTION.category', {'title': 'Audit category: DCC ACTION'}),
 ]
 
 MAX_ES_RESULTS_WINDOW = 9999
 
 DEFAULT_FRAMES = [
     EMBEDDED_FRAME,
-    OBJECT_FRAME
+    OBJECT_FRAME,
 ]
 
 KEEP_LAYERED_FIELDS = [
-    AUDIT
+    AUDIT,
 ]
 
 DEFAULT_SORT_OPTIONS = {'order': 'desc', 'unmapped_type': 'keyword'}
@@ -99,5 +99,5 @@ DEFAULT_SORT_OPTIONS = {'order': 'desc', 'unmapped_type': 'keyword'}
 DEFAULT_SORT = [
     {'embedded.date_created': {'order': 'desc', 'unmapped_type': 'keyword'}},
     {'embedded.label': {'order': 'desc', 'unmapped_type': 'keyword'}},
-    {'embedded.uuid': {'order': 'desc', 'unmapped_type': 'keyword'}}
+    {'embedded.uuid': {'order': 'desc', 'unmapped_type': 'keyword'}},
 ]
