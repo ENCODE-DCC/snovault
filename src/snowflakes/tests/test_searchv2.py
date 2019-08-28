@@ -373,6 +373,31 @@ def test_matrixv2_response_no_results(workbook, testapp):
     assert r.json['notification'] == 'No results found'
 
 
+def test_summaryv2_response(workbook, testapp):
+    r = testapp.get('/summaryv2/?type=Snowball')
+    assert 'aggregations' not in r.json
+    assert 'facets' in r.json
+    assert 'total' in r.json
+    assert r.json['title'] == 'Summary'
+    assert r.json['@type'] == ['Summary']
+    assert r.json['clear_filters'] == '/summaryv2/?type=Snowball'
+    assert r.json['filters'] == [{'term': 'Snowball', 'remove': '/summaryv2/', 'field': 'type'}]
+    assert r.json['@id'] == '/summaryv2/?type=Snowball'
+    assert r.json['total'] >= 22
+    assert r.json['notification'] == 'Success'
+    assert r.json['title'] == 'Summary'
+    assert 'facets' in r.json
+    assert r.json['@context'] == '/terms/'
+    assert 'matrix' in r.json
+    assert r.json['matrix']['x']['group_by'] == 'status'
+    assert r.json['matrix']['y']['group_by'] == ['snowflakes.type']
+    assert 'buckets' in r.json['matrix']['y']['snowflakes.type']
+    assert 'key' in r.json['matrix']['y']['snowflakes.type']['buckets'][0]
+    assert 'status' in r.json['matrix']['y']['snowflakes.type']['buckets'][0]
+    assert 'search_base' in r.json
+    assert r.json['search_base'] == '/search/?type=Snowball'
+
+
 def test_collection_listing_es_view(workbook, testapp):
     r = testapp.get(
         '/snowflakes/'
