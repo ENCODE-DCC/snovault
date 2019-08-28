@@ -82,6 +82,14 @@ class Snowball(Snowset):
             'group_by': ['award.rfa', 'lab.title']
         }
     }
+    summary = {
+        'x': {
+            'group_by': 'status'
+        },
+        'y': {
+            'group_by': ['snowflakes.type']
+        }
+    }
 
 
 @collection(
