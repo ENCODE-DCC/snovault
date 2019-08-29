@@ -706,15 +706,31 @@ def test_searches_queries_abstract_query_factory_get_int_from_value(params_parse
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     assert aq._get_int_from_value() == 0
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&from=0'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_int_from_value() == 0
 
 
-def test_searches_queries_abstract_query_factory_get_limit(params_parser):
+def test_searches_queries_abstract_query_factory_get_limit(params_parser, dummy_request):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     aq = AbstractQueryFactory(params_parser)
     limit = aq.params_parser.param_values_to_list(aq._get_limit())
     assert limit == [
         '10'
     ]
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=0'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    limit = aq.params_parser.param_values_to_list(aq._get_limit())
+    assert limit == ['0']
 
 
 def test_searches_queries_abstract_query_factory_get_default_limit(params_parser):
@@ -724,11 +740,20 @@ def test_searches_queries_abstract_query_factory_get_default_limit(params_parser
     assert default_limit == [('limit', 25)]
 
 
-def test_searches_queries_abstract_query_factory_get_limit_value(params_parser):
+def test_searches_queries_abstract_query_factory_get_limit_value(params_parser, dummy_request):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     aq = AbstractQueryFactory(params_parser)
     limit = aq._get_limit_value()
     assert limit == 10
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=0'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    limit = aq._get_limit_value()
+    assert limit == 0
 
 
 def test_searches_queries_abstract_query_factory_get_int_limit_value(params_parser, dummy_request):
@@ -756,6 +781,13 @@ def test_searches_queries_abstract_query_factory_get_int_limit_value(params_pars
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     assert aq._get_int_limit_value() == 25
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=0'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_int_limit_value() == 0
 
 
 def test_searches_queries_abstract_query_factory_limit_is_all(params_parser, dummy_request):

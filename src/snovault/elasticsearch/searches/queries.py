@@ -316,13 +316,16 @@ class AbstractQueryFactory:
         return self.params_parser.get_from() or self._get_default_from()
 
     def _get_int_from_value(self):
-        return self.params_parser.coerce_value_to_int_or_return_none(
+        from_ = self.params_parser.coerce_value_to_int_or_return_none(
             self.params_parser.get_one_value(
                 params=self._get_from()
             )
-        ) or self.params_parser.get_one_value(
-            params=self._get_default_from()
         )
+        if from_ is None:
+            return self.params_parser.get_one_value(
+                params=self._get_default_from()
+            )
+        return from_
 
     def _get_default_limit(self):
         return [(LIMIT_KEY, 25)]
@@ -339,11 +342,14 @@ class AbstractQueryFactory:
         )
 
     def _get_int_limit_value(self):
-        return self.params_parser.coerce_value_to_int_or_return_none(
+        limit = self.params_parser.coerce_value_to_int_or_return_none(
             self._get_limit_value()
-        ) or self.params_parser.get_one_value(
-            params=self._get_default_limit()
         )
+        if limit is None:
+            return self.params_parser.get_one_value(
+                params=self._get_default_limit()
+            )
+        return limit
 
     def _limit_is_all(self):
         return self._get_limit_value() == ALL
