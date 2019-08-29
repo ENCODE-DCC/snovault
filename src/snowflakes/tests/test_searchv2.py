@@ -56,6 +56,15 @@ def test_searchv2_view_with_limit(workbook, testapp):
     assert 'all' not in r.json
 
 
+def test_searchv2_view_with_limit_zero(workbook, testapp):
+    r = testapp.get(
+        '/search/?type=Snowflake&limit=0'
+    )
+    assert len(r.json['@graph']) == 0
+    assert 'all' in r.json
+    assert r.json['total'] == 35
+
+
 def test_searchv2_view_values(workbook, testapp):
     r = testapp.get(
         '/search/?status=released'
@@ -251,6 +260,24 @@ def test_reportv2_view_with_limit(workbook, testapp):
     )
     assert len(r.json['@graph']) == 35
     assert 'all' not in r.json
+
+
+def test_reportv2_view_with_limit_zero(workbook, testapp):
+    r = testapp.get(
+        '/report/?type=Snowflake&limit=0'
+    )
+    assert len(r.json['@graph']) == 0
+    assert 'all' in r.json
+    assert r.json['total'] == 35
+
+
+def test_reportv2_view_with_limit_zero_from_zero(workbook, testapp):
+    r = testapp.get(
+        '/report/?type=Snowflake&limit=0&from=0'
+    )
+    assert len(r.json['@graph']) == 0
+    assert 'all' in r.json
+    assert r.json['total'] == 35
 
 
 def test_reportv2_view_values_bad_type(workbook, testapp):
