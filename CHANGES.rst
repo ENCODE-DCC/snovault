@@ -1,7 +1,11 @@
 Changes
 =======
 
-Snovault 1.0.34 (candidaste) encoded v88.0
+Snovault 1.0.35 (released) encoded v90.0
+----------------------------------------
+1. SNO-95-refactor-search (#214)
+
+Snovault 1.0.34 (released) encoded v88.0
 ----------------------------------------
 1. SNO-108-improve-search-new (#212)
 2. SNO-105-fix-batchupgrade-tests-sno103 (#211)
