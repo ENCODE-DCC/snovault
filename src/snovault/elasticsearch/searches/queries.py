@@ -315,7 +315,7 @@ class AbstractQueryFactory:
     def _get_from(self):
         return self.params_parser.get_from() or self._get_default_from()
 
-    def _get_int_from_value(self):
+    def _get_from_value_as_int(self):
         from_ = self.params_parser.coerce_value_to_int_or_return_none(
             self.params_parser.get_one_value(
                 params=self._get_from()
@@ -341,7 +341,7 @@ class AbstractQueryFactory:
             )
         )
 
-    def _get_int_limit_value(self):
+    def _get_limit_value_as_int(self):
         limit = self.params_parser.coerce_value_to_int_or_return_none(
             self._get_limit_value()
         )
@@ -355,7 +355,7 @@ class AbstractQueryFactory:
         return self._get_limit_value() == ALL
 
     def _limit_is_over_maximum_window(self):
-        limit = self._get_int_limit_value()
+        limit = self._get_limit_value_as_int()
         if limit:
             return limit > MAX_ES_RESULTS_WINDOW
         return False
@@ -385,13 +385,13 @@ class AbstractQueryFactory:
         ]
         return any(conditions)
 
-    def _get_bounded_int_limit_value_or_default(self):
+    def _get_bounded_limit_value_or_default(self):
         default_limit = self.params_parser.get_one_value(
             params=self._get_default_limit()
         )
         if self._should_scan_over_results():
             return default_limit
-        return self._get_int_limit_value()
+        return self._get_limit_value_as_int()
 
     @assert_one_or_none_returned(error_message='Invalid to specify multiple mode parameters:')
     def _get_mode(self):
@@ -787,7 +787,7 @@ class AbstractQueryFactory:
         default slice for the aggregations/total and scan over results
         in response mixin to_graph method.
         '''
-        end = self._get_bounded_int_limit_value_or_default()
+        end = self._get_bounded_limit_value_or_default()
         self.search = self._get_or_create_search()[:end]
 
     def add_sort(self):
@@ -868,8 +868,8 @@ class BasicReportQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
         '''
         Report frontend passes from and size parameters to paginate.
         '''
-        start = self._get_int_from_value()
-        end = self._get_bounded_int_limit_value_or_default()
+        start = self._get_from_value_as_int()
+        end = self._get_bounded_limit_value_or_default()
         self.search = self._get_or_create_search()[start:start + end]
 
     def build_query(self):

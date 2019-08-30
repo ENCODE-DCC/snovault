@@ -306,7 +306,7 @@ class AllResponseField(ResponseField):
     def _maybe_add_all(self):
         conditions = [
             not self.get_query_builder()._limit_is_all(),
-            self.get_query_builder()._get_int_limit_value() < self.parent.response.get(TOTAL, 0)
+            self.get_query_builder()._get_limit_value_as_int() < self.parent.response.get(TOTAL, 0)
         ]
         if all(conditions):
             self.response.update(
