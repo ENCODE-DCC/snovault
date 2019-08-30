@@ -59,7 +59,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
         search_base = normalize_query(self._request)
         result = {
             '@context': self._request.route_path('jsonld_context'),
-            '@id': '/searchv1/' + search_base,
+            '@id': '/search/' + search_base,
             '@type': ['Search'],
             'title': 'Search',
             'filters': [],
@@ -95,7 +95,7 @@ class SearchView(BaseView):  # pylint: disable=too-few-public-methods
             clear_qs = search_only
         else:
             clear_qs = urlencode([("type", typ) for typ in doc_types])
-        search_route = self._request.route_path('searchv1', slash='/')
+        search_route = self._request.route_path('search', slash='/')
         clear_route = '?' + clear_qs if clear_qs else ''
         result['clear_filters'] = search_route + clear_route
         if not doc_types:

@@ -64,7 +64,7 @@ class ReportView(SearchView):  # pylint: disable=too-few-public-methods
         else:
             res['views'][0] = view
         search_base = normalize_query(self._request)
-        res['@id'] = '/reportv1/' + search_base
+        res['@id'] = '/report/' + search_base
         res['title'] = 'Report'
         res['@type'] = ['Report']
         res['non_sortable'] = TEXT_FIELDS
