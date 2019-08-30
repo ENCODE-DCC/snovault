@@ -547,7 +547,6 @@ def test_searches_fields_collection_clear_filter_response_field_get_path_qs_with
     assert ccfr._get_path_qs_with_no_filters() == '/search/?type=TestingSearchSchema'
 
 
-
 def test_searches_fields_debug_query_response_field(dummy_parent, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     mocker.patch.object(AbstractQueryFactory, '_get_index')
