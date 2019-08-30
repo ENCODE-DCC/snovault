@@ -209,7 +209,7 @@ globals.listing_views.register(Image, 'Image');
 function termSelected(term, field, filters) {
     for (var filter in filters) {
         if (filters[filter]['field'] == field && filters[filter]['term'] == term) {
-            return url.parse(filters[filter]['remove']).search;
+            return url.parse(filters[filter]['remove']).search || filters[filter]['remove'];
         }
     }
     return null;

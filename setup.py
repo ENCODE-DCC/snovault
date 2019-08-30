@@ -17,6 +17,7 @@ requires = [
     'jmespath',
     'boto3',
     'elasticsearch>=5.2',
+    'elasticsearch-dsl==5.4.0',
     'lucenequery',
     'future',
     'humanfriendly',
