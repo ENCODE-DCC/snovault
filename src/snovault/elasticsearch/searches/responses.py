@@ -11,6 +11,7 @@ class FieldedResponse:
     '''
     Returns rendered ResponseFields.
     '''
+
     def __init__(self, response_fields=[], _meta={}):
         self._meta = _meta
         self.response = {}

@@ -148,6 +148,7 @@ class CollectionSearchWithFacetsResponseField(BasicSearchWithFacetsResponseField
     Like BasicSearchWithFacetsResponseField but uses CollectionSearchQueryFactoryWithFacets
     as query builder.
     '''
+
     def _build_query(self):
         self.query_builder = CollectionSearchQueryFactoryWithFacets(
             params_parser=self.get_params_parser(),
@@ -437,6 +438,7 @@ class CollectionClearFiltersResponseField(ClearFiltersResponseField):
     Like ClearFiltersResponseField but redirects to search page and
     gets item_type from collection context.
     '''
+
     def _get_search_term_or_types_from_query_string(self):
         return self.get_query_builder()._get_item_types()
 

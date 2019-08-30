@@ -836,6 +836,7 @@ class CollectionSearchQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
     Like BasicSearchQueryFactoryWithFacets but only searches over context item type.
     Provides listing view for collections.
     '''
+
     def __init__(self, params_parser, *args, **kwargs):
         super().__init__(params_parser, *args, **kwargs)
 
