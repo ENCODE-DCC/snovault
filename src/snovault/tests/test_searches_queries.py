@@ -550,6 +550,7 @@ def test_searches_queries_abstract_query_factory_get_post_filters(params_parser)
         ('type', 'Experiment')
     ]
 
+
 def test_searches_queries_abstract_query_factory_should_add_default_sort(dummy_request):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from snovault.elasticsearch.searches.parsers import ParamsParser
@@ -574,7 +575,7 @@ def test_searches_queries_abstract_query_factory_should_add_default_sort(dummy_r
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     assert not aq._should_add_default_sort()
-  
+
 
 
 def test_searches_queries_abstract_query_factory_get_default_sort(dummy_request):
@@ -1005,6 +1006,7 @@ def test_searches_queries_abstract_query_factory_get_fields(params_parser, dummy
         ('field', '@id'),
         ('field', 'lab.name')
     ]
+
 
 def test_searches_queries_abstract_query_factory_get_return_fields_from_field_params(params_parser, dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
