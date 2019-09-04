@@ -6,6 +6,8 @@ var url = require('url');
 var origin = require('../libs/origin');
 var serialize = require('form-serialize');
 var ga = require('google-analytics');
+import * as cookie from 'js-cookie';
+
 
 
 var parseError = module.exports.parseError = function (response) {
@@ -147,8 +149,7 @@ module.exports.SessionManagement = {
     },
 
     extractSessionCookie: function () {
-        var cookie = require('cookie-monster');
-        return cookie(document).get('session');
+        return cookie.get('session');
     },
 
     componentWillReceiveProps: function (nextProps) {

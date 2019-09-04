@@ -1,52 +1,107 @@
-var path = require('path');
-var webpack = require('webpack');
-var env = process.env.NODE_ENV;
+const path = require('path');
+const webpack = require('webpack');
+const env = process.env.NODE_ENV;
 
-var PATHS = {
+const PATHS = {
 	static: path.resolve(__dirname, 'src/snowflakes/static'),
 	build: path.resolve(__dirname, 'src/snowflakes/static/build'),
 }
 
-var plugins = [];
+const plugins = [];
 // don't include momentjs locales (large)
-plugins.push(new webpack.IgnorePlugin(/^\.\/locale$/, [/moment$/]));
-var chunkFilename = '[name].js';
+//plugins.push(new webpack.IgnorePlugin(/^\.\/locale$/, [/moment$/]));
+let chunkFilename = '[name].js';
+let mode = 'development';
+const TerserPlugin = require('terser-webpack-plugin');
+let optimization = {
+	minimize: false,
+};
 
 if (env === 'production') {
+	mode = 'production';
 	// uglify code for production
-	plugins.push(new webpack.optimize.UglifyJsPlugin({minimize: true}));
+    optimization.minimizer= [
+        new TerserPlugin({
+			terserOptions: {
+				warning: true,
+				mangle:true,
+			}
+		})
+	];
+	optimization.minimize= true;
+
 	// add chunkhash to chunk names for production only (it's slower)
 	chunkFilename = '[name].[chunkhash].js';
 }
 
-var preLoaders = [
-	// Strip @jsx pragma in react-forms, which makes babel abort
-	{
-		test: /\.js$/,
-		include: path.resolve(__dirname, 'node_modules/react-forms'),
-		loader: 'string-replace',
-		query: {
-			search: '@jsx',
-			replace: 'jsx',
-		}
-	}
+plugins.push(new webpack.LoaderOptionsPlugin({
+	debug: true
+}));
+
+
+// Strip @jsx pragma in react-forms, which makes babel abort
+// add babel to load .js files as ES6 and transpile JSX
+const rules = [
+	    {
+	        test: /\.js$/,
+	        include: path.resolve(__dirname, 'node_modules/react-forms'),
+	        enforce: "pre",
+	        loader: 'string-replace-loader',
+	        options: {
+	            search: '@jsx',
+	            replace: 'jsx',
+	        }
+	    },
+	    {
+	        test: /\.js$/,
+	        include: [
+	            path.resolve(__dirname, 'src/snowflakes/static'),
+	            path.resolve(__dirname, 'node_modules/react-forms'),
+				path.resolve(__dirname, 'node_modules/terser-webpack-plugin/dist'),
+	        ],
+	        use: { 
+				loader: 'babel-loader',
+				options: {
+					presets: ['@babel/preset-env', '@babel/preset-react', '@babel/flow']
+				  }
+			}
+	    },
+
 ];
 
-var loaders = [
-	// add babel to load .js files as ES6 and transpile JSX
-	{
-		test: /\.js$/,
-		include: [
-			path.resolve(__dirname, 'src/snowflakes/static'),
-			path.resolve(__dirname, 'node_modules/react-forms'),
-		],
-		loader: 'babel',
-	},
-	{
-		test: /\.json$/,
-		loader: 'json',
-	}
-];
+// const rules = [
+//     {
+//         test: /\.js$/,
+//         include: [
+//             PATHS.static,
+//             path.resolve(__dirname, 'node_modules/dagre-d3'),
+//             path.resolve(__dirname, 'node_modules/superagent'),
+//         ],
+//         use: {
+//                 loader: 'babel-loader',
+//             },       
+//     },
+//     {
+//         test: /\.(jpg|png|gif)$/,
+//         include: PATHS.images,
+//         use: [
+//             {
+//                 loader: 'url-loader',
+//                 options: {
+//                     limit: 25000,
+//                 },
+//             }
+//         ],
+//     },
+//     {
+//         test: /\.scss$/,
+//         use: [
+//             MiniCssExtractPlugin.loader,
+//             { loader: 'css-loader', options: { url: false, sourceMap: true } },
+//             { loader: 'sass-loader', options: { sourceMap: true } }
+//         ],
+//     },
+// ];
 
 module.exports = [
 	// for browser
@@ -60,12 +115,12 @@ module.exports = [
 			chunkFilename: chunkFilename,
 		},
 		module: {
-			preLoaders: preLoaders,
-			loaders: loaders,
+			rules,
 		},
+		mode,
+		optimization,
 		devtool: 'source-map',
-		plugins: plugins,
-		debug: true
+		plugins: plugins
 	},
 	// for server-side rendering
 	{
@@ -83,8 +138,8 @@ module.exports = [
 			'brace/theme/solarized_light',
 			'd3',
 			'dagre-d3',
-			// avoid bundling babel transpiler, which is not used at runtime
-			'babel-core/register',
+            // avoid bundling babel transpiler, which is not used at runtime
+            '@babel/register',
 		],
 		output: {
 			path: PATHS.build,
@@ -93,11 +148,11 @@ module.exports = [
 			chunkFilename: chunkFilename,
 		},
 		module: {
-			preLoaders: preLoaders,
-			loaders: loaders,
+			rules,
 		},
+		mode,
+		optimization,
 		devtool: 'source-map',
-		plugins: plugins,
-		debug: true
+		plugins: plugins
 	}
 ];
