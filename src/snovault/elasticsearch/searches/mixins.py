@@ -2,6 +2,7 @@ from collections import defaultdict
 from collections import OrderedDict
 from functools import lru_cache
 
+from .defaults import AUDIT_FIELDS
 from .defaults import KEEP_LAYERED_FIELDS
 from .interfaces import APPENDED
 from .interfaces import BUCKETS
@@ -255,3 +256,18 @@ class AggsToMatrixMixin:
     def to_matrix(self):
         self._build_matrix()
         return self.matrix
+
+
+class AuditAggsToMatrixMixin(AggsToMatrixMixin):
+
+    def _add_audit_aggs_to_matrix(self):
+        for field in AUDIT_FIELDS:
+            self._add_agg_to_matrix(
+                field,
+                self._get_aggregations().get(field, {})
+            )
+
+    def _build_matrix(self):
+        self._add_matrix_definition_to_matrix()
+        self._add_x_agg_to_matrix()
+        self._add_audit_aggs_to_matrix()

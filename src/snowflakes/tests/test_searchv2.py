@@ -465,3 +465,54 @@ def test_collection_listing_db_view(workbook, testapp):
     assert r.json['@type'] == ['SnowflakeCollection', 'Collection']
     assert r.json['@context'] == '/terms/'
     assert r.json['description'] == 'Listing of Snowflakes'
+
+
+def test_auditv2_response(workbook, testapp):
+    r = testapp.get('/auditv2/?type=Snowball')
+    assert 'aggregations' not in r.json
+    assert 'facets' in r.json
+    assert 'total' in r.json
+    assert r.json['title'] == 'Audit'
+    assert r.json['@type'] == ['Audit']
+    assert r.json['clear_filters'] == '/auditv2/?type=Snowball'
+    assert r.json['filters'] == [{'term': 'Snowball', 'remove': '/auditv2/', 'field': 'type'}]
+    assert r.json['@id'] == '/auditv2/?type=Snowball'
+    assert r.json['total'] >= 22
+    assert r.json['notification'] == 'Success'
+    assert 'facets' in r.json
+    assert r.json['@context'] == '/terms/'
+    assert 'matrix' in r.json
+    assert r.json['matrix']['x']['group_by'] == 'snowflakes.type'
+    assert r.json['matrix']['audit.ERROR.category']
+    assert r.json['matrix']['audit.WARNING.category']
+    assert r.json['matrix']['audit.NOT_COMPLIANT.category']
+    assert r.json['matrix']['audit.INTERNAL_ACTION.category']
+    assert 'search_base' in r.json
+    assert r.json['search_base'] == '/search/?type=Snowball'
+
+
+def test_auditv2_response_with_search_term_type_only_clear_filters(workbook, testapp):
+    r = testapp.get('/auditv2/?type=Snowball&searchTerm=crisp')
+    assert 'clear_filters' in r.json
+    assert r.json['clear_filters'] == '/auditv2/?type=Snowball'
+
+
+def test_auditv2_response_debug(workbook, testapp):
+    r = testapp.get('/auditv2/?type=Snowball&debug=true')
+    assert 'debug' in r.json
+
+
+def test_auditv2_response_no_results(workbook, testapp):
+    r = testapp.get(
+        '/auditv2/?type=Snowball&status=no_status',
+        status=404
+    )
+    assert r.json['notification'] == 'No results found'
+
+
+def test_auditv2_view_no_matrix_defined(workbook, testapp):
+    r = testapp.get(
+        '/auditv2/?type=Snowflake',
+        status=400
+    )
+    assert r.json['description'] == 'Item type does not have requested view defined: {}'

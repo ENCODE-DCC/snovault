@@ -4070,3 +4070,54 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
     assert set(actual.keys()) == set(expected.keys())
     assert set(actual['aggs'].keys()) == set(expected['aggs'].keys())
     assert actual['size'] == 0
+
+
+def test_searches_queries_audit_matrix_query_factory_with_facets_init(params_parser):
+    from snovault.elasticsearch.searches.queries import AuditMatrixQueryFactoryWithFacets
+    amqf = AuditMatrixQueryFactoryWithFacets(params_parser)
+    assert isinstance(amqf, AuditMatrixQueryFactoryWithFacets)
+    assert amqf.params_parser == params_parser
+
+
+def test_searches_queries_audit_matrix_query_factory_with_facets_get_matrix_for_item_type(params_parser):
+    from snovault.elasticsearch.searches.queries import AuditMatrixQueryFactoryWithFacets
+    amqf = AuditMatrixQueryFactoryWithFacets(params_parser)
+    assert amqf._get_matrix_for_item_type('TestingSearchSchema') == {
+        'audit.ERROR.category': {
+            'group_by': 'audit.ERROR.category',
+            'label': 'Error'
+        },
+        'audit.INTERNAL_ACTION.category': {
+            'group_by': 'audit.INTERNAL_ACTION.category',
+            'label': 'Internal Action'},
+        'audit.NOT_COMPLIANT.category': {
+            'group_by': 'audit.NOT_COMPLIANT.category',
+            'label': 'Not Compliant'
+        },
+        'audit.WARNING.category': {
+            'group_by': 'audit.WARNING.category',
+            'label': 'Warning'
+        },
+        'x': {
+            'group_by': 'status', 'label': 'Status'
+        }
+    }
+
+
+def test_searches_queries_audit_matrix_query_factory_with_facets_get_group_by_names(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import AuditMatrixQueryFactoryWithFacets
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    amqf = AuditMatrixQueryFactoryWithFacets(params_parser)
+    expected = [
+        ('x', ['status']),
+        ('audit.ERROR.category', ['audit.ERROR.category', 'status']),
+        ('audit.NOT_COMPLIANT.category', ['audit.NOT_COMPLIANT.category', 'status']),
+        ('audit.WARNING.category', ['audit.WARNING.category', 'status']),
+        ('audit.INTERNAL_ACTION.category', ['audit.INTERNAL_ACTION.category', 'status'])
+    ]
+    actual = amqf._get_group_by_names()
+    assert len(expected) == len(actual)
+    assert all(e in actual for e in expected)    
