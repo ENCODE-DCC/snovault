@@ -309,6 +309,14 @@ def test_reportv2_view_values_no_type(workbook, testapp):
     assert r.json['description'] == 'Report view requires specifying a single type: []'
 
 
+def test_reportv2_view_type_negation(workbook, testapp):
+    r = testapp.get(
+        '/report/?type!=Snowflake',
+        status=400
+    )
+    assert r.json['description'] == 'Report view requires specifying a single type: []'
+
+
 def test_matrixv2_raw_view_raw_response(workbook, testapp):
     r = testapp.get('/matrixv2_raw/?type=Snowball')
     assert 'hits' in r.json
@@ -400,6 +408,14 @@ def test_matrixv2_response_no_results(workbook, testapp):
     assert r.json['notification'] == 'No results found'
 
 
+def test_matrixv2_view_type_negation(workbook, testapp):
+    r = testapp.get(
+        '/matrix/?type!=Snowball',
+        status=400
+    )
+    assert r.json['description'] == 'Matrix view requires specifying a single type: []'
+
+
 def test_summaryv2_response(workbook, testapp):
     r = testapp.get('/summaryv2/?type=Snowball')
     assert 'aggregations' not in r.json
@@ -423,6 +439,14 @@ def test_summaryv2_response(workbook, testapp):
     assert 'status' in r.json['matrix']['y']['snowflakes.type']['buckets'][0]
     assert 'search_base' in r.json
     assert r.json['search_base'] == '/search/?type=Snowball'
+
+
+def test_summaryv2_view_type_negation(workbook, testapp):
+    r = testapp.get(
+        '/summaryv2/?type!=Snowball',
+        status=400
+    )
+    assert r.json['description'] == 'Matrix view requires specifying a single type: []'
 
 
 def test_collection_listing_es_view(workbook, testapp):

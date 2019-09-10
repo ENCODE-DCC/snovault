@@ -147,6 +147,22 @@ def test_searches_queries_abstract_query_factory_get_index_variations(dummy_requ
         ]
     )
     assert aq._get_index() == ['testing_search_schema']
+    dummy_request.environ['QUERY_STRING'] = (
+        '&type!=TestingSearchSchema&status=released&limit=10'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(
+        params_parser
+    )
+    assert aq._get_index() == ['snovault-resources']
+    dummy_request.environ['QUERY_STRING'] = (
+        '&type=*&status=released&limit=10'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(
+        params_parser
+    )
+    assert aq._get_index() == ['snovault-resources']
 
 
 def test_searches_queries_abstract_query_factory_wildcard_in_item_types(params_parser):
@@ -157,13 +173,38 @@ def test_searches_queries_abstract_query_factory_wildcard_in_item_types(params_p
     assert aq._wildcard_in_item_types([('type', '*')])
 
 
-def test_searches_queries_abstract_query_factory_get_item_types(params_parser):
+def test_searches_queries_abstract_query_factory_get_item_types(params_parser, dummy_request):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     aq = AbstractQueryFactory(params_parser)
     item_types = aq._get_item_types()
     assert item_types == [
         ('type', 'Experiment')
     ]
+    dummy_request.environ['QUERY_STRING'] = (
+        '&type=TestingSearchSchema&status=released&limit=10'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_item_types() == [('type', 'TestingSearchSchema')]
+    dummy_request.environ['QUERY_STRING'] = (
+        '&type!=TestingSearchSchema&status=released&limit=10'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_item_types() == [('type!', 'TestingSearchSchema')]
+    dummy_request.environ['QUERY_STRING'] = (
+        '&type!=*&status=released&limit=10'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_item_types() == [('type!', '*')]
+    dummy_request.environ['QUERY_STRING'] = (
+        '&searchType=blah&type!=TestingSearchSchema&status=released&limit=10'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_item_types() == [('type!', 'TestingSearchSchema')]
 
 
 def test_searches_queries_abstract_query_factory_get_principals(params_parser):
@@ -337,6 +378,15 @@ def test_searches_queries_abstract_query_factory_get_columns_for_item_types(dumm
     assert dict(columns) == {
         '@id': {'title': 'ID'},
         'accession': {'title': 'Accession'}
+    }
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&type!=TestingSearchSchema'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    columns = aq._get_columns_for_item_types()
+    assert dict(columns) == {
+        '@id': {'title': 'ID'}
     }
 
 
@@ -902,6 +952,18 @@ def test_searches_queries_abstract_query_factory_should_search_over_all_indices(
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     assert not aq._should_search_over_all_indices()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type!=TestingPostPutPatch&type=TestingSearchSchema&status=released'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._should_search_over_all_indices()
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=*&type=TestingSearchSchema&status=released'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._should_search_over_all_indices()
 
 
 def test_searches_queries_abstract_query_factory_get_bounded_limit_value_or_default(params_parser, dummy_request):

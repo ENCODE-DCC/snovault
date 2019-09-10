@@ -159,7 +159,9 @@ class AbstractQueryFactory:
     def _get_columns_for_item_types(self, item_types=None):
         columns = self._get_base_columns()
         item_type_values = item_types or self.params_parser.param_values_to_list(
-            params=self._get_item_types() or self._get_default_item_types()
+            params=self.params_parser.get_must_match_filters(
+                params=self._get_item_types()
+            ) or self._get_default_item_types()
         )
         for item_type in item_type_values:
             columns.update(
@@ -381,6 +383,9 @@ class AbstractQueryFactory:
                 TYPE_KEY,
                 ITEM,
                 params=self._get_item_types() or self._get_default_item_types()
+            ),
+            self.params_parser.get_must_not_match_filters(
+                params=self._get_item_types()
             )
         ]
         return any(conditions)
@@ -855,7 +860,9 @@ class BasicReportQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
 
     @assert_one_returned(error_message='Report view requires specifying a single type:')
     def _get_item_types(self):
-        return super()._get_item_types()
+        return self.params_parser.get_must_match_filters(
+                params=super()._get_item_types()
+            )
 
     @assert_one_or_none_returned(error_message='Report view requires a type with no child types:')
     def validate_item_type_subtypes(self):
@@ -890,7 +897,9 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
 
     @assert_one_returned(error_message='Matrix view requires specifying a single type:')
     def _get_item_types(self):
-        return super()._get_item_types()
+        return self.params_parser.get_must_match_filters(
+                params=super()._get_item_types()
+        )
 
     def _get_matrix_definition_name(self):
         '''
