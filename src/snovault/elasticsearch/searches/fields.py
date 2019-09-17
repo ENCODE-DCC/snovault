@@ -37,6 +37,7 @@ from .queries import BasicReportQueryFactoryWithFacets
 from .queries import CollectionSearchQueryFactoryWithFacets
 from .queries import MissingMatrixQueryFactoryWithFacets
 from .responses import AuditMatrixResponseWithFacets
+from .queries import TopHitsQueryFactory
 from .responses import BasicMatrixResponseWithFacets
 from .responses import BasicQueryResponseWithFacets
 from .responses import RawQueryResponseWithAggs
@@ -276,6 +277,19 @@ class AuditMatrixWithFacetsResponseField(BasicMatrixWithFacetsResponseField):
             results=self.query.execute(),
             query_builder=self.query_builder
         )
+
+
+class RawTopHitsResponseField(RawMatrixWithAggsResponseField):
+    '''
+    Like RawMatrixWithAggsResponseField but uses TopHitsQueryFactory.
+    '''
+
+    def _build_query(self):
+        self.query_builder = TopHitsQueryFactory(
+            params_parser=self.get_params_parser(),
+            **self.kwargs
+        )
+        self.query = self.query_builder.build_query()
 
 
 class TitleResponseField(ResponseField):
