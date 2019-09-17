@@ -56,6 +56,8 @@ from .interfaces import LIMIT_KEY
 from .interfaces import LENGTH
 from .interfaces import LONG
 from .interfaces import MATRIX
+from .interfaces import MAX
+from .interfaces import MAX_SCORE
 from .interfaces import NOT_JOIN
 from .interfaces import NO
 from .interfaces import NO_LIMIT
@@ -70,6 +72,7 @@ from .interfaces import SIMPLE_QUERY_STRING
 from .interfaces import _SOURCE
 from .interfaces import TITLE
 from .interfaces import TERMS
+from .interfaces import TOP_HITS
 from .interfaces import TYPE_KEY
 from .interfaces import WILDCARD
 from .interfaces import X
@@ -1110,3 +1113,57 @@ class AuditMatrixQueryFactoryWithFacets(BasicMatrixQueryFactoryWithFacets):
             for field in AUDIT_FIELDS
         ]
         return [(X, x_group_by)] + audit_group_by
+
+
+class TopHitsQueryFactory(BasicSearchQueryFactory):
+    '''
+    Like BasicSearchQueryFactory but returns top hits by @type aggregation.
+    '''
+
+    def __init__(self, params_parser, *args, **kwargs):
+        super().__init__(params_parser, *args, **kwargs)
+
+    def _make_max_aggregation(self, **kwargs):
+        return A(
+            MAX,
+            **kwargs
+        )
+
+    def _make_top_hits_aggregation(self, **kwargs):
+        return A(
+            TOP_HITS,
+            **kwargs
+        )
+
+    def _make_top_hits_by_type_aggregation(self):
+        return self._make_terms_aggregation(
+            field=EMBEDDED_TYPE,
+            aggs={
+                TOP_HITS: self._make_top_hits_aggregation(),
+                MAX_SCORE: self._make_max_aggregation(script=_SOURCE)
+            }
+        )
+
+    def add_filtered_top_hits_aggregations(self):
+        must, must_not, exists, not_exists = self._make_split_filter_queries(
+            params=self._get_post_filters()
+        )
+        filter_context = self._make_bool_query(
+            must=must + exists,
+            must_not=must_not + not_exists
+        )
+        subaggregation = self._make_top_hits_by_type_aggregation()
+        filter_agg = self._make_filter_and_subaggregation(
+                title=TYPES,
+                filter_context=filter_context,
+                subaggregation=subaggregation
+            )
+        self._get_or_create_search().aggs.bucket(TYPES, filter_agg)
+
+    def add_slice(self):
+        self.search = self._get_or_create_search()[0:0]
+
+    def build_query(self):
+        super().build_query()
+        self.add_filtered_top_hits_aggregations()
+        return self.search
