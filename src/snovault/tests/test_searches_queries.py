@@ -4121,3 +4121,170 @@ def test_searches_queries_audit_matrix_query_factory_with_facets_get_group_by_na
     actual = amqf._get_group_by_names()
     assert len(expected) == len(actual)
     assert all(e in actual for e in expected)    
+
+
+def test_searches_queries_top_hits_query_factory_init(params_parser):
+    from snovault.elasticsearch.searches.queries import TopHitsQueryFactory
+    thqf = TopHitsQueryFactory(params_parser)
+    assert isinstance(thqf, TopHitsQueryFactory)
+    assert thqf.params_parser == params_parser
+
+
+def test_searches_queries_top_hits_query_factory_build_query(dummy_request):
+    from snovault.elasticsearch.searches.queries import TopHitsQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.testing import DummyResource
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=ep300'
+    )
+    dummy_request.context = DummyResource()
+    params_parser = ParamsParser(dummy_request)
+    thqf = TopHitsQueryFactory(params_parser)
+    query = thqf.build_query()
+    expected = {
+        'size': 0,
+        'query': {
+            'bool': {
+                'must': [
+                    {
+                        'query_string': {
+                            'query': '(ep300)',
+                            'fields': ['_all'],
+                            'default_operator': 'AND'
+                        }
+                    }
+                ],
+                'filter': [
+                    {
+                        'bool': {
+                            'must': [
+                                {'terms': {'principals_allowed.view': ['system.Everyone']}},
+                                {'terms': {'embedded.@type': []}}
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        'from': 0,
+        'aggs': {
+            'types': {
+                'filter': {
+                    'bool': {}
+                },
+                'aggs': {
+                    'types': {
+                        'terms': {
+                            'exclude': [],
+                            'field': 'embedded.@type',
+                            'size': 200
+                        },
+                        'aggs': {
+                            'max_score': {
+                                'max': {
+                                    'script': '_source'
+                                }
+                            },
+                            'top_hits': {
+                                'top_hits': {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        '_source': [
+            'audit.*',
+            'embedded.@id',
+            'embedded.@type'
+        ],
+        'post_filter': {
+            'bool': {}
+        }
+    }
+    actual = query.to_dict()
+    assert expected['aggs'] == actual['aggs']
+
+
+def test_searches_queries_top_hits_query_factory_build_query_with_filter(dummy_request):
+    from snovault.elasticsearch.searches.queries import TopHitsQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.testing import DummyResource
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=ep300&type=TestingSearchSchema&status=released'
+    )
+    dummy_request.context = DummyResource()
+    params_parser = ParamsParser(dummy_request)
+    thqf = TopHitsQueryFactory(params_parser)
+    query = thqf.build_query()
+    actual = query.to_dict()
+    expected = {
+        'aggs': {
+            'types': {
+                'aggs': {
+                    'types': {
+                        'aggs': {
+                            'top_hits': {
+                                'top_hits': {}
+                            },
+                            'max_score': {
+                                'max': {
+                                    'script': '_source'
+                                }
+                            }
+                        },
+                        'terms': {
+                            'field': 'embedded.@type',
+                            'exclude': [],
+                            'size': 200
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                        ]
+                    }
+                }
+            }
+        },
+        'from': 0,
+        'query': {
+            'bool': {
+                'filter': [
+                    {
+                        'bool': {
+                            'must': [
+                                {'terms': {'principals_allowed.view': ['system.Everyone']}},
+                                {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                            ]
+                        }
+                    }
+                ],
+                'must': [
+                    {'query_string': {'fields': ['_all'], 'default_operator': 'AND', 'query': '(ep300)'}}
+                ]
+            }
+        },
+        '_source': ['audit.*', 'embedded.@id', 'embedded.@type', 'embedded.accession', 'embedded.status'],
+        'size': 0,
+        'post_filter': {
+            'bool': {
+                'must': [
+                    {'terms': {'embedded.status': ['released']}},
+                    {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+                ]
+            }
+        }
+    }
+    assert len(
+        actual['aggs']['types']['filter']['bool']['must']
+    ) == len(
+        expected['aggs']['types']['filter']['bool']['must']
+    )
+    assert all(
+        e in actual['aggs']['types']['filter']['bool']['must']
+        for e in expected['aggs']['types']['filter']['bool']['must']
+    )
