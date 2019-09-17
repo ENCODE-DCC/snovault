@@ -65,6 +65,7 @@ from .interfaces import PICKER
 from .interfaces import PRINCIPALS_ALLOWED_VIEW
 from .interfaces import PROPERTIES
 from .interfaces import QUERY_STRING
+from .interfaces import _SCORE
 from .interfaces import SEARCH_AUDIT
 from .interfaces import _SOURCE
 from .interfaces import TITLE
@@ -1047,9 +1048,17 @@ class TopHitsQueryFactory(BasicSearchQueryFactory):
     def _make_top_hits_by_type_aggregation(self):
         return self._make_terms_aggregation(
             field=EMBEDDED_TYPE,
+            include=self.params_parser.param_values_to_list(
+                params=self._get_item_types() or self._get_default_item_types()
+            ),
+            size=10,
             aggs={
-                TOP_HITS: self._make_top_hits_aggregation(),
-                MAX_SCORE: self._make_max_aggregation(script=_SOURCE)
+                TOP_HITS: self._make_top_hits_aggregation(
+                    _source=self._get_return_fields()
+                ),
+                MAX_SCORE: self._make_max_aggregation(
+                    script=_SCORE
+                )
             }
         )
 

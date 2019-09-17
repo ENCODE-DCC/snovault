@@ -4176,17 +4176,20 @@ def test_searches_queries_top_hits_query_factory_build_query(dummy_request):
                     'types': {
                         'terms': {
                             'exclude': [],
+                            'include': [],
                             'field': 'embedded.@type',
-                            'size': 200
+                            'size': 10
                         },
                         'aggs': {
                             'max_score': {
                                 'max': {
-                                    'script': '_source'
+                                    'script': '_score'
                                 }
                             },
                             'top_hits': {
-                                'top_hits': {}
+                                'top_hits': {
+                                    '_source': []
+                                }
                             }
                         }
                     }
@@ -4203,6 +4206,7 @@ def test_searches_queries_top_hits_query_factory_build_query(dummy_request):
         }
     }
     actual = query.to_dict()
+    actual['aggs']['types']['aggs']['types']['aggs']['top_hits']['top_hits']['_source'] = []
     assert expected['aggs'] == actual['aggs']
 
 
@@ -4218,6 +4222,7 @@ def test_searches_queries_top_hits_query_factory_build_query_with_filter(dummy_r
     thqf = TopHitsQueryFactory(params_parser)
     query = thqf.build_query()
     actual = query.to_dict()
+    actual['aggs']['types']['aggs']['types']['aggs']['top_hits']['top_hits']['_source'] = []
     expected = {
         'aggs': {
             'types': {
@@ -4225,18 +4230,21 @@ def test_searches_queries_top_hits_query_factory_build_query_with_filter(dummy_r
                     'types': {
                         'aggs': {
                             'top_hits': {
-                                'top_hits': {}
+                                'top_hits': {
+                                    '_source': []
+                                }
                             },
                             'max_score': {
                                 'max': {
-                                    'script': '_source'
+                                    'script': '_score'
                                 }
                             }
                         },
                         'terms': {
                             'field': 'embedded.@type',
                             'exclude': [],
-                            'size': 200
+                            'include': [],
+                            'size': 10
                         }
                     }
                 },
@@ -4323,19 +4331,28 @@ def test_searches_queries_top_hits_query_factory_make_top_hits_by_type_aggregati
     th = TopHitsQueryFactory(params_parser)
     thbta = th._make_top_hits_by_type_aggregation(
     )
-    assert thbta.to_dict() == {
+    actual = thbta.to_dict()
+    source_actual = actual['aggs']['top_hits']['top_hits']['_source']
+    source_expected = ['embedded.accession', 'embedded.@id', 'embedded.@type']
+    assert all(e in source_actual for e in source_expected)
+    assert len(source_actual) == len(source_expected)
+    actual['aggs']['top_hits']['top_hits']['_source'] = []
+    assert actual == {
         'terms': {
+            'include': ['Experiment'],
             'exclude': [],
-            'size': 200,
+            'size': 10,
             'field': 'embedded.@type'
         },
         'aggs': {
             'top_hits': {
-                'top_hits': {}
+                'top_hits': {
+                    '_source': []
+                }
             },
             'max_score': {
                 'max': {
-                    'script': '_source'
+                    'script': '_score'
                 }
             }
         }
@@ -4350,39 +4367,43 @@ def test_searches_queries_top_hits_query_factory_add_filtered_top_hits_aggregati
     th = TopHitsQueryFactory(params_parser)
     th.add_filtered_top_hits_aggregation()
     actual = th.search.to_dict()
+    actual['aggs']['types']['aggs']['types']['aggs']['top_hits']['top_hits']['_source'] = []
+    print(actual)
     expected = {
-        'aggs': {
+        'query': {
+            'match_all': {}
+        }, 'aggs': {
             'types': {
-                'aggs': {
-                    'types': {
-                        'aggs': {
-                            'max_score': {
-                                'max': {
-                                    'script': '_source'
-                                }
-                            },
-                            'top_hits': {
-                                'top_hits': {}
-                            }
-                        },
-                        'terms': {
-                            'size': 200,
-                            'exclude': [],
-                            'field': 'embedded.@type'
-                        }
-                    }
-                },
                 'filter': {
                     'bool': {
                         'must': [
                             {'terms': {'embedded.status': ['released']}}
                         ]
                     }
+                },
+                'aggs': {
+                    'types': {
+                        'terms': {
+                            'include': [],
+                            'exclude': [],
+                            'field': 'embedded.@type',
+                            'size': 10
+                        },
+                        'aggs': {
+                            'max_score': {
+                                'max': {
+                                    'script': '_score'
+                                }
+                            },
+                            'top_hits': {
+                                'top_hits': {
+                                    '_source': []
+                                }
+                            }
+                        }
+                    }
                 }
             }
-        },
-        'query': {
-            'match_all': {}
         }
     }
     assert actual == expected

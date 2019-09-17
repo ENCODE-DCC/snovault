@@ -627,6 +627,26 @@ def test_searches_fields_raw_matrix_with_aggs_response_field_build_query(dummy_p
     assert isinstance(rmf.query_builder, BasicMatrixQueryFactoryWithFacets)
 
 
+def test_searches_fields_raw_top_hits_response_field_init():
+    from snovault.elasticsearch.searches.fields import RawTopHitsResponseField
+    rth = RawTopHitsResponseField()
+    assert isinstance(rth, RawTopHitsResponseField)
+
+
+def test_searches_fields_raw_top_hits_response_field_build_query(dummy_parent):
+    from snovault.elasticsearch.searches.fields import RawTopHitsResponseField
+    from snovault.elasticsearch.searches.queries import TopHitsQueryFactory
+    from elasticsearch_dsl import Search
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    rth = RawTopHitsResponseField()
+    rth.parent = dummy_parent
+    rth._build_query()
+    assert isinstance(rth.query, Search)
+    assert isinstance(rth.query_builder, TopHitsQueryFactory)
+
+
 def test_searches_fields_basic_matrix_with_facets_response_field_init():
     from snovault.elasticsearch.searches.fields import BasicMatrixWithFacetsResponseField
     bmwf = BasicMatrixWithFacetsResponseField()
