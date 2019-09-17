@@ -1053,7 +1053,7 @@ class TopHitsQueryFactory(BasicSearchQueryFactory):
             }
         )
 
-    def add_filtered_top_hits_aggregations(self):
+    def add_filtered_top_hits_aggregation(self):
         must, must_not, exists, not_exists = self._make_split_filter_queries(
             params=self._get_post_filters()
         )
@@ -1074,5 +1074,5 @@ class TopHitsQueryFactory(BasicSearchQueryFactory):
 
     def build_query(self):
         super().build_query()
-        self.add_filtered_top_hits_aggregations()
+        self.add_filtered_top_hits_aggregation()
         return self.search
