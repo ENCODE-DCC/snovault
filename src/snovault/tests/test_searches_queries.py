@@ -4537,3 +4537,101 @@ def test_searches_queries_top_hits_query_factory_build_query_with_filter(dummy_r
         e in actual['aggs']['types']['filter']['bool']['must']
         for e in expected['aggs']['types']['filter']['bool']['must']
     )
+
+
+def test_searches_queries_top_hits_query_factory_make_max_aggregation(params_parser):
+    from snovault.elasticsearch.searches.queries import TopHitsQueryFactory
+    th = TopHitsQueryFactory(params_parser)
+    ma = th._make_max_aggregation()
+    assert ma.to_dict() == {
+        'max': {}
+    }
+    ma = th._make_max_aggregation(script='_source')
+    assert ma.to_dict() == {
+        'max': {'script': '_source'}
+    }
+
+
+def test_searches_queries_top_hits_query_factory_make_top_hits_aggregation(params_parser):
+    from snovault.elasticsearch.searches.queries import TopHitsQueryFactory
+    th = TopHitsQueryFactory(params_parser)
+    tha = th._make_top_hits_aggregation(
+        size=3,
+        source=['embedded.*']
+    )
+    assert tha.to_dict() == {
+        'top_hits': {
+            'size': 3,
+            'source': ['embedded.*']
+        }
+    }
+
+
+def test_searches_queries_top_hits_query_factory_make_top_hits_by_type_aggregation(params_parser):
+    from snovault.elasticsearch.searches.queries import TopHitsQueryFactory
+    th = TopHitsQueryFactory(params_parser)
+    thbta = th._make_top_hits_by_type_aggregation(
+    )
+    assert thbta.to_dict() == {
+        'terms': {
+            'exclude': [],
+            'size': 200,
+            'field': 'embedded.@type'
+        },
+        'aggs': {
+            'top_hits': {
+                'top_hits': {}
+            },
+            'max_score': {
+                'max': {
+                    'script': '_source'
+                }
+            }
+        }
+    }
+
+
+def test_searches_queries_top_hits_query_factory_add_filtered_top_hits_aggregation(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import TopHitsQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=blah&status=released'
+    )
+    th = TopHitsQueryFactory(params_parser)
+    th.add_filtered_top_hits_aggregation()
+    actual = th.search.to_dict()
+    expected = {
+        'aggs': {
+            'types': {
+                'aggs': {
+                    'types': {
+                        'aggs': {
+                            'max_score': {
+                                'max': {
+                                    'script': '_source'
+                                }
+                            },
+                            'top_hits': {
+                                'top_hits': {}
+                            }
+                        },
+                        'terms': {
+                            'size': 200,
+                            'exclude': [],
+                            'field': 'embedded.@type'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released']}}
+                        ]
+                    }
+                }
+            }
+        },
+        'query': {
+            'match_all': {}
+        }
+    }
+    assert actual == expected
