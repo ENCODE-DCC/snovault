@@ -1045,7 +1045,6 @@ class TopHitsQueryFactory(BasicSearchQueryFactory):
             **kwargs
         )
 
-    
     def _make_top_hits_by_type_aggregation(self):
         return self._make_terms_aggregation(
             field=EMBEDDED_TYPE,
