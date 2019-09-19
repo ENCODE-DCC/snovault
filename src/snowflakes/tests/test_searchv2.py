@@ -525,44 +525,5 @@ def test_top_hits_raw_view_response(workbook, testapp):
     assert '_shards' in r.json
     assert 'timed_out' in r.json
     assert 'took' in r.json
-    assert r.json['aggregations'] == {
-        'types': {
-            'types': {
-                'sum_other_doc_count': 0,
-                'buckets': [
-                    {
-                        'key': 'Lab',
-                        'top_hits': {
-                            'hits': {
-                                'max_score': 2.5063515,
-                                'total': 1,
-                                'hits': [
-                                    {
-                                        '_score': 2.5063515,
-                                        '_index': 'lab',
-                                        '_type': 'lab',
-                                        '_id': 'cfb789b8-46f3-4d59-a2b3-adc39e7df93a',
-                                        '_source': {
-                                            'embedded': {
-                                                '@type': ['Lab', 'Item'],
-                                                '@id': '/labs/j-michael-cherry/',
-                                                'title': 'J. Michael Cherry, Stanford',
-                                                'name': 'j-michael-cherry',
-                                                'status': 'current'
-                                            }
-                                        }
-                                    }
-                                ]
-                            }
-                        },
-                        'max_score': {
-                            'value': 2.5063514709472656
-                        },
-                        'doc_count': 1
-                    }
-                ],
-                'doc_count_error_upper_bound': 0
-            },
-            'doc_count': 1
-        }
-    }
+    assert len(r.json['aggregations']['types']['types']['buckets']) == 1
+    assert r.json['aggregations']['types']['types']['buckets'][0]['key'] == 'Lab'
