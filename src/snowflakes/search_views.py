@@ -38,8 +38,8 @@ def includeme(config):
     config.add_route('report', '/report{slash:/?}')
     config.add_route('matrixv2_raw', '/matrixv2_raw{slash:/?}')
     config.add_route('matrix', '/matrix{slash:/?}')
-    config.add_route('summaryv2', '/summaryv2{slash:/?}')
-    config.add_route('auditv2', '/auditv2{slash:/?}')
+    config.add_route('summary', '/summary{slash:/?}')
+    config.add_route('audit', '/audit{slash:/?}')
     config.scan(__name__)
 
 
@@ -186,8 +186,8 @@ def matrix(context, request):
     return fr.render()
 
 
-@view_config(route_name='summaryv2', request_method='GET', permission='search')
-def summaryv2(context, request):
+@view_config(route_name='summary', request_method='GET', permission='search')
+def summary(context, request):
     fr = FieldedResponse(
         _meta={
             'params_parser': ParamsParser(request)
@@ -215,8 +215,8 @@ def summaryv2(context, request):
     return fr.render()
 
 
-@view_config(route_name='auditv2', request_method='GET', permission='search')
-def auditv2(context, request):
+@view_config(route_name='audit', request_method='GET', permission='search')
+def audit(context, request):
     fr = FieldedResponse(
         _meta={
             'params_parser': ParamsParser(request)

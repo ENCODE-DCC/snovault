@@ -401,15 +401,15 @@ def test_matrixv2_response_no_results(workbook, testapp):
 
 
 def test_summaryv2_response(workbook, testapp):
-    r = testapp.get('/summaryv2/?type=Snowball')
+    r = testapp.get('/summary/?type=Snowball')
     assert 'aggregations' not in r.json
     assert 'facets' in r.json
     assert 'total' in r.json
     assert r.json['title'] == 'Summary'
     assert r.json['@type'] == ['Summary']
-    assert r.json['clear_filters'] == '/summaryv2/?type=Snowball'
-    assert r.json['filters'] == [{'term': 'Snowball', 'remove': '/summaryv2/', 'field': 'type'}]
-    assert r.json['@id'] == '/summaryv2/?type=Snowball'
+    assert r.json['clear_filters'] == '/summary/?type=Snowball'
+    assert r.json['filters'] == [{'term': 'Snowball', 'remove': '/summary/', 'field': 'type'}]
+    assert r.json['@id'] == '/summary/?type=Snowball'
     assert r.json['total'] >= 22
     assert r.json['notification'] == 'Success'
     assert r.json['title'] == 'Summary'
@@ -468,15 +468,15 @@ def test_collection_listing_db_view(workbook, testapp):
 
 
 def test_auditv2_response(workbook, testapp):
-    r = testapp.get('/auditv2/?type=Snowball')
+    r = testapp.get('/audit/?type=Snowball')
     assert 'aggregations' not in r.json
     assert 'facets' in r.json
     assert 'total' in r.json
     assert r.json['title'] == 'Audit'
     assert r.json['@type'] == ['Audit']
-    assert r.json['clear_filters'] == '/auditv2/?type=Snowball'
-    assert r.json['filters'] == [{'term': 'Snowball', 'remove': '/auditv2/', 'field': 'type'}]
-    assert r.json['@id'] == '/auditv2/?type=Snowball'
+    assert r.json['clear_filters'] == '/audit/?type=Snowball'
+    assert r.json['filters'] == [{'term': 'Snowball', 'remove': '/audit/', 'field': 'type'}]
+    assert r.json['@id'] == '/audit/?type=Snowball'
     assert r.json['total'] >= 22
     assert r.json['notification'] == 'Success'
     assert 'facets' in r.json
@@ -492,19 +492,19 @@ def test_auditv2_response(workbook, testapp):
 
 
 def test_auditv2_response_with_search_term_type_only_clear_filters(workbook, testapp):
-    r = testapp.get('/auditv2/?type=Snowball&searchTerm=crisp')
+    r = testapp.get('/audit/?type=Snowball&searchTerm=crisp')
     assert 'clear_filters' in r.json
-    assert r.json['clear_filters'] == '/auditv2/?type=Snowball'
+    assert r.json['clear_filters'] == '/audit/?type=Snowball'
 
 
 def test_auditv2_response_debug(workbook, testapp):
-    r = testapp.get('/auditv2/?type=Snowball&debug=true')
+    r = testapp.get('/audit/?type=Snowball&debug=true')
     assert 'debug' in r.json
 
 
 def test_auditv2_response_no_results(workbook, testapp):
     r = testapp.get(
-        '/auditv2/?type=Snowball&status=no_status',
+        '/audit/?type=Snowball&status=no_status',
         status=404
     )
     assert r.json['notification'] == 'No results found'
@@ -512,7 +512,7 @@ def test_auditv2_response_no_results(workbook, testapp):
 
 def test_auditv2_view_no_matrix_defined(workbook, testapp):
     r = testapp.get(
-        '/auditv2/?type=Snowflake',
+        '/audit/?type=Snowflake',
         status=400
     )
     assert r.json['description'] == 'Item type does not have requested view defined: {}'
