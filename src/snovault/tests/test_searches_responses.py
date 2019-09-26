@@ -50,3 +50,13 @@ def test_searches_responses_basic_matrix_response_with_facets_init():
     assert isinstance(bmr, BasicMatrixResponseWithFacets)
     assert isinstance(bmr, AggsToFacetsMixin)
     assert isinstance(bmr, AggsToMatrixMixin)
+
+
+def test_searches_responses_audit_matrix_response_with_facets_init():
+    from snovault.elasticsearch.searches.responses import AuditMatrixResponseWithFacets
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    from snovault.elasticsearch.searches.mixins import AuditAggsToMatrixMixin
+    amr = AuditMatrixResponseWithFacets([], [])
+    assert isinstance(amr, AuditMatrixResponseWithFacets)
+    assert isinstance(amr, AggsToFacetsMixin)
+    assert isinstance(amr, AuditAggsToMatrixMixin)

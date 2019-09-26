@@ -1889,3 +1889,8 @@ def test_searches_mixins_aggs_to_matrix_mixin_to_matrix(basic_matrix_response_wi
     assert 'award.rfa' in matrix['y']
     assert len(matrix['y']['award.rfa']['buckets']) >= 3
 
+
+def test_searches_mixins_audit_aggs_to_matrix_mixin_init():
+    from snovault.elasticsearch.searches.mixins import AuditAggsToMatrixMixin
+    am = AuditAggsToMatrixMixin()
+    assert isinstance(am, AuditAggsToMatrixMixin)

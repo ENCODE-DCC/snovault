@@ -1,10 +1,12 @@
 from pyramid.view import view_config
 
+from snovault.elasticsearch.searches.interfaces import AUDIT_TITLE
 from snovault.elasticsearch.searches.interfaces import MATRIX_TITLE
 from snovault.elasticsearch.searches.interfaces import REPORT_TITLE
 from snovault.elasticsearch.searches.interfaces import SEARCH_TITLE
 from snovault.elasticsearch.searches.interfaces import SUMMARY
 from snovault.elasticsearch.searches.interfaces import SUMMARY_TITLE
+from snovault.elasticsearch.searches.fields import AuditMatrixWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import AllResponseField
 from snovault.elasticsearch.searches.fields import BasicMatrixWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import BasicSearchResponseField
@@ -36,7 +38,8 @@ def includeme(config):
     config.add_route('report', '/report{slash:/?}')
     config.add_route('matrixv2_raw', '/matrixv2_raw{slash:/?}')
     config.add_route('matrix', '/matrix{slash:/?}')
-    config.add_route('summaryv2', '/summaryv2{slash:/?}')
+    config.add_route('summary', '/summary{slash:/?}')
+    config.add_route('audit', '/audit{slash:/?}')
     config.scan(__name__)
 
 
@@ -183,8 +186,8 @@ def matrix(context, request):
     return fr.render()
 
 
-@view_config(route_name='summaryv2', request_method='GET', permission='search')
-def summaryv2(context, request):
+@view_config(route_name='summary', request_method='GET', permission='search')
+def summary(context, request):
     fr = FieldedResponse(
         _meta={
             'params_parser': ParamsParser(request)
@@ -202,6 +205,34 @@ def summaryv2(context, request):
             BasicMatrixWithFacetsResponseField(
                 default_item_types=DEFAULT_ITEM_TYPES,
                 matrix_definition_name=SUMMARY
+            ),
+            NotificationResponseField(),
+            FiltersResponseField(),
+            TypeOnlyClearFiltersResponseField(),
+            DebugQueryResponseField()
+        ]
+    )
+    return fr.render()
+
+
+@view_config(route_name='audit', request_method='GET', permission='search')
+def audit(context, request):
+    fr = FieldedResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
+        response_fields=[
+            TitleResponseField(
+                title=AUDIT_TITLE
+            ),
+            TypeResponseField(
+                at_type=[AUDIT_TITLE]
+            ),
+            IDResponseField(),
+            SearchBaseResponseField(),
+            ContextResponseField(),
+            AuditMatrixWithFacetsResponseField(
+                default_item_types=DEFAULT_ITEM_TYPES
             ),
             NotificationResponseField(),
             FiltersResponseField(),

@@ -91,6 +91,29 @@ class Snowball(Snowset):
         }
     }
 
+    audit = {
+        'x': {
+            'group_by': 'snowflakes.type',
+            'label': 'Type',
+        },
+        'audit.ERROR.category': {
+            'group_by': 'audit.ERROR.category',
+            'label': 'Error',
+        },
+        'audit.NOT_COMPLIANT.category': {
+            'group_by': 'audit.NOT_COMPLIANT.category',
+            'label': 'Not Compliant',
+        },
+        'audit.WARNING.category': {
+            'group_by': 'audit.WARNING.category',
+            'label': 'Warning',
+        },
+        'audit.INTERNAL_ACTION.category': {
+            'group_by': 'audit.INTERNAL_ACTION.category',
+            'label': 'Internal Action',
+        },
+    }
+
 
 @collection(
     name='snowforts',
