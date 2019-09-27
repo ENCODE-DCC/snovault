@@ -1,7 +1,12 @@
 Changes
 =======
 
-Snovault 1.0.35 (released) encoded v90.0
+Snovault 1.0.36 (released) encoded v91.0
+----------------------------------------
+1. SNO-112-fix-npm-audit-issues (#216)
+2. SNO-113-make-audit-view (#217)
+
+Snovault 1.0.35 (UNRELEASED) encoded
 ----------------------------------------
 1. SNO-95-refactor-search (#214)
 
