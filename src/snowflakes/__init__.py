@@ -95,7 +95,6 @@ def main(global_config, **local_config):
 
     if 'elasticsearch.server' in config.registry.settings:
         config.include('snovault.elasticsearch')
-        config.include('snowflakes.viewconfigs.views')
         config.include('snowflakes.search_views')
 
     config.include(static_resources)
