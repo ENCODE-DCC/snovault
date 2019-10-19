@@ -193,10 +193,10 @@ class HitsToGraphMixin:
         return OrderedDict(sorted(r.items()))
 
     def to_graph(self):
-        return [
+        return (
             self._unlayer(r.to_dict())
             for r in self._get_results()
-        ]
+        )
 
 
 class RawHitsToGraphMixin(HitsToGraphMixin):
