@@ -243,6 +243,24 @@ class BasicMatrixWithFacetsResponseField(RawMatrixWithAggsResponseField):
         )
 
 
+class BasicTargetMatrixWithFacetsResponseField(BasicMatrixWithFacetsResponseField):
+    def _format_results(self):
+        fields = [
+            'status',
+            'award.project',
+            'target.investigated_as',
+            'replicates.library.biosample.donor.organism.scientific_name',
+        ]
+        facets = [facet for facet in self.results.to_facets() if facet.get('field', '').lower() in fields]
+        self.response.update(
+            {
+                FACETS: facets,
+                MATRIX: self.results.to_matrix(),
+                TOTAL: self.results.results.hits.total
+            }
+        )
+
+
 class AuditMatrixWithFacetsResponseField(BasicMatrixWithFacetsResponseField):
     '''
     Like BasicMatrixWithFacetsResponseField but uses AuditMatrixQueryFactoryWithFacet

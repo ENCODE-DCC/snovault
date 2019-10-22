@@ -627,6 +627,25 @@ def test_searches_fields_raw_matrix_with_aggs_response_field_build_query(dummy_p
     assert isinstance(rmf.query_builder, BasicMatrixQueryFactoryWithFacets)
 
 
+def test_basic_target_matrix_with_facets_response_field_init():
+    from snovault.elasticsearch.searches.fields import BasicTargetMatrixWithFacetsResponseField
+    btmwf = BasicTargetMatrixWithFacetsResponseField()
+    assert isinstance(btmwf, BasicTargetMatrixWithFacetsResponseField)
+
+def test_searches_fields_basic_target_matrix_with_facets_response_field_build_query(dummy_parent):
+    from snovault.elasticsearch.searches.fields import BasicTargetMatrixWithFacetsResponseField
+    from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl import Search
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    btmwf = BasicTargetMatrixWithFacetsResponseField()
+    btmwf.parent = dummy_parent
+    btmwf._build_query()
+    assert isinstance(btmwf.query, Search)
+    assert isinstance(btmwf.query_builder, BasicMatrixQueryFactoryWithFacets)
+
+
 def test_searches_fields_basic_matrix_with_facets_response_field_init():
     from snovault.elasticsearch.searches.fields import BasicMatrixWithFacetsResponseField
     bmwf = BasicMatrixWithFacetsResponseField()
