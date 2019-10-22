@@ -632,6 +632,7 @@ def test_basic_target_matrix_with_facets_response_field_init():
     btmwf = BasicTargetMatrixWithFacetsResponseField()
     assert isinstance(btmwf, BasicTargetMatrixWithFacetsResponseField)
 
+
 def test_searches_fields_basic_target_matrix_with_facets_response_field_build_query(dummy_parent):
     from snovault.elasticsearch.searches.fields import BasicTargetMatrixWithFacetsResponseField
     from snovault.elasticsearch.searches.queries import BasicMatrixQueryFactoryWithFacets
