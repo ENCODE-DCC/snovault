@@ -162,13 +162,13 @@ def schema_mapping(name, schema):
         }
 
 
-def index_settings():
+def index_settings(primary_shards=5, replicate_shards=2):
     return {
         'settings': {
             'index.max_result_window': 99999,
             'index.mapping.total_fields.limit': 5000,
-            'index.number_of_shards': 5,
-            'index.number_of_replicas': 2,
+            'index.number_of_shards': primary_shards,
+            'index.number_of_replicas': replicate_shards,
             'analysis': {
                 'filter': {
                     'substring': {
@@ -487,6 +487,8 @@ def create_snovault_index_alias(es, indices):
 def run(app, collections=None, dry_run=False):
     index = app.registry.settings['snovault.elasticsearch.index']
     registry = app.registry
+    primary_shards = registry.settings.get('elasticsearch.shards.primary', 5)
+    replicate_shards = registry.settings.get('elasticsearch.shards.replicate', 2)
     if not dry_run:
         es = app.registry[ELASTIC_SEARCH]
         print('CREATE MAPPING RUNNING')
@@ -509,7 +511,7 @@ def run(app, collections=None, dry_run=False):
         if dry_run:
             print(json.dumps(sorted_dict({index: {doc_type: mapping}}), indent=4))
             continue
-        create_elasticsearch_index(es, index, index_settings())
+        create_elasticsearch_index(es, index, index_settings(primary_shards, replicate_shards))
         set_index_mapping(es, index, doc_type, {doc_type: mapping})
         if collection_name != 'meta':
             indices.append(index)
