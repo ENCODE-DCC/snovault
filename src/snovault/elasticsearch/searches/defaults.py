@@ -101,3 +101,10 @@ DEFAULT_SORT = [
     {'embedded.label': {'order': 'desc', 'unmapped_type': 'keyword'}},
     {'embedded.uuid': {'order': 'desc', 'unmapped_type': 'keyword'}},
 ]
+
+AUDIT_FIELDS = [
+    'audit.ERROR.category',
+    'audit.NOT_COMPLIANT.category',
+    'audit.WARNING.category',
+    'audit.INTERNAL_ACTION.category',
+]

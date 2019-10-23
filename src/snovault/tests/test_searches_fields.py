@@ -686,3 +686,37 @@ def test_searches_fields_search_base_render(dummy_parent):
     assert sb.render(
         parent=dummy_parent
     ) == {'search_base': '/search/?type=TestingSearchSchema&status=released'}
+
+
+def test_searches_fields_audit_matrix_with_facets_response_field_init():
+    from snovault.elasticsearch.searches.fields import AuditMatrixWithFacetsResponseField
+    amwf = AuditMatrixWithFacetsResponseField()
+    assert isinstance(amwf, AuditMatrixWithFacetsResponseField)
+
+
+def test_searches_fields_audit_matrix_with_facets_response_field_build_query(dummy_parent):
+    from snovault.elasticsearch.searches.fields import AuditMatrixWithFacetsResponseField
+    from snovault.elasticsearch.searches.queries import AuditMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl import Search
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    amwf = AuditMatrixWithFacetsResponseField()
+    amwf.parent = dummy_parent
+    amwf._build_query()
+    assert isinstance(amwf.query, Search)
+    assert isinstance(amwf.query_builder, AuditMatrixQueryFactoryWithFacets)
+
+
+def test_searches_fields_audit_matrix_with_facets_response_field_execute_query(dummy_parent, mocker):
+    from snovault.elasticsearch.searches.fields import AuditMatrixWithFacetsResponseField
+    from elasticsearch_dsl import Search
+    mocker.patch.object(Search, 'execute')
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    amwf = AuditMatrixWithFacetsResponseField()
+    amwf.parent = dummy_parent
+    amwf._build_query()
+    amwf._execute_query()
+    assert Search.execute.call_count == 1

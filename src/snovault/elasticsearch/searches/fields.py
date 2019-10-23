@@ -29,11 +29,13 @@ from .interfaces import SUCCESS
 from .interfaces import TERM
 from .interfaces import TITLE
 from .interfaces import TOTAL
+from .queries import AuditMatrixQueryFactoryWithFacets
 from .queries import BasicMatrixQueryFactoryWithFacets
 from .queries import BasicSearchQueryFactory
 from .queries import BasicSearchQueryFactoryWithFacets
 from .queries import BasicReportQueryFactoryWithFacets
 from .queries import CollectionSearchQueryFactoryWithFacets
+from .responses import AuditMatrixResponseWithFacets
 from .responses import BasicMatrixResponseWithFacets
 from .responses import BasicQueryResponseWithFacets
 from .responses import RawQueryResponseWithAggs
@@ -238,6 +240,26 @@ class BasicMatrixWithFacetsResponseField(RawMatrixWithAggsResponseField):
                 MATRIX: self.results.to_matrix(),
                 TOTAL: self.results.results.hits.total
             }
+        )
+
+
+class AuditMatrixWithFacetsResponseField(BasicMatrixWithFacetsResponseField):
+    '''
+    Like BasicMatrixWithFacetsResponseField but uses AuditMatrixQueryFactoryWithFacet
+    and AuditMatrixResponseWithFacets.
+    '''
+
+    def _build_query(self):
+        self.query_builder = AuditMatrixQueryFactoryWithFacets(
+            params_parser=self.get_params_parser(),
+            **self.kwargs
+        )
+        self.query = self.query_builder.build_query()
+
+    def _execute_query(self):
+        self.results = AuditMatrixResponseWithFacets(
+            results=self.query.execute(),
+            query_builder=self.query_builder
         )
 
 

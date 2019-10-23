@@ -14,14 +14,14 @@ describe('ItemStore', function() {
 
     beforeEach(function() {
         ItemStore = require('../lib/store').ItemStore;
-        fetch = jest.genMockFunction();
+        fetch = jest.fn();
         fetch.mockResponse = function(data, options) {
             this.mockReturnValue(Promise.resolve(new Response(JSON.stringify(data), options || {status: 200})));
         };
         items = [{'@id': '/items/foo/'}];
         view = {
             context: {fetch: fetch},
-            setState: jest.genMockFunction(),
+            setState: jest.fn(),
         };
     });
 
@@ -41,7 +41,7 @@ describe('ItemStore', function() {
         var store, done;
 
         beforeEach(function() {
-            view.onCreate = jest.genMockFunction();
+            view.onCreate = jest.fn();
             fetch.mockResponse({
                 '@graph': [{'@id': '/items/bar/'}]
             });
@@ -50,22 +50,22 @@ describe('ItemStore', function() {
             done = store.create('/items/', {'@id': 'bar'});
         });
 
-        pit('posts the item to the backend', function() {
-            return done.then(() => expect(fetch.mock.calls.length).toEqual(1));
+        it('posts the item to the backend', function() {
+            done.then(() => expect(fetch.mock.calls.length).toEqual(1));
         });
 
-        pit('updates the internal list of items', function() {
-            return done.then(() => expect(store._items.length).toEqual(2));
+        it('updates the internal list of items', function() {
+            done.then(() => expect(store._items.length).toEqual(2));
         });
 
-        pit('calls the view onCreate callback with the response', function() {
-            return done.then(() => {
+        it('calls the view onCreate callback with the response', function() {
+            done.then(() => {
                 expect(view.onCreate).toBeCalledWith({'@graph': [{'@id': '/items/bar/'}]});
             });
         });
 
-        pit('notifies the view of its new state', function() {
-            return done.then(() => expect(view.setState.mock.calls[0][0].items.length).toEqual(2));
+        it('notifies the view of its new state', function() {
+            done.then(() => expect(view.setState.mock.calls[0][0].items.length).toEqual(2));
         });
     });
 
@@ -73,27 +73,27 @@ describe('ItemStore', function() {
         var store, done;
 
         beforeEach(function() {
-            view.onUpdate = jest.genMockFunction();
+            view.onUpdate = jest.fn();
             fetch.mockResponse({});
             
             store = new ItemStore(items, view, 'items');
             done = store.update({'@id': '/items/foo/', updated: true});
         });
 
-        pit('puts the item to the backend', function() {
-            return done.then(function() {
+        it('puts the item to the backend', function() {
+            done.then(function() {
                 expect(fetch.mock.calls.length).toEqual(1);
                 var args = fetch.mock.calls[0];
                 expect(args[1].method).toEqual('PUT');
             });
         });
 
-        pit('updates the internal list of items', function() {
+        it('updates the internal list of items', function() {
             return done.then(() => expect(store._items[0].updated).toBe(true));
         });
 
-        pit('calls the view onUpdate callback with the response', function() {
-            return done.then(() => {
+        it('calls the view onUpdate callback with the response', function() {
+            done.then(() => {
                 expect(view.onUpdate).toBeCalledWith({'@id': '/items/foo/', updated: true});
             });
         });
@@ -103,14 +103,14 @@ describe('ItemStore', function() {
         var store, done;
 
         beforeEach(function() {
-            view.onDelete = jest.genMockFunction();
+            view.onDelete = jest.fn();
             fetch.mockResponse({});
             
             store = new ItemStore(items, view, 'items');
             done = store.delete('/items/foo/');
         });
 
-        pit('updates the status on the backend', function() {
+        it('updates the status on the backend', function() {
             return done.then(function() {
                 expect(fetch.mock.calls.length).toEqual(1);
                 var args = fetch.mock.calls[0];
@@ -120,11 +120,11 @@ describe('ItemStore', function() {
             });
         });
 
-        pit('updates the internal list of items', function() {
+        it('updates the internal list of items', function() {
             return done.then(() => expect(store._items.length).toEqual(0));
         });
 
-        pit('calls the view onDelete callback with the removed item', function() {
+        it('calls the view onDelete callback with the removed item', function() {
             return done.then(() => {
                 expect(view.onDelete).toBeCalledWith({'@id': '/items/foo/'});
             });
@@ -132,12 +132,12 @@ describe('ItemStore', function() {
     });
 
     describe('Reporting errors', function() {
-        pit('calls the view onError callback in case of HTTP errors', function() {
-            view.onError = jest.genMockFunction();
+        it('calls the view onError callback in case of HTTP errors', function() {
+            view.onError = jest.fn();
             fetch.mockResponse({message: 'failure'}, {status: 500, headers: new Headers({'Content-Type': 'application/json'})});
 
             var store = new ItemStore(items, view, 'items');
-            return store.create('/items/', {}).then(function() {
+            store.create('/items/', {}).then(function() {
                 expect(view.onError.mock.calls[0][0].message).toEqual('failure');
             });
         });

@@ -3,6 +3,7 @@ from collections import OrderedDict
 from .decorators import remove_from_return
 from .mixins import AggsToFacetsMixin
 from .mixins import AggsToMatrixMixin
+from .mixins import AuditAggsToMatrixMixin
 from .mixins import HitsToGraphMixin
 from .mixins import RawHitsToGraphMixin
 
@@ -61,5 +62,10 @@ class RawQueryResponseWithAggs(QueryResponse, RawHitsToGraphMixin):
 
 
 class BasicMatrixResponseWithFacets(QueryResponse, AggsToFacetsMixin, AggsToMatrixMixin):
+    def __init__(self, results, query_builder, *args, **kwargs):
+        super().__init__(results, query_builder, *args, **kwargs)
+
+
+class AuditMatrixResponseWithFacets(QueryResponse, AggsToFacetsMixin, AuditAggsToMatrixMixin):
     def __init__(self, results, query_builder, *args, **kwargs):
         super().__init__(results, query_builder, *args, **kwargs)

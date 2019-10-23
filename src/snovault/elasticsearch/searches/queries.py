@@ -15,6 +15,7 @@ from .decorators import assert_one_returned
 from .decorators import assert_one_or_none_returned
 from .decorators import assert_something_returned
 from .decorators import deduplicate
+from .defaults import AUDIT_FIELDS
 from .defaults import BASE_AUDIT_FACETS
 from .defaults import BASE_COLUMNS
 from .defaults import BASE_FIELD_FACETS
@@ -1000,3 +1001,20 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
         self.add_aggregations_and_aggregation_filters()
         self.add_matrix_aggregations()
         return self.search
+
+
+class AuditMatrixQueryFactoryWithFacets(BasicMatrixQueryFactoryWithFacets):
+    '''
+    Like BasicMatrixQueryFactoryWithFacets but adds aggregation for all audit fields.
+    '''
+
+    def _get_matrix_definition_name(self):
+        return self.kwargs.get('matrix_definition_name') or AUDIT
+
+    def _get_group_by_names(self):
+        x_group_by = self._get_x_group_by_fields()
+        audit_group_by = [
+            (field, [field] + x_group_by)
+            for field in AUDIT_FIELDS
+        ]
+        return [(X, x_group_by)] + audit_group_by
