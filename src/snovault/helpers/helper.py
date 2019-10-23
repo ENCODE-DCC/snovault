@@ -75,33 +75,23 @@ def prepare_search_term(request):
     """
     # avoid interpreting slashes as regular expressions
     advanced_query = request.params.get('advancedQuery', '').strip().replace('/', r'\/')
-    search_term = request.params.get('searchTerm')
-    # true if no search is being performed
-    if search_term is None and not advanced_query:
+    search_term = request.params.get('searchTerm', '').strip().replace('/', r'\/')
+    if search_term == '*' or (not search_term and not advanced_query):
         return '*'
-    if search_term is not None:
-        search_term = (search_term or '').strip()
-        if search_term in ('', '*'):
-            return '*'
-        # elasticsearch uses ':' as field delimiter, but we use it as namespace designator
-        # if you need to search fields you have to use @type:field
-        # if you need to search fields where the field contains ":", you will have to escape it
-        # yourself
-        search_term = search_term.replace('/', r'\/').replace('^', r'').replace('<', r'').replace('>', r'')
-        search_term = re.sub('\?+', '?', search_term)
-        if search_term.find("@type") < 0:
-            search_term = search_term.replace(':', r'\:')
+    if search_term and search_term.find("@type") < 0:
+        search_term = search_term.replace(':', r'\:')
     search_query = ''
-    if advanced_query:
-        try:
-            query = prefixfields('embedded.', advanced_query, dialects.elasticsearch)
-        except IllegalStateException:
-            msg = "Invalid query: {}".format(advanced_query)
-            raise HTTPBadRequest(explanation=msg)
-        else:
-            search_query = query.getText()
-    if search_term:
-        search_query = ''.join([search_query, ' And ', search_term]) if search_query else search_term
+    if advanced_query and search_term:
+        search_query = ' '.join([advanced_query, 'AND', search_term])
+    else:
+        search_query = search_term or advanced_query
+    try:
+        query = prefixfields('embedded.', search_query, dialects.elasticsearch)
+    except IllegalStateException:
+        msg = "Invalid query: {}".format(search_query)
+        raise HTTPBadRequest(explanation=msg)
+    else:
+        search_query = query.getText()
     return search_query
 
 
@@ -167,15 +157,7 @@ def get_search_fields(request, doc_types):
     Returns set of columns that are being searched and highlights
     """
 
-    fields = {'uuid', 'unique_keys.*'}
-    highlights = {}
-    types = request.registry[TYPES]
-    for doc_type in doc_types:
-        type_info = types[doc_type]
-        for value in type_info.schema.get('boost_values', ()):
-            fields.add('embedded.' + value)
-            highlights['embedded.' + value] = {}
-    return list(fields), highlights
+    return [], {}
 
 
 def list_visible_columns_for_schemas(request, schemas):

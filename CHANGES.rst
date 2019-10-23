@@ -1,6 +1,12 @@
 Changes
 =======
 
+Snovault 1.0.34 (candidaste) encoded v88.0
+----------------------------------------
+1. SNO-108-improve-search-new (#212)
+2. SNO-105-fix-batchupgrade-tests-sno103 (#211)
+3. SNO-106-fix-spec-char-500-error (#209)
+
 Snovault 1.0.33 (released) encoded v87.0
 ----------------------------------------
 1. SNO-103 fix-batch-upgrade-error-logging (#206)
