@@ -1,7 +1,14 @@
 Changes
 =======
 
-Snovault 1.0.31 (released) encoded v86rc1
+Snovault 1.0.32 (released) encoded v87.0
+----------------------------------------
+1. SNO-99 port travis tests to circleci (#202)
+2. SNO-100 Parallelize batchupgrade script (#201)
+3. SNO-92 Fix batch upgrade logging (#201)
+4. SNO-101 Refactor batchupgrade (#201)
+
+Snovault 1.0.31 (released) encoded v86.0
 -----------------------------------------
 1. SNO-98 Update sauce connect to 4.5.3 (#199)
 2. SNO-93 user-count-does-not-match (#191)

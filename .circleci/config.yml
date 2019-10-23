@@ -1,0 +1,99 @@
+version: 2.1
+
+orbs:
+    browser-tools: circleci/browser-tools@0.1.0
+
+executors:
+  snovault-executor:
+    docker:
+      - image: circleci/buildpack-deps:trusty
+    working_directory: ~/snovault
+    environment:
+      - BASH_ENV: /home/circleci/.bashrc
+      - JAVA_HOME: /usr/lib/jvm/java-11-oracle
+      - ES_JAVA_OPTS: -Xms2g -Xmx2g
+      - ES_BIN: /usr/share/elasticsearch/bin
+      - ES_MAJOR_VERSION: 5
+      - PG_VERSION: 9.3
+      - NODE_VERSION: 6
+
+commands:
+  buildout:
+    description: A buildout process based on snovault-executor
+    steps:
+      - checkout
+      # Do not use caching for now to avoid potential conflicts/bugs
+      - run:
+          name: Add apt repositories
+          command: |
+            ES_APT_REPO="deb https://artifacts.elastic.co/packages/${ES_MAJOR_VERSION}.x/apt stable main"
+            sudo apt-get install apt-transport-https software-properties-common
+            wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
+            echo ${ES_APT_REPO} | sudo tee -a /etc/apt/sources.list.d/elastic-${ES_MAJOR_VERSION}.x.list
+            curl -sSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | sudo apt-key add -
+            curl -sL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash -
+            sudo add-apt-repository -y ppa:linuxuprising/java
+            sudo apt-add-repository -y ppa:brightbox/ruby-ng
+            sudo apt-get update
+      - run:
+          name: Install dependencies
+          command: |
+            echo "oracle-java11-installer shared/accepted-oracle-license-v1-2 select true" | sudo debconf-set-selections
+            PG_BIN="/usr/lib/postgresql/${PG_VERSION}/bin"
+            sudo apt-get install -y \
+              bsdtar \
+              elasticsearch \
+              graphviz \
+              nodejs \
+              oracle-java11-installer \
+              oracle-java11-set-default \
+              postgresql-${PG_VERSION} \
+              ruby2.3 \
+              ruby2.3-dev
+            sudo chown -R circleci /etc/elasticsearch
+            sed -i "1s;^;export PATH=${ES_BIN}:${PG_BIN}:$PATH\n;" $BASH_ENV
+            sudo apt-get install -y python3.4-dev python3-pip
+            sed -i '1s;^;alias python=python3\n;' $BASH_ENV
+            sudo gem install compass
+      - run:
+          name: Run buildout
+          command: |
+            sudo pip3 install -U zc.buildout setuptools
+            buildout bootstrap
+            bin/buildout
+jobs:
+  npm-non-bdd-tests:
+    executor: snovault-executor
+    # indexing tests fail using default medium resource_class
+    resource_class: large
+    steps:
+      - buildout
+      - run:
+          name: NPM and non BDD tests
+          command: |
+            npm test
+            bin/test -v -v --timeout=400 -m "not bdd"
+  bdd-tests:
+    executor: snovault-executor
+    resource_class: large
+    steps:
+      - buildout
+      # Use install tasks from the orb
+      - browser-tools/install-chrome
+      - browser-tools/install-chromedriver
+      - run:
+          name: Run bdd tests
+          command: |
+            bin/test -v -v --timeout=400 -m "bdd" --tb=short \
+              --splinter-implicit-wait 10 \
+              --splinter-webdriver chrome \
+              --splinter-socket-timeout 300 \
+              --chrome-options "--headless --disable-gpu --no-sandbox --disable-dev-shm-usage --disable-extensions --whitelisted-ips"
+          no_output_timeout: 30m
+
+workflows:
+  version: 2
+  snovault-tests:
+    jobs:
+      - bdd-tests
+      - npm-non-bdd-tests
