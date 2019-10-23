@@ -1814,7 +1814,7 @@ def test_searches_mixins_hits_to_graph_mixin_to_graph(
         basic_query_response_with_facets,
         raw_response
 ):
-    r = basic_query_response_with_facets.to_graph()
+    r = list(basic_query_response_with_facets.to_graph())
     assert len(r) == len(raw_response['hits']['hits'])
     assert all(['accession' in x for x in r])
 
@@ -1826,7 +1826,7 @@ def test_searches_mixins_raw_hits_to_graph_mixin_init():
 
 
 def test_searches_mixins_raw_hits_to_graph_mixin_to_graph(raw_query_response_with_facets):
-    r = raw_query_response_with_facets.to_graph()
+    r = list(raw_query_response_with_facets.to_graph())
     assert len(r) == 2
     assert 'embedded' in r[0]
 
