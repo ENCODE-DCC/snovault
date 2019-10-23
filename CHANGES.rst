@@ -1,7 +1,13 @@
 Changes
 =======
 
-Snovault 1.0.30 (unreleased)
+Snovault 1.0.31 (released) encoded v86rc1
+-----------------------------------------
+1. SNO-98 Update sauce connect to 4.5.3 (#199)
+2. SNO-93 user-count-does-not-match (#191)
+3. SNO-90 added-advancedQuery (#183)
+
+Snovault 1.0.30 (released) encoded v85x2
 ----------------------------------------
 1. SNO-96 fix indexing tests (#196)
 

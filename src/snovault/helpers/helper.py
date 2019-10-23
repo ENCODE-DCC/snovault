@@ -68,27 +68,41 @@ def get_filtered_query(term, search_fields, result_fields, principals, doc_types
 
 
 def prepare_search_term(request):
+    """
+    Process search query into a form that can be used by lucence.
 
-    search_term = request.params.get('searchTerm', '').strip() or '*'
-    if search_term == '*':
-        return search_term
-
+        :param request: pyramid request
+    """
     # avoid interpreting slashes as regular expressions
-    search_term = search_term.replace('/', r'\/').replace('^', r'').replace('<', r'').replace('>', r'')
-    search_term = re.sub('\?+', '?', search_term)
-    # elasticsearch uses : as field delimiter, but we use it as namespace designator
-    # if you need to search fields you have to use @type:field
-    # if you need to search fields where the field contains ":", you will have to escape it
-    # yourself
-    if search_term.find("@type") < 0:
-        search_term = search_term.replace(':', r'\:')
-    try:
-        query = prefixfields('embedded.', search_term, dialects.elasticsearch)
-    except IllegalStateException:
-        msg = "Invalid query: {}".format(search_term)
-        raise HTTPBadRequest(explanation=msg)
-    else:
-        return query.getText()
+    advanced_query = request.params.get('advancedQuery', '').strip().replace('/', r'\/')
+    search_term = request.params.get('searchTerm')
+    # true if no search is being performed
+    if search_term is None and not advanced_query:
+        return '*'
+    if search_term is not None:
+        search_term = (search_term or '').strip()
+        if search_term in ('', '*'):
+            return '*'
+        # elasticsearch uses ':' as field delimiter, but we use it as namespace designator
+        # if you need to search fields you have to use @type:field
+        # if you need to search fields where the field contains ":", you will have to escape it
+        # yourself
+        search_term = search_term.replace('/', r'\/').replace('^', r'').replace('<', r'').replace('>', r'')
+        search_term = re.sub('\?+', '?', search_term)
+        if search_term.find("@type") < 0:
+            search_term = search_term.replace(':', r'\:')
+    search_query = ''
+    if advanced_query:
+        try:
+            query = prefixfields('embedded.', advanced_query, dialects.elasticsearch)
+        except IllegalStateException:
+            msg = "Invalid query: {}".format(advanced_query)
+            raise HTTPBadRequest(explanation=msg)
+        else:
+            search_query = query.getText()
+    if search_term:
+        search_query = ''.join([search_query, ' And ', search_term]) if search_query else search_term
+    return search_query
 
 
 def set_sort_order(request, search_term, types, doc_types, query, result):
@@ -133,6 +147,10 @@ def set_sort_order(request, search_term, types, doc_types, query, result):
             sort['embedded.label'] = result_sort['label'] = {
                 'order': 'asc',
                 'missing': '_last',
+                'unmapped_type': 'keyword',
+            }
+            sort['embedded.uuid'] = result_sort['uuid'] = {
+                'order': 'desc',
                 'unmapped_type': 'keyword',
             }
 
@@ -316,7 +334,7 @@ def set_filters(request, query, result, static_items=None, filter_exclusion=None
                     'remove': '{}?{}'.format(request.path, query_string)
                 })
 
-        if field == 'searchTerm':
+        if field in ('searchTerm', 'advancedQuery'):
             continue
 
         # Add to list of active filters
