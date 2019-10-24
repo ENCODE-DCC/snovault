@@ -91,6 +91,13 @@ def test_searchv2_view_values_malformed_query_string(workbook, testapp):
     assert r.json['notification'] == 'No results found'
 
 
+def test_searchv2_view_values_regex_slash_escape(workbook, testapp):
+    r = testapp.get(
+        '/search/?searchTerm=/*'
+    )
+    assert r.json['total'] >= 32
+
+
 def test_searchv2_view_values_bad_type(workbook, testapp):
     r = testapp.get(
         '/search/?status=released&type=Sno',

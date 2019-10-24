@@ -190,6 +190,9 @@ class AbstractQueryFactory:
             if self._get_collection_name_for_item_type(item_type)
         ]
 
+    def _escape_regex_slashes(self, query):
+        return query.replace('/', '\/')
+
     def _validated_query_string_query(self, query):
         try:
             query = prefixfields(EMBEDDED, query, dialects.elasticsearch)
@@ -710,7 +713,9 @@ class AbstractQueryFactory:
     def add_query_string_query(self):
         query = self._get_query()
         if query:
-            query = self._validated_query_string_query(query)
+            query = self._validated_query_string_query(
+                self._escape_regex_slashes(query)
+            )
             self.search = self._get_or_create_search().query(
                 self._make_query_string_query(
                     query=query,
