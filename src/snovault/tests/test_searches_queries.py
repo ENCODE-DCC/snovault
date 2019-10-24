@@ -384,6 +384,24 @@ def test_searches_queries_abstract_query_factory_get_collection_names_for_item_t
     ) == ['testing_search_schema', 'testing_post_put_patch']
 
 
+def test_searches_queries_abstract_query_factory_escape_regex_slashes(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.exceptions import HTTPBadRequest
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    assert aq._escape_regex_slashes('ctcf') == 'ctcf'
+    assert aq._escape_regex_slashes(
+        '@type:Experiment date_created:[01-01-2018 TO 01-02-2018]'
+    ) == '@type:Experiment date_created:[01-01-2018 TO 01-02-2018]'
+    assert aq._escape_regex_slashes(
+        '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (@type:File)'
+    ) == '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (@type:File)'
+    assert aq._escape_regex_slashes(
+        'Wnt/β-catenin'
+    ) == 'Wnt\/β-catenin'
+    assert aq._escape_regex_slashes(
+        '/targets/H3K9me3-human/'
+    ) == '\/targets\/H3K9me3-human\/'
+
 
 def test_searches_queries_abstract_query_factory_validated_query_string_query(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
@@ -396,6 +414,9 @@ def test_searches_queries_abstract_query_factory_validated_query_string_query(pa
     assert aq._validated_query_string_query(
         '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (@type:File)'
     ) == '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (embedded.@type:File)'
+    assert aq._validated_query_string_query(
+        'Wnt\/β-catenin'
+    ) == 'Wnt\/β-catenin'
     special_chars = '&& || > < ! ( ) { } [ ] ^ " ~ \ :'
     for c in special_chars.split(' '):
         with pytest.raises(HTTPBadRequest):
