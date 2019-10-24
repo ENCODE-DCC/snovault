@@ -1,6 +1,12 @@
 Changes
 =======
 
+Snovault 1.0.37 (released) encoded v92.0
+----------------------------------------
+1. SNO-119-escape-regex-slash (#221)
+2. [HOTFIX] SNO-120-stream-large-json (#222)
+3. SNO-115-delete-old-search-code (#219)
+
 Snovault 1.0.36 (released) encoded v91.0
 ----------------------------------------
 1. SNO-112-fix-npm-audit-issues (#216)
