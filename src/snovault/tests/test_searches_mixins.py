@@ -1772,6 +1772,53 @@ def test_searches_mixins_aggs_to_facets_mixin_to_facets(
     assert len(actual) == 13
 
 
+def test_searches_mixins_hits_to_graph_mixin_init():
+    from snovault.elasticsearch.searches.mixins import HitsToGraphMixin
+    hg = HitsToGraphMixin()
+    assert isinstance(hg, HitsToGraphMixin)
+
+
+def test_searches_mixins_hits_to_graph_mixin_limit_generator():
+    from snovault.elasticsearch.searches.mixins import HitsToGraphMixin
+    hg = HitsToGraphMixin()
+    g = (x for x in range(100))
+    assert len(list(g)) == 100
+    g = (x for x in range(100))
+    g = hg._limit_generator(g, 25)
+    assert len(list(g)) == 25
+    g = (x for x in range(100))
+    g = hg._limit_generator(g, 100)
+    assert len(list(g)) == 100
+    g = (x for x in range(100))
+    g = hg._limit_generator(g, 0)
+    assert len(list(g)) == 0
+    g = (x for x in range(200))
+    g = hg._limit_generator(g, 2)
+    assert len(list(g)) == 2
+    g = (x for x in range(50))
+    g = hg._limit_generator(g, 100)
+    assert len(list(g)) == 50
+
+
+def test_searches_mixins_hits_to_graph_mixin_scan(
+        basic_query_response_with_facets,
+        raw_response,
+        mocker
+):
+    from elasticsearch_dsl.response import Response
+    from types import GeneratorType
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
+    mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_limit_is_all')
+    BasicSearchQueryFactoryWithFacets._limit_is_all.return_value = False
+    scan = basic_query_response_with_facets._scan()
+    assert isinstance(scan, GeneratorType)
+    assert scan.__name__ == '_limit_generator'
+    BasicSearchQueryFactoryWithFacets._limit_is_all.return_value = True
+    scan = basic_query_response_with_facets._scan()
+    assert isinstance(scan, GeneratorType)
+    assert scan.__name__ == 'scan'
+
+
 def test_searches_mixins_hits_to_graph_mixin_get_results(
         basic_query_response_with_facets,
         raw_response,
@@ -1779,13 +1826,21 @@ def test_searches_mixins_hits_to_graph_mixin_get_results(
 ):
     from elasticsearch_dsl.response import Response
     from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
+    mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_should_scan_over_results')
+    mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_limit_is_all')
+    BasicSearchQueryFactoryWithFacets._should_scan_over_results.return_value = False
     res = basic_query_response_with_facets._get_results()
     assert isinstance(res, Response)
-    mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_should_scan_over_results')
     BasicSearchQueryFactoryWithFacets._should_scan_over_results.return_value = True
+    BasicSearchQueryFactoryWithFacets._limit_is_all.return_value = True
     from types import GeneratorType
     res = basic_query_response_with_facets._get_results()
     assert isinstance(res, GeneratorType)
+    assert res.__name__ == 'scan'
+    BasicSearchQueryFactoryWithFacets._limit_is_all.return_value = False
+    res = basic_query_response_with_facets._get_results()
+    assert isinstance(res, GeneratorType)
+    assert res.__name__ == '_limit_generator'
 
 
 def test_searches_mixins_hits_to_graph_mixin_unlayer(basic_query_response_with_facets):
@@ -1817,6 +1872,35 @@ def test_searches_mixins_hits_to_graph_mixin_to_graph(
     r = list(basic_query_response_with_facets.to_graph())
     assert len(r) == len(raw_response['hits']['hits'])
     assert all(['accession' in x for x in r])
+
+
+def test_searches_mixins_hits_to_graph_mixin_to_graph_scan_with_limit(
+        basic_query_response_with_facets,
+        raw_response,
+        mocker
+):
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
+    from elasticsearch_dsl.search import Search
+    mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_should_scan_over_results')
+    mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_limit_is_all')
+    mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_get_limit_value_as_int')
+    mocker.patch.object(Search, 'scan')
+    BasicSearchQueryFactoryWithFacets._should_scan_over_results.return_value = False
+    Search.scan.return_value = (x for x in basic_query_response_with_facets.results)
+    r = list(basic_query_response_with_facets.to_graph())
+    assert len(r) == 2
+    BasicSearchQueryFactoryWithFacets._should_scan_over_results.return_value = True
+    BasicSearchQueryFactoryWithFacets._limit_is_all.return_value = False
+    BasicSearchQueryFactoryWithFacets._get_limit_value_as_int.return_value = 1
+    Search.scan.return_value = (x for x in basic_query_response_with_facets.results)
+    r = list(basic_query_response_with_facets.to_graph())
+    assert len(r) == 1
+    BasicSearchQueryFactoryWithFacets._should_scan_over_results.return_value = True
+    BasicSearchQueryFactoryWithFacets._limit_is_all.return_value = True
+    BasicSearchQueryFactoryWithFacets._get_limit_value_as_int.return_value = 1
+    Search.scan.return_value = (x for x in basic_query_response_with_facets.results)
+    r = list(basic_query_response_with_facets.to_graph())
+    assert len(r) == 2
 
 
 def test_searches_mixins_raw_hits_to_graph_mixin_init():

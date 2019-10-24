@@ -56,6 +56,29 @@ def test_searchv2_view_with_limit(workbook, testapp):
     assert 'all' not in r.json
 
 
+def test_searchv2_view_with_limit_and_scan(workbook, testapp, mocker):
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
+    mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_should_scan_over_results')
+    BasicSearchQueryFactoryWithFacets._should_scan_over_results.return_value = True
+    r = testapp.get(
+        '/search/?type=Snowflake&limit=all'
+    )
+    assert len(r.json['@graph']) == 35
+    r = testapp.get(
+        '/search/?type=Snowflake&limit=30'
+    )
+    assert len(r.json['@graph']) == 30
+    BasicSearchQueryFactoryWithFacets._should_scan_over_results.return_value = False
+    r = testapp.get(
+        '/search/?type=Snowflake&limit=all'
+    )
+    assert len(r.json['@graph']) == 25
+    r = testapp.get(
+        '/search/?type=Snowflake&limit=30'
+    )
+    assert len(r.json['@graph']) == 30
+
+
 def test_searchv2_view_with_limit_zero(workbook, testapp):
     r = testapp.get(
         '/search/?type=Snowflake&limit=0'
