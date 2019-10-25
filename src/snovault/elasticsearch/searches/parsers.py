@@ -323,3 +323,101 @@ class ParamsParser:
         exists = self.get_exists_filters(params=params)
         not_exists = self.get_not_exists_filters(params=params)
         return must, must_not, exists, not_exists
+
+
+class MutableParamsParser(ParamsParser):
+    '''
+    Allows for manual modification of query string params and generation of new request.
+    '''
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.params = self._get_original_params()
+
+    def _params(self, params=None):
+        if params is None:
+            params = self.params
+        return params
+
+    def _get_original_params(self):
+        return list(self._request.params.items())
+
+    def _get_original_query_string(self):
+        return self.get_query_string(
+            params=self._get_original_params()
+        )
+
+    def _validate_param(self, param):
+        conditions = [
+            isinstance(param, tuple),
+            len(param) == 2
+        ]
+        if not all(conditions):
+            raise ValueError(
+                'Param must be a key, value tuple.'
+            )
+
+    def _validate_params(self, params):
+        if not isinstance(params, list):
+            raise ValueError(
+                'Params but be a list of key, value tuples.'
+            )
+        for p in params:
+            self._validate_param(p)
+
+    def append(self, param):
+        self._validate_param(param)
+        self.params.append(param)
+
+    def extend(self, params):
+        self._validate_params(params)
+        self.params.extend(params)
+
+    def _drop_key(self, key):
+        self.params = self.get_not_keys_filters(
+            not_keys=[key],
+            params=self.params
+        )
+
+    def _drop_key_and_value(self, key, value):
+        self.params = self.remove_key_and_value_pair_from_filters(
+            key=key,
+            value=value,
+            params=self.params
+        )
+
+    def drop(self, param):
+        if isinstance(param, tuple):
+            self._validate_param(param)
+            self._drop_key_and_value(
+                key=param[0],
+                value=param[1]
+            )
+        elif isinstance(param, str):
+            self._drop_key(param)
+        else:
+            raise ValueError(
+                'Param must be key, value tuple or key string.'
+                )
+
+    def deduplicate(self):
+        '''
+        Keeps order while deduplicating.
+        '''
+        params = set()
+        params_add = params.add
+        self.params = [
+            p
+            for p in self.params
+            if not (p in params or params_add(p))
+        ]
+
+    def get_request_with_new_query_string(self, deduplicate=True):
+        '''
+        Copies request and fills in new deduplicated query_string.
+        '''
+        if deduplicate:
+            self.deduplicate()
+        request = self._request.copy()
+        request.query_string = self.get_query_string()
+        return request
