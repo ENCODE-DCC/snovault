@@ -1021,4 +1021,22 @@ def test_searches_parsers_mutable_params_parser_get_request_with_new_query_strin
     assert mpp.get_request_with_new_query_string().query_string == 'type=Snowflake&subtype=abc123+abc3%2B'
     mpp.drop(('subtype', 'abc123 abc3+'))
     assert mpp.get_request_with_new_query_string().query_string == 'type=Snowflake'
-    
+
+
+def test_searches_parsers_query_string_init(dummy_request):
+    from snovault.elasticsearch.searches.parsers import QueryString
+    qs = QueryString(dummy_request)
+    assert isinstance(qs, QueryString)
+
+
+def test_searches_parsers_query_string__repr__(dummy_request):
+    from snovault.elasticsearch.searches.parsers import QueryString
+    dummy_request.query_string = 'type=Snowflake&type!=Snowball'
+    qs = QueryString(dummy_request)
+    assert str(qs) == 'type=Snowflake&type%21=Snowball'
+    dummy_request.query_string = 'type=Snowball&status!=revoked&files.file_type=bed+bed6%2B'
+    qs = QueryString(dummy_request)
+    assert str(qs) == 'type=Snowball&status%21=revoked&files.file_type=bed+bed6%2B'
+    dummy_request.query_string = 'type=Snowball&status%21=revoked&files.file_type=bed+bed6%2B'
+    qs = QueryString(dummy_request)
+    assert str(qs) == 'type=Snowball&status%21=revoked&files.file_type=bed+bed6%2B'

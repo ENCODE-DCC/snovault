@@ -421,3 +421,11 @@ class MutableParamsParser(ParamsParser):
         request = self._request.copy()
         request.query_string = self.get_query_string()
         return request
+
+
+class QueryString(MutableParamsParser):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __repr__(self):
+        return self.get_query_string()
