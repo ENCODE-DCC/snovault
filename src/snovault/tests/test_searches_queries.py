@@ -507,37 +507,70 @@ def test_searches_queries_abstract_query_factory_get_default_and_maybe_item_face
     assert all(e in actual for e in expected)
 
 
-def test_searches_queries_abstract_query_factory_get_query(params_parser, dummy_request):
+def test_searches_queries_abstract_query_factory_get_query_string_query(params_parser, dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    search_terms = aq._get_query()
-    assert search_terms == '(chip-seq)'
+    search_terms = aq._get_query_string_query()
+    assert search_terms is None
     dummy_request.environ['QUERY_STRING'] = (
         'status=released&frame=object&mode=picker'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    assert aq._get_query() is None
-    dummy_request.environ['QUERY_STRING'] = (
-        'status=released&searchTerm=cherry'
-    )
-    params_parser = ParamsParser(dummy_request)
-    aq = AbstractQueryFactory(params_parser)
-    assert aq._get_query() == '(cherry)'
+    assert aq._get_query_string_query() is None
     dummy_request.environ['QUERY_STRING'] = (
         'status=released&advancedQuery=cherry'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    assert aq._get_query() == '(cherry)'
+    assert aq._get_query_string_query() == '(cherry)'
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&advancedQuery=cherry'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_query_string_query() == '(cherry)'
     dummy_request.environ['QUERY_STRING'] = (
         'status=released&advancedQuery=@type:Experiment date_created:[01-01-2018 TO 01-02-2018'
         '&searchTerm=ctcf'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    assert aq._get_query() == '(ctcf) AND (@type:Experiment date_created:[01-01-2018 TO 01-02-2018)'
+    assert aq._get_query_string_query() == '(@type:Experiment date_created:[01-01-2018 TO 01-02-2018)'
+
+
+def test_searches_queries_abstract_query_factory_get_simple_query_string_query(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    search_terms = aq._get_simple_query_string_query()
+    assert search_terms == '(chip-seq)'
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&frame=object&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_simple_query_string_query() is None
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&searchTerm=cherry'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_simple_query_string_query() == '(cherry)'
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&advancedQuery=cherry'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_simple_query_string_query() is None
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&advancedQuery=@type:Experiment date_created:[01-01-2018 TO 01-02-2018'
+        '&searchTerm=ctcf'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_simple_query_string_query() == '(ctcf)'
 
 
 def test_searches_queries_abstract_query_factory_get_filters(params_parser):
@@ -1726,11 +1759,46 @@ def test_searches_queries_abstract_query_factory_map_params_to_elasticsearch_fie
     ]
 
 
-def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_request):
+def test_searches_queries_abstract_query_factory_add_simple_query_string_query(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
         'searchTerm=chip-seq'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_simple_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'simple_query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all'
+                ],
+                'query': '(chip-seq)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['simple_query_string']['query']
+        == expected_query['query']['simple_query_string']['query']
+    )
+    assert (
+        constructed_query['query']['simple_query_string']['default_operator']
+        == expected_query['query']['simple_query_string']['default_operator']
+    )
+    assert (
+        set(constructed_query['query']['simple_query_string']['fields'])
+        == set(expected_query['query']['simple_query_string']['fields'])
+    )
+
+
+def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'advancedQuery=chip-seq'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
@@ -1761,7 +1829,101 @@ def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_re
     )
 
 
+def test_searches_queries_abstract_query_factory_add_query_string_query_and_simple_query_string_query(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&advancedQuery=date_released:[01-01-2018 TO 01-01-2019]'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_query_string_query()
+    aq.add_simple_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'bool': {
+                'must': [
+                    {
+                        'query_string': {
+                            'query': '(embedded.date_released:[01-01-2018 TO 01-01-2019])',
+                            'default_operator': 'AND',
+                            'fields': ['_all']
+                        }
+                    },
+                    {
+                        'simple_query_string': {
+                            'query': '(chip-seq)',
+                            'default_operator': 'AND',
+                            'fields': ['_all']
+                        }
+                    }
+                ]
+            }
+        }
+    }
+    actual_must = constructed_query['query']['bool']['must']
+    actual_query_string = [
+        a.get('query_string')
+        for a in actual_must
+        if 'query_string' in a
+    ][0]
+    actual_simple_query_string = [
+        a.get('simple_query_string')
+        for a in actual_must
+        if 'simple_query_string' in a
+    ][0]
+    expected_must = expected_query['query']['bool']['must']
+    expected_query_string = [
+        e.get('query_string')
+        for e in expected_must
+        if 'query_string' in e
+    ][0]
+    expected_simple_query_string = [
+        e.get('simple_query_string')
+        for e in expected_must
+        if 'simple_query_string' in e
+    ][0]
+    assert len(actual_must) == len(expected_must)
+    assert actual_query_string == expected_query_string
+    assert actual_simple_query_string == expected_simple_query_string
+
+
 def test_searches_queries_abstract_query_factory_add_query_string_query_with_type(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'advancedQuery=chip-seq&type=TestingSearchSchema&status=released'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all'
+                ],
+                'query': '(chip-seq)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['query_string']['query']
+        == expected_query['query']['query_string']['query']
+    )
+    assert (
+        constructed_query['query']['query_string']['default_operator']
+        == expected_query['query']['query_string']['default_operator']
+    )
+    assert (
+        set(constructed_query['query']['query_string']['fields'])
+        == set(expected_query['query']['query_string']['fields'])
+    )
+
+def test_searches_queries_abstract_query_factory_add_simple_query_string_query_with_type(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
@@ -1769,11 +1931,11 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_typ
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    aq.add_query_string_query()
+    aq.add_simple_query_string_query()
     constructed_query = aq.search.to_dict()
     expected_query = {
         'query': {
-            'query_string': {
+            'simple_query_string': {
                 'default_operator': 'AND',
                 'fields': [
                     '_all'
@@ -1783,16 +1945,16 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_typ
         }
     }
     assert (
-        constructed_query['query']['query_string']['query']
-        == expected_query['query']['query_string']['query']
+        constructed_query['query']['simple_query_string']['query']
+        == expected_query['query']['simple_query_string']['query']
     )
     assert (
-        constructed_query['query']['query_string']['default_operator']
-        == expected_query['query']['query_string']['default_operator']
+        constructed_query['query']['simple_query_string']['default_operator']
+        == expected_query['query']['simple_query_string']['default_operator']
     )
     assert (
-        set(constructed_query['query']['query_string']['fields'])
-        == set(expected_query['query']['query_string']['fields'])
+        set(constructed_query['query']['simple_query_string']['fields'])
+        == set(expected_query['query']['simple_query_string']['fields'])
     )
 
 
@@ -1800,7 +1962,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_def
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
-        'searchTerm=chip-seq'
+        'advancedQuery=chip-seq'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(
@@ -1835,6 +1997,46 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_def
         == set(expected_query['query']['query_string']['fields'])
     )
 
+    
+def test_searches_queries_abstract_query_factory_add_simple_query_string_query_with_default_type(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(
+        params_parser,
+        default_item_types=[
+            'TestingSearchSchema'
+        ]
+    )
+    aq.add_simple_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'simple_query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all'
+                ],
+                'query': '(chip-seq)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['simple_query_string']['query']
+        == expected_query['query']['simple_query_string']['query']
+    )
+    assert (
+        constructed_query['query']['simple_query_string']['default_operator']
+        == expected_query['query']['simple_query_string']['default_operator']
+    )
+    assert (
+        set(constructed_query['query']['simple_query_string']['fields'])
+        == set(expected_query['query']['simple_query_string']['fields'])
+    )
+
 
 def test_searches_queries_abstract_query_factory_add_query_string_query_no_search_term(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
@@ -1845,6 +2047,18 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_no_searc
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     aq.add_query_string_query()
+    assert aq.search is None
+
+
+def test_searches_queries_abstract_query_factory_add_simple_query_string_query_no_search_term(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_simple_query_string_query()
     assert aq.search is None
 
 
@@ -2412,7 +2626,7 @@ def test_searches_queries_abstract_query_factory_make_exists_aggregation(params_
     }
 
 
-def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_request):
+def test_searches_queries_abstract_query_factory_add_simple_query_string_query(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
@@ -2420,11 +2634,11 @@ def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_re
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    aq.add_query_string_query()
+    aq.add_simple_query_string_query()
     constructed_query = aq.search.to_dict()
     expected_query = {
         'query': {
-            'query_string': {
+            'simple_query_string': {
                 'default_operator': 'AND',
                 'fields': [
                     '_all'
@@ -2434,16 +2648,16 @@ def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_re
         }
     }
     assert (
-        constructed_query['query']['query_string']['query']
-        == expected_query['query']['query_string']['query']
+        constructed_query['query']['simple_query_string']['query']
+        == expected_query['query']['simple_query_string']['query']
     )
     assert (
-        constructed_query['query']['query_string']['default_operator']
-        == expected_query['query']['query_string']['default_operator']
+        constructed_query['query']['simple_query_string']['default_operator']
+        == expected_query['query']['simple_query_string']['default_operator']
     )
     assert (
-        set(constructed_query['query']['query_string']['fields'])
-        == set(expected_query['query']['query_string']['fields'])
+        set(constructed_query['query']['simple_query_string']['fields'])
+        == set(expected_query['query']['simple_query_string']['fields'])
     )
 
 
@@ -2451,7 +2665,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_typ
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
-        'searchTerm=chip-seq&type=TestingSearchSchema&status=released'
+        'advancedQuery=chip-seq&type=TestingSearchSchema&status=released'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
@@ -2486,7 +2700,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_def
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
-        'searchTerm=chip-seq'
+        'advancedQuery=chip-seq'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(
@@ -2902,12 +3116,12 @@ def test_searches_queries_abstract_query_factory_add_query_string_and_post_filte
     )
     p = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(p)
-    aq.add_query_string_query()
+    aq.add_simple_query_string_query()
     aq.add_post_filters()
     actual_query = aq.search.to_dict()
     expected_query = {
         'query': {
-            'query_string': {
+            'simple_query_string': {
                 'query': '(chip-seq)',
                 'fields': [
                     '_all',
@@ -2937,8 +3151,8 @@ def test_searches_queries_abstract_query_factory_add_query_string_and_post_filte
         }
     }
     assert (
-        expected_query['query']['query_string']['query']
-        == actual_query['query']['query_string']['query']
+        expected_query['query']['simple_query_string']['query']
+        == actual_query['query']['simple_query_string']['query']
     )
     assert all(
         e in actual_query['post_filter']['bool']['must_not']

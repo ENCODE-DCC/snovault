@@ -145,9 +145,13 @@ def test_searchv2_view_values_item_wildcard(workbook, testapp):
 def test_searchv2_view_values_invalid_search_term(workbook, testapp):
     r = testapp.get(
         '/search/?searchTerm=[',
-        status=400
+        status=404
     )
-    assert r.json['description'] == 'Invalid query: ([)'
+    r = testapp.get(
+        '/search/?searchTerm=cherry^',
+        status=200
+    )
+    assert r.json['total'] == 1
 
 
 def test_searchv2_view_values_invalid_advanced_query(workbook, testapp):
