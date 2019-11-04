@@ -162,6 +162,34 @@ def test_searchv2_view_values_invalid_advanced_query(workbook, testapp):
     assert r.json['description'] == 'Invalid query: ([)'
 
 
+def test_searchv2_view_values_reserved_characters_advanced_query(workbook, testapp):
+    r = testapp.get(
+        '/search/?searchTerm=cherry^',
+        status=200
+    )
+    assert r.json['total'] == 1
+    r = testapp.get(
+        '/search/?searchTerm=cherry~',
+        status=200
+    )
+    assert r.json['total'] == 1
+    r = testapp.get(
+        '/search/?searchTerm=/cherry',
+        status=200
+    )
+    assert r.json['total'] == 1
+    r = testapp.get(
+        '/search/?searchTerm=/cherryp',
+        status=404
+    )
+    assert r.json['total'] == 0
+    r = testapp.get(
+        '/search/?searchTerm=/cherry:',
+        status=200
+    )
+    assert r.json['total'] == 1
+
+
 def test_searchv2_view_embedded_frame(workbook, testapp):
     r = testapp.get(
         '/search/?type=Snowflake&frame=embedded'

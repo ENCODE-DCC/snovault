@@ -194,6 +194,25 @@ class AbstractQueryFactory:
     def _escape_regex_slashes(self, query):
         return query.replace('/', '\/')
 
+    def _escape_fuzzy_tilde(self, query):
+        return query.replace('~', '\~')
+
+    def _escape_boost_caret(self, query):
+        return query.replace('^', '\^')
+
+    def _escape_reserved_query_string_characters(self, query):
+        '''
+        Removes some of the sharp edges of query strings from
+        invalid user input.
+        '''
+        return self._escape_regex_slashes(
+            self._escape_fuzzy_tilde(
+                self._escape_boost_caret(
+                    query
+                )
+            )
+        )
+
     def _validated_query_string_query(self, query):
         try:
             query = prefixfields(EMBEDDED, query, dialects.elasticsearch)
@@ -732,7 +751,7 @@ class AbstractQueryFactory:
         query = self._get_query_string_query()
         if query:
             query = self._validated_query_string_query(
-                self._escape_regex_slashes(query)
+                self._escape_reserved_query_string_characters(query)
             )
             self.search = self._get_or_create_search().query(
                 self._make_query_string_query(

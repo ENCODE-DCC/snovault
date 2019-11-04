@@ -403,6 +403,72 @@ def test_searches_queries_abstract_query_factory_escape_regex_slashes(params_par
     ) == '\/targets\/H3K9me3-human\/'
 
 
+def test_searches_queries_abstract_query_factory_escape_fuzzy_tilde(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.exceptions import HTTPBadRequest
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    assert aq._escape_fuzzy_tilde('ctcf') == 'ctcf'
+    assert aq._escape_fuzzy_tilde(
+        '@type:Experiment date_created:[01-01-2018 TO 01-02-2018]'
+    ) == '@type:Experiment date_created:[01-01-2018 TO 01-02-2018]'
+    assert aq._escape_fuzzy_tilde(
+        '(ctcf) AND (myers)~ AND NOT (~snyder or pacha) AND (@type:File)'
+    ) == '(ctcf) AND (myers)\~ AND NOT (\~snyder or pacha) AND (@type:File)'
+    assert aq._escape_fuzzy_tilde(
+        'Wnt/β-~catenin'
+    ) == 'Wnt/β-\~catenin'
+    assert aq._escape_fuzzy_tilde(
+        '/targets/H3K9me3-human/~'
+    ) == '/targets/H3K9me3-human/\~'
+
+
+def test_searches_queries_abstract_query_factory_escape_boost_caret(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.exceptions import HTTPBadRequest
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    assert aq._escape_boost_caret('ctcf') == 'ctcf'
+    assert aq._escape_boost_caret(
+        'eclip^'
+    ) == 'eclip\^'
+    assert aq._escape_boost_caret(
+        '(ctcf) AND (my^ers)^'
+    ) == '(ctcf) AND (my\^ers)\^'
+    assert aq._escape_boost_caret(
+        '^^Wnt/β-catenin'
+    ) == '\^\^Wnt/β-catenin'
+    assert aq._escape_boost_caret(
+        '/targets/H3K9me3-human/'
+    ) == '/targets/H3K9me3-human/'
+
+
+def test_searches_queries_abstract_query_factory_escape_reserved_query_string_characters(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.exceptions import HTTPBadRequest
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    assert aq._escape_reserved_query_string_characters('ctcf') == 'ctcf'
+    assert aq._escape_reserved_query_string_characters(
+        '@type:Experiment date_created:[01-01-2018 TO 01-02-2018]'
+    ) == '@type:Experiment date_created:[01-01-2018 TO 01-02-2018]'
+    assert aq._escape_reserved_query_string_characters(
+        '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (@type:File)'
+    ) == '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (@type:File)'
+    assert aq._escape_reserved_query_string_characters(
+        'Wnt/β-catenin'
+    ) == 'Wnt\/β-catenin'
+    assert aq._escape_reserved_query_string_characters(
+        '/targets/H3K9me3-human/'
+    ) == '\/targets\/H3K9me3-human\/'
+    assert aq._escape_reserved_query_string_characters(
+        '(ctcf)~ AND (myers) AND NOT^ (snyder or pacha) AND (@type:File)'
+    ) == '(ctcf)\~ AND (myers) AND NOT\^ (snyder or pacha) AND (@type:File)'
+    assert aq._escape_reserved_query_string_characters(
+        '^Wnt/β-catenin~~'
+    ) == '\^Wnt\/β-catenin\~\~'
+    assert aq._escape_reserved_query_string_characters(
+        '/targets/H3K9me3-human~/'
+    ) == '\/targets\/H3K9me3-human\~\/'
+
+
 def test_searches_queries_abstract_query_factory_validated_query_string_query(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from pyramid.exceptions import HTTPBadRequest
@@ -1826,6 +1892,72 @@ def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_re
     assert (
         set(constructed_query['query']['query_string']['fields'])
         == set(expected_query['query']['query_string']['fields'])
+    )
+    dummy_request.environ['QUERY_STRING'] = (
+        'advancedQuery=cherry^'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all'
+                ],
+                'query': '(cherry\^)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['query_string']['query']
+        == expected_query['query']['query_string']['query']
+    )
+    dummy_request.environ['QUERY_STRING'] = (
+        'advancedQuery=cherry~'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all'
+                ],
+                'query': '(cherry\~)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['query_string']['query']
+        == expected_query['query']['query_string']['query']
+    )
+    dummy_request.environ['QUERY_STRING'] = (
+        'advancedQuery=/cherry^~'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all'
+                ],
+                'query': '(\/cherry\^\~)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['query_string']['query']
+        == expected_query['query']['query_string']['query']
     )
 
 
