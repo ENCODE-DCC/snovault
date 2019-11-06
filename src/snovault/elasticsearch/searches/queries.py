@@ -64,6 +64,7 @@ from .interfaces import PRINCIPALS_ALLOWED_VIEW
 from .interfaces import PROPERTIES
 from .interfaces import QUERY_STRING
 from .interfaces import SEARCH_AUDIT
+from .interfaces import SIMPLE_QUERY_STRING
 from .interfaces import _SOURCE
 from .interfaces import TITLE
 from .interfaces import TERMS
@@ -193,6 +194,25 @@ class AbstractQueryFactory:
     def _escape_regex_slashes(self, query):
         return query.replace('/', '\/')
 
+    def _escape_fuzzy_tilde(self, query):
+        return query.replace('~', '\~')
+
+    def _escape_boost_caret(self, query):
+        return query.replace('^', '\^')
+
+    def _escape_reserved_query_string_characters(self, query):
+        '''
+        Removes some of the sharp edges of query strings from
+        invalid user input.
+        '''
+        return self._escape_regex_slashes(
+            self._escape_fuzzy_tilde(
+                self._escape_boost_caret(
+                    query
+                )
+            )
+        )
+
     def _validated_query_string_query(self, query):
         try:
             query = prefixfields(EMBEDDED, query, dialects.elasticsearch)
@@ -260,18 +280,16 @@ class AbstractQueryFactory:
         facets.extend(self._get_audit_facets())
         return facets
 
-    def _get_query(self):
-        must = (
-            self.params_parser.get_must_match_search_term_filters()
-            + self.params_parser.get_must_match_advanced_query_filters()
-        )
-        must_not = (
-            self.params_parser.get_must_not_match_search_term_filters()
-            + self.params_parser.get_must_not_match_advanced_query_filters()
-        )
+    def _get_simple_query_string_query(self):
         return self._combine_search_term_queries(
-            must_match_filters=must,
-            must_not_match_filters=must_not
+            must_match_filters=self.params_parser.get_must_match_search_term_filters(),
+            must_not_match_filters=self.params_parser.get_must_not_match_search_term_filters()
+        )
+
+    def _get_query_string_query(self):
+        return self._combine_search_term_queries(
+            must_match_filters=self.params_parser.get_must_match_advanced_query_filters(),
+            must_not_match_filters=self.params_parser.get_must_not_match_advanced_query_filters()
         )
 
     def _get_filters(self):
@@ -469,6 +487,14 @@ class AbstractQueryFactory:
             return must
         elif must_not:
             return NOT_JOIN.lstrip() + must_not
+
+    def _make_simple_query_string_query(self, query, fields, default_operator=AND):
+        return Q(
+            SIMPLE_QUERY_STRING,
+            query=query,
+            fields=fields,
+            default_operator=default_operator
+        )
 
     def _make_query_string_query(self, query, fields, default_operator=AND):
         return Q(
@@ -710,11 +736,22 @@ class AbstractQueryFactory:
             )
         )
 
+    def add_simple_query_string_query(self):
+        query = self._get_simple_query_string_query()
+        if query:
+            self.search = self._get_or_create_search().query(
+                self._make_simple_query_string_query(
+                    query=query,
+                    fields=self._get_search_fields(),
+                    default_operator=AND
+                )
+            )
+
     def add_query_string_query(self):
-        query = self._get_query()
+        query = self._get_query_string_query()
         if query:
             query = self._validated_query_string_query(
-                self._escape_regex_slashes(query)
+                self._escape_reserved_query_string_characters(query)
             )
             self.search = self._get_or_create_search().query(
                 self._make_query_string_query(
@@ -817,6 +854,7 @@ class BasicSearchQueryFactory(AbstractQueryFactory):
 
     def build_query(self):
         self.validate_item_types()
+        self.add_simple_query_string_query()
         self.add_query_string_query()
         self.add_filters()
         self.add_post_filters()
@@ -999,6 +1037,7 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
 
     def build_query(self):
         self.validate_item_types()
+        self.add_simple_query_string_query()
         self.add_query_string_query()
         self.add_filters()
         self.add_post_filters()
