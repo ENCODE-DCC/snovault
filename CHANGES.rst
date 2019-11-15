@@ -1,6 +1,14 @@
 Changes
 =======
 
+
+Snovault 1.0.38 (released) encoded v93.0
+----------------------------------------
+1. SNO-125-switch-batch-download-to-query-string (#238)
+2. SNO-118-simple-query-string (#240)
+3. SNO-123-limit-es-scan (#237)
+4. SNO-121-fix-circleci-apt-install (#224)
+
 Snovault 1.0.37 (released) encoded v92.0
 ----------------------------------------
 1. SNO-119-escape-regex-slash (#221)
