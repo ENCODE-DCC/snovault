@@ -18,6 +18,7 @@ from snovault.elasticsearch.searches.fields import ContextResponseField
 from snovault.elasticsearch.searches.fields import DebugQueryResponseField
 from snovault.elasticsearch.searches.fields import FiltersResponseField
 from snovault.elasticsearch.searches.fields import IDResponseField
+from snovault.elasticsearch.searches.fields import MissingMatrixWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import NotificationResponseField
 from snovault.elasticsearch.searches.fields import NonSortableResponseField
 from snovault.elasticsearch.searches.fields import RawMatrixWithAggsResponseField
@@ -38,6 +39,7 @@ def includeme(config):
     config.add_route('report', '/report{slash:/?}')
     config.add_route('matrixv2_raw', '/matrixv2_raw{slash:/?}')
     config.add_route('matrix', '/matrix{slash:/?}')
+    config.add_route('missing_matrix', '/missing_matrix{slash:/?}')
     config.add_route('summary', '/summary{slash:/?}')
     config.add_route('audit', '/audit{slash:/?}')
     config.scan(__name__)
@@ -176,6 +178,35 @@ def matrix(context, request):
             ContextResponseField(),
             BasicMatrixWithFacetsResponseField(
                 default_item_types=DEFAULT_ITEM_TYPES
+            ),
+            NotificationResponseField(),
+            FiltersResponseField(),
+            TypeOnlyClearFiltersResponseField(),
+            DebugQueryResponseField()
+        ]
+    )
+    return fr.render()
+
+
+@view_config(route_name='missing_matrix', request_method='GET', permission='search')
+def missing_matrix(context, request):
+    fr = FieldedResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
+        response_fields=[
+            TitleResponseField(
+                title=MATRIX_TITLE
+            ),
+            TypeResponseField(
+                at_type=[MATRIX_TITLE]
+            ),
+            IDResponseField(),
+            SearchBaseResponseField(),
+            ContextResponseField(),
+            MissingMatrixWithFacetsResponseField(
+                default_item_types=DEFAULT_ITEM_TYPES,
+                matrix_definition_name='missing_matrix'
             ),
             NotificationResponseField(),
             FiltersResponseField(),

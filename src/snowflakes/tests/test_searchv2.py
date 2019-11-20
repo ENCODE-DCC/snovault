@@ -462,6 +462,32 @@ def test_matrixv2_response_no_results(workbook, testapp):
     assert r.json['notification'] == 'No results found'
 
 
+def test_missing_matrix_response(workbook, testapp):
+    r = testapp.get('/missing_matrix/?type=Snowball')
+    assert 'aggregations' not in r.json
+    assert 'facets' in r.json
+    assert 'total' in r.json
+    assert r.json['title'] == 'Matrix'
+    assert r.json['@type'] == ['Matrix']
+    assert r.json['clear_filters'] == '/missing_matrix/?type=Snowball'
+    assert r.json['filters'] == [{'term': 'Snowball', 'remove': '/missing_matrix/', 'field': 'type'}]
+    assert r.json['@id'] == '/missing_matrix/?type=Snowball'
+    assert r.json['total'] >= 22
+    assert r.json['notification'] == 'Success'
+    assert r.json['title'] == 'Matrix'
+    assert 'facets' in r.json
+    assert r.json['@context'] == '/terms/'
+    assert 'matrix' in r.json
+    assert r.json['matrix']['x']['group_by'] == 'snowflakes.type'
+    assert r.json['matrix']['y']['group_by'] == ['award.rfa', ['lab.not_a_real_value', 'some_lab']]
+    assert 'buckets' in r.json['matrix']['y']['award.rfa']
+    assert 'key' in r.json['matrix']['y']['award.rfa']['buckets'][0]
+    assert 'lab.not_a_real_value' in r.json['matrix']['y']['award.rfa']['buckets'][0]
+    assert r.json['matrix']['y']['award.rfa']['buckets'][0]['lab.not_a_real_value']['buckets'][0]['key'] == 'some_lab'
+    assert 'search_base' in r.json
+    assert r.json['search_base'] == '/search/?type=Snowball'
+
+
 def test_summaryv2_response(workbook, testapp):
     r = testapp.get('/summary/?type=Snowball')
     assert 'aggregations' not in r.json

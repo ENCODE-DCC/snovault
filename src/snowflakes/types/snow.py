@@ -82,6 +82,14 @@ class Snowball(Snowset):
             'group_by': ['award.rfa', 'lab.title']
         }
     }
+    missing_matrix = {
+        'x': {
+            'group_by': 'snowflakes.type'
+        },
+        'y': {
+            'group_by': ['award.rfa', ('lab.not_a_real_value', 'some_lab')]
+        }
+    }
     summary = {
         'x': {
             'group_by': 'status'
