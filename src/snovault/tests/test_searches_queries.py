@@ -4439,6 +4439,305 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
     assert actual['size'] == 0
 
 
+def test_searches_queries_missing_matrix_query_factory_with_facets_init(params_parser):
+    from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
+    mmqf = MissingMatrixQueryFactoryWithFacets(params_parser)
+    assert isinstance(mmqf, MissingMatrixQueryFactoryWithFacets)
+    assert mmqf.params_parser == params_parser
+
+
+def test_searches_queries_missing_matrix_query_factory_with_facets_maybe_make_subaggregation_with_default_value_from_name(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl.aggs import Terms
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    mmqf = MissingMatrixQueryFactoryWithFacets(params_parser)
+    name, subagg_with_default_value = mmqf._maybe_make_subaggregation_with_default_value_from_name(
+        mmqf._subaggregation_factory('TERMS'),
+        ('target.label', 'no_target')
+    )
+    assert name == 'target.label'
+    assert subagg_with_default_value.to_dict() == {
+        'terms': {
+            'size': 999999,
+            'exclude': [],
+            'field': 'embedded.target.label',
+            'missing': 'no_target'
+        }
+    }
+
+
+def test_searches_queries_missing_matrix_query_factory_with_facets_make_list_of_name_and_subagg_tuples(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl.aggs import Terms
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    mmqf = MissingMatrixQueryFactoryWithFacets(params_parser)
+    nat = mmqf._make_list_of_name_and_subagg_tuples(['file_type', 'lab.name'])
+    assert nat[0][0] == 'file_type'
+    assert nat[1][0] == 'lab.name'
+    assert isinstance(nat[0][1], Terms)
+    assert isinstance(nat[1][1], Terms)
+    assert nat[0][1].to_dict() == {
+        'terms': {
+            'exclude': [],
+            'field': 'embedded.file_type',
+            'size': 999999
+        }
+    }
+    nat = mmqf._make_list_of_name_and_subagg_tuples([('file_type', 'missing_file_type'), 'lab.name'])
+    assert nat[0][0] == 'file_type'
+    assert nat[1][0] == 'lab.name'
+    assert isinstance(nat[0][1], Terms)
+    assert isinstance(nat[1][1], Terms)
+    assert nat[0][1].to_dict() == {
+        'terms': {
+            'exclude': [],
+            'field': 'embedded.file_type',
+            'missing': 'missing_file_type',
+            'size': 999999
+        }
+    }
+    assert nat[1][1].to_dict() == {
+        'terms': {
+            'exclude': [],
+            'size': 999999,
+            'field': 'embedded.lab.name'
+        }
+    }
+
+
+def test_searches_queries_missing_matrix_query_factory_with_facets_add_matrix_aggregations(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    mmqf = MissingMatrixQueryFactoryWithFacets(params_parser)
+    mmqf.add_matrix_aggregations()
+    expected = {
+        'aggs': {
+            'y': {
+                'aggs': {
+                    'status': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 999999,
+                            'field': 'embedded.status'
+                        },
+                        'aggs': {
+                            'name': {
+                                'terms': {
+                                    'exclude': [],
+                                    'size': 999999,
+                                    'field': 'embedded.name'
+                                },
+                                'aggs': {
+                                    'label': {
+                                        'terms': {
+                                            'exclude': [],
+                                            'size': 999999,
+                                            'field': 'embedded.label'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {
+                                'terms': {
+                                    'embedded.status': [
+                                        'released'
+                                    ]
+                                }
+                            },
+                            {
+                                'terms': {
+                                    'embedded.@type': [
+                                        'TestingSearchSchema'
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            'x': {
+                'aggs': {
+                    'label': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 999999,
+                            'field': 'embedded.label'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {
+                                'terms': {
+                                    'embedded.status': [
+                                        'released'
+                                    ]
+                                }
+                            },
+                            {
+                                'terms': {
+                                    'embedded.@type': [
+                                        'TestingSearchSchema'
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        'query': {
+            'match_all': {}
+        }
+    }
+    actual = mmqf.search.to_dict()
+    assert all([e in actual for e in expected])
+    assert actual['aggs']['y']['aggs']['status']['terms']['field'] == 'embedded.status'
+    assert actual['aggs']['y']['aggs']['status']['terms']['size'] == 999999
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']['field'] == 'embedded.name'
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']['size'] == 999999
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']['field'] == 'embedded.label'
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']['size'] == 999999
+    assert actual['aggs']['x']['aggs']['label']['terms']['field'] == 'embedded.label'
+    assert actual['aggs']['x']['aggs']['label']['terms']['size'] == 999999
+    assert len(actual['aggs']['y']['filter']['bool']['must']) == 2
+    assert len(actual['aggs']['x']['filter']['bool']['must']) == 2
+    assert 'missing' not in actual['aggs']['y']['aggs']['status']['terms']
+    assert 'missing' not in  actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']
+    assert 'missing' not in actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']
+
+
+def test_searches_queries_missing_matrix_query_factory_with_facets_add_matrix_aggregations_with_default_value(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    mmqf = MissingMatrixQueryFactoryWithFacets(
+        params_parser,
+        matrix_definition_name='missing_matrix'
+    )
+    mmqf.add_matrix_aggregations()
+    expected = {
+        'aggs': {
+            'y': {
+                'aggs': {
+                    'status': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 999999,
+                            'field': 'embedded.status'
+                        },
+                        'aggs': {
+                            'name': {
+                                'terms': {
+                                    'exclude': [],
+                                    'size': 999999,
+                                    'field': 'embedded.name'
+                                },
+                                'aggs': {
+                                    'label': {
+                                        'terms': {
+                                            'exclude': [],
+                                            'size': 999999,
+                                            'field': 'embedded.label'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {
+                                'terms': {
+                                    'embedded.status': [
+                                        'released'
+                                    ]
+                                }
+                            },
+                            {
+                                'terms': {
+                                    'embedded.@type': [
+                                        'TestingSearchSchema'
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            'x': {
+                'aggs': {
+                    'label': {
+                        'terms': {
+                            'exclude': [],
+                            'size': 999999,
+                            'field': 'embedded.label'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {
+                                'terms': {
+                                    'embedded.status': [
+                                        'released'
+                                    ]
+                                }
+                            },
+                            {
+                                'terms': {
+                                    'embedded.@type': [
+                                        'TestingSearchSchema'
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        'query': {
+            'match_all': {}
+        }
+    }
+    actual = mmqf.search.to_dict()
+    assert all([e in actual for e in expected])
+    assert actual['aggs']['y']['aggs']['status']['terms']['field'] == 'embedded.status'
+    assert actual['aggs']['y']['aggs']['status']['terms']['size'] == 999999
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']['field'] == 'embedded.name'
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']['size'] == 999999
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']['field'] == 'embedded.label'
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']['size'] == 999999
+    assert actual['aggs']['x']['aggs']['label']['terms']['field'] == 'embedded.label'
+    assert actual['aggs']['x']['aggs']['label']['terms']['size'] == 999999
+    assert len(actual['aggs']['y']['filter']['bool']['must']) == 2
+    assert len(actual['aggs']['x']['filter']['bool']['must']) == 2
+    assert 'missing' not in actual['aggs']['y']['aggs']['status']['terms']
+    assert  actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']['missing'] == 'default_name'
+    assert 'missing' not in actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']
+
+
 def test_searches_queries_audit_matrix_query_factory_with_facets_init(params_parser):
     from snovault.elasticsearch.searches.queries import AuditMatrixQueryFactoryWithFacets
     amqf = AuditMatrixQueryFactoryWithFacets(params_parser)

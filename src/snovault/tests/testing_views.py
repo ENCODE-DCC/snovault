@@ -209,6 +209,14 @@ class TestingSearchSchema(Item):
             'group_by': ['status', 'name']
         }
     }
+    missing_matrix = {
+        'x': {
+            'group_by': 'label'
+        },
+        'y': {
+            'group_by': ['status', ('name', 'default_name')]
+        }
+    }
     audit = {
         'audit.ERROR.category': {
             'group_by': 'audit.ERROR.category',
