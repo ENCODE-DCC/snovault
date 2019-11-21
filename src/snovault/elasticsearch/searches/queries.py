@@ -596,8 +596,7 @@ class AbstractQueryFactory:
             filters={
                 YES: Q(EXISTS, field=field),
                 NO: ~Q(EXISTS, field=field)
-            },
-            **kwargs
+            }
         )
 
     def _make_filter_aggregation(self, filter_context, **kwargs):
