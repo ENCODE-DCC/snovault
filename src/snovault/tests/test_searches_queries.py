@@ -1535,16 +1535,16 @@ def test_searches_queries_abstract_query_factory_make_filter_and_subaggregation(
             )
         ),
         subaggregation=aq._make_terms_aggregation(
-            field='embedded.lab.name'
+            field='embedded.lab.name',
+            size=123
         )
     )
     assert fasa.to_dict() == {
         'aggs': {
             'Lab name terms on Experiments that have files with file_size': {
                 'terms': {
-                    'size': 200,
                     'field': 'embedded.lab.name',
-                    'exclude': []
+                    'size': 123,
                 }
             }
         },
@@ -2194,8 +2194,10 @@ def test_searches_queries_abstract_query_factory_add_simple_query_string_query_n
     assert aq.search is None
 
 
-def test_searches_queries_abstract_query_factory_add_must_equal_terms_filter(params_parser):
+def test_searches_queries_abstract_query_factory_add_must_equal_terms_filter(params_parser, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_must_equal_terms_filter(
         field='status',
@@ -2404,7 +2406,6 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_pa
         'aggs': {
             'Statuses': {
                 'terms': {
-                    'exclude': [],
                     'field': 'embedded.status',
                     'size': 10,
                 }
@@ -2695,7 +2696,6 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_pa
         'aggs': {
             'Statuses': {
                 'terms': {
-                    'exclude': [],
                     'field': 'embedded.status',
                     'size': 10,
                 }
@@ -2971,7 +2971,6 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
                 'aggs': {
                     'audit-WARNING-category': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'audit.WARNING.category'
                         }
@@ -2990,7 +2989,6 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
                 'aggs': {
                     'audit-NOT_COMPLIANT-category': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'audit.NOT_COMPLIANT.category'
                         }
@@ -3010,7 +3008,6 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
                 'aggs': {
                     'status': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'embedded.status'
                         }
@@ -3028,7 +3025,6 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
                 'aggs': {
                     'name': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'embedded.name'
                         }
@@ -3047,7 +3043,6 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
                 'aggs': {
                     'type': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'embedded.@type'
                         }
@@ -3065,7 +3060,6 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
                 'aggs': {
                     'audit-ERROR-category': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'audit.ERROR.category'
                         }
@@ -3184,7 +3178,6 @@ def test_searches_queries_basic_search_query_factory_with_facets_build_query(dum
                     'status': {
                         'terms': {
                             'size': 200,
-                            'exclude': [],
                             'field': 'embedded.status'
                         }
                     }
@@ -3208,7 +3201,6 @@ def test_searches_queries_basic_search_query_factory_with_facets_build_query(dum
                     'audit-ERROR-category': {
                         'terms': {
                             'size': 200,
-                            'exclude': [],
                             'field': 'audit.ERROR.category'
                         }
                     }
@@ -3234,7 +3226,6 @@ def test_searches_queries_basic_search_query_factory_with_facets_build_query(dum
                     'audit-NOT_COMPLIANT-category': {
                         'terms': {
                             'size': 200,
-                            'exclude': [],
                             'field': 'audit.NOT_COMPLIANT.category'
                         }
                     }
@@ -3284,7 +3275,6 @@ def test_searches_queries_basic_search_query_factory_with_facets_build_query(dum
                     'name': {
                         'terms': {
                             'size': 200,
-                            'exclude': [],
                             'field': 'embedded.name'
                         }
                     }
@@ -3310,7 +3300,6 @@ def test_searches_queries_basic_search_query_factory_with_facets_build_query(dum
                     'audit-WARNING-category': {
                         'terms': {
                             'size': 200,
-                            'exclude': [],
                             'field': 'audit.WARNING.category'
                         }
                     }
@@ -3631,7 +3620,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_make_list_of_na
     assert isinstance(nat[1][1], Terms)
     assert nat[0][1].to_dict() == {
         'terms': {
-            'exclude': [],
             'field': 'embedded.file_type',
             'size': 999999
         }
@@ -3651,21 +3639,18 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_make_subaggrega
                         'terms': {
                             'field': 'embedded.assay_title',
                             'size': 999999,
-                            'exclude': []
                         }
                     }
                 },
                 'terms': {
                     'field': 'embedded.biosample_title',
                     'size': 999999,
-                    'exclude': []
                 }
             }
         },
         'terms': {
             'field': 'embedded.biosample_term_name',
             'size': 999999,
-            'exclude': []
         }
     }
     actual = subagg.to_dict()
@@ -3674,7 +3659,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_make_subaggrega
     assert name == 'assay_title'
     assert subagg.to_dict() == {
         'terms': {
-            'exclude': [],
             'field':
             'embedded.assay_title',
             'size': 999999
@@ -3710,21 +3694,18 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_add_matrix_aggr
                 'aggs': {
                     'status': {
                         'terms': {
-                            'exclude': [],
                             'size': 999999,
                             'field': 'embedded.status'
                         },
                         'aggs': {
                             'name': {
                                 'terms': {
-                                    'exclude': [],
                                     'size': 999999,
                                     'field': 'embedded.name'
                                 },
                                 'aggs': {
                                     'label': {
                                         'terms': {
-                                            'exclude': [],
                                             'size': 999999,
                                             'field': 'embedded.label'
                                         }
@@ -3759,7 +3740,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_add_matrix_aggr
                 'aggs': {
                     'label': {
                         'terms': {
-                            'exclude': [],
                             'size': 999999,
                             'field': 'embedded.label'
                         }
@@ -3853,21 +3833,18 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                                 'aggs': {
                                     'label': {
                                         'terms': {
-                                            'exclude': [],
                                             'size': 999999,
                                             'field': 'embedded.label'
                                         }
                                     }
                                 },
                                 'terms': {
-                                    'exclude': [],
                                     'size': 999999,
                                     'field': 'embedded.name'
                                 }
                             }
                         },
                         'terms': {
-                            'exclude': [],
                             'size': 999999,
                             'field': 'embedded.status'
                         }
@@ -3886,7 +3863,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 'aggs': {
                     'audit-NOT_COMPLIANT-category': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field':
                             'audit.NOT_COMPLIANT.category'
@@ -3906,7 +3882,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 'aggs': {
                     'audit-ERROR-category': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'audit.ERROR.category'
                         }
@@ -3925,7 +3900,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 'aggs': {
                     'status': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field':
                             'embedded.status'
@@ -3945,7 +3919,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 'aggs': {
                     'audit-WARNING-category': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'audit.WARNING.category'
                         }
@@ -3964,7 +3937,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 'aggs': {
                     'name': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'embedded.name'
                         }
@@ -3983,7 +3955,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 'aggs': {
                     'label': {
                         'terms': {
-                            'exclude': [],
                             'size': 999999,
                             'field': 'embedded.label'
                         }
@@ -4045,7 +4016,6 @@ def test_searches_queries_missing_matrix_query_factory_with_facets_maybe_make_su
     assert subagg_with_default_value.to_dict() == {
         'terms': {
             'size': 999999,
-            'exclude': [],
             'field': 'embedded.target.label',
             'missing': 'no_target'
         }
@@ -4067,7 +4037,6 @@ def test_searches_queries_missing_matrix_query_factory_with_facets_make_list_of_
     assert isinstance(nat[1][1], Terms)
     assert nat[0][1].to_dict() == {
         'terms': {
-            'exclude': [],
             'field': 'embedded.file_type',
             'size': 999999
         }
@@ -4079,7 +4048,6 @@ def test_searches_queries_missing_matrix_query_factory_with_facets_make_list_of_
     assert isinstance(nat[1][1], Terms)
     assert nat[0][1].to_dict() == {
         'terms': {
-            'exclude': [],
             'field': 'embedded.file_type',
             'missing': 'missing_file_type',
             'size': 999999
@@ -4087,7 +4055,6 @@ def test_searches_queries_missing_matrix_query_factory_with_facets_make_list_of_
     }
     assert nat[1][1].to_dict() == {
         'terms': {
-            'exclude': [],
             'size': 999999,
             'field': 'embedded.lab.name'
         }
@@ -4108,21 +4075,18 @@ def test_searches_queries_missing_matrix_query_factory_with_facets_add_matrix_ag
                 'aggs': {
                     'status': {
                         'terms': {
-                            'exclude': [],
                             'size': 999999,
                             'field': 'embedded.status'
                         },
                         'aggs': {
                             'name': {
                                 'terms': {
-                                    'exclude': [],
                                     'size': 999999,
                                     'field': 'embedded.name'
                                 },
                                 'aggs': {
                                     'label': {
                                         'terms': {
-                                            'exclude': [],
                                             'size': 999999,
                                             'field': 'embedded.label'
                                         }
@@ -4157,7 +4121,6 @@ def test_searches_queries_missing_matrix_query_factory_with_facets_add_matrix_ag
                 'aggs': {
                     'label': {
                         'terms': {
-                            'exclude': [],
                             'size': 999999,
                             'field': 'embedded.label'
                         }
@@ -4223,21 +4186,18 @@ def test_searches_queries_missing_matrix_query_factory_with_facets_add_matrix_ag
                 'aggs': {
                     'status': {
                         'terms': {
-                            'exclude': [],
                             'size': 999999,
                             'field': 'embedded.status'
                         },
                         'aggs': {
                             'name': {
                                 'terms': {
-                                    'exclude': [],
                                     'size': 999999,
                                     'field': 'embedded.name'
                                 },
                                 'aggs': {
                                     'label': {
                                         'terms': {
-                                            'exclude': [],
                                             'size': 999999,
                                             'field': 'embedded.label'
                                         }
@@ -4272,7 +4232,6 @@ def test_searches_queries_missing_matrix_query_factory_with_facets_add_matrix_ag
                 'aggs': {
                     'label': {
                         'terms': {
-                            'exclude': [],
                             'size': 999999,
                             'field': 'embedded.label'
                         }

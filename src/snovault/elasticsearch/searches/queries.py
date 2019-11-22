@@ -10,6 +10,8 @@ from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.interfaces import TYPES
 
+from .configs import ExistsAggregationConfig
+from .configs import TermsAggregationConfig
 from .decorators import assert_none_returned
 from .decorators import assert_one_returned
 from .decorators import assert_one_or_none_returned
@@ -581,13 +583,11 @@ class AbstractQueryFactory:
         not_exists = self._make_field_must_exist_query_from_params(_not_exists)
         return must, must_not, exists, not_exists
 
-    def _make_terms_aggregation(self, field, exclude=[], size=200, **kwargs):
+    def _make_terms_aggregation(self, field, **kwargs):
         return A(
             TERMS,
             field=field,
-            size=size,
-            exclude=exclude,
-            **kwargs
+            **TermsAggregationConfig(**kwargs)
         )
 
     def _make_exists_aggregation(self, field, **kwargs):
@@ -596,7 +596,8 @@ class AbstractQueryFactory:
             filters={
                 YES: Q(EXISTS, field=field),
                 NO: ~Q(EXISTS, field=field)
-            }
+            },
+            **ExistsAggregationConfig(**kwargs)
         )
 
     def _make_filter_aggregation(self, filter_context, **kwargs):
@@ -791,7 +792,7 @@ class AbstractQueryFactory:
             )
             subaggregation = subaggregation(
                 field=self._map_param_key_to_elasticsearch_field(facet_name),
-                exclude=facet_options.get(EXCLUDE, []),
+                exclude=facet_options.get(EXCLUDE),
                 # TODO: size should be defined in schema instead of long keyword.
                 size=3000 if facet_options.get(LENGTH) == LONG else 200
             )
