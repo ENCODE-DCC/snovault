@@ -1055,34 +1055,31 @@ class MissingMatrixQueryFactoryWithFacets(BasicMatrixQueryFactoryWithFacets):
     for objects missing an aggregation field.
     '''
 
-    def _maybe_make_subaggregation_with_default_value_from_name(self, subaggregation, name):
+    def _parse_name_and_default_value_from_name(self, name, default_value=None):
         '''
         Specifying a tuple in the group_by definition indicates a default value
         should be filled in when the field is missing. Assumes tuple is
-        (name, default_value).
+        (name, default_value). Default value only applies if it is not None.
         '''
         if isinstance(name, tuple):
             name, default_value = name
-            return (
-                name,
-                subaggregation(
-                    field=self._map_param_key_to_elasticsearch_field(name),
-                    size=NO_LIMIT,
-                    missing=default_value
-                )
-            )
+        return name, default_value
+
+    def _make_subaggregation_with_possible_default_value_from_name(self, subaggregation, name):
+        name, default_value = self._parse_name_and_default_value_from_name(name)
         return (
             name,
             subaggregation(
                 field=self._map_param_key_to_elasticsearch_field(name),
-                size=NO_LIMIT
+                size=NO_LIMIT,
+                missing=default_value
             )
         )
 
     def _make_list_of_name_and_subagg_tuples(self, names, aggregation_type=TERMS):
         subaggregation = self._subaggregation_factory(aggregation_type)
         return [
-            self._maybe_make_subaggregation_with_default_value_from_name(
+            self._make_subaggregation_with_possible_default_value_from_name(
                 subaggregation,
                 name
             )

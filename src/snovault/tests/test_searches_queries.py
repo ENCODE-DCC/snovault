@@ -4000,7 +4000,7 @@ def test_searches_queries_missing_matrix_query_factory_with_facets_init(params_p
     assert mmqf.params_parser == params_parser
 
 
-def test_searches_queries_missing_matrix_query_factory_with_facets_maybe_make_subaggregation_with_default_value_from_name(params_parser, dummy_request):
+def test_searches_queries_missing_matrix_query_factory_with_facets_parse_name_and_default_value_from_name(params_parser, dummy_request):
     from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
     from elasticsearch_dsl.aggs import Terms
     dummy_request.environ['QUERY_STRING'] = (
@@ -4008,7 +4008,23 @@ def test_searches_queries_missing_matrix_query_factory_with_facets_maybe_make_su
         '&limit=10&field=@id&field=accession&mode=picker'
     )
     mmqf = MissingMatrixQueryFactoryWithFacets(params_parser)
-    name, subagg_with_default_value = mmqf._maybe_make_subaggregation_with_default_value_from_name(
+    name, default_value = mmqf._parse_name_and_default_value_from_name('target.label')
+    assert name == 'target.label'
+    assert default_value is None
+    name, default_value = mmqf._parse_name_and_default_value_from_name(('target.label', 'no_target'))
+    assert name == 'target.label'
+    assert default_value == 'no_target'
+
+
+def test_searches_queries_missing_matrix_query_factory_with_facets_make_subaggregation_with_possible_default_value_from_name(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl.aggs import Terms
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    mmqf = MissingMatrixQueryFactoryWithFacets(params_parser)
+    name, subagg_with_default_value = mmqf._make_subaggregation_with_possible_default_value_from_name(
         mmqf._subaggregation_factory('TERMS'),
         ('target.label', 'no_target')
     )
