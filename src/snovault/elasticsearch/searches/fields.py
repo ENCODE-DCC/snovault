@@ -35,6 +35,7 @@ from .queries import BasicSearchQueryFactory
 from .queries import BasicSearchQueryFactoryWithFacets
 from .queries import BasicReportQueryFactoryWithFacets
 from .queries import CollectionSearchQueryFactoryWithFacets
+from .queries import MissingMatrixQueryFactoryWithFacets
 from .responses import AuditMatrixResponseWithFacets
 from .responses import BasicMatrixResponseWithFacets
 from .responses import BasicQueryResponseWithFacets
@@ -241,6 +242,20 @@ class BasicMatrixWithFacetsResponseField(RawMatrixWithAggsResponseField):
                 TOTAL: self.results.results.hits.total
             }
         )
+
+
+class MissingMatrixWithFacetsResponseField(BasicMatrixWithFacetsResponseField):
+    '''
+    Like BasicMatrixWithAggsResponseField but uses MissingMatrixQueryFactoryWithFacets
+    query.
+    '''
+
+    def _build_query(self):
+        self.query_builder = MissingMatrixQueryFactoryWithFacets(
+            params_parser=self.get_params_parser(),
+            **self.kwargs
+        )
+        self.query = self.query_builder.build_query()
 
 
 class AuditMatrixWithFacetsResponseField(BasicMatrixWithFacetsResponseField):

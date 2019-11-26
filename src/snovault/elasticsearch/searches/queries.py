@@ -10,6 +10,8 @@ from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.interfaces import TYPES
 
+from .configs import ExistsAggregationConfig
+from .configs import TermsAggregationConfig
 from .decorators import assert_none_returned
 from .decorators import assert_one_returned
 from .decorators import assert_one_or_none_returned
@@ -581,12 +583,11 @@ class AbstractQueryFactory:
         not_exists = self._make_field_must_exist_query_from_params(_not_exists)
         return must, must_not, exists, not_exists
 
-    def _make_terms_aggregation(self, field, exclude=[], size=200, *kwargs):
+    def _make_terms_aggregation(self, field, **kwargs):
         return A(
             TERMS,
             field=field,
-            size=size,
-            exclude=exclude
+            **TermsAggregationConfig(**kwargs)
         )
 
     def _make_exists_aggregation(self, field, **kwargs):
@@ -595,7 +596,8 @@ class AbstractQueryFactory:
             filters={
                 YES: Q(EXISTS, field=field),
                 NO: ~Q(EXISTS, field=field)
-            }
+            },
+            **ExistsAggregationConfig(**kwargs)
         )
 
     def _make_filter_aggregation(self, filter_context, **kwargs):
@@ -790,7 +792,7 @@ class AbstractQueryFactory:
             )
             subaggregation = subaggregation(
                 field=self._map_param_key_to_elasticsearch_field(facet_name),
-                exclude=facet_options.get(EXCLUDE, []),
+                exclude=facet_options.get(EXCLUDE),
                 # TODO: size should be defined in schema instead of long keyword.
                 size=3000 if facet_options.get(LENGTH) == LONG else 200
             )
@@ -1045,6 +1047,44 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
         self.add_aggregations_and_aggregation_filters()
         self.add_matrix_aggregations()
         return self.search
+
+
+class MissingMatrixQueryFactoryWithFacets(BasicMatrixQueryFactoryWithFacets):
+    '''
+    Like BasicMatrixQueryFactoryWithFacets but allows specification of default value
+    for objects missing an aggregation field.
+    '''
+
+    def _parse_name_and_default_value_from_name(self, name, default_value=None):
+        '''
+        Specifying a tuple in the group_by definition indicates a default value
+        should be filled in when the field is missing. Assumes tuple is
+        (name, default_value). Default value only applies if it is not None.
+        '''
+        if isinstance(name, tuple):
+            name, default_value = name
+        return name, default_value
+
+    def _make_subaggregation_with_possible_default_value_from_name(self, subaggregation, name):
+        name, default_value = self._parse_name_and_default_value_from_name(name)
+        return (
+            name,
+            subaggregation(
+                field=self._map_param_key_to_elasticsearch_field(name),
+                size=NO_LIMIT,
+                missing=default_value
+            )
+        )
+
+    def _make_list_of_name_and_subagg_tuples(self, names, aggregation_type=TERMS):
+        subaggregation = self._subaggregation_factory(aggregation_type)
+        return [
+            self._make_subaggregation_with_possible_default_value_from_name(
+                subaggregation,
+                name
+            )
+            for name in names
+        ]
 
 
 class AuditMatrixQueryFactoryWithFacets(BasicMatrixQueryFactoryWithFacets):
