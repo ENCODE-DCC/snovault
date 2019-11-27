@@ -8,12 +8,12 @@ import json
 import codecs
 import collections
 import copy
-from jsonschema_serialize_fork import (
-    Draft4Validator,
+from jsonschema import (
     FormatChecker,
     RefResolver,
 )
-from jsonschema_serialize_fork.exceptions import ValidationError
+from validatation import DefaultValidatingDraft4Validator
+from jsonschema.exceptions import ValidationError
 from uuid import UUID
 from .util import ensurelist
 
@@ -250,7 +250,7 @@ def permission(validator, permission, instance, schema):
         yield IgnoreUnchanged(error)
 
 
-orig_uniqueItems = Draft4Validator.VALIDATORS['uniqueItems']
+orig_uniqueItems = DefaultValidatingDraft4Validator.VALIDATORS['uniqueItems']
 
 
 def uniqueItems(validator, uI, instance, schema):
@@ -281,8 +281,8 @@ def notSubmittable(validator, linkTo, instance, schema):
     yield ValidationError('submission disallowed')
 
 
-class SchemaValidator(Draft4Validator):
-    VALIDATORS = Draft4Validator.VALIDATORS.copy()
+class SchemaValidator(DefaultValidatingDraft4Validator):
+    VALIDATORS = DefaultValidatingDraft4Validator.VALIDATORS.copy()
     VALIDATORS['notSubmittable'] = notSubmittable
     # for backwards-compatibility
     VALIDATORS['calculatedProperty'] = notSubmittable
