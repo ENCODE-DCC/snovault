@@ -12,10 +12,10 @@ from jsonschema import (
     FormatChecker,
     RefResolver,
 )
-from validatation import DefaultValidatingDraft4Validator
 from jsonschema.exceptions import ValidationError
 from uuid import UUID
 from .util import ensurelist
+from .validation import DefaultValidatingDraft4Validator
 
 
 SERVER_DEFAULTS = {}
