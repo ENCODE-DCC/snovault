@@ -311,13 +311,13 @@ def load_schema(filename):
     schema = mixinProperties(schema, resolver)
 
     # SchemaValidator is not thread safe for now
-    SchemaValidator(schema, resolver=resolver, serialize=True)
+    SchemaValidator(schema, resolver=resolver)
     return schema
 
 
 def validate(schema, data, current=None):
     resolver = NoRemoteResolver.from_schema(schema)
-    sv = SchemaValidator(schema, resolver=resolver, serialize=True, format_checker=format_checker)
+    sv = SchemaValidator(schema, resolver=resolver, format_checker=format_checker)
     validated, errors = sv.serialize(data)
 
     filtered_errors = []
