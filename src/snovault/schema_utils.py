@@ -318,10 +318,10 @@ def load_schema(filename):
 def validate(schema, data, current=None):
     resolver = NoRemoteResolver.from_schema(schema)
     sv = SchemaValidator(schema, resolver=resolver, format_checker=format_checker)
-    validated, errors = sv.serialize(data)
+    validated = copy.deepcopy(data)
 
     filtered_errors = []
-    for error in errors:
+    for error in sv.iter_errors(data):
         # Possibly ignore validation if it results in no change to data
         if current is not None and isinstance(error, IgnoreUnchanged):
             current_value = current
