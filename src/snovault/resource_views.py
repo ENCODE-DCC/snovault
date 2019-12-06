@@ -21,8 +21,10 @@ from snovault.elasticsearch.searches.fields import FiltersResponseField
 from snovault.elasticsearch.searches.fields import IDResponseField
 from snovault.elasticsearch.searches.fields import NotificationResponseField
 from snovault.elasticsearch.searches.parsers import ParamsParser
+from snovault.elasticsearch.searches.parsers import QueryString
 from snovault.elasticsearch.searches.responses import FieldedResponse
 from .calculated import calculate_properties
+from .calculated import calculate_select_properties
 from .etag import etag_tid
 from .interfaces import CONNECTION
 from .elasticsearch.interfaces import ELASTIC_SEARCH
@@ -210,6 +212,28 @@ def item_view_object(context, request):
     if not asbool(request.params.get('skip_calculated')):
         calculated = calculate_properties(context, request, properties)
         properties.update(calculated)
+    return properties
+
+
+@view_config(
+    context=Item,
+    permission='view',
+    request_method='GET',
+    name='object_with_select_calculated_properties'
+)
+def item_view_object_with_select_calculated_properties(context, request):
+    properties = item_links(context, request)
+    qs = QueryString(request)
+    select_properties = qs.param_values_to_list(
+        params=qs.get_field_filters()
+    )
+    calculated = calculate_select_properties(
+        context,
+        request,
+        ns=properties,
+        select_properties=select_properties
+        )
+    properties.update(calculated)
     return properties
 
 

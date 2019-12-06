@@ -74,6 +74,35 @@ class Snowset(Item):
 class Snowball(Snowset):
     item_type = 'snowball'
     schema = load_schema('snowflakes:schemas/snowball.json')
+
+    @calculated_property(
+        schema={
+        "title": "test_calculated",
+        "type": "string",
+        },
+        define=True
+    )
+    def test_calculated(self):
+        return 'test_calculated_value'
+
+    @calculated_property(
+        schema={
+        "title": "another_test_calculated",
+        "type": "string",
+    })
+    def another_test_calculated(self):
+        return 'another_test_calculated_value'
+    
+    @calculated_property(
+        schema={
+        "title": "conditional_test_calculated",
+        "type": "string",
+        },
+        condition='test_calculated'
+    )
+    def conditional_test_calculated(self):
+        return 'conditional_test_calculated_value'
+    
     matrix = {
         'x': {
             'group_by': 'snowflakes.type'
@@ -82,6 +111,7 @@ class Snowball(Snowset):
             'group_by': ['award.rfa', 'lab.title']
         }
     }
+    
     missing_matrix = {
         'x': {
             'group_by': 'snowflakes.type'
@@ -90,6 +120,7 @@ class Snowball(Snowset):
             'group_by': ['award.rfa', ('lab.not_a_real_value', 'some_lab')]
         }
     }
+    
     summary = {
         'x': {
             'group_by': 'status'
