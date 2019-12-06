@@ -1,6 +1,9 @@
 Changes
 =======
 
+Snovault 1.0.39 (released) encoded v94.0
+----------------------------------------
+1. SNO-126-allow-default-value-for-missing-aggregation-field (#242)
 
 Snovault 1.0.38 (released) encoded v93.0
 ----------------------------------------
