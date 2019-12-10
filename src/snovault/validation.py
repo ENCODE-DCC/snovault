@@ -184,4 +184,3 @@ def extend_with_default(validator_class):
 
 
 DefaultValidatingDraft4Validator = extend_with_default(Draft4Validator)
-

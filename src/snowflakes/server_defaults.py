@@ -1,5 +1,4 @@
 from datetime import datetime
-from jsonschema import NO_DEFAULT
 from pyramid.security import effective_principals
 from pyramid.threadlocal import get_current_request
 from string import (
@@ -32,7 +31,7 @@ def userid(instance, subschema):
     for principal in principals:
         if principal.startswith('userid.'):
             return principal[7:]
-    return NO_DEFAULT
+    return object() # do not default
 
 
 @server_default
@@ -49,7 +48,7 @@ def uuid4(instance, subschema):
 @server_default
 def accession(instance, subschema):
     if 'external_accession' in instance:
-        return NO_DEFAULT
+        return object() # do not default
     request = get_current_request()
     factory = request.registry[ACCESSION_FACTORY]
     # With 17 576 000 options

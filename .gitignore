@@ -25,6 +25,7 @@
 /src/snowflakes/static/scss/_variables.original.scss
 
 *.DS_Store
+*.vscode/
 *.egg-info
 *.pyc
 +.project
