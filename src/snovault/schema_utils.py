@@ -64,6 +64,7 @@ def mixinProperties(schema, resolver):
 
 def linkTo(validator, linkTo, instance, schema):
     # avoid circular import
+    import pdb;pdb.set_trace()
     from snovault import Item, COLLECTIONS
 
     if not validator.is_type(instance, "string"):
@@ -218,7 +219,7 @@ def requestMethod(validator, requestMethod, instance, schema):
 
     request = get_current_request()
     if request.method not in requestMethod:
-        raise Exception("Bad method")
+        raise Exception("Bad method") # TODO REMOVE THIS LINE
         reprs = ', '.join(repr(it) for it in requestMethod)
         error = "request method %r is not one of %s" % (request.method, reprs)
         yield IgnoreUnchanged(error)
@@ -318,6 +319,9 @@ def validate(schema, data, current=None):
                 if validated_value == current_value:
                     continue
         filtered_errors.append(error)
+
+    # default properties are added during iter_errors
+    validated.update(data)
 
     return validated, filtered_errors
 

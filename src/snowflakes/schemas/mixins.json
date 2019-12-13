@@ -14,8 +14,7 @@
             "type": "string",
             "format": "uuid",
             "serverDefault": "uuid4",
-            "permission": "import_items",
-            "requestMethod": "POST"
+            "permission": "import_items"
         }
     },
     "standard_status": {
