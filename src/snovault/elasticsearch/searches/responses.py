@@ -86,6 +86,19 @@ class FieldedResponse:
         return self._response_factory().render()
 
 
+class FieldedGeneratorResponse(FieldedResponse):
+    '''
+    Like FieldedResponse but always returns a GeneratorResponse.
+    '''
+
+    def __init__(self, response_fields=[], _meta={}):
+        super().__init__(response_fields=response_fields, _meta=_meta)
+
+    def _response_factory(self):
+        response = GeneratorResponse(self)
+        return response
+
+
 class StreamedResponse:
     '''
     Streams FieldedResponse generators that would otherwise run the machine
@@ -166,7 +179,23 @@ class InMemoryResponse:
             k: list(v) if isinstance(v, GeneratorType) else v
             for k, v in self.fielded_response.ordered_response.items()
         }
-    
+
+
+class GeneratorResponse:
+    '''
+    Returns only raw FieldedResponse generators.
+    '''
+
+    def __init__(self, fielded_response):
+        self.fielded_response = fielded_response
+
+    def render(self):
+        return {
+            k: v
+            for k, v in self.fielded_response.ordered_response.items()
+            if isinstance(v, GeneratorType)
+        }
+
 
 class QueryResponse:
     '''
