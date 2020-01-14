@@ -408,3 +408,106 @@ def test_searches_responses_in_memory_response_render():
     fr.response = {'a': 1, 'b': (x for x in [1, 2, 3])}
     response = im.render()
     assert response == {'a': 1, 'b': [1, 2, 3]}
+
+
+def test_searches_responses_generator_memory_response_init():
+    from snovault.elasticsearch.searches.responses import FieldedResponse
+    from snovault.elasticsearch.searches.responses import FieldedGeneratorResponse
+    from snovault.elasticsearch.searches.responses import GeneratorResponse
+    fr = FieldedResponse()
+    gr = GeneratorResponse(fr)
+    assert isinstance(gr, GeneratorResponse)
+    fgr = FieldedGeneratorResponse()
+    gr = GeneratorResponse(fgr)
+    assert isinstance(gr, GeneratorResponse)
+
+
+def test_searches_responses_generator_response_render():
+    from snovault.elasticsearch.searches.responses import FieldedResponse
+    from snovault.elasticsearch.searches.responses import FieldedGeneratorResponse
+    from snovault.elasticsearch.searches.responses import GeneratorResponse
+    from types import GeneratorType
+    fr = FieldedResponse()
+    gr = GeneratorResponse(fr)
+    fr.response = {'a': 1}
+    response = gr.render()
+    assert isinstance(response, dict)
+    assert response == {}
+    fr.response = {'a': 1, 'b': (x for x in [1, 2, 3])}
+    response = gr.render()
+    assert 'a' not in response
+    assert 'b' in response
+    assert isinstance(response['b'], GeneratorType)
+    fgr = FieldedGeneratorResponse()
+    gr = GeneratorResponse(fgr)
+    fgr.response = {'a': 1}
+    response = gr.render()
+    assert isinstance(response, dict)
+    assert response == {}
+    fgr.response = {'a': 1, 'b': (x for x in [1, 2, 3])}
+    response = gr.render()
+    assert 'a' not in response
+    assert 'b' in response
+    assert isinstance(response['b'], GeneratorType)
+
+
+def test_searches_responses_fielded_generator_response_init():
+    from snovault.elasticsearch.searches.responses import FieldedGeneratorResponse
+    fgr = FieldedGeneratorResponse()
+    assert isinstance(fgr, FieldedGeneratorResponse)
+
+
+def test_searches_responses_fielded_generator_response_response_factory(dummy_request):
+    from snovault.elasticsearch.searches.responses import FieldedGeneratorResponse
+    from snovault.elasticsearch.searches.responses import GeneratorResponse
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    fgr = FieldedGeneratorResponse()
+    fgr.response = {'a': 1}
+    assert isinstance(fgr._response_factory(), GeneratorResponse)
+    fgr = FieldedGeneratorResponse(
+        _meta={
+            'params_parser': ParamsParser(dummy_request)
+        }
+    )
+    assert isinstance(fgr._response_factory(), GeneratorResponse)
+    fgr.response = {'a': (x for x in [1, 2, 3])}
+    assert isinstance(fgr._response_factory(), GeneratorResponse)
+    dummy_request.__parent__ = 'something'
+    fgr = FieldedGeneratorResponse(
+        _meta={
+            'params_parser': ParamsParser(dummy_request)
+        }
+    )
+    assert isinstance(fgr._response_factory(), GeneratorResponse)
+    fgr.response = {'a': (x for x in [1, 2, 3])}
+    assert isinstance(fgr._response_factory(), GeneratorResponse)
+
+
+def test_searches_responses_fielded_generator_response_render(dummy_request):
+    from snovault.elasticsearch.searches.responses import FieldedGeneratorResponse
+    from snovault.elasticsearch.searches.responses import GeneratorResponse
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from types import GeneratorType
+    from pyramid.response import Response
+    fgr = FieldedGeneratorResponse()
+    fgr.response = {'a': 1}
+    response = fgr.render()
+    assert isinstance(response, dict)
+    fgr.response = {'a': (x for x in [1, 2, 3])}
+    response = fgr.render()
+    assert isinstance(response, dict)
+    assert 'a' in response
+    assert isinstance(response['a'], GeneratorType)
+    assert list(response['a']) == [1, 2, 3]
+    dummy_request.__parent__ = 'something'
+    fgr = FieldedGeneratorResponse(
+        _meta={
+            'params_parser': ParamsParser(dummy_request)
+        }
+    )
+    fgr.response = {'a': (x for x in [1, 2, 3])}
+    response = fgr.render()
+    assert isinstance(response, dict)
+    assert 'a' in response
+    assert isinstance(response['a'], GeneratorType)
+    assert list(response['a']) == [1, 2, 3]
