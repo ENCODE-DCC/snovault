@@ -197,3 +197,29 @@ def calculate_properties(context, request, ns=None, category='object'):
             for name, prop in props.items()
         ) if value is not None
     }
+
+
+def _init_property_calculation(context, request, ns=None, category='object'):
+    calculated_properties = request.registry[CALCULATED_PROPERTIES]
+    props = calculated_properties.props_for(context, category)
+    defined = {name: prop for name, prop in props.items() if prop.define}
+    if isinstance(context, type):
+        context = None
+    namespace = ItemNamespace(context, request, defined, ns)
+    return namespace, props
+
+
+def calculate_select_properties(context, request, ns=None, category='object', select_properties=None):
+    select_properties = select_properties or []
+    namespace, props = _init_property_calculation(context, request, ns=ns, category=category)
+    filtered_properties = (
+        (name, prop(namespace))
+        for name, prop in props.items()
+        if name in select_properties
+    )
+    select_calculated_properties = {
+        name: value
+        for name, value in filtered_properties
+        if value is not None
+    }
+    return select_calculated_properties
