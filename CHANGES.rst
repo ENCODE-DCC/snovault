@@ -1,6 +1,12 @@
 Changes
 =======
 
+Snovault 1.0.40 (released) encoded v95.0
+----------------------------------------
+1. SNO-129-add-fielded-generator-response (#244)
+2. SNO-128-make-select-calculated-properties-view (#245)
+3. SNO-133-setuptools-test-failure (#247)
+
 Snovault 1.0.39 (released) encoded v94.0
 ----------------------------------------
 1. SNO-126-allow-default-value-for-missing-aggregation-field (#242)
