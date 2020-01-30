@@ -36,7 +36,7 @@ All of these steps call other classes to do the work for them.
 
 **In the case of (2) Execute the query and gather raw search results:**
 - passes the query built up in previous step to ES cluster
-- raw results wrapped in *BasicQueryResponseWithFacets* (**responses.py**) which has mixins (**mixins.py**) for rendering specifc raw output types (e.g. aggregations are converted from raw form to something that frontend expects, namely *facets*). Mixins allow for flexible extension of rendering capabilities based on context.
+- raw results wrapped in *BasicQueryResponseWithFacets* (**responses.py**) which has mixins (**mixins.py**) for rendering specific raw output types (e.g. aggregations are converted from raw form to something that frontend expects, namely *facets*). Mixins allow for flexible extension of rendering capabilities based on context.
 
 **In the case of (3) Format raw search results into dictionary used by frontend:**
 - *BasicQueryResponseWithFacet* mixin methods (e.g. *to_hits*, *to_facets*) are called and return a dictionary with *@graph* and *facets* fields to the *BasicSearchResponseField*:
