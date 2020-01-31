@@ -1,6 +1,6 @@
 ## High-level overview of search package
 
-The search module handles requests from Pyramid (web browser or API) via a _view_, passes them to ElasticSearch, and returns a JSON Response. Reponses are composed of a series of fields that can vary depending on how the view is subclassed. Views may or may not contain query parameters that modify the action of the view - some of which are view-specific and others that are passed more or less directly to Elasticsearch "filters" as field=value pairs.
+The search module handles requests from Pyramid (web browser or API) via a _view_, passes them to ElasticSearch, and returns a JSON response. Reponses are composed of a series of fields that can vary depending on how the view is subclassed. Views may or may not contain query parameters that modify the action of the view - some of which are view-specific and others that are passed more or less directly to Elasticsearch "filters" as field=value pairs.
 
 Basic implementation of this package as Pyramid views can be found in src/snowflakes/search_views.py and src/snowflakes/tests/test_searchv2.py. Other examples of use can be found in snovault/tests/test_searches_responses.py.
 
