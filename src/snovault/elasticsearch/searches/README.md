@@ -16,7 +16,7 @@ Pyramid view (**snowflakes.search_views.py**) -> renders *FieldedResponse* (**re
 * mixins.py - Mixin classes, usually used to gernate facets (what is shown in response JSON) from aggregations (how ES treats them) - mixed in to Reponse classes.
 * parsers.py - Classes for handling the query string
 * queries.py - Classes and sub-classes for generating Elasticseach queries; many views have specific query variants.
-* responses.py - The primary classes that are the core of the Views.  FieldedReponse is the simplest useful Response.
+* responses.py - Classes for ES Responses (QueryResponse and subclasses) and Pyramid view responses (FieldedReponse and subclasses).
 
 ### Longer Examples
 
