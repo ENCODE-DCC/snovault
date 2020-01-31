@@ -1,22 +1,25 @@
-## High-level overview of search package.
+## High-level overview of search package
 
-The search module handles requests from pyramid (web browser or API) via a _view_ passes them to elasticsearch, and returns a JSON Response.  Reponses are composed of a series of fields that can vary depending on how the view is subclassed.  Views may or may not contain query parameters that modify the action of the view - some of which are view-specific and others that are passed more or less directly to Elasticsearch "filters" as field=value pairs.
+The search module handles requests from Pyramid (web browser or API) via a _view_, passes them to ElasticSearch, and returns a JSON Response. Reponses are composed of a series of fields that can vary depending on how the view is subclassed. Views may or may not contain query parameters that modify the action of the view - some of which are view-specific and others that are passed more or less directly to Elasticsearch "filters" as field=value pairs.
 
-Basic implementation of this package as Pyramid views can be found in src/snowflakes/search_views.py.  Other examples of use can be found in tests/test_searches_responses.py.
+Basic implementation of this package as Pyramid views can be found in src/snowflakes/search_views.py and src/snowflakes/tests/test_searchv2.py. Other examples of use can be found in snovault/tests/test_searches_responses.py.
 
+### Object relationships
 
 Pyramid view (**snowflakes.search_views.py**) -> renders *FieldedResponse* (**responses.py**) -> contains many *ResponseFields* (**fields.py**)
 
 ### Manifest of modules
-* configs.py- Config classes for filtering arguments
-* decorators.py - Decorators used for exception handling and Dict filtering
-* defaults.py - Constant datastructures (ALL_CAPS variables)
-* __fields.py__ - Classes that define the fields that are returned in JSON; specificall subclasses for different types of searches; matrices etc.
-* interfaces.py - Alias-like constants (ALL_CAPS variables)
-* mixins.py - Mixin classes, usually used to gernate facets (what is shown in response JSON) from aggregations (how ES treats them) - mixed in to Reponse classes.
-* parsers.py - Classes for handling the query string
-* queries.py - Classes and sub-classes for generating Elasticseach queries; many views have specific query variants.
-* responses.py - Classes for ES Responses (QueryResponse and subclasses) and Pyramid view responses (FieldedReponse and subclasses).
+* configs.py - Specialized helper classes for filtering parameters passed to certain ElasticSearch aggregations
+* decorators.py - General helper decorators for exception handling and dict filtering
+* defaults.py - Default parameters and templates used in query building (ALL_CAPS variables)
+* __fields.py__ - Classes that define the fields that are returned in JSON, specifically subclasses for different types of searches, matrices, etc.
+* interfaces.py - Constants that alias raw strings (ALL_CAPS variables)
+* __mixins.py__ - Classes mixed in to *FieldedResponse* that allow for flexible formatting of raw ElasticSearch results
+* __parsers.py__ - Class for parsing and maniuplating the query string passed in by the user
+* __queries.py__ - Classes and subclasses for generating specific Elasticseach queries
+* __responses.py__ - Classes for wrapping raw ElasticSearch responses (*QueryResponse* and subclasses) and Pyramid view responses (*FieldedReponse* and subclasses)
+
+\* Note that bolded modules contain core functionality, unbolded are less important/contain implementation details.
 
 ### Longer Examples
 
