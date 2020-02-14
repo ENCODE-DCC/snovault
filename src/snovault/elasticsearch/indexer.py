@@ -375,6 +375,11 @@ class Indexer(object):
         self.index = registry.settings['snovault.elasticsearch.index']
         self.indexer_initial_log = asbool(registry.settings.get('indexer_initial_log', False))
         self.indexer_initial_log_path = registry.settings.get('indexer_initial_log_path')
+        try:
+            self.indexer_short_uuids = int(registry.settings.get('indexer_short_uuids'))
+        except Exception as ecp:
+            log.warning('registry settings indexer_short_uuids could not be cast to int')
+            self.indexer_short_uuids = 0
         queue_type = registry.settings.get('queue_type', None)
         is_queue_server = asbool(registry.settings.get('queue_server'))
         is_queue_worker = asbool(registry.settings.get('queue_worker'))
