@@ -1,3 +1,5 @@
+import os
+
 from elasticsearch.exceptions import (
     ConflictError,
     ConnectionError,
@@ -264,6 +266,7 @@ def index(request):
                 if snapshot_id is None and not recovery:
                     snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
 
+    indexing_update_infos = []
     if invalidated and not dry_run:
         if len(stage_for_followup) > 0:
             # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
@@ -273,7 +276,7 @@ def index(request):
 
         # Do the work...
 
-        errors, err_msg = indexer.serve_objects(
+        indexing_update_infos, errors, err_msg = indexer.serve_objects(
             request,
             invalidated,
             xmin,
@@ -312,6 +315,11 @@ def index(request):
         result['txn_lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
 
     state.send_notices()
+    if indexing_update_infos:
+        # Check for logging of intitial indexing info here,
+        #  opposed to in the indexer or just after serve_objects,
+        #  so a crash in logging does not interupt indexing complietion
+        indexer.check_log_indexing_times(indexing_update_infos)
     return result
 
 
@@ -351,8 +359,22 @@ class Indexer(object):
         if registry.settings.get('indexer'):
             self._setup_queues(registry)
 
+    def check_log_indexing_times(self, update_infos):
+        if self.indexer_initial_log and not os.path.exists(self.indexer_initial_log_path):
+            log.warning('Logging indexing data to %s', self.indexer_initial_log_path)
+            counter = 0
+            with open(self.indexer_initial_log_path, 'w', encoding='utf-8') as file_handler:
+                for update_info in update_infos:
+                    str_update_info = json.dumps(update_info, ensure_ascii=False)
+                    file_handler.write(str_update_info)
+                    counter += 1
+            log.warning('Logged %d uuids.  One per line' % counter)
+
     def _setup_queues(self, registry):
         '''Init helper - Setup server and worker queues'''
+        self.index = registry.settings['snovault.elasticsearch.index']
+        self.indexer_initial_log = asbool(registry.settings.get('indexer_initial_log', False))
+        self.indexer_initial_log_path = registry.settings.get('indexer_initial_log_path')
         queue_type = registry.settings.get('queue_type', None)
         is_queue_server = asbool(registry.settings.get('queue_server'))
         is_queue_worker = asbool(registry.settings.get('queue_worker'))
@@ -489,17 +511,32 @@ class Indexer(object):
         errors = []
         err_msg = self._serve_objects_init(uuids)
         if err_msg:
-            return errors, err_msg
+            return None, errors, err_msg
+        # Check for shorting uuids
+        if self.indexer_short_uuids:
+            short_uuids = []
+            for count, uuid in enumerate(uuids, 1):
+                if count > self.indexer_short_uuids:
+                    break
+                short_uuids.append(uuid)
+            log.warning(
+                'Shorting %d uuids to %d.  New list is %d uuids.',
+                len(uuids),
+                self.indexer_short_uuids,
+                len(short_uuids)
+            )
+            uuids = short_uuids
         err_msg = self._serve_objects_load_uuids(uuids)
         if err_msg:
-            return errors, err_msg
+            return None, errors, err_msg
         # Run Process Loop
         start_time = time.time()
         self.worker_runs = []
+        update_infos = []
         while self.queue_server.is_indexing(errs_cnt=len(errors)):
             if self.queue_worker and not self.queue_worker.is_running:
                 # Server Worker
-                uuids_ran = self.run_worker(
+                update_infos, uuids_ran = self.run_worker(
                     request, xmin, snapshot_id, restart
                 )
                 if not uuids_ran:
@@ -516,7 +553,7 @@ class Indexer(object):
                 err_msg = 'Indexer sleep timeout'
                 break
         self.queue_server.close_indexing()
-        return errors, err_msg
+        return update_infos, errors, err_msg
 
     def run_worker(self, request, xmin, snapshot_id, restart):
         '''Run the uuid queue worker'''
@@ -526,15 +563,17 @@ class Indexer(object):
             self.queue_worker.worker_id,
             len(batch_uuids),
         )
+        update_infos = []
         if batch_uuids:
             self.queue_worker.is_running = True
-            batch_errors = self.update_objects(
+            batch_update_infos, batch_errors = self.update_objects(
                 request,
                 batch_uuids,
                 xmin,
                 snapshot_id=snapshot_id,
                 restart=restart,
             )
+            update_infos.extend(batch_update_infos)
             batch_results = {
                 'errors': batch_errors,
                 'successes': len(batch_uuids) - len(batch_errors),
@@ -543,10 +582,10 @@ class Indexer(object):
             if err_msg:
                 log.warning('Issue closing worker: %s', err_msg)
             self.queue_worker.is_running = False
-            return len(batch_uuids)
+            return update_infos, len(batch_uuids)
         else:
             log.warning('No uudis to run %d', self.queue_worker.get_cnt)
-        return None
+        return update_infos, None
 
     def update_objects(
             self,
@@ -559,14 +598,18 @@ class Indexer(object):
         # pylint: disable=too-many-arguments, unused-argument
         '''Run indexing process on uuids'''
         errors = []
+        update_infos = []
         for i, uuid in enumerate(uuids):
             update_info = self.update_object(self.es, request, uuid, xmin)
+            update_info['return_time'] = time.time()
+            update_infos.append(update_info)
             error = update_info.get('error')
             if error is not None:
+                print('Error', error)
                 errors.append(error)
             if (i + 1) % 1000 == 0:
                 log.info('Indexing %d', i + 1)
-        return errors
+        return update_infos, errors
 
     @staticmethod
     def update_object(encoded_es, request, uuid, xmin, restart=False):
