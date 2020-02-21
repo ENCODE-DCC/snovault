@@ -1,14 +1,18 @@
 import pytest
 
 
-@pytest.fixture
-def remote_user_testapp(app, remote_user):
+def _remote_user_testapp(app, remote_user):
     from webtest import TestApp
     environ = {
         'HTTP_ACCEPT': 'application/json',
         'REMOTE_USER': str(remote_user),
     }
     return TestApp(app, environ)
+
+
+@pytest.fixture
+def remote_user_testapp(app, remote_user):
+    return _remote_user_testapp(app, remote_user)
 
 
 @pytest.fixture
@@ -36,22 +40,22 @@ def other_lab(testapp):
 
 @pytest.fixture
 def wrangler_testapp(wrangler, app, external_tx, zsa_savepoints):
-    return remote_user_testapp(app, wrangler['uuid'])
+    return _remote_user_testapp(app, wrangler['uuid'])
 
 
 @pytest.fixture
 def submitter_testapp(submitter, app, external_tx, zsa_savepoints):
-    return remote_user_testapp(app, submitter['uuid'])
+    return _remote_user_testapp(app, submitter['uuid'])
 
 
 @pytest.fixture
 def viewing_group_member_testapp(viewing_group_member, app, external_tx, zsa_savepoints):
-    return remote_user_testapp(app, viewing_group_member['uuid'])
+    return _remote_user_testapp(app, viewing_group_member['uuid'])
 
 
 @pytest.fixture
 def remc_member_testapp(remc_member, app, external_tx, zsa_savepoints):
-    return remote_user_testapp(app, remc_member['uuid'])
+    return _remote_user_testapp(app, remc_member['uuid'])
 
 
 def test_user_view_details_admin(submitter, access_key, testapp):

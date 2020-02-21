@@ -90,7 +90,7 @@ class TestIndexerRedisQueue(TestCase):
         )
         request = MockRequest(embed_wait=self.embed_wait)
         uuids = []
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -108,7 +108,7 @@ class TestIndexerRedisQueue(TestCase):
         self.indexer.queue_server.load_uuids = mock.MagicMock(return_value=None)
         expected_err_msg = 'Uuids given to Indexer.serve_objects failed to load'
         request = MockRequest(embed_wait=self.embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -136,7 +136,7 @@ class TestIndexerRedisQueue(TestCase):
             )
         )
         request = MockRequest(embed_wait=self.embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -155,7 +155,7 @@ class TestIndexerRedisQueue(TestCase):
         self.indexer.queue_server.is_indexing = mock.MagicMock(return_value=True)
         expected_err_msg = 'Cannot initialize indexing process: Already Indexing'
         request = MockRequest(embed_wait=self.embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -179,7 +179,7 @@ class TestIndexerRedisQueue(TestCase):
         self.indexer.queue_worker = None
         expected_err_msg = 'Indexer sleep timeout'
         request = MockRequest(embed_wait=self.embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -203,7 +203,7 @@ class TestIndexerRedisQueue(TestCase):
         embed_wait = 0.01
         expected_err_msg = 'Indexer sleep timeout'
         request = MockRequest(embed_wait=embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -228,7 +228,7 @@ class TestIndexerRedisQueue(TestCase):
             return_value=return_errors
         )
         request = MockRequest(embed_wait=embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -254,7 +254,7 @@ class TestIndexerRedisQueue(TestCase):
         # pylint: disable=protected-access
         self.indexer.queue_worker._queue_options['batch_size'] = batch_size
         request = MockRequest(embed_wait=embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -276,7 +276,7 @@ class TestIndexerRedisQueue(TestCase):
         self.indexer.queue_worker._queue_options['batch_size'] = batch_size
         request = MockRequest(embed_wait=embed_wait)
         request.set_embed_errors(10)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -299,7 +299,7 @@ class TestIndexerRedisQueue(TestCase):
         # Error Run
         request = MockRequest(embed_wait=embed_wait)
         request.set_embed_errors(10)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -311,7 +311,7 @@ class TestIndexerRedisQueue(TestCase):
         self.assertIsNone(err_msg)
         # Clean Run
         request = MockRequest(embed_wait=embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,

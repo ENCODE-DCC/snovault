@@ -114,6 +114,12 @@ Or if you need to supply command line arguments::
 
     $ ./node_modules/.bin/jest
 
+Use the circle-tests.sh to run osx tests with .circleci/config.yml args::
+
+    $ circle-tests.sh bdd                  # Headless bdd tests with chromedriver
+    $ circle-tests.sh npm                  # Npm tests
+    $ circle-tests.sh                      # All non-bdd tests
+
 
 Building Javascript
 ===================

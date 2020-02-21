@@ -190,7 +190,7 @@ class MPIndexer(Indexer):
         except:
             self.shutdown()
             raise
-        return errors
+        return update_infos, errors
 
     def shutdown(self):
         if 'pool' in self.__dict__:
