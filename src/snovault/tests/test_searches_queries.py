@@ -403,6 +403,72 @@ def test_searches_queries_abstract_query_factory_escape_regex_slashes(params_par
     ) == '\/targets\/H3K9me3-human\/'
 
 
+def test_searches_queries_abstract_query_factory_escape_fuzzy_tilde(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.exceptions import HTTPBadRequest
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    assert aq._escape_fuzzy_tilde('ctcf') == 'ctcf'
+    assert aq._escape_fuzzy_tilde(
+        '@type:Experiment date_created:[01-01-2018 TO 01-02-2018]'
+    ) == '@type:Experiment date_created:[01-01-2018 TO 01-02-2018]'
+    assert aq._escape_fuzzy_tilde(
+        '(ctcf) AND (myers)~ AND NOT (~snyder or pacha) AND (@type:File)'
+    ) == '(ctcf) AND (myers)\~ AND NOT (\~snyder or pacha) AND (@type:File)'
+    assert aq._escape_fuzzy_tilde(
+        'Wnt/β-~catenin'
+    ) == 'Wnt/β-\~catenin'
+    assert aq._escape_fuzzy_tilde(
+        '/targets/H3K9me3-human/~'
+    ) == '/targets/H3K9me3-human/\~'
+
+
+def test_searches_queries_abstract_query_factory_escape_boost_caret(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.exceptions import HTTPBadRequest
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    assert aq._escape_boost_caret('ctcf') == 'ctcf'
+    assert aq._escape_boost_caret(
+        'eclip^'
+    ) == 'eclip\^'
+    assert aq._escape_boost_caret(
+        '(ctcf) AND (my^ers)^'
+    ) == '(ctcf) AND (my\^ers)\^'
+    assert aq._escape_boost_caret(
+        '^^Wnt/β-catenin'
+    ) == '\^\^Wnt/β-catenin'
+    assert aq._escape_boost_caret(
+        '/targets/H3K9me3-human/'
+    ) == '/targets/H3K9me3-human/'
+
+
+def test_searches_queries_abstract_query_factory_escape_reserved_query_string_characters(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from pyramid.exceptions import HTTPBadRequest
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    assert aq._escape_reserved_query_string_characters('ctcf') == 'ctcf'
+    assert aq._escape_reserved_query_string_characters(
+        '@type:Experiment date_created:[01-01-2018 TO 01-02-2018]'
+    ) == '@type:Experiment date_created:[01-01-2018 TO 01-02-2018]'
+    assert aq._escape_reserved_query_string_characters(
+        '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (@type:File)'
+    ) == '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (@type:File)'
+    assert aq._escape_reserved_query_string_characters(
+        'Wnt/β-catenin'
+    ) == 'Wnt\/β-catenin'
+    assert aq._escape_reserved_query_string_characters(
+        '/targets/H3K9me3-human/'
+    ) == '\/targets\/H3K9me3-human\/'
+    assert aq._escape_reserved_query_string_characters(
+        '(ctcf)~ AND (myers) AND NOT^ (snyder or pacha) AND (@type:File)'
+    ) == '(ctcf)\~ AND (myers) AND NOT\^ (snyder or pacha) AND (@type:File)'
+    assert aq._escape_reserved_query_string_characters(
+        '^Wnt/β-catenin~~'
+    ) == '\^Wnt\/β-catenin\~\~'
+    assert aq._escape_reserved_query_string_characters(
+        '/targets/H3K9me3-human~/'
+    ) == '\/targets\/H3K9me3-human\~\/'
+
+
 def test_searches_queries_abstract_query_factory_validated_query_string_query(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from pyramid.exceptions import HTTPBadRequest
@@ -507,37 +573,70 @@ def test_searches_queries_abstract_query_factory_get_default_and_maybe_item_face
     assert all(e in actual for e in expected)
 
 
-def test_searches_queries_abstract_query_factory_get_query(params_parser, dummy_request):
+def test_searches_queries_abstract_query_factory_get_query_string_query(params_parser, dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    search_terms = aq._get_query()
-    assert search_terms == '(chip-seq)'
+    search_terms = aq._get_query_string_query()
+    assert search_terms is None
     dummy_request.environ['QUERY_STRING'] = (
         'status=released&frame=object&mode=picker'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    assert aq._get_query() is None
-    dummy_request.environ['QUERY_STRING'] = (
-        'status=released&searchTerm=cherry'
-    )
-    params_parser = ParamsParser(dummy_request)
-    aq = AbstractQueryFactory(params_parser)
-    assert aq._get_query() == '(cherry)'
+    assert aq._get_query_string_query() is None
     dummy_request.environ['QUERY_STRING'] = (
         'status=released&advancedQuery=cherry'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    assert aq._get_query() == '(cherry)'
+    assert aq._get_query_string_query() == '(cherry)'
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&advancedQuery=cherry'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_query_string_query() == '(cherry)'
     dummy_request.environ['QUERY_STRING'] = (
         'status=released&advancedQuery=@type:Experiment date_created:[01-01-2018 TO 01-02-2018'
         '&searchTerm=ctcf'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    assert aq._get_query() == '(ctcf) AND (@type:Experiment date_created:[01-01-2018 TO 01-02-2018)'
+    assert aq._get_query_string_query() == '(@type:Experiment date_created:[01-01-2018 TO 01-02-2018)'
+
+
+def test_searches_queries_abstract_query_factory_get_simple_query_string_query(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    search_terms = aq._get_simple_query_string_query()
+    assert search_terms == '(chip-seq)'
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&frame=object&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_simple_query_string_query() is None
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&searchTerm=cherry'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_simple_query_string_query() == '(cherry)'
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&advancedQuery=cherry'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_simple_query_string_query() is None
+    dummy_request.environ['QUERY_STRING'] = (
+        'status=released&advancedQuery=@type:Experiment date_created:[01-01-2018 TO 01-02-2018'
+        '&searchTerm=ctcf'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    assert aq._get_simple_query_string_query() == '(ctcf)'
 
 
 def test_searches_queries_abstract_query_factory_get_filters(params_parser):
@@ -1436,16 +1535,16 @@ def test_searches_queries_abstract_query_factory_make_filter_and_subaggregation(
             )
         ),
         subaggregation=aq._make_terms_aggregation(
-            field='embedded.lab.name'
+            field='embedded.lab.name',
+            size=123
         )
     )
     assert fasa.to_dict() == {
         'aggs': {
             'Lab name terms on Experiments that have files with file_size': {
                 'terms': {
-                    'size': 200,
                     'field': 'embedded.lab.name',
-                    'exclude': []
+                    'size': 123,
                 }
             }
         },
@@ -1726,11 +1825,207 @@ def test_searches_queries_abstract_query_factory_map_params_to_elasticsearch_fie
     ]
 
 
-def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_request):
+def test_searches_queries_abstract_query_factory_add_simple_query_string_query(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
         'searchTerm=chip-seq'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_simple_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'simple_query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all'
+                ],
+                'query': '(chip-seq)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['simple_query_string']['query']
+        == expected_query['query']['simple_query_string']['query']
+    )
+    assert (
+        constructed_query['query']['simple_query_string']['default_operator']
+        == expected_query['query']['simple_query_string']['default_operator']
+    )
+    assert (
+        set(constructed_query['query']['simple_query_string']['fields'])
+        == set(expected_query['query']['simple_query_string']['fields'])
+    )
+
+
+def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'advancedQuery=chip-seq'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all'
+                ],
+                'query': '(chip-seq)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['query_string']['query']
+        == expected_query['query']['query_string']['query']
+    )
+    assert (
+        constructed_query['query']['query_string']['default_operator']
+        == expected_query['query']['query_string']['default_operator']
+    )
+    assert (
+        set(constructed_query['query']['query_string']['fields'])
+        == set(expected_query['query']['query_string']['fields'])
+    )
+    dummy_request.environ['QUERY_STRING'] = (
+        'advancedQuery=cherry^'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all'
+                ],
+                'query': '(cherry\^)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['query_string']['query']
+        == expected_query['query']['query_string']['query']
+    )
+    dummy_request.environ['QUERY_STRING'] = (
+        'advancedQuery=cherry~'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all'
+                ],
+                'query': '(cherry\~)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['query_string']['query']
+        == expected_query['query']['query_string']['query']
+    )
+    dummy_request.environ['QUERY_STRING'] = (
+        'advancedQuery=/cherry^~'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all'
+                ],
+                'query': '(\/cherry\^\~)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['query_string']['query']
+        == expected_query['query']['query_string']['query']
+    )
+
+
+def test_searches_queries_abstract_query_factory_add_query_string_query_and_simple_query_string_query(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&advancedQuery=date_released:[01-01-2018 TO 01-01-2019]'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_query_string_query()
+    aq.add_simple_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'bool': {
+                'must': [
+                    {
+                        'query_string': {
+                            'query': '(embedded.date_released:[01-01-2018 TO 01-01-2019])',
+                            'default_operator': 'AND',
+                            'fields': ['_all']
+                        }
+                    },
+                    {
+                        'simple_query_string': {
+                            'query': '(chip-seq)',
+                            'default_operator': 'AND',
+                            'fields': ['_all']
+                        }
+                    }
+                ]
+            }
+        }
+    }
+    actual_must = constructed_query['query']['bool']['must']
+    actual_query_string = [
+        a.get('query_string')
+        for a in actual_must
+        if 'query_string' in a
+    ][0]
+    actual_simple_query_string = [
+        a.get('simple_query_string')
+        for a in actual_must
+        if 'simple_query_string' in a
+    ][0]
+    expected_must = expected_query['query']['bool']['must']
+    expected_query_string = [
+        e.get('query_string')
+        for e in expected_must
+        if 'query_string' in e
+    ][0]
+    expected_simple_query_string = [
+        e.get('simple_query_string')
+        for e in expected_must
+        if 'simple_query_string' in e
+    ][0]
+    assert len(actual_must) == len(expected_must)
+    assert actual_query_string == expected_query_string
+    assert actual_simple_query_string == expected_simple_query_string
+
+
+def test_searches_queries_abstract_query_factory_add_query_string_query_with_type(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'advancedQuery=chip-seq&type=TestingSearchSchema&status=released'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
@@ -1760,8 +2055,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_re
         == set(expected_query['query']['query_string']['fields'])
     )
 
-
-def test_searches_queries_abstract_query_factory_add_query_string_query_with_type(dummy_request):
+def test_searches_queries_abstract_query_factory_add_simple_query_string_query_with_type(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
@@ -1769,11 +2063,11 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_typ
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    aq.add_query_string_query()
+    aq.add_simple_query_string_query()
     constructed_query = aq.search.to_dict()
     expected_query = {
         'query': {
-            'query_string': {
+            'simple_query_string': {
                 'default_operator': 'AND',
                 'fields': [
                     '_all'
@@ -1783,16 +2077,16 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_typ
         }
     }
     assert (
-        constructed_query['query']['query_string']['query']
-        == expected_query['query']['query_string']['query']
+        constructed_query['query']['simple_query_string']['query']
+        == expected_query['query']['simple_query_string']['query']
     )
     assert (
-        constructed_query['query']['query_string']['default_operator']
-        == expected_query['query']['query_string']['default_operator']
+        constructed_query['query']['simple_query_string']['default_operator']
+        == expected_query['query']['simple_query_string']['default_operator']
     )
     assert (
-        set(constructed_query['query']['query_string']['fields'])
-        == set(expected_query['query']['query_string']['fields'])
+        set(constructed_query['query']['simple_query_string']['fields'])
+        == set(expected_query['query']['simple_query_string']['fields'])
     )
 
 
@@ -1800,7 +2094,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_def
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
-        'searchTerm=chip-seq'
+        'advancedQuery=chip-seq'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(
@@ -1835,6 +2129,46 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_with_def
         == set(expected_query['query']['query_string']['fields'])
     )
 
+    
+def test_searches_queries_abstract_query_factory_add_simple_query_string_query_with_default_type(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(
+        params_parser,
+        default_item_types=[
+            'TestingSearchSchema'
+        ]
+    )
+    aq.add_simple_query_string_query()
+    constructed_query = aq.search.to_dict()
+    expected_query = {
+        'query': {
+            'simple_query_string': {
+                'default_operator': 'AND',
+                'fields': [
+                    '_all'
+                ],
+                'query': '(chip-seq)'
+            }
+        }
+    }
+    assert (
+        constructed_query['query']['simple_query_string']['query']
+        == expected_query['query']['simple_query_string']['query']
+    )
+    assert (
+        constructed_query['query']['simple_query_string']['default_operator']
+        == expected_query['query']['simple_query_string']['default_operator']
+    )
+    assert (
+        set(constructed_query['query']['simple_query_string']['fields'])
+        == set(expected_query['query']['simple_query_string']['fields'])
+    )
+
 
 def test_searches_queries_abstract_query_factory_add_query_string_query_no_search_term(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
@@ -1848,8 +2182,22 @@ def test_searches_queries_abstract_query_factory_add_query_string_query_no_searc
     assert aq.search is None
 
 
-def test_searches_queries_abstract_query_factory_add_must_equal_terms_filter(params_parser):
+def test_searches_queries_abstract_query_factory_add_simple_query_string_query_no_search_term(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    aq.add_simple_query_string_query()
+    assert aq.search is None
+
+
+def test_searches_queries_abstract_query_factory_add_must_equal_terms_filter(params_parser, mocker):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq._add_must_equal_terms_filter(
         field='status',
@@ -2058,7 +2406,6 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_pa
         'aggs': {
             'Statuses': {
                 'terms': {
-                    'exclude': [],
                     'field': 'embedded.status',
                     'size': 10,
                 }
@@ -2139,423 +2486,6 @@ def test_searches_queries_abstract_query_factory_make_filter_aggregation(params_
         'filter': {
             'terms': {
                 'embedded.@type': ['File']
-            }
-        }
-    }
-
-
-def test_searches_queries_abstract_query_factory_make_filter_aggregation_bool_context(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser)
-    fa = aq._make_filter_aggregation(
-        filter_context=aq._make_bool_query(
-            filter=[
-                aq._make_field_must_exist_query(
-                    field='embedded.status'
-                ),
-                ~aq._make_field_must_exist_query(
-                    field='embedded.audit'
-                )
-            ]
-        )
-    )
-    assert fa.to_dict() == {
-        'filter': {
-            'bool': {
-                'filter': [
-                    {'exists': {'field': 'embedded.status'}},
-                    {'bool': {'must_not': [{'exists': {'field': 'embedded.audit'}}]}}]
-            }
-        }
-    }
-
-
-def test_searches_queries_abstract_query_factory_make_filter_and_subaggregation(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser)
-    fasa = aq._make_filter_and_subaggregation(
-        title='Lab name terms on Experiments that have files with file_size',
-        filter_context=(
-            aq._make_must_equal_terms_query(
-                field='@type',
-                terms=['Experiment']
-            )
-            & aq._make_bool_query(
-                filter=[
-                    aq._make_field_must_exist_query(
-                        field='embeddded.files.file_size'
-                    )
-                ]
-            )
-        ),
-        subaggregation=aq._make_terms_aggregation(
-            field='embedded.lab.name'
-        )
-    )
-    assert fasa.to_dict() == {
-        'aggs': {
-            'Lab name terms on Experiments that have files with file_size': {
-                'terms': {
-                    'size': 200,
-                    'field': 'embedded.lab.name',
-                    'exclude': []
-                }
-            }
-        },
-        'filter': {
-            'bool': {
-                'filter': [
-                    {'exists': {'field': 'embeddded.files.file_size'}}
-                ],
-                'must': [
-                    {'terms': {'@type': ['Experiment']}}
-                ]
-            }
-        }
-    }
-
-
-def test_searches_queries_abstract_query_factory_make_filter_and_subaggregation_bool(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser)
-    fasa = aq._make_filter_and_subaggregation(
-        title='Small processed versus raw files on first day of ENCODE4',
-        filter_context=aq._make_bool_query(
-            must=[
-                aq._make_field_must_exist_query(
-                    field='embedded.file_type'
-                )
-            ],
-            should=[
-                aq._make_must_equal_terms_query(
-                    field='embedded.file_size',
-                    terms=['1', '2', '3']
-                )
-            ],
-            must_not=[
-                aq._make_must_equal_terms_query(
-                    field='embedded.@type',
-                    terms=['Publication']
-                ),
-                aq._make_must_equal_terms_query(
-                    field='embedded.award.rfa',
-                    terms=['ENCODE2']
-                )
-            ],
-            filter=[
-                aq._make_must_equal_terms_query(
-                    field='embedded.date_created',
-                    terms=['05/01/2017']
-                )
-            ]
-        ),
-        subaggregation=aq._make_exists_aggregation(
-            field='embedded.derived_from'
-        )
-    )
-    assert fasa.to_dict() == {
-        'aggs': {
-            'Small processed versus raw files on first day of ENCODE4': {
-                'filters': {
-                    'filters': {
-                        'no': {
-                            'bool': {
-                                'must_not': [{'exists': {'field': 'embedded.derived_from'}}]}
-                        },
-                        'yes': {
-                            'exists': {'field': 'embedded.derived_from'}}}
-                }
-            }
-        },
-        'filter': {
-            'bool': {
-                'must_not': [
-                    {'terms': {'embedded.@type': ['Publication']}},
-                    {'terms': {'embedded.award.rfa': ['ENCODE2']}}
-                ],
-                'filter': [
-                    {'terms': {'embedded.date_created': ['05/01/2017']}}
-                ],
-                'must': [
-                    {'exists': {'field': 'embedded.file_type'}}
-                ],
-                'should': [
-                    {'terms': {'embedded.file_size': ['1', '2', '3']}}]
-            }
-        }
-    }
-
-
-def test_searches_queries_abstract_query_factory_make_query_string_query(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser)
-    qsq = aq._make_query_string_query(
-        'my TEST',
-        fields=['embedded.description'],
-        default_operator='OR'
-    )
-    assert qsq.to_dict() == {
-        'query_string': {
-            'default_operator': 'OR',
-            'fields': ['embedded.description'],
-            'query': 'my TEST'
-        }
-    }
-
-
-def test_searches_queries_abstract_query_factory_make_must_equal_terms_query(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser)
-    mtq = aq._make_must_equal_terms_query(
-        field='embedded.status',
-        terms=['released']
-    )
-    assert mtq.to_dict() == {
-        'terms': {
-            'embedded.status': ['released']
-        }
-    }
-
-
-def test_searches_queries_abstract_query_factory_make_field_must_exist_query(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser)
-    meq = aq._make_field_must_exist_query(
-        field='embedded.file_size'
-    )
-    assert meq.to_dict() == {
-        'exists': {
-            'field': 'embedded.file_size'
-        }
-    }
-
-
-def test_searches_queries_abstract_query_factory_make_default_filters(params_parser_snovault_types):
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser_snovault_types)
-    df = aq._make_default_filters()
-    assert df[0].to_dict() == {
-        'terms': {
-            'principals_allowed.view': ['system.Everyone']
-        }
-    }
-    assert df[1].to_dict() == {
-        'terms': {
-            'embedded.@type': ['TestingSearchSchema']
-        }
-    }
-
-
-def test_searches_queries_abstract_query_factory_make_default_filters_default_types(dummy_request):
-    from snovault.elasticsearch.searches.parsers import ParamsParser
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    dummy_request.environ['QUERY_STRING'] = (
-        'assay_title=Histone+ChIP-seq&award.project=Roadmap'
-        '&assembly=GRCh38&biosample_ontology.classification=primary+cell'
-        '&target.label=H3K27me3&biosample_ontology.classification%21=cell+line'
-    )
-    p = ParamsParser(dummy_request)
-    aq = AbstractQueryFactory(p, default_item_types=['Snowflake', 'Pancake'])
-    df = aq._make_default_filters()
-    assert df[0].to_dict() == {
-        'terms': {
-            'principals_allowed.view': ['system.Everyone']
-        }
-    }
-    assert df[1].to_dict() == {
-        'terms': {
-            'embedded.@type': [
-                'Snowflake', 'Pancake'
-            ]
-        }
-    }
-
-
-def test_searches_queries_abstract_query_factory_make_terms_aggregation(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser)
-    ta = aq._make_terms_aggregation(
-        field='embedded.lab.name',
-        exclude=['other lab'],
-        size=14
-    )
-    assert ta.to_dict() == {
-        'terms': {
-            'exclude': ['other lab'],
-            'field': 'embedded.lab.name',
-            'size': 14
-        }
-    }
-
-
-def test_searches_queries_abstract_query_factory_make_exists_aggregation(params_parser):
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    aq = AbstractQueryFactory(params_parser)
-    eq = aq._make_exists_aggregation(
-        field='embedded.file_available'
-    )
-    assert eq.to_dict() == {
-        'filters': {
-            'filters': {
-                'no': {
-                    'bool': {
-                        'must_not': [
-                            {'exists': {'field': 'embedded.file_available'}}
-                        ]
-                    }
-                },
-                'yes': {
-                    'exists': {'field': 'embedded.file_available'}
-                }
-            }
-        }
-    }
-
-
-def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_request):
-    from snovault.elasticsearch.searches.parsers import ParamsParser
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    dummy_request.environ['QUERY_STRING'] = (
-        'searchTerm=chip-seq'
-    )
-    params_parser = ParamsParser(dummy_request)
-    aq = AbstractQueryFactory(params_parser)
-    aq.add_query_string_query()
-    constructed_query = aq.search.to_dict()
-    expected_query = {
-        'query': {
-            'query_string': {
-                'default_operator': 'AND',
-                'fields': [
-                    '_all'
-                ],
-                'query': '(chip-seq)'
-            }
-        }
-    }
-    assert (
-        constructed_query['query']['query_string']['query']
-        == expected_query['query']['query_string']['query']
-    )
-    assert (
-        constructed_query['query']['query_string']['default_operator']
-        == expected_query['query']['query_string']['default_operator']
-    )
-    assert (
-        set(constructed_query['query']['query_string']['fields'])
-        == set(expected_query['query']['query_string']['fields'])
-    )
-
-
-def test_searches_queries_abstract_query_factory_add_query_string_query_with_type(dummy_request):
-    from snovault.elasticsearch.searches.parsers import ParamsParser
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    dummy_request.environ['QUERY_STRING'] = (
-        'searchTerm=chip-seq&type=TestingSearchSchema&status=released'
-    )
-    params_parser = ParamsParser(dummy_request)
-    aq = AbstractQueryFactory(params_parser)
-    aq.add_query_string_query()
-    constructed_query = aq.search.to_dict()
-    expected_query = {
-        'query': {
-            'query_string': {
-                'default_operator': 'AND',
-                'fields': [
-                    '_all'
-                ],
-                'query': '(chip-seq)'
-            }
-        }
-    }
-    assert (
-        constructed_query['query']['query_string']['query']
-        == expected_query['query']['query_string']['query']
-    )
-    assert (
-        constructed_query['query']['query_string']['default_operator']
-        == expected_query['query']['query_string']['default_operator']
-    )
-    assert (
-        set(constructed_query['query']['query_string']['fields'])
-        == set(expected_query['query']['query_string']['fields'])
-    )
-
-
-def test_searches_queries_abstract_query_factory_add_query_string_query_with_default_type(dummy_request):
-    from snovault.elasticsearch.searches.parsers import ParamsParser
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    dummy_request.environ['QUERY_STRING'] = (
-        'searchTerm=chip-seq'
-    )
-    params_parser = ParamsParser(dummy_request)
-    aq = AbstractQueryFactory(
-        params_parser,
-        default_item_types=[
-            'TestingSearchSchema'
-        ]
-    )
-    aq.add_query_string_query()
-    constructed_query = aq.search.to_dict()
-    expected_query = {
-        'query': {
-            'query_string': {
-                'default_operator': 'AND',
-                'fields': [
-                    '_all'
-                ],
-                'query': '(chip-seq)'
-            }
-        }
-    }
-    assert (
-        constructed_query['query']['query_string']['query']
-        == expected_query['query']['query_string']['query']
-    )
-    assert (
-        constructed_query['query']['query_string']['default_operator']
-        == expected_query['query']['query_string']['default_operator']
-    )
-    assert (
-        set(constructed_query['query']['query_string']['fields'])
-        == set(expected_query['query']['query_string']['fields'])
-    )
-
-
-def test_searches_queries_abstract_query_factory_add_query_string_query_no_search_term(dummy_request):
-    from snovault.elasticsearch.searches.parsers import ParamsParser
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    dummy_request.environ['QUERY_STRING'] = (
-        'type=TestingSearchSchema&status=released'
-    )
-    params_parser = ParamsParser(dummy_request)
-    aq = AbstractQueryFactory(params_parser)
-    aq.add_query_string_query()
-    assert aq.search is None
-
-
-def test_searches_queries_abstract_query_factory_add_must_equal_terms_filter(params_parser, mocker):
-    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    mocker.patch.object(AbstractQueryFactory, '_get_index')
-    AbstractQueryFactory._get_index.return_value = 'snovault-resources'
-    aq = AbstractQueryFactory(params_parser)
-    aq._add_must_equal_terms_filter(
-        field='status',
-        terms=['released', 'archived']
-    )
-    assert aq.search.to_dict() == {
-        'query': {
-            'bool': {
-                'filter': [
-                    {
-                        'terms': {
-                            'status': [
-                                'released',
-                                'archived'
-                            ]
-                        }
-                    }
-                ]
             }
         }
     }
@@ -2766,7 +2696,6 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_pa
         'aggs': {
             'Statuses': {
                 'terms': {
-                    'exclude': [],
                     'field': 'embedded.status',
                     'size': 10,
                 }
@@ -2902,12 +2831,12 @@ def test_searches_queries_abstract_query_factory_add_query_string_and_post_filte
     )
     p = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(p)
-    aq.add_query_string_query()
+    aq.add_simple_query_string_query()
     aq.add_post_filters()
     actual_query = aq.search.to_dict()
     expected_query = {
         'query': {
-            'query_string': {
+            'simple_query_string': {
                 'query': '(chip-seq)',
                 'fields': [
                     '_all',
@@ -2937,8 +2866,8 @@ def test_searches_queries_abstract_query_factory_add_query_string_and_post_filte
         }
     }
     assert (
-        expected_query['query']['query_string']['query']
-        == actual_query['query']['query_string']['query']
+        expected_query['query']['simple_query_string']['query']
+        == actual_query['query']['simple_query_string']['query']
     )
     assert all(
         e in actual_query['post_filter']['bool']['must_not']
@@ -3042,7 +2971,6 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
                 'aggs': {
                     'audit-WARNING-category': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'audit.WARNING.category'
                         }
@@ -3061,7 +2989,6 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
                 'aggs': {
                     'audit-NOT_COMPLIANT-category': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'audit.NOT_COMPLIANT.category'
                         }
@@ -3081,7 +3008,6 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
                 'aggs': {
                     'status': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'embedded.status'
                         }
@@ -3099,7 +3025,6 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
                 'aggs': {
                     'name': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'embedded.name'
                         }
@@ -3118,7 +3043,6 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
                 'aggs': {
                     'type': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'embedded.@type'
                         }
@@ -3136,7 +3060,6 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
                 'aggs': {
                     'audit-ERROR-category': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'audit.ERROR.category'
                         }
@@ -3255,7 +3178,6 @@ def test_searches_queries_basic_search_query_factory_with_facets_build_query(dum
                     'status': {
                         'terms': {
                             'size': 200,
-                            'exclude': [],
                             'field': 'embedded.status'
                         }
                     }
@@ -3279,7 +3201,6 @@ def test_searches_queries_basic_search_query_factory_with_facets_build_query(dum
                     'audit-ERROR-category': {
                         'terms': {
                             'size': 200,
-                            'exclude': [],
                             'field': 'audit.ERROR.category'
                         }
                     }
@@ -3305,7 +3226,6 @@ def test_searches_queries_basic_search_query_factory_with_facets_build_query(dum
                     'audit-NOT_COMPLIANT-category': {
                         'terms': {
                             'size': 200,
-                            'exclude': [],
                             'field': 'audit.NOT_COMPLIANT.category'
                         }
                     }
@@ -3355,7 +3275,6 @@ def test_searches_queries_basic_search_query_factory_with_facets_build_query(dum
                     'name': {
                         'terms': {
                             'size': 200,
-                            'exclude': [],
                             'field': 'embedded.name'
                         }
                     }
@@ -3381,7 +3300,6 @@ def test_searches_queries_basic_search_query_factory_with_facets_build_query(dum
                     'audit-WARNING-category': {
                         'terms': {
                             'size': 200,
-                            'exclude': [],
                             'field': 'audit.WARNING.category'
                         }
                     }
@@ -3702,7 +3620,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_make_list_of_na
     assert isinstance(nat[1][1], Terms)
     assert nat[0][1].to_dict() == {
         'terms': {
-            'exclude': [],
             'field': 'embedded.file_type',
             'size': 999999
         }
@@ -3722,21 +3639,18 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_make_subaggrega
                         'terms': {
                             'field': 'embedded.assay_title',
                             'size': 999999,
-                            'exclude': []
                         }
                     }
                 },
                 'terms': {
                     'field': 'embedded.biosample_title',
                     'size': 999999,
-                    'exclude': []
                 }
             }
         },
         'terms': {
             'field': 'embedded.biosample_term_name',
             'size': 999999,
-            'exclude': []
         }
     }
     actual = subagg.to_dict()
@@ -3745,7 +3659,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_make_subaggrega
     assert name == 'assay_title'
     assert subagg.to_dict() == {
         'terms': {
-            'exclude': [],
             'field':
             'embedded.assay_title',
             'size': 999999
@@ -3781,21 +3694,18 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_add_matrix_aggr
                 'aggs': {
                     'status': {
                         'terms': {
-                            'exclude': [],
                             'size': 999999,
                             'field': 'embedded.status'
                         },
                         'aggs': {
                             'name': {
                                 'terms': {
-                                    'exclude': [],
                                     'size': 999999,
                                     'field': 'embedded.name'
                                 },
                                 'aggs': {
                                     'label': {
                                         'terms': {
-                                            'exclude': [],
                                             'size': 999999,
                                             'field': 'embedded.label'
                                         }
@@ -3830,7 +3740,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_add_matrix_aggr
                 'aggs': {
                     'label': {
                         'terms': {
-                            'exclude': [],
                             'size': 999999,
                             'field': 'embedded.label'
                         }
@@ -3924,21 +3833,18 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                                 'aggs': {
                                     'label': {
                                         'terms': {
-                                            'exclude': [],
                                             'size': 999999,
                                             'field': 'embedded.label'
                                         }
                                     }
                                 },
                                 'terms': {
-                                    'exclude': [],
                                     'size': 999999,
                                     'field': 'embedded.name'
                                 }
                             }
                         },
                         'terms': {
-                            'exclude': [],
                             'size': 999999,
                             'field': 'embedded.status'
                         }
@@ -3957,7 +3863,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 'aggs': {
                     'audit-NOT_COMPLIANT-category': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field':
                             'audit.NOT_COMPLIANT.category'
@@ -3977,7 +3882,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 'aggs': {
                     'audit-ERROR-category': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'audit.ERROR.category'
                         }
@@ -3996,7 +3900,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 'aggs': {
                     'status': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field':
                             'embedded.status'
@@ -4016,7 +3919,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 'aggs': {
                     'audit-WARNING-category': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'audit.WARNING.category'
                         }
@@ -4035,7 +3937,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 'aggs': {
                     'name': {
                         'terms': {
-                            'exclude': [],
                             'size': 200,
                             'field': 'embedded.name'
                         }
@@ -4054,7 +3955,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 'aggs': {
                     'label': {
                         'terms': {
-                            'exclude': [],
                             'size': 999999,
                             'field': 'embedded.label'
                         }
@@ -4091,6 +3991,309 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
     assert set(actual.keys()) == set(expected.keys())
     assert set(actual['aggs'].keys()) == set(expected['aggs'].keys())
     assert actual['size'] == 0
+
+
+def test_searches_queries_missing_matrix_query_factory_with_facets_init(params_parser):
+    from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
+    mmqf = MissingMatrixQueryFactoryWithFacets(params_parser)
+    assert isinstance(mmqf, MissingMatrixQueryFactoryWithFacets)
+    assert mmqf.params_parser == params_parser
+
+
+def test_searches_queries_missing_matrix_query_factory_with_facets_parse_name_and_default_value_from_name(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl.aggs import Terms
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    mmqf = MissingMatrixQueryFactoryWithFacets(params_parser)
+    name, default_value = mmqf._parse_name_and_default_value_from_name('target.label')
+    assert name == 'target.label'
+    assert default_value is None
+    name, default_value = mmqf._parse_name_and_default_value_from_name(('target.label', 'no_target'))
+    assert name == 'target.label'
+    assert default_value == 'no_target'
+
+
+def test_searches_queries_missing_matrix_query_factory_with_facets_make_subaggregation_with_possible_default_value_from_name(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl.aggs import Terms
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    mmqf = MissingMatrixQueryFactoryWithFacets(params_parser)
+    name, subagg_with_default_value = mmqf._make_subaggregation_with_possible_default_value_from_name(
+        mmqf._subaggregation_factory('TERMS'),
+        ('target.label', 'no_target')
+    )
+    assert name == 'target.label'
+    assert subagg_with_default_value.to_dict() == {
+        'terms': {
+            'size': 999999,
+            'field': 'embedded.target.label',
+            'missing': 'no_target'
+        }
+    }
+
+
+def test_searches_queries_missing_matrix_query_factory_with_facets_make_list_of_name_and_subagg_tuples(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl.aggs import Terms
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    mmqf = MissingMatrixQueryFactoryWithFacets(params_parser)
+    nat = mmqf._make_list_of_name_and_subagg_tuples(['file_type', 'lab.name'])
+    assert nat[0][0] == 'file_type'
+    assert nat[1][0] == 'lab.name'
+    assert isinstance(nat[0][1], Terms)
+    assert isinstance(nat[1][1], Terms)
+    assert nat[0][1].to_dict() == {
+        'terms': {
+            'field': 'embedded.file_type',
+            'size': 999999
+        }
+    }
+    nat = mmqf._make_list_of_name_and_subagg_tuples([('file_type', 'missing_file_type'), 'lab.name'])
+    assert nat[0][0] == 'file_type'
+    assert nat[1][0] == 'lab.name'
+    assert isinstance(nat[0][1], Terms)
+    assert isinstance(nat[1][1], Terms)
+    assert nat[0][1].to_dict() == {
+        'terms': {
+            'field': 'embedded.file_type',
+            'missing': 'missing_file_type',
+            'size': 999999
+        }
+    }
+    assert nat[1][1].to_dict() == {
+        'terms': {
+            'size': 999999,
+            'field': 'embedded.lab.name'
+        }
+    }
+
+
+def test_searches_queries_missing_matrix_query_factory_with_facets_add_matrix_aggregations(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    mmqf = MissingMatrixQueryFactoryWithFacets(params_parser)
+    mmqf.add_matrix_aggregations()
+    expected = {
+        'aggs': {
+            'y': {
+                'aggs': {
+                    'status': {
+                        'terms': {
+                            'size': 999999,
+                            'field': 'embedded.status'
+                        },
+                        'aggs': {
+                            'name': {
+                                'terms': {
+                                    'size': 999999,
+                                    'field': 'embedded.name'
+                                },
+                                'aggs': {
+                                    'label': {
+                                        'terms': {
+                                            'size': 999999,
+                                            'field': 'embedded.label'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {
+                                'terms': {
+                                    'embedded.status': [
+                                        'released'
+                                    ]
+                                }
+                            },
+                            {
+                                'terms': {
+                                    'embedded.@type': [
+                                        'TestingSearchSchema'
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            'x': {
+                'aggs': {
+                    'label': {
+                        'terms': {
+                            'size': 999999,
+                            'field': 'embedded.label'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {
+                                'terms': {
+                                    'embedded.status': [
+                                        'released'
+                                    ]
+                                }
+                            },
+                            {
+                                'terms': {
+                                    'embedded.@type': [
+                                        'TestingSearchSchema'
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        'query': {
+            'match_all': {}
+        }
+    }
+    actual = mmqf.search.to_dict()
+    assert all([e in actual for e in expected])
+    assert actual['aggs']['y']['aggs']['status']['terms']['field'] == 'embedded.status'
+    assert actual['aggs']['y']['aggs']['status']['terms']['size'] == 999999
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']['field'] == 'embedded.name'
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']['size'] == 999999
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']['field'] == 'embedded.label'
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']['size'] == 999999
+    assert actual['aggs']['x']['aggs']['label']['terms']['field'] == 'embedded.label'
+    assert actual['aggs']['x']['aggs']['label']['terms']['size'] == 999999
+    assert len(actual['aggs']['y']['filter']['bool']['must']) == 2
+    assert len(actual['aggs']['x']['filter']['bool']['must']) == 2
+    assert 'missing' not in actual['aggs']['y']['aggs']['status']['terms']
+    assert 'missing' not in  actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']
+    assert 'missing' not in actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']
+
+
+def test_searches_queries_missing_matrix_query_factory_with_facets_add_matrix_aggregations_with_default_value(params_parser, dummy_request):
+    from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    mmqf = MissingMatrixQueryFactoryWithFacets(
+        params_parser,
+        matrix_definition_name='missing_matrix'
+    )
+    mmqf.add_matrix_aggregations()
+    expected = {
+        'aggs': {
+            'y': {
+                'aggs': {
+                    'status': {
+                        'terms': {
+                            'size': 999999,
+                            'field': 'embedded.status'
+                        },
+                        'aggs': {
+                            'name': {
+                                'terms': {
+                                    'size': 999999,
+                                    'field': 'embedded.name'
+                                },
+                                'aggs': {
+                                    'label': {
+                                        'terms': {
+                                            'size': 999999,
+                                            'field': 'embedded.label'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {
+                                'terms': {
+                                    'embedded.status': [
+                                        'released'
+                                    ]
+                                }
+                            },
+                            {
+                                'terms': {
+                                    'embedded.@type': [
+                                        'TestingSearchSchema'
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            'x': {
+                'aggs': {
+                    'label': {
+                        'terms': {
+                            'size': 999999,
+                            'field': 'embedded.label'
+                        }
+                    }
+                },
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {
+                                'terms': {
+                                    'embedded.status': [
+                                        'released'
+                                    ]
+                                }
+                            },
+                            {
+                                'terms': {
+                                    'embedded.@type': [
+                                        'TestingSearchSchema'
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        'query': {
+            'match_all': {}
+        }
+    }
+    actual = mmqf.search.to_dict()
+    assert all([e in actual for e in expected])
+    assert actual['aggs']['y']['aggs']['status']['terms']['field'] == 'embedded.status'
+    assert actual['aggs']['y']['aggs']['status']['terms']['size'] == 999999
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']['field'] == 'embedded.name'
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']['size'] == 999999
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']['field'] == 'embedded.label'
+    assert actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']['size'] == 999999
+    assert actual['aggs']['x']['aggs']['label']['terms']['field'] == 'embedded.label'
+    assert actual['aggs']['x']['aggs']['label']['terms']['size'] == 999999
+    assert len(actual['aggs']['y']['filter']['bool']['must']) == 2
+    assert len(actual['aggs']['x']['filter']['bool']['must']) == 2
+    assert 'missing' not in actual['aggs']['y']['aggs']['status']['terms']
+    assert  actual['aggs']['y']['aggs']['status']['aggs']['name']['terms']['missing'] == 'default_name'
+    assert 'missing' not in actual['aggs']['y']['aggs']['status']['aggs']['name']['aggs']['label']['terms']
 
 
 def test_searches_queries_audit_matrix_query_factory_with_facets_init(params_parser):

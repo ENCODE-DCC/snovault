@@ -124,6 +124,39 @@ def test_abstract_collection(testapp, snowball):
     testapp.get('/snowsets/{accession}'.format(**snowball))
 
 
+def test_views_object_with_select_calculated_properties(workbook, testapp):
+    r = testapp.get('/snowballs/')
+    at_id = r.json['@graph'][0]['@id']
+    r = testapp.get(at_id + '?frame=object')
+    assert 'test_calculated' in r.json
+    assert 'another_test_calculated' in r.json
+    assert 'conditional_test_calculated' in r.json
+    r = testapp.get(at_id + '?frame=object&skip_calculated=true')
+    assert 'test_calculated' not in r.json
+    assert 'another_test_calculated' not in r.json
+    assert 'conditional_test_calculated' not in r.json
+    r = testapp.get(at_id + '?frame=object_with_select_calculated_properties')
+    assert 'test_calculated' not in r.json
+    assert 'another_test_calculated' not in r.json
+    assert 'conditional_test_calculated' not in r.json
+    r = testapp.get(at_id + '?frame=object_with_select_calculated_properties&field=test_calculated')
+    assert 'test_calculated' in r.json
+    assert 'another_test_calculated' not in r.json
+    assert 'conditional_test_calculated' not in r.json
+    r = testapp.get(
+        at_id + '?frame=object_with_select_calculated_properties&field=test_calculated&field=another_test_calculated'
+    )
+    assert 'test_calculated' in r.json
+    assert 'another_test_calculated' in r.json
+    assert 'conditional_test_calculated' not in r.json
+    r = testapp.get(
+        at_id + '?frame=object_with_select_calculated_properties&field=test_calculated&field=conditional_test_calculated'
+    )
+    assert 'test_calculated' in r.json
+    assert 'another_test_calculated' not in r.json
+    assert 'conditional_test_calculated' in r.json
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize(('item_type', 'length'), TYPE_LENGTH.items())
 def test_load_workbook(workbook, testapp, item_type, length):

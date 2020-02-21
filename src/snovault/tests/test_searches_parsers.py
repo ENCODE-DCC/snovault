@@ -813,3 +813,230 @@ def test_searchers_parsers_params_parser_split_filters_by_must_and_exists(dummy_
         ('restricted!', '*'),
         ('no_file_available!', '*')
     ]
+
+
+def test_searches_parsers_mutable_params_parser_init(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    mpp = MutableParamsParser(dummy_request)
+    assert isinstance(mpp, MutableParamsParser)
+    assert mpp.params == []
+    dummy_request.query_string = 'type=Snowflake'
+    mpp = MutableParamsParser(dummy_request)
+    assert mpp.params == [
+        ('type', 'Snowflake')
+]
+
+
+def test_searches_parsers_mutable_params_parser_get_original_params(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    mpp = MutableParamsParser(dummy_request)
+    assert mpp._get_original_params() == []
+    dummy_request.query_string = 'type=Snowflake'
+    mpp = MutableParamsParser(dummy_request)
+    assert mpp._get_original_params() == [('type', 'Snowflake')]
+
+
+def test_searches_parsers_mutable_params_parser_get_original_query_string(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    mpp = MutableParamsParser(dummy_request)
+    assert mpp._get_original_query_string() == ''
+    dummy_request.query_string = 'type=Snowflake&status!=deleted'
+    mpp = MutableParamsParser(dummy_request)
+    assert mpp._get_original_query_string() == 'type=Snowflake&status%21=deleted'
+
+
+def test_searches_parsers_mutable_params_parser_validate_param(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    mpp = MutableParamsParser(dummy_request)
+    mpp._validate_param(('type', 'Snowflake'))
+    mpp._validate_param(('status!', 'deleted'))
+    with pytest.raises(ValueError):
+        mpp._validate_param('abc')
+        mpp._validate_param(['abc'])
+        mpp._validate_param([('abc', 123), ('abc', 123)])
+        mpp._validate_param(('abc', 123, 'cdf'))
+
+
+def test_searches_parsers_mutable_params_parser_validate_params(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    mpp = MutableParamsParser(dummy_request)
+    mpp._validate_params([('type', 'Snowflake')])
+    mpp._validate_params([('type', 'Snowflake'), ('type!', 'Item')])
+    with pytest.raises(ValueError):
+        mpp._validate_params([('type', 'Snowflake'), ('type!', 'Item', 123)])
+        mpp._validate_params(('type', 'Snowflake'))
+
+
+def test_searches_parsers_mutable_params_parser_append(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    mpp = MutableParamsParser(dummy_request)
+    mpp.append(('type', 'Snowflake'))
+    assert mpp.params == [('type', 'Snowflake')]
+    with pytest.raises(ValueError):
+        mpp.append('asdf')
+        assert mpp.params == [('type', 'Snowflake')]
+    mpp.append(('type', 'Snowball'))
+    assert mpp.params == [
+        ('type', 'Snowflake'),
+        ('type', 'Snowball')
+    ]
+    mpp.append(('type', 'Snowball'))
+    assert mpp.params == [
+        ('type', 'Snowflake'),
+        ('type', 'Snowball'),
+        ('type', 'Snowball')
+    ]
+    mpp.append(('type!', 'Snowball'))
+    assert mpp.params == [
+        ('type', 'Snowflake'),
+        ('type', 'Snowball'),
+        ('type', 'Snowball'),
+        ('type!', 'Snowball')
+    ]
+    mpp.params = [('status', 'released')]
+    mpp.append(('thing', 'other_thing'))
+    assert mpp.params == [('status', 'released'), ('thing', 'other_thing')]
+
+
+def test_searches_parsers_mutable_params_parser_extend(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    mpp = MutableParamsParser(dummy_request)
+    mpp.params = [('status', 'released')]
+    mpp.extend(
+        [
+            ('type', 'Snowflake'),
+            ('type', 'Snowball')
+        ]
+    )
+    assert mpp.params == [
+        ('status', 'released'),
+        ('type', 'Snowflake'),
+        ('type', 'Snowball')
+    ]
+    with pytest.raises(ValueError):
+        mpp.extend([('x', 'y', 'z')])
+        mpp.extend(('x', 'y'))
+
+
+def test_searches_parsers_mutable_params_parser_drop_key(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    mpp = MutableParamsParser(dummy_request)
+    mpp.params = [('status', 'released')]
+    mpp._drop_key('status')
+    assert mpp.params == []
+    mpp.params = [('status', 'released'), ('status', 'deleted')]
+    mpp._drop_key('status')
+    assert mpp.params == []
+    mpp.params = [('status', 'released'), ('status!', 'deleted'), ('type', 'Snowflake')]
+    mpp._drop_key('status')
+    assert mpp.params == [('type', 'Snowflake')]
+
+
+def test_searches_parsers_mutable_params_parser_drop_key_and_value(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    mpp = MutableParamsParser(dummy_request)
+    mpp.params = [('status', 'released')]
+    mpp._drop_key_and_value(key='status', value='deleted')
+    assert mpp.params == [('status', 'released')]
+    mpp._drop_key_and_value(key='status!', value='released')
+    assert mpp.params == [('status', 'released')]
+    mpp._drop_key_and_value(key='status', value='released')
+    assert mpp.params == []
+
+
+def test_searches_parsers_mutable_params_parser_drop(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    mpp = MutableParamsParser(dummy_request)
+    mpp.params = [('status', 'released')]
+    mpp.drop('status')
+    assert mpp.params == []
+    mpp.params = [('status', 'released')]
+    mpp.drop(('status', 'released'))
+    assert mpp.params == []
+    mpp.params = [('status', 'deleted')]
+    mpp.drop(('status', 'released'))
+    assert mpp.params == [('status', 'deleted')]
+
+
+def test_searches_parsers_mutable_params_parser_deduplicate(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    mpp = MutableParamsParser(dummy_request)
+    mpp.params = [('status', 'released')]
+    mpp.deduplicate()
+    assert mpp.params == [('status', 'released')]
+    mpp.params = [('status', 'released'), ('status', 'released'), ('limit', 'all')]
+    mpp.deduplicate()
+    assert mpp.params == [('status', 'released'), ('limit', 'all')]
+    mpp.params = [
+        ('status', 'released'),
+        ('abc', 123),
+        ('status', 'released'),
+        ('limit', 'all'),
+        ('type', 'Snowball'),
+        ('type!', 'Snowball'),
+        ('type', 'Snowflake'),
+        ('limit', 'all')
+    ]
+    mpp.deduplicate()
+    assert mpp.params == [
+        ('status', 'released'),
+        ('abc', 123),
+        ('limit', 'all'),
+        ('type', 'Snowball'),
+        ('type!', 'Snowball'),
+        ('type', 'Snowflake')
+    ]
+
+    
+def test_searches_parsers_mutable_params_parser_get_request_with_new_query_string(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    dummy_request.query_string = 'type=Snowflake&status=released&format=json'
+    mpp = MutableParamsParser(dummy_request)
+    assert mpp.get_request_with_new_query_string().query_string == 'type=Snowflake&status=released&format=json'
+    mpp.append(('limit', 'all'))
+    assert mpp.get_request_with_new_query_string().query_string == 'type=Snowflake&status=released&format=json&limit=all'
+    mpp.append(('limit', 'all'))
+    assert mpp.params == [
+        ('type', 'Snowflake'),
+        ('status', 'released'),
+        ('format', 'json'),
+        ('limit', 'all'),
+        ('limit', 'all')
+    ]
+    assert mpp.get_request_with_new_query_string(
+        deduplicate=False
+    ).query_string == 'type=Snowflake&status=released&format=json&limit=all&limit=all'
+    assert mpp.get_request_with_new_query_string().query_string == 'type=Snowflake&status=released&format=json&limit=all'
+    
+
+def test_searches_parsers_mutable_params_parser_get_request_with_new_query_string_special_values(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    dummy_request.query_string = 'type=Snowflake&subtype=abc123+abc3%2B'
+    mpp = MutableParamsParser(dummy_request)
+    assert mpp.get_request_with_new_query_string().query_string == 'type=Snowflake&subtype=abc123+abc3%2B'
+    dummy_request.query_string = 'type=Snowflake'
+    mpp = MutableParamsParser(dummy_request)
+    assert mpp.get_request_with_new_query_string().query_string == 'type=Snowflake'
+    mpp.append(('subtype', 'abc123 abc3+'))
+    assert mpp.get_request_with_new_query_string().query_string == 'type=Snowflake&subtype=abc123+abc3%2B'
+    mpp.drop(('subtype', 'abc123 abc3+'))
+    assert mpp.get_request_with_new_query_string().query_string == 'type=Snowflake'
+
+
+def test_searches_parsers_query_string_init(dummy_request):
+    from snovault.elasticsearch.searches.parsers import QueryString
+    qs = QueryString(dummy_request)
+    assert isinstance(qs, QueryString)
+
+
+def test_searches_parsers_query_string__repr__(dummy_request):
+    from snovault.elasticsearch.searches.parsers import QueryString
+    dummy_request.query_string = 'type=Snowflake&type!=Snowball'
+    qs = QueryString(dummy_request)
+    assert str(qs) == 'type=Snowflake&type%21=Snowball'
+    dummy_request.query_string = 'type=Snowball&status!=revoked&files.file_type=bed+bed6%2B'
+    qs = QueryString(dummy_request)
+    assert str(qs) == 'type=Snowball&status%21=revoked&files.file_type=bed+bed6%2B'
+    dummy_request.query_string = 'type=Snowball&status%21=revoked&files.file_type=bed+bed6%2B'
+    qs = QueryString(dummy_request)
+    assert str(qs) == 'type=Snowball&status%21=revoked&files.file_type=bed+bed6%2B'

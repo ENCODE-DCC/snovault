@@ -76,3 +76,23 @@ def remove_from_return(keys=[], values=[]):
             return r
         return wrapper
     return remove_from_return_decorator
+
+
+def catch_and_swap(catch=Exception, swap=None, details=None):
+    '''
+    Catch given exception and raise new exception instead.
+    '''
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                result = func(*args, **kwargs)
+            except catch as e:
+                if not swap:
+                    raise e
+                raise swap(details)
+            else:
+                return result
+        return wrapper
+    return decorator
+

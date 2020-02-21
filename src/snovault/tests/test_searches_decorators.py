@@ -108,3 +108,33 @@ def test_searces_decorators_remove_from_return():
         return value_dict
     assert dummy_func({'a': 1}) == {}
     assert dummy_func({'a': 2}) == {'a': 2}
+
+
+def test_searces_decorators_catch_and_swap():
+    from snovault.elasticsearch.searches.decorators import catch_and_swap
+    @catch_and_swap()
+    def dummy_func():
+        raise ValueError
+    with pytest.raises(ValueError):
+        dummy_func()
+    @catch_and_swap(catch=ValueError, swap=TypeError)
+    def dummy_func():
+        raise ValueError
+    with pytest.raises(TypeError):
+        dummy_func()
+    @catch_and_swap(catch=ValueError, swap=TypeError, details='Invalid type')
+    def dummy_func():
+        raise ValueError
+    with pytest.raises(TypeError) as e:
+        dummy_func()
+    assert str(e.value) == 'Invalid type'
+    @catch_and_swap(catch=TypeError, swap=TypeError, details='Invalid type')
+    def dummy_func():
+        raise ValueError
+    with pytest.raises(ValueError) as e:
+        dummy_func()
+    @catch_and_swap(catch=ValueError, swap=Exception, details='Invalid type')
+    def dummy_func():
+        raise ValueError
+    with pytest.raises(Exception) as e:
+        dummy_func()

@@ -10,6 +10,8 @@ from snovault.elasticsearch import ELASTIC_SEARCH
 from snovault.elasticsearch.interfaces import RESOURCES_INDEX
 from snovault.interfaces import TYPES
 
+from .configs import ExistsAggregationConfig
+from .configs import TermsAggregationConfig
 from .decorators import assert_none_returned
 from .decorators import assert_one_returned
 from .decorators import assert_one_or_none_returned
@@ -64,6 +66,7 @@ from .interfaces import PRINCIPALS_ALLOWED_VIEW
 from .interfaces import PROPERTIES
 from .interfaces import QUERY_STRING
 from .interfaces import SEARCH_AUDIT
+from .interfaces import SIMPLE_QUERY_STRING
 from .interfaces import _SOURCE
 from .interfaces import TITLE
 from .interfaces import TERMS
@@ -193,6 +196,25 @@ class AbstractQueryFactory:
     def _escape_regex_slashes(self, query):
         return query.replace('/', '\/')
 
+    def _escape_fuzzy_tilde(self, query):
+        return query.replace('~', '\~')
+
+    def _escape_boost_caret(self, query):
+        return query.replace('^', '\^')
+
+    def _escape_reserved_query_string_characters(self, query):
+        '''
+        Removes some of the sharp edges of query strings from
+        invalid user input.
+        '''
+        return self._escape_regex_slashes(
+            self._escape_fuzzy_tilde(
+                self._escape_boost_caret(
+                    query
+                )
+            )
+        )
+
     def _validated_query_string_query(self, query):
         try:
             query = prefixfields(EMBEDDED, query, dialects.elasticsearch)
@@ -260,18 +282,16 @@ class AbstractQueryFactory:
         facets.extend(self._get_audit_facets())
         return facets
 
-    def _get_query(self):
-        must = (
-            self.params_parser.get_must_match_search_term_filters()
-            + self.params_parser.get_must_match_advanced_query_filters()
-        )
-        must_not = (
-            self.params_parser.get_must_not_match_search_term_filters()
-            + self.params_parser.get_must_not_match_advanced_query_filters()
-        )
+    def _get_simple_query_string_query(self):
         return self._combine_search_term_queries(
-            must_match_filters=must,
-            must_not_match_filters=must_not
+            must_match_filters=self.params_parser.get_must_match_search_term_filters(),
+            must_not_match_filters=self.params_parser.get_must_not_match_search_term_filters()
+        )
+
+    def _get_query_string_query(self):
+        return self._combine_search_term_queries(
+            must_match_filters=self.params_parser.get_must_match_advanced_query_filters(),
+            must_not_match_filters=self.params_parser.get_must_not_match_advanced_query_filters()
         )
 
     def _get_filters(self):
@@ -470,6 +490,14 @@ class AbstractQueryFactory:
         elif must_not:
             return NOT_JOIN.lstrip() + must_not
 
+    def _make_simple_query_string_query(self, query, fields, default_operator=AND):
+        return Q(
+            SIMPLE_QUERY_STRING,
+            query=query,
+            fields=fields,
+            default_operator=default_operator
+        )
+
     def _make_query_string_query(self, query, fields, default_operator=AND):
         return Q(
             QUERY_STRING,
@@ -555,12 +583,11 @@ class AbstractQueryFactory:
         not_exists = self._make_field_must_exist_query_from_params(_not_exists)
         return must, must_not, exists, not_exists
 
-    def _make_terms_aggregation(self, field, exclude=[], size=200, *kwargs):
+    def _make_terms_aggregation(self, field, **kwargs):
         return A(
             TERMS,
             field=field,
-            size=size,
-            exclude=exclude
+            **TermsAggregationConfig(**kwargs)
         )
 
     def _make_exists_aggregation(self, field, **kwargs):
@@ -569,7 +596,8 @@ class AbstractQueryFactory:
             filters={
                 YES: Q(EXISTS, field=field),
                 NO: ~Q(EXISTS, field=field)
-            }
+            },
+            **ExistsAggregationConfig(**kwargs)
         )
 
     def _make_filter_aggregation(self, filter_context, **kwargs):
@@ -710,11 +738,22 @@ class AbstractQueryFactory:
             )
         )
 
+    def add_simple_query_string_query(self):
+        query = self._get_simple_query_string_query()
+        if query:
+            self.search = self._get_or_create_search().query(
+                self._make_simple_query_string_query(
+                    query=query,
+                    fields=self._get_search_fields(),
+                    default_operator=AND
+                )
+            )
+
     def add_query_string_query(self):
-        query = self._get_query()
+        query = self._get_query_string_query()
         if query:
             query = self._validated_query_string_query(
-                self._escape_regex_slashes(query)
+                self._escape_reserved_query_string_characters(query)
             )
             self.search = self._get_or_create_search().query(
                 self._make_query_string_query(
@@ -753,7 +792,7 @@ class AbstractQueryFactory:
             )
             subaggregation = subaggregation(
                 field=self._map_param_key_to_elasticsearch_field(facet_name),
-                exclude=facet_options.get(EXCLUDE, []),
+                exclude=facet_options.get(EXCLUDE),
                 # TODO: size should be defined in schema instead of long keyword.
                 size=3000 if facet_options.get(LENGTH) == LONG else 200
             )
@@ -817,6 +856,7 @@ class BasicSearchQueryFactory(AbstractQueryFactory):
 
     def build_query(self):
         self.validate_item_types()
+        self.add_simple_query_string_query()
         self.add_query_string_query()
         self.add_filters()
         self.add_post_filters()
@@ -999,6 +1039,7 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
 
     def build_query(self):
         self.validate_item_types()
+        self.add_simple_query_string_query()
         self.add_query_string_query()
         self.add_filters()
         self.add_post_filters()
@@ -1006,6 +1047,44 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
         self.add_aggregations_and_aggregation_filters()
         self.add_matrix_aggregations()
         return self.search
+
+
+class MissingMatrixQueryFactoryWithFacets(BasicMatrixQueryFactoryWithFacets):
+    '''
+    Like BasicMatrixQueryFactoryWithFacets but allows specification of default value
+    for objects missing an aggregation field.
+    '''
+
+    def _parse_name_and_default_value_from_name(self, name, default_value=None):
+        '''
+        Specifying a tuple in the group_by definition indicates a default value
+        should be filled in when the field is missing. Assumes tuple is
+        (name, default_value). Default value only applies if it is not None.
+        '''
+        if isinstance(name, tuple):
+            name, default_value = name
+        return name, default_value
+
+    def _make_subaggregation_with_possible_default_value_from_name(self, subaggregation, name):
+        name, default_value = self._parse_name_and_default_value_from_name(name)
+        return (
+            name,
+            subaggregation(
+                field=self._map_param_key_to_elasticsearch_field(name),
+                size=NO_LIMIT,
+                missing=default_value
+            )
+        )
+
+    def _make_list_of_name_and_subagg_tuples(self, names, aggregation_type=TERMS):
+        subaggregation = self._subaggregation_factory(aggregation_type)
+        return [
+            self._make_subaggregation_with_possible_default_value_from_name(
+                subaggregation,
+                name
+            )
+            for name in names
+        ]
 
 
 class AuditMatrixQueryFactoryWithFacets(BasicMatrixQueryFactoryWithFacets):

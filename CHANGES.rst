@@ -1,6 +1,23 @@
 Changes
 =======
 
+Snovault 1.0.40 (released) encoded v95.0
+----------------------------------------
+1. SNO-129-add-fielded-generator-response (#244)
+2. SNO-128-make-select-calculated-properties-view (#245)
+3. SNO-133-setuptools-test-failure (#247)
+
+Snovault 1.0.39 (released) encoded v94.0
+----------------------------------------
+1. SNO-126-allow-default-value-for-missing-aggregation-field (#242)
+
+Snovault 1.0.38 (released) encoded v93.0
+----------------------------------------
+1. SNO-125-switch-batch-download-to-query-string (#238)
+2. SNO-118-simple-query-string (#240)
+3. SNO-123-limit-es-scan (#237)
+4. SNO-121-fix-circleci-apt-install (#224)
+
 Snovault 1.0.37 (released) encoded v92.0
 ----------------------------------------
 1. SNO-119-escape-regex-slash (#221)

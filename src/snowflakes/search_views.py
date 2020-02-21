@@ -18,6 +18,7 @@ from snovault.elasticsearch.searches.fields import ContextResponseField
 from snovault.elasticsearch.searches.fields import DebugQueryResponseField
 from snovault.elasticsearch.searches.fields import FiltersResponseField
 from snovault.elasticsearch.searches.fields import IDResponseField
+from snovault.elasticsearch.searches.fields import MissingMatrixWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import NotificationResponseField
 from snovault.elasticsearch.searches.fields import NonSortableResponseField
 from snovault.elasticsearch.searches.fields import RawMatrixWithAggsResponseField
@@ -28,6 +29,7 @@ from snovault.elasticsearch.searches.fields import TitleResponseField
 from snovault.elasticsearch.searches.fields import TypeOnlyClearFiltersResponseField
 from snovault.elasticsearch.searches.fields import TypeResponseField
 from snovault.elasticsearch.searches.parsers import ParamsParser
+from snovault.elasticsearch.searches.responses import FieldedGeneratorResponse
 from snovault.elasticsearch.searches.responses import FieldedResponse
 
 
@@ -38,6 +40,7 @@ def includeme(config):
     config.add_route('report', '/report{slash:/?}')
     config.add_route('matrixv2_raw', '/matrixv2_raw{slash:/?}')
     config.add_route('matrix', '/matrix{slash:/?}')
+    config.add_route('missing_matrix', '/missing_matrix{slash:/?}')
     config.add_route('summary', '/summary{slash:/?}')
     config.add_route('audit', '/audit{slash:/?}')
     config.scan(__name__)
@@ -114,6 +117,24 @@ def searchv2_quick(context, request):
     return fr.render()
 
 
+def search_generator(request):
+    '''
+    For internal use (no view). Like search_quick but returns raw generator
+    of search hits in @graph field.
+    '''
+    fgr = FieldedGeneratorResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
+        response_fields=[
+            BasicSearchResponseField(
+                default_item_types=DEFAULT_ITEM_TYPES
+            )
+        ]
+    )
+    return fgr.render()
+
+
 @view_config(route_name='report', request_method='GET', permission='search')
 def report(context, request):
     fr = FieldedResponse(
@@ -176,6 +197,35 @@ def matrix(context, request):
             ContextResponseField(),
             BasicMatrixWithFacetsResponseField(
                 default_item_types=DEFAULT_ITEM_TYPES
+            ),
+            NotificationResponseField(),
+            FiltersResponseField(),
+            TypeOnlyClearFiltersResponseField(),
+            DebugQueryResponseField()
+        ]
+    )
+    return fr.render()
+
+
+@view_config(route_name='missing_matrix', request_method='GET', permission='search')
+def missing_matrix(context, request):
+    fr = FieldedResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
+        response_fields=[
+            TitleResponseField(
+                title=MATRIX_TITLE
+            ),
+            TypeResponseField(
+                at_type=[MATRIX_TITLE]
+            ),
+            IDResponseField(),
+            SearchBaseResponseField(),
+            ContextResponseField(),
+            MissingMatrixWithFacetsResponseField(
+                default_item_types=DEFAULT_ITEM_TYPES,
+                matrix_definition_name='missing_matrix'
             ),
             NotificationResponseField(),
             FiltersResponseField(),

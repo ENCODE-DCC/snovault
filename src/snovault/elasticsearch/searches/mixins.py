@@ -175,9 +175,24 @@ class HitsToGraphMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def _limit_generator(self, generator, limit):
+        for i, r in enumerate(generator):
+            if i >= limit:
+                break
+            yield r
+
+    def _scan(self):
+        results = self.results._search.scan()
+        if not self.query_builder._limit_is_all():
+            results = self._limit_generator(
+                results,
+                limit=self.query_builder._get_limit_value_as_int()
+            )
+        return results
+
     def _get_results(self):
         if self.query_builder._should_scan_over_results():
-            return self.results._search.scan()
+            return self._scan()
         return self.results
 
     def _unlayer(self, hit_dict, keep_layered=KEEP_LAYERED_FIELDS):

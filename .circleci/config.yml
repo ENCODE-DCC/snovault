@@ -27,7 +27,7 @@ commands:
           name: Add apt repositories
           command: |
             ES_APT_REPO="deb https://artifacts.elastic.co/packages/${ES_MAJOR_VERSION}.x/apt stable main"
-            sudo apt-get install apt-transport-https software-properties-common
+            sudo apt-get update && sudo apt-get install apt-transport-https software-properties-common
             wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
             echo ${ES_APT_REPO} | sudo tee -a /etc/apt/sources.list.d/elastic-${ES_MAJOR_VERSION}.x.list
             curl -sSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | sudo apt-key add -
@@ -56,6 +56,7 @@ commands:
       - run:
           name: Run buildout
           command: |
+            sudo pip3 install --upgrade pip
             sudo pip3 install -U zc.buildout setuptools
             buildout bootstrap
             bin/buildout

@@ -661,6 +661,26 @@ def test_searches_fields_basic_matrix_with_facets_response_field_execute_query(d
     assert Search.execute.call_count == 1
 
 
+def test_searches_fields_missing_matrix_with_facets_response_field_init():
+    from snovault.elasticsearch.searches.fields import MissingMatrixWithFacetsResponseField
+    mmwf = MissingMatrixWithFacetsResponseField()
+    assert isinstance(mmwf, MissingMatrixWithFacetsResponseField)
+
+
+def test_searches_fields_missing_matrix_with_facets_response_field_build_query(dummy_parent):
+    from snovault.elasticsearch.searches.fields import MissingMatrixWithFacetsResponseField
+    from snovault.elasticsearch.searches.queries import MissingMatrixQueryFactoryWithFacets
+    from elasticsearch_dsl import Search
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    mmwf = MissingMatrixWithFacetsResponseField()
+    mmwf.parent = dummy_parent
+    mmwf._build_query()
+    assert isinstance(mmwf.query, Search)
+    assert isinstance(mmwf.query_builder, MissingMatrixQueryFactoryWithFacets)
+
+
 def test_searches_fields_search_base_get_search_base(dummy_parent):
     from snovault.elasticsearch.searches.fields import SearchBaseResponseField
     dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (

@@ -56,6 +56,29 @@ def test_searchv2_view_with_limit(workbook, testapp):
     assert 'all' not in r.json
 
 
+def test_searchv2_view_with_limit_and_scan(workbook, testapp, mocker):
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
+    mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_should_scan_over_results')
+    BasicSearchQueryFactoryWithFacets._should_scan_over_results.return_value = True
+    r = testapp.get(
+        '/search/?type=Snowflake&limit=all'
+    )
+    assert len(r.json['@graph']) == 35
+    r = testapp.get(
+        '/search/?type=Snowflake&limit=30'
+    )
+    assert len(r.json['@graph']) == 30
+    BasicSearchQueryFactoryWithFacets._should_scan_over_results.return_value = False
+    r = testapp.get(
+        '/search/?type=Snowflake&limit=all'
+    )
+    assert len(r.json['@graph']) == 25
+    r = testapp.get(
+        '/search/?type=Snowflake&limit=30'
+    )
+    assert len(r.json['@graph']) == 30
+
+
 def test_searchv2_view_with_limit_zero(workbook, testapp):
     r = testapp.get(
         '/search/?type=Snowflake&limit=0'
@@ -122,9 +145,13 @@ def test_searchv2_view_values_item_wildcard(workbook, testapp):
 def test_searchv2_view_values_invalid_search_term(workbook, testapp):
     r = testapp.get(
         '/search/?searchTerm=[',
-        status=400
+        status=404
     )
-    assert r.json['description'] == 'Invalid query: ([)'
+    r = testapp.get(
+        '/search/?searchTerm=cherry^',
+        status=200
+    )
+    assert r.json['total'] == 1
 
 
 def test_searchv2_view_values_invalid_advanced_query(workbook, testapp):
@@ -133,6 +160,34 @@ def test_searchv2_view_values_invalid_advanced_query(workbook, testapp):
         status=400
     )
     assert r.json['description'] == 'Invalid query: ([)'
+
+
+def test_searchv2_view_values_reserved_characters_advanced_query(workbook, testapp):
+    r = testapp.get(
+        '/search/?searchTerm=cherry^',
+        status=200
+    )
+    assert r.json['total'] == 1
+    r = testapp.get(
+        '/search/?searchTerm=cherry~',
+        status=200
+    )
+    assert r.json['total'] == 1
+    r = testapp.get(
+        '/search/?searchTerm=/cherry',
+        status=200
+    )
+    assert r.json['total'] == 1
+    r = testapp.get(
+        '/search/?searchTerm=/cherryp',
+        status=404
+    )
+    assert r.json['total'] == 0
+    r = testapp.get(
+        '/search/?searchTerm=/cherry:',
+        status=200
+    )
+    assert r.json['total'] == 1
 
 
 def test_searchv2_view_embedded_frame(workbook, testapp):
@@ -209,6 +264,45 @@ def test_searchv2_quick_view_specify_field(workbook, testapp):
     assert '@id' in r.json['@graph'][0]
     assert '@type' in r.json['@graph'][0]
     assert len(r.json['@graph'][0].keys()) == 2
+
+
+def test_search_generator(workbook, threadlocals, dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch import ELASTIC_SEARCH
+    from elasticsearch import Elasticsearch
+    from types import GeneratorType
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=*&limit=all'
+    )
+    dummy_request.registry[ELASTIC_SEARCH] = Elasticsearch(port=9201)
+    from snowflakes.search_views import search_generator
+    r = search_generator(dummy_request)
+    assert '@graph' in r
+    assert len(r.keys()) == 1
+    assert isinstance(r['@graph'], GeneratorType)
+    hits = [dict(h) for h in r['@graph']]
+    assert len(hits) > 150
+    assert '@id' in hits[0]
+
+
+def test_search_generator_field_specified(workbook, threadlocals, dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch import ELASTIC_SEARCH
+    from elasticsearch import Elasticsearch
+    from types import GeneratorType
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Snowflake&field=@id&limit=5'
+    )
+    dummy_request.registry[ELASTIC_SEARCH] = Elasticsearch(port=9201)
+    from snowflakes.search_views import search_generator
+    r = search_generator(dummy_request)
+    assert '@graph' in r
+    assert len(r.keys()) == 1
+    assert isinstance(r['@graph'], GeneratorType)
+    hits = [dict(h) for h in r['@graph']]
+    assert len(hits) == 5
+    assert '@id' in hits[0]
+    assert len(hits[0].keys()) == 2
 
 
 def test_reportv2_view(workbook, testapp):
@@ -405,6 +499,32 @@ def test_matrixv2_response_no_results(workbook, testapp):
         status=404
     )
     assert r.json['notification'] == 'No results found'
+
+
+def test_missing_matrix_response(workbook, testapp):
+    r = testapp.get('/missing_matrix/?type=Snowball')
+    assert 'aggregations' not in r.json
+    assert 'facets' in r.json
+    assert 'total' in r.json
+    assert r.json['title'] == 'Matrix'
+    assert r.json['@type'] == ['Matrix']
+    assert r.json['clear_filters'] == '/missing_matrix/?type=Snowball'
+    assert r.json['filters'] == [{'term': 'Snowball', 'remove': '/missing_matrix/', 'field': 'type'}]
+    assert r.json['@id'] == '/missing_matrix/?type=Snowball'
+    assert r.json['total'] >= 22
+    assert r.json['notification'] == 'Success'
+    assert r.json['title'] == 'Matrix'
+    assert 'facets' in r.json
+    assert r.json['@context'] == '/terms/'
+    assert 'matrix' in r.json
+    assert r.json['matrix']['x']['group_by'] == 'snowflakes.type'
+    assert r.json['matrix']['y']['group_by'] == ['award.rfa', ['lab.not_a_real_value', 'some_lab']]
+    assert 'buckets' in r.json['matrix']['y']['award.rfa']
+    assert 'key' in r.json['matrix']['y']['award.rfa']['buckets'][0]
+    assert 'lab.not_a_real_value' in r.json['matrix']['y']['award.rfa']['buckets'][0]
+    assert r.json['matrix']['y']['award.rfa']['buckets'][0]['lab.not_a_real_value']['buckets'][0]['key'] == 'some_lab'
+    assert 'search_base' in r.json
+    assert r.json['search_base'] == '/search/?type=Snowball'
 
 
 def test_summaryv2_response(workbook, testapp):

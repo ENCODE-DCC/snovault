@@ -108,3 +108,11 @@ AUDIT_FIELDS = [
     'audit.WARNING.category',
     'audit.INTERNAL_ACTION.category',
 ]
+
+DEFAULT_TERMS_AGGREGATION_KWARGS = [
+    'size',
+    'exclude',
+    'missing',
+]
+
+DEFAULT_EXISTS_AGGREGATION_KWARGS = []
