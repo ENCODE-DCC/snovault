@@ -1,6 +1,15 @@
 Changes
 =======
 
+Snovault 1.0.41 (released) encoded v97.0
+----------------------------------------
+1. SNO-142 Minor fixes for ubutnu 18 on v96x1rc1 (#252)
+2. SNO-141-update-osx-catalina-readme (#252)
+3. SNO-140 Allow shorting uuids with flag (#249)
+4. SNO-139 Log detailed initial indexing times (#249)
+5. SNO-135 Update installation for osx catalina (#249)
+6. SNO-132 Update to py37 lrowe pr with fixes (#249)
+
 Snovault 1.0.40 (released) encoded v95.0
 ----------------------------------------
 1. SNO-129-add-fielded-generator-response (#244)
