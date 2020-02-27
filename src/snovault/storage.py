@@ -63,12 +63,9 @@ bakery = baked.bakery()
 baked_query_resource = bakery(lambda session: session.query(Resource))
 baked_query_unique_key = bakery(
     lambda session: session.query(Key).options(
-        orm.joinedload_all(
-            Key.resource,
-            Resource.data,
-            CurrentPropertySheet.propsheet,
-            innerjoin=True,
-        ),
+        orm.joinedload(Key.resource, innerjoin=True)
+        .joinedload(Resource.data, innerjoin=True)
+        .joinedload(CurrentPropertySheet.propsheet, innerjoin=True),
     ).filter(Key.name == bindparam('name'), Key.value == bindparam('value'))
 )
 
@@ -570,13 +567,9 @@ class TransactionRecord(Base):
     }
 
 
-# User specific stuff
-import cryptacular.bcrypt
-crypt = cryptacular.bcrypt.BCRYPTPasswordManager()
-
-
 def hash_password(password):
-    return crypt.encode(password)
+    from passlib.hash import bcrypt
+    return bcrypt.hash(password)
 
 
 class User(Base):
@@ -609,10 +602,11 @@ class User(Base):
 
     @classmethod
     def check_password(cls, email, password):
+        from passlib.hash import bcrypt
         user = cls.get_by_username(email)
         if not user:
             return False
-        return crypt.check(user.password, password)
+        return bcrypt.verify(password, user.password)
 notify_ddl = DDL("""
     ALTER TABLE %(table)s ALTER COLUMN "xid" SET DEFAULT txid_current();
     CREATE OR REPLACE FUNCTION snovault_transaction_notify() RETURNS trigger AS $$
@@ -678,10 +672,8 @@ def record_transaction_data(session):
     if txn.description:
         data['description'] = txn.description
 
-    # txn.setUser(user_name, path='/') -> '/ user_name'
-    # Set by pyramid_tm as (userid, '')
-    if txn.user:
-        user_path, userid = txn.user.split(' ', 1)
+    userid = txn.user
+    if userid:
         data['userid'] = userid
 
     record.data = {k: v for k, v in data.items() if not k.startswith('_')}

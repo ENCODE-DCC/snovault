@@ -152,7 +152,7 @@ def test_smsimp_indexinit(small_index_objs):
 def test_smsimp_indexserve(small_index_objs):
     """Test simple indexer serve with small vars"""
     indexer, request, invalidated = small_index_objs
-    errors, err_msg = indexer.serve_objects(
+    _, errors, err_msg = indexer.serve_objects(
         request,
         invalidated,
         None,  # xmin
@@ -169,7 +169,7 @@ def test_smsimp_indexserve(small_index_objs):
 def test_smsimp_indextimeout(small_index_objs):
     """test simple indexer serve timeout with small vars"""
     indexer, request, invalidated = small_index_objs
-    errors, err_msg = indexer.serve_objects(
+    _, errors, err_msg = indexer.serve_objects(
         request,
         invalidated,
         None,  # xmin
@@ -188,7 +188,7 @@ def test_smsimp_indexrun(small_index_objs):
     worker_runs_expected = SMALL_BATCH_DIV
     if SMALL_UUIDS_CNT % SMALL_BATCH_DIV:
         worker_runs_expected += 1
-    errors, err_msg = indexer.serve_objects(
+    _, errors, err_msg = indexer.serve_objects(
         request,
         invalidated,
         None,  # xmin
@@ -217,7 +217,7 @@ def _test_smsimp_indexrun_emberr(small_index_objs):
     worker_runs_expected = SMALL_BATCH_DIV
     if SMALL_UUIDS_CNT % SMALL_BATCH_DIV:
         worker_runs_expected += 1
-    errors, err_msg = indexer.serve_objects(
+    _, errors, err_msg = indexer.serve_objects(
         request,
         invalidated,
         None,  # xmin
@@ -279,7 +279,7 @@ class TestIndexer(TestCase):
         )
         request = MockRequest(embed_wait=self.embed_wait)
         uuids = []
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -297,7 +297,7 @@ class TestIndexer(TestCase):
         self.indexer.queue_server.load_uuids = mock.MagicMock(return_value=None)
         expected_err_msg = 'Uuids given to Indexer.serve_objects failed to load'
         request = MockRequest(embed_wait=self.embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -323,7 +323,7 @@ class TestIndexer(TestCase):
             )
         )
         request = MockRequest(embed_wait=self.embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -342,7 +342,7 @@ class TestIndexer(TestCase):
         self.indexer.queue_server.is_indexing = mock.MagicMock(return_value=True)
         expected_err_msg = 'Cannot initialize indexing process: Already Indexing'
         request = MockRequest(embed_wait=self.embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -366,7 +366,7 @@ class TestIndexer(TestCase):
         self.indexer.queue_worker = None
         expected_err_msg = 'Indexer sleep timeout'
         request = MockRequest(embed_wait=self.embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -392,7 +392,7 @@ class TestIndexer(TestCase):
         embed_wait = 0.01
         expected_err_msg = 'Indexer sleep timeout'
         request = MockRequest(embed_wait=embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -415,7 +415,7 @@ class TestIndexer(TestCase):
         org_pop_errors = self.indexer.queue_server.pop_errors
         self.indexer.queue_server.pop_errors = mock.MagicMock(return_value=return_errors)
         request = MockRequest(embed_wait=embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -440,7 +440,7 @@ class TestIndexer(TestCase):
         batch_size = 1024
         self.indexer.queue_worker.queue_options['batch_size'] = batch_size
         request = MockRequest(embed_wait=embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -461,7 +461,7 @@ class TestIndexer(TestCase):
         self.indexer.queue_worker.queue_options['batch_size'] = batch_size
         request = MockRequest(embed_wait=embed_wait)
         request.set_embed_errors(10)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -483,7 +483,7 @@ class TestIndexer(TestCase):
         # Error Run
         request = MockRequest(embed_wait=embed_wait)
         request.set_embed_errors(10)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
@@ -495,7 +495,7 @@ class TestIndexer(TestCase):
         self.assertIsNone(err_msg)
         # Clean Run
         request = MockRequest(embed_wait=embed_wait)
-        errors, err_msg = self.indexer.serve_objects(
+        _, errors, err_msg = self.indexer.serve_objects(
             request,
             uuids,
             self.xmin,
