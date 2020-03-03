@@ -87,9 +87,15 @@ class TimedUrllib3HttpConnection(Urllib3HttpConnection):
             return
 
         duration = int(duration * 1e6)
-        stats = request._stats
-        stats[self.stats_count_key] = stats.get(self.stats_count_key, 0) + 1
-        stats[self.stats_time_key] = stats.get(self.stats_time_key, 0) + duration
+        if hasattr(request, '_stats'): 
+            stats = request._stats
+            stats[self.stats_count_key] = stats.get(self.stats_count_key, 0) + 1
+            stats[self.stats_time_key] = stats.get(self.stats_time_key, 0) + duration
+        else:
+            print('WARNING: _stats does not exist on request')
+            print(request)
+            stats[self.stats_count_key] = 0
+            stats[self.stats_time_key] = 0
 
     def log_request_success(self, method, full_url, path, body, status_code, response, duration):
         self.stats_record(duration)
