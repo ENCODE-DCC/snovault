@@ -1,3 +1,5 @@
+import logging
+
 from snovault.json_renderer import json_renderer
 from snovault.util import get_root_request
 from elasticsearch import Elasticsearch
@@ -15,6 +17,9 @@ from .interfaces import (
 import json
 import sys
 PY2 = sys.version_info.major == 2
+
+
+ROOT_LOG = logging.getLogger('root')
 
 
 def includeme(config):
@@ -85,6 +90,16 @@ class TimedUrllib3HttpConnection(Urllib3HttpConnection):
         request = get_root_request()
         if request is None:
             return
+        if not hasattr(request, '_stats'):
+            # For an unknown reason, requests may reach this location without stats
+            # Logging the issues and adding the stats late should be temporary
+            ROOT_LOG.error('_stats object missing from request: %s', request.url)
+            ROOT_LOG.error(request)
+            request._stats = {
+                'late_stats_added': True,
+                'stats_count_key': 0,
+                'stats_time_key': 0
+            }
 
         duration = int(duration * 1e6)
         stats = request._stats
