@@ -1,5 +1,7 @@
 import psutil
 import time
+import logging
+
 import pyramid.tweens
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
@@ -7,7 +9,11 @@ from urllib.parse import urlencode
 from .util import get_root_request
 
 
+TWEEN_LOG = logging.getLogger('tweens')
+
+
 def includeme(config):
+    TWEEN_LOG.debug('snovalut stats.py includeme tweens')
     config.add_tween('snovault.stats.stats_tween_factory', under=pyramid.tweens.INGRESS)
 
 
@@ -54,13 +60,17 @@ def after_cursor_execute(
 
 # http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/hooks.html#creating-a-tween-factory
 def stats_tween_factory(handler, registry):
+    TWEEN_LOG.debug('snovault stats.py wrapper stats_tween_factory')
     process = psutil.Process()
 
     def stats_tween(request):
+        TWEEN_LOG.debug('ss stats_tween: %s', request.url)
         stats = request._stats = {}
         rss_begin = stats['rss_begin'] = process.memory_info().rss
         begin = stats['wsgi_begin'] = int(time.time() * 1e6)
+        TWEEN_LOG.debug('ss stats_tween call: %s', request.url)
         response = handler(request)
+        TWEEN_LOG.debug('ss stats_tween res: %s', request.url)
         end = stats['wsgi_end'] = int(time.time() * 1e6)
         rss_end = stats['rss_end'] = process.memory_info().rss
         stats['wsgi_time'] = end - begin
@@ -75,6 +85,7 @@ def stats_tween_factory(handler, registry):
         xs = response.headers['X-Stats'] = str(urlencode(sorted(stats.items())))
         if getattr(request, '_stats_html_attribute', False):
             response.set_cookie('X-Stats', xs)
+        TWEEN_LOG.debug('ss stats_tween return: %s', request.url)
         return response
 
     return stats_tween
