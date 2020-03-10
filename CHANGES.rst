@@ -1,7 +1,11 @@
 Changes
 =======
 
-Snovault 1.0.41 (released) encoded v97.0
+Snovault 1.0.42 (released) encoded v97.0
+----------------------------------------
+1. SNO-145-handle-missing-obj-on-request (#258)
+
+Snovault 1.0.41 (released) encoded v97rc
 ----------------------------------------
 1. SNO-142 Minor fixes for ubutnu 18 on v96x1rc1 (#252)
 2. SNO-141-update-osx-catalina-readme (#252)
