@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.43 (released) encoded v98.0
+----------------------------------------
+1. SNO-146-clean-up-threadmanager-on-pyramid-retry-exception (#261)
+
 Snovault 1.0.42 (released) encoded v97.0
 ----------------------------------------
 1. SNO-145-handle-missing-obj-on-request (#258)
