@@ -6,7 +6,6 @@ blob_bucket = ${blob_bucket}
 blob_store_profile_name = encoded-files-upload
 accession_factory = ${accession_factory}
 indexer.processes = ${indexer_processes}
-accel_redirect_header = ${accel_redirect_header}
 
 [composite:indexer]
 use = config:base.ini#indexer
