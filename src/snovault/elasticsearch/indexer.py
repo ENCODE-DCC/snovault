@@ -366,7 +366,7 @@ class Indexer(object):
             with open(self.indexer_initial_log_path, 'w', encoding='utf-8') as file_handler:
                 for update_info in update_infos:
                     str_update_info = json.dumps(update_info, ensure_ascii=False)
-                    file_handler.write(str_update_info)
+                    file_handler.write(str_update_info + '\n')
                     counter += 1
             log.warning('Logged %d uuids.  One per line' % counter)
 
