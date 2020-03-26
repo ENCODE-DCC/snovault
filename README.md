@@ -1,10 +1,10 @@
 SnoVault JSON-LD Database Framework
 ===================================
 
-## System Installation (OSX Catlina 10.15.2)
-    The instructions below are not guaranteed to work.  See the dependency's website for
-    furthur instruction.  We will try to keep this updated as OSX, Xcode, and brew update.  These
-    instructions were also tested on Mojave 10.14.6.
+## System Installation (OSX Catlina~10.15.2, Mojave~10.14.6)
+    We will try to keep this updated as OSX, Xcode, and brew update.  However the steps below are
+    examples and not guaranteed to work for your specific system.  See the dependency's website for
+    detailed instructions or let us know of any changes with a pull request.
 
 1. Command line tools
     ```
@@ -22,25 +22,16 @@ SnoVault JSON-LD Database Framework
 1. Postgres@11 (Postgres@9.3 also works)
     ```
     $ brew install postgresql@11
-    # Only do the following commands if it doesn't exists in ~/.zshrc
-    $ echo 'export PATH="/usr/local/opt/postgresql@11/bin:$PATH"' >> ~/.zshrc
-    $ source ~/.zshrc
     ```
 
 1. Node 10.x.x
     ```
     $ brew install node@10
-    # Only do the following commands if it doesn't exists in ~/.zshrc
-    $ echo 'export PATH="/usr/local/opt/postgresql@11/bin:$PATH"' >> ~/.zshrc
-    $ source ~/.zshrc
     ```
 
 1. Ruby - Non system version to install compass while avoiding permission errors
     ```
     $ brew install ruby
-    # Only do the following commands if it doesn't exists in ~/.zshrc
-    $ echo 'export PATH="/usr/local/opt/ruby/bin:$PATH"' >> ~/.zshrc
-    $ source ~/.zshrc
     ```
 
 1. Compass
@@ -59,9 +50,6 @@ SnoVault JSON-LD Database Framework
 1. Elasticsearch 5.x
     ```
     $ brew install elasticsearch@5.6
-    # Only do the following commands if it doesn't exists in ~/.zshrc
-    $ echo 'export PATH="/usr/local/opt/elasticsearch@5.6/bin:$PATH"' >> ~/.zshrc
-    $ source ~/.zshrc
     ```
 
 1. Brew dependencies
@@ -90,7 +78,7 @@ SnoVault JSON-LD Database Framework
 1. Clone the repo and install requirements
     ```
     $ cd snovault
-    $ pip install -r requirements.osx.catalina.txt
+    $ pip install -r requirements.osx.txt
     ```
 
 1. Build Application
