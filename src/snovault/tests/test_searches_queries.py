@@ -1132,11 +1132,12 @@ def test_searches_queries_abstract_query_factory_get_return_fields_from_field_pa
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    fields = [('field', '@id'), ('field', 'accession'), ('field', 'status')]
+    fields = [('field', '@id'), ('field', 'accession'), ('field', 'status'), ('field', 'audit')]
     expected = [
         'embedded.@id',
         'embedded.accession',
-        'embedded.status'
+        'embedded.status',
+        'audit',
     ]
     actual = aq._get_return_fields_from_field_params(fields)
     assert all([e in actual for e in expected])

@@ -437,11 +437,8 @@ class AbstractQueryFactory:
         return BASE_SEARCH_FIELDS.copy()
 
     def _get_return_fields_from_field_params(self, fields):
-        return self._prefix_values(
-            EMBEDDED,
-            self.params_parser.param_values_to_list(
-                params=fields
-            )
+        return self.params_parser.param_values_to_list(
+            params=self._map_param_values_to_elasticsearch_fields(fields)
         )
 
     def _get_return_fields_from_schema_columns(self):
