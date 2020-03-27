@@ -515,7 +515,7 @@ class AbstractQueryFactory:
     def _make_queries_from_params(self, query_context, params):
         return [
             query_context(
-                field=self._map_param_key_to_elasticsearch_field(param_key=field),
+                field=self._map_param_to_elasticsearch_field(field),
                 terms=terms
             )
             for field, terms in self.params_parser.group_values_by_key(
@@ -611,28 +611,39 @@ class AbstractQueryFactory:
         a.bucket(title, subaggregation)
         return a
 
-    def _map_param_key_to_elasticsearch_field(self, param_key):
+    def _map_param_to_elasticsearch_field(self, param):
         '''
-        Special rules for mapping param key to actual field in ES.
+        Special rules for mapping param to actual field in ES.
         For exampe type -> embedded.@type.
         '''
 
-        if param_key == TYPE_KEY:
+        if param == TYPE_KEY:
             return EMBEDDED_TYPE
-        elif param_key.startswith(AUDIT):
-            return param_key
+        elif param.startswith(AUDIT):
+            return param
         else:
-            return self._prefix_value(EMBEDDED, param_key)
+            return self._prefix_value(EMBEDDED, param)
 
-    def _map_params_to_elasticsearch_fields(self, params):
+    def _map_param_keys_to_elasticsearch_fields(self, params):
         '''
-        Like _map_param_key_to_elasticsearch_field but used for iterating over list
-        of param tuples.
+        Like _map_param_to_elasticsearch_field but used for iterating over keys
+        in param tuples.
         '''
         for param_key, param_value in params:
             yield (
-                self._map_param_key_to_elasticsearch_field(param_key),
+                self._map_param_to_elasticsearch_field(param_key),
                 param_value
+            )
+
+    def _map_param_values_to_elasticsearch_fields(self, params):
+        '''
+        Like _map_param_to_elasticsearch_field but used for iterating over values
+        in param tuples.
+        '''
+        for param_key, param_value in params:
+            yield (
+                param_key,
+                self._map_param_to_elasticsearch_field(param_value)
             )
 
     def _subaggregation_factory(self, aggregation_type):
@@ -791,7 +802,7 @@ class AbstractQueryFactory:
                 facet_options.get(TYPE_KEY)
             )
             subaggregation = subaggregation(
-                field=self._map_param_key_to_elasticsearch_field(facet_name),
+                field=self._map_param_to_elasticsearch_field(facet_name),
                 exclude=facet_options.get(EXCLUDE),
                 # TODO: size should be defined in schema instead of long keyword.
                 size=3000 if facet_options.get(LENGTH) == LONG else 200
@@ -980,7 +991,7 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
             (
                 name,
                 subaggregation(
-                    field=self._map_param_key_to_elasticsearch_field(name),
+                    field=self._map_param_to_elasticsearch_field(name),
                     size=NO_LIMIT
                 )
             )
@@ -1070,7 +1081,7 @@ class MissingMatrixQueryFactoryWithFacets(BasicMatrixQueryFactoryWithFacets):
         return (
             name,
             subaggregation(
-                field=self._map_param_key_to_elasticsearch_field(name),
+                field=self._map_param_to_elasticsearch_field(name),
                 size=NO_LIMIT,
                 missing=default_value
             )
