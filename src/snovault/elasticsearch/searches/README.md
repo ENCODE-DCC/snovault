@@ -2,7 +2,7 @@
 
 The search module sits between a user's search request and our ElasticSearch cluster. It is responsible for converting the query string from a user's request into an ElasticSearch query, executing the query, gathering the raw results, and formatting them in a way that the frontend expects. The general goal is to keep each of these steps as decoupled as possible so that it's easy to reuse and extend the functionality in new views. For examples it's possible to create a new way of building up a query or formatting raw results and drop them into place without modifying the surrounding components.
 
-How this package is used to create Pyramid views can be seen in src/snowflakes/search_views.py and src/snowflakes/tests/test_searchv2.py. There are extensive tests for every component (e.g. snovault/tests/test_searches_responses.py) that document expected behavior.
+How this package is used to create Pyramid views can be seen in **src/snowflakes/search_views.py** and **src/snowflakes/tests/test_searchv2.py**. There are extensive tests for every component (e.g. **snovault/tests/test_searches_responses.py**) that document expected behavior.
 
 ### Object relationships
 
