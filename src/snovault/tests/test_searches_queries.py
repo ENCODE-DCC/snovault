@@ -1132,11 +1132,12 @@ def test_searches_queries_abstract_query_factory_get_return_fields_from_field_pa
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    fields = [('field', '@id'), ('field', 'accession'), ('field', 'status')]
+    fields = [('field', '@id'), ('field', 'accession'), ('field', 'status'), ('field', 'audit')]
     expected = [
         'embedded.@id',
         'embedded.accession',
-        'embedded.status'
+        'embedded.status',
+        'audit',
     ]
     actual = aq._get_return_fields_from_field_params(fields)
     assert all([e in actual for e in expected])
@@ -1796,15 +1797,15 @@ def test_searches_queries_abstract_query_factory_make_exists_aggregation(params_
     }
 
 
-def test_searches_queries_abstract_query_factory_map_param_key_to_elasticsearch_field():
+def test_searches_queries_abstract_query_factory_map_param_to_elasticsearch_field():
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory({})
-    assert aq._map_param_key_to_elasticsearch_field('type') == 'embedded.@type'
-    assert aq._map_param_key_to_elasticsearch_field('audit.WARNING.category') == 'audit.WARNING.category'
-    assert aq._map_param_key_to_elasticsearch_field('status') == 'embedded.status'
+    assert aq._map_param_to_elasticsearch_field('type') == 'embedded.@type'
+    assert aq._map_param_to_elasticsearch_field('audit.WARNING.category') == 'audit.WARNING.category'
+    assert aq._map_param_to_elasticsearch_field('status') == 'embedded.status'
 
 
-def test_searches_queries_abstract_query_factory_map_params_to_elasticsearch_fields(dummy_request):
+def test_searches_queries_abstract_query_factory_map_param_keys_to_elasticsearch_fields(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
@@ -1814,7 +1815,7 @@ def test_searches_queries_abstract_query_factory_map_params_to_elasticsearch_fie
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    mapped_keys = list(aq._map_params_to_elasticsearch_fields(
+    mapped_keys = list(aq._map_param_keys_to_elasticsearch_fields(
         params=aq._get_filters() + aq._get_item_types()
     ))
     assert mapped_keys == [
@@ -1822,6 +1823,28 @@ def test_searches_queries_abstract_query_factory_map_params_to_elasticsearch_fie
         ('audit.WARNING.category', 'missing biosample characterization'),
         ('embedded.file_size', '12'),
         ('embedded.@type', 'TestingSearchSchema')
+    ]
+
+
+def test_searches_queries_abstract_query_factory_map_param_values_to_elasticsearch_fields(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&type=TestingSearchSchema&status=released'
+        '&audit.WARNING.category=missing+biosample+characterization&file_size=12'
+        '&field=status&field=@id&field=type&field=audit'
+        '&limit=all'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    mapped_values = list(aq._map_param_values_to_elasticsearch_fields(
+        params=aq._get_fields()
+    ))
+    assert mapped_values == [
+        ('field', 'embedded.status'),
+        ('field', 'embedded.@id'),
+        ('field', 'embedded.@type'),
+        ('field', 'audit')
     ]
 
 
