@@ -1,6 +1,14 @@
 Changes
 =======
 
+Snovault 1.0.44 (released) encoded v99.0
+----------------------------------------
+1. SNO-150 Remove duplicates and fix antlr version (#266)
+2. SNO-149-allow-specification-of-audit-field (#265)
+3. SNO-143-update-and-switch-readme
+4. SNO-148-uuid-indexing-times-new-line-bit
+5. SNO-144-redirect-downloads-through-nginx-or-apache (#192)
+
 Snovault 1.0.43 (released) encoded v98.0
 ----------------------------------------
 1. SNO-146-clean-up-threadmanager-on-pyramid-retry-exception (#261)
