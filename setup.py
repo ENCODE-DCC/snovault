@@ -3,7 +3,7 @@ import sys
 from setuptools import setup, find_packages
 
 here = os.path.abspath(os.path.dirname(__file__))
-README = open(os.path.join(here, 'README.rst')).read()
+README = open(os.path.join(here, 'README.md')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 
 
@@ -26,10 +26,10 @@ requires = [
     'netaddr',
     'passlib',
     'psutil',
+    'pyramid_retry',
     'pyramid',
     'pyramid_localroles',
     'pyramid_multiauth',
-    'pyramid_retry',
     'pyramid_tm',
     'python-magic',
     'pytz',
@@ -61,7 +61,7 @@ tests_require = [
 
 setup(
     name='snovault',
-    version='1.0.41',
+    version='1.0.44',
     description='Snovault Hybrid Object Relational Database Framework',
     long_description=README + '\n\n' + CHANGES,
     packages=find_packages('src'),
