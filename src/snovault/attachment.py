@@ -114,9 +114,9 @@ class ItemWithAttachment(Item):
         else:
             mime_type = mime_type_from_filename
 
-        # Magic depends on BSD file command
-        #  Valid json with empty objects, i.e. {} or []
-        #  does not return valid in file.
+        # Magic python package depends on BSD 'file' command
+        #  Valid json with empty objects, i.e. {} or [],
+        #  do not return as valid in 'file'.
         json_file_loaded = False
         if mime_type_from_filename == 'application/json':
             try:
