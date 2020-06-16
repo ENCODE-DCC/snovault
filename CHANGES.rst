@@ -1,6 +1,13 @@
 Changes
 =======
 
+Snovault 1.0.45 (released) encoded v102.0
+----------------------------------------
+1. SNO-154-fix-magic-json-bug (#272)
+2. SNO-156 Use pyramid_retry 2.1.1 (#273)
+3. SNO-137-add-search-doc (#267)
+4. SNO-152 fix circle-ci browser install (#269)
+
 Snovault 1.0.44 (released) encoded v99.0
 ----------------------------------------
 1. SNO-150 Remove duplicates and fix antlr version (#266)
