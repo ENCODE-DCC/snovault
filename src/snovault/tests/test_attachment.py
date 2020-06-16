@@ -14,6 +14,11 @@ AAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPA
 AAAANQTFRFALfvPEv6TAAAAAtJREFUCB1jYMAHAAAeAAEBGN
 laAAAAAElFTkSuQmCC"""
 
+# {"key": []} is 'eyJrZXkiOiBbXX0='
+EMPTY_JSON = """data:application/json;base64,eyJrZXkiOiBbXX0="""
+# {"key": ["value1"]} is 'eyJrZXkiOiBbInZhbHVlMSJdfQ=='
+FILLED_JSON = """data:application/json;base64,eyJrZXkiOiBbInZhbHVlMSJdfQ=="""
+
 
 @pytest.fixture
 def testing_download(testapp):
@@ -26,6 +31,27 @@ def testing_download(testapp):
         'attachment2': {
             'download': 'blue-dot.png',
             'href': BLUE_DOT,
+        },
+        'attachment3': {
+            'download': 'empty-json.json',
+            'href': EMPTY_JSON,
+        },
+    }
+    res = testapp.post_json(url, item, status=201)
+    return res.location
+
+
+@pytest.fixture
+def testing_download_json(testapp):
+    url = '/testing-downloads/'
+    item = {
+        'attachment3': {
+            'download': 'empty-json.json',
+            'href': EMPTY_JSON,
+        },
+        'attachment4': {
+            'download': 'filled-json.json',
+            'href': FILLED_JSON,
         },
     }
     res = testapp.post_json(url, item, status=201)
@@ -56,6 +82,26 @@ def test_download_create(testapp, testing_download):
     res = testapp.get(url)
     assert res.content_type == 'image/png'
     assert res.body == b64decode(BLUE_DOT.split(',', 1)[1])
+
+
+def test_download_create_json(testapp, testing_download_json):
+    '''
+    Verifies json_file_loaded flag in ItemWithAttachment._process_downloads(...)
+    Empty and filled json file should pass upload
+    '''
+    get_res = testapp.get(testing_download_json)
+    # Empty
+    attachment3 = get_res.json['attachment3']
+    url = testing_download_json + '/' + attachment3['href']
+    test_res = testapp.get(url)
+    assert test_res.content_type == 'application/json'
+    assert test_res.body == b64decode(EMPTY_JSON.split(',', 1)[1])
+    # Filled
+    attachment4 = get_res.json['attachment4']
+    url = testing_download_json + '/' + attachment4['href']
+    test_res = testapp.get(url)
+    assert test_res.content_type == 'application/json'
+    assert test_res.body == b64decode(FILLED_JSON.split(',', 1)[1])
 
 
 def test_download_update(testapp, testing_download):

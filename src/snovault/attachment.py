@@ -1,3 +1,4 @@
+import json
 from base64 import b64decode
 from hashlib import md5
 from io import BytesIO
@@ -113,6 +114,20 @@ class ItemWithAttachment(Item):
         else:
             mime_type = mime_type_from_filename
 
+        # Magic python package depends on BSD 'file' command
+        #  Valid json with empty objects, i.e. {} or [],
+        #  do not return as valid in 'file'.
+        json_file_loaded = False
+        if mime_type_from_filename == 'application/json':
+            try:
+                _ = json.loads(data)
+                json_file_loaded = True
+            except json.JSONDecodeError:
+                raise ValidationFailure(
+                    'body', [prop_name, 'href'],
+                    f"JSON could not be parsed"
+                )
+
         # Make sure the mimetype appears to be what the client says it is
         # for python3 magic.from_buffer always returns a string a thus doesn't need to be decoded
         try:
@@ -120,7 +135,7 @@ class ItemWithAttachment(Item):
         except AttributeError:
             mime_type_detected = magic.from_buffer(data, mime=True)
 
-        if not mimetypes_are_equal(mime_type, mime_type_detected):
+        if not json_file_loaded and not mimetypes_are_equal(mime_type, mime_type_detected):
             msg = "Incorrect file type. (Appears to be %s)" % mime_type_detected
             raise ValidationFailure('body', [prop_name, 'href'], msg)
 

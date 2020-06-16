@@ -68,6 +68,26 @@ class TestingDownload(ItemWithAttachment):
                         'enum': ['image/png'],
                     }
                 }
+            },
+            'attachment3': {
+                'type': 'object',
+                'attachment': True,
+                'properties': {
+                    'type': {
+                        'type': 'string',
+                        'enum': ['application/json'],
+                    }
+                }
+            },
+            'attachment4': {
+                'type': 'object',
+                'attachment': True,
+                'properties': {
+                    'type': {
+                        'type': 'string',
+                        'enum': ['application/json'],
+                    }
+                }
             }
         }
     }
