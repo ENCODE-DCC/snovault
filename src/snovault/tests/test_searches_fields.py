@@ -559,7 +559,6 @@ def test_searches_fields_debug_query_response_field(dummy_parent, mocker):
     from snovault.elasticsearch.searches.fields import DebugQueryResponseField
     dbr = DebugQueryResponseField()
     r = dbr.render(parent=dummy_parent)
-    assert 'query' in r['debug']['raw_query']
     assert 'post_filter' in r['debug']['raw_query']
 
 

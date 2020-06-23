@@ -10,9 +10,6 @@ indexer.processes = ${indexer_processes}
 [composite:indexer]
 use = config:base.ini#indexer
 
-[composite:regionindexer]
-use = config:base.ini#regionindexer
-
 [pipeline:main]
 pipeline =
     config:base.ini#memlimit

@@ -48,7 +48,6 @@ class MockES(object):  # pylint: disable=too-few-public-methods
     @staticmethod
     def index(
             index=None,
-            doc_type=None,
             body=None,
             id=None,
             version=None,
