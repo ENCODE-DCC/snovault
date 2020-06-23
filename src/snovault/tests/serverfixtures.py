@@ -75,7 +75,6 @@ def elasticsearch_server(request, elasticsearch_host_port):
     tmpdir = request.config._tmpdirhandler.mktemp('elasticsearch', numbered=True)
     tmpdir = str(tmpdir)
     process = server_process(str(tmpdir), host=host, port=9201, echo=False)
-    print('PORT CHANGED')
     yield 'http://%s:%d' % (host, 9201)
 
     if 'process' in locals() and process.poll() is None:

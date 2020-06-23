@@ -31,10 +31,6 @@ log = logging.getLogger(__name__)
 
 # An index to store non-content metadata
 META_MAPPING = {
-    '_all': {
-        'enabled': False,
-        'analyzer': 'snovault_search_analyzer'
-    },
     'dynamic_templates': [
         {
             'store_generic': {
@@ -52,9 +48,6 @@ META_MAPPING = {
 PATH_FIELDS = ['submitted_file_name']
 NON_SUBSTRING_FIELDS = ['uuid', '@id', 'submitted_by', 'md5sum',
                         'references', 'submitted_file_name']
-KEYWORD_FIELDS = ['schema_version', 'uuid', 'accession', 'alternate_accessions',
-                  'aliases', 'status', 'date_created', 'submitted_by',
-                  'internal_status', 'target', 'biosample_type']
 TEXT_FIELDS = ['pipeline_error_detail', 'description', 'notes']
 
 
@@ -66,7 +59,7 @@ def sorted_dict(d):
     return json.loads(json.dumps(d), object_pairs_hook=sorted_pairs_hook)
 
 
-def schema_mapping(name, schema):
+def schema_mapping(name, schema, depth=0, parent=None):
     # If a mapping is explicitly defined, use it
     if 'mapping' in schema:
         return schema['mapping']
@@ -80,19 +73,28 @@ def schema_mapping(name, schema):
 
     # Elasticsearch handles multiple values for a field
     if type_ == 'array':
-        return schema_mapping(name, schema['items'])
+        return schema_mapping(
+            name,
+            schema['items'],
+            depth=depth + 1,
+            parent=type_)
 
     if type_ == 'object':
         properties = {}
         for k, v in schema.get('properties', {}).items():
-            mapping = schema_mapping(k, v)
+            mapping = schema_mapping(k, v, depth=depth + 1)
             if mapping is not None:
                 properties[k] = mapping
-        return {
-            'type': 'object',
-            'include_in_all': False,
-            'properties': properties,
-        }
+        if properties:
+            return {
+                'type': 'object',
+                'properties': properties,
+            }
+        else:
+            return {
+                'type': 'object',
+                'enabled': False
+            }
 
     if type_ == ["number", "string"]:
         return {
@@ -122,9 +124,7 @@ def schema_mapping(name, schema):
 
     if type_ == 'string':
 
-        if name in KEYWORD_FIELDS:
-            field_type = 'keyword'
-        elif name in TEXT_FIELDS:
+        if name in TEXT_FIELDS:
             field_type = 'text'
         else:
             field_type = 'keyword'
@@ -133,10 +133,12 @@ def schema_mapping(name, schema):
             'type': field_type
         }
 
-        # these fields are unintentially partially matching some small search
-        # keywords because fields are analyzed by nGram analyzer
-        if name in NON_SUBSTRING_FIELDS:
-            sub_mapping['include_in_all'] = False
+        if name not in NON_SUBSTRING_FIELDS:
+            if depth == 1 or (depth == 2 and parent == 'array'):
+                sub_mapping.update({
+                    'copy_to': '_all'
+                })
+
         return sub_mapping
 
     if type_ == 'number':
@@ -167,12 +169,13 @@ def index_settings():
         'settings': {
             'index.max_result_window': 99999,
             'index.mapping.total_fields.limit': 5000,
-            'index.number_of_shards': 5,
-            'index.number_of_replicas': 2,
+            'index.number_of_shards': 1,
+            'index.number_of_replicas': 0,
+            'index.max_ngram_diff': 32,
             'analysis': {
                 'filter': {
                     'substring': {
-                        'type': 'nGram',
+                        'type': 'ngram',
                         'min_gram': 1,
                         'max_gram': 33
                     },
@@ -273,10 +276,6 @@ def audit_mapping():
 
 def es_mapping(mapping):
     return {
-        '_all': {
-            'enabled': True,
-            'analyzer': 'snovault_search_analyzer'
-        },
         'dynamic_templates': [
             {
                 'template_principals_allowed': {
@@ -325,16 +324,19 @@ def es_mapping(mapping):
                         }
                     },
                 },
-            }
+            },
         ],
         'properties': {
+            '_all': {
+                'type': 'text',
+                'store': False,
+                'analyzer': 'snovault_search_analyzer'
+            },
             'uuid': {
                 'type': 'keyword',
-                'include_in_all': False,
             },
             'tid': {
                 'type': 'keyword',
-                'include_in_all': False,
             },
             'item_type': {
                 'type': 'keyword',
@@ -343,33 +345,26 @@ def es_mapping(mapping):
             'object': {
                 'type': 'object',
                 'enabled': False,
-                'include_in_all': False,
             },
             'properties': {
                 'type': 'object',
                 'enabled': False,
-                'include_in_all': False,
             },
             'propsheets': {
                 'type': 'object',
                 'enabled': False,
-                'include_in_all': False,
             },
             'embedded_uuids': {
                 'type': 'keyword',
-                'include_in_all': False,
             },
             'linked_uuids': {
                 'type': 'keyword',
-                'include_in_all': False,
             },
             'paths': {
                 'type': 'keyword',
-                'include_in_all': False,
             },
             'audit': {
                 'type': 'object',
-                'include_in_all': False,
                 'properties': {
                     'ERROR': {
                         'type': 'object',
@@ -447,7 +442,7 @@ def type_mapping(types, item_type, embed=True):
             # Check if mapping for property is already an object
             # multiple subobjects may be embedded, so be carful here
             if m['properties'][p]['type'] in ['keyword', 'text']:
-                m['properties'][p] = schema_mapping(p, s)
+                m['properties'][p] = schema_mapping(p, s, depth=1)
 
             m = m['properties'][p]
 
@@ -465,10 +460,7 @@ def type_mapping(types, item_type, embed=True):
         for prop in props:
             new_mapping = new_mapping[prop]['properties']
         new_mapping[last]['boost'] = boost
-        if last in NON_SUBSTRING_FIELDS:
-            new_mapping[last]['include_in_all'] = False
-        else:
-            new_mapping[last]['include_in_all'] = True
+        new_mapping[last]['copy_to'] = '_all'
     return mapping
 
 
@@ -476,8 +468,8 @@ def create_elasticsearch_index(es, index, body):
     es.indices.create(index=index, body=body, wait_for_active_shards=1, ignore=[400, 404], master_timeout='5m', request_timeout=300)
 
 
-def set_index_mapping(es, index, doc_type, mapping):
-    es.indices.put_mapping(index=index, doc_type=doc_type, body=mapping, ignore=[400], request_timeout=300)
+def set_index_mapping(es, index, mapping):
+    es.indices.put_mapping(index=index, body=mapping, ignore=[400], request_timeout=300)
 
 
 def create_snovault_index_alias(es, indices):
@@ -497,20 +489,19 @@ def run(app, collections=None, dry_run=False):
     indices = []
     for collection_name in collections:
         if collection_name == 'meta':
-            doc_type = 'meta'
             mapping = META_MAPPING
         else:
-            index = doc_type = collection_name
+            index = collection_name
             collection = registry[COLLECTIONS].by_item_type[collection_name]
             mapping = es_mapping(type_mapping(registry[TYPES], collection.type_info.item_type))
 
         if mapping is None:
             continue  # Testing collections
         if dry_run:
-            print(json.dumps(sorted_dict({index: {doc_type: mapping}}), indent=4))
+            print(json.dumps(sorted_dict({index: {collection_name: mapping}}), indent=4))
             continue
         create_elasticsearch_index(es, index, index_settings())
-        set_index_mapping(es, index, doc_type, {doc_type: mapping})
+        set_index_mapping(es, index, mapping)
         if collection_name != 'meta':
             indices.append(index)
 

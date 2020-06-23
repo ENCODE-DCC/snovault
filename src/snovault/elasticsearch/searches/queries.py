@@ -850,6 +850,11 @@ class AbstractQueryFactory:
                 *sort_by
             )
 
+    def add_exact_counting(self):
+        self.search = self._get_or_create_search().extra(
+            track_total_hits=True
+        )
+
     def build_query(self):
         '''
         Public method to be implemented by children.
@@ -869,6 +874,7 @@ class BasicSearchQueryFactory(AbstractQueryFactory):
         self.add_filters()
         self.add_post_filters()
         self.add_source()
+        self.add_exact_counting()
         self.add_slice()
         return self.search
 
@@ -1051,6 +1057,7 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
         self.add_query_string_query()
         self.add_filters()
         self.add_post_filters()
+        self.add_exact_counting()
         self.add_slice()
         self.add_aggregations_and_aggregation_filters()
         self.add_matrix_aggregations()
