@@ -15,13 +15,6 @@ def server_process(datadir, host='127.0.0.1', port=9201, prefix='', echo=False):
         '-Epath.data=%s' % os.path.join(datadir, 'data'),
         '-Epath.logs=%s' % os.path.join(datadir, 'logs'),
     ]
-    if os.environ.get('TRAVIS'):
-        print('IN TRAVIS')
-        echo = True
-        args.append('-Epath.conf=%s/conf' % os.environ['TRAVIS_BUILD_DIR'])
-    elif os.path.exists('/etc/elasticsearch'):
-        print('NOT IN TRAVIS')
-        args.append('-Epath.conf=./conf')
     print(args)
     process = subprocess.Popen(
         args,

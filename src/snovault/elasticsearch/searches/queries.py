@@ -94,7 +94,7 @@ class AbstractQueryFactory:
             self.search = Search(
                 using=self._get_client(),
                 index=self._get_index(),
-            )
+            ).extra(track_total_hits=True).query()
         return self.search
 
     def _get_client(self):

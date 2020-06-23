@@ -151,7 +151,7 @@ def test_searchv2_view_values_invalid_search_term(workbook, testapp):
         '/search/?searchTerm=cherry^',
         status=200
     )
-    assert r.json['total'] == 1
+    assert r.json['total'] == 44
 
 
 def test_searchv2_view_values_invalid_advanced_query(workbook, testapp):
@@ -167,17 +167,17 @@ def test_searchv2_view_values_reserved_characters_advanced_query(workbook, testa
         '/search/?searchTerm=cherry^',
         status=200
     )
-    assert r.json['total'] == 1
+    assert r.json['total'] == 44
     r = testapp.get(
         '/search/?searchTerm=cherry~',
         status=200
     )
-    assert r.json['total'] == 1
+    assert r.json['total'] == 44
     r = testapp.get(
         '/search/?searchTerm=/cherry',
         status=200
     )
-    assert r.json['total'] == 1
+    assert r.json['total'] == 44
     r = testapp.get(
         '/search/?searchTerm=/cherryp',
         status=404
@@ -187,7 +187,7 @@ def test_searchv2_view_values_reserved_characters_advanced_query(workbook, testa
         '/search/?searchTerm=/cherry:',
         status=200
     )
-    assert r.json['total'] == 1
+    assert r.json['total'] == 44
 
 
 def test_searchv2_view_embedded_frame(workbook, testapp):
@@ -413,7 +413,7 @@ def test_reportv2_view_values_no_type(workbook, testapp):
 def test_matrixv2_raw_view_raw_response(workbook, testapp):
     r = testapp.get('/matrixv2_raw/?type=Snowball')
     assert 'hits' in r.json
-    assert r.json['hits']['total'] >= 22
+    assert r.json['hits']['total']['value'] >= 22
     assert len(r.json['hits']['hits']) == 0
     assert 'aggregations' in r.json
     assert 'x' in r.json['aggregations']
