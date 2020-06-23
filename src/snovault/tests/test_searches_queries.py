@@ -2254,9 +2254,6 @@ def test_searches_queries_abstract_query_factory_add_must_equal_terms_post_filte
         terms=['released', 'archived']
     )
     assert aq.search.to_dict() == {
-        'query': {
-            'match_all': {}
-        },
         'post_filter': {
             'terms': {'status': ['released', 'archived']}}
     }
@@ -2270,9 +2267,6 @@ def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_post_f
         terms=['released', 'archived']
     )
     assert aq.search.to_dict() == {
-        'query': {
-            'match_all': {}
-        },
         'post_filter': {
             'bool': {
                 'filter': [
@@ -2340,9 +2334,6 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_post_filte
                 'filter': [
                     {'exists': {'field': 'embedded.status'}}]
             }
-        },
-        'query': {
-            'match_all': {}
         }
     }
 
@@ -2390,9 +2381,6 @@ def test_searches_queries_abstract_query_factory_add_field_must_not_exist_post_f
         'embedded.file_size'
     )
     assert aq.search.to_dict() == {
-        'query': {
-            'match_all': {}
-        },
         'post_filter': {
             'bool': {
                 'filter': [
@@ -2435,8 +2423,7 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_pa
                     'size': 10,
                 }
             }
-        },
-        'query': {'match_all': {}}
+        }
     }
 
 
@@ -2526,9 +2513,6 @@ def test_searches_queries_abstract_query_factory_add_must_equal_terms_post_filte
         terms=['released', 'archived']
     )
     assert aq.search.to_dict() == {
-        'query': {
-            'match_all': {}
-        },
         'post_filter': {
             'terms': {'status': ['released', 'archived']}}
     }
@@ -2544,9 +2528,6 @@ def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_post_f
         terms=['released', 'archived']
     )
     assert aq.search.to_dict() == {
-        'query': {
-            'match_all': {}
-        },
         'post_filter': {
             'bool': {
                 'filter': [
@@ -2620,9 +2601,6 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_post_filte
                 'filter': [
                     {'exists': {'field': 'embedded.status'}}]
             }
-        },
-        'query': {
-            'match_all': {}
         }
     }
 
@@ -2676,9 +2654,6 @@ def test_searches_queries_abstract_query_factory_add_field_must_not_exist_post_f
         'embedded.file_size'
     )
     assert aq.search.to_dict() == {
-        'query': {
-            'match_all': {}
-        },
         'post_filter': {
             'bool': {
                 'filter': [
@@ -2725,8 +2700,7 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_pa
                     'size': 10,
                 }
             }
-        },
-        'query': {'match_all': {}}
+        }
     }
 
 
@@ -2745,8 +2719,7 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation_with_excl
                     'size': 200
                 }
             }
-        },
-        'query': {'match_all': {}}
+        }
     }
 
 
@@ -2780,8 +2753,7 @@ def test_searches_queries_abstract_query_factory_add_exists_aggregation(params_p
                     }
                 }
             }
-        },
-        'query': {'match_all': {}}
+        }
     }
 
 
@@ -2930,6 +2902,12 @@ def test_searches_queries_abstract_query_factory_add_source_object(dummy_request
     assert all([e in actual for e in expected])
     assert len(expected) == len(actual)
 
+def test_searches_queries_abstract_query_factory_add_exact_counting(params_parser, mocker):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    mocker.patch.object(AbstractQueryFactory, '_get_index')
+    aq.add_exact_counting()
+    assert aq.search.to_dict().get('track_total_hits', False)
 
 def test_searches_queries_abstract_query_factory_add_slice(params_parser, dummy_request, mocker):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
@@ -2938,35 +2916,35 @@ def test_searches_queries_abstract_query_factory_add_slice(params_parser, dummy_
     AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq.add_slice()
-    assert aq.search.to_dict() == {'from': 0, 'size': 10, 'query': {'match_all': {}}}
+    assert aq.search.to_dict() == {'from': 0, 'size': 10}
     dummy_request.environ['QUERY_STRING'] = (
         'searchTerm=chip-seq&type=TestingSearchSchema&frame=object&limit=all'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     aq.add_slice()
-    assert aq.search.to_dict() == {'from': 0, 'size': 25, 'query': {'match_all': {}}}
+    assert aq.search.to_dict() == {'from': 0, 'size': 25}
     dummy_request.environ['QUERY_STRING'] = (
         'searchTerm=chip-seq&type=TestingSearchSchema&frame=object&limit=3000'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     aq.add_slice()
-    assert aq.search.to_dict() == {'from': 0, 'size': 3000, 'query': {'match_all': {}}}
+    assert aq.search.to_dict() == {'from': 0, 'size': 3000}
     dummy_request.environ['QUERY_STRING'] = (
         'searchTerm=chip-seq&type=TestingSearchSchema&frame=object&limit=blah'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     aq.add_slice()
-    assert aq.search.to_dict() == {'from': 0, 'size': 25, 'query': {'match_all': {}}}
+    assert aq.search.to_dict() == {'from': 0, 'size': 25}
     dummy_request.environ['QUERY_STRING'] = (
         'searchTerm=chip-seq&type=TestingSearchSchema&frame=object&limit=10000'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     aq.add_slice()
-    assert aq.search.to_dict() == {'from': 0, 'size': 25, 'query': {'match_all': {}}}
+    assert aq.search.to_dict() == {'from': 0, 'size': 25}
 
 
 def test_searches_queries_abstract_query_factory_subaggregation_factory(params_parser_snovault_types):
@@ -2988,9 +2966,6 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
     aq = AbstractQueryFactory(params_parser_snovault_types)
     aq.add_aggregations_and_aggregation_filters()
     expected = {
-        'query': {
-            'match_all': {}
-        },
         'aggs': {
             'Audit category: WARNING': {
                 'aggs': {
@@ -3791,9 +3766,6 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_add_matrix_aggr
                     }
                 }
             }
-        },
-        'query': {
-            'match_all': {}
         }
     }
     actual = bmqf.search.to_dict()
@@ -4010,6 +3982,7 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 ]
             }
         },
+        'track_total_hits': True,
         'size': 0
     }
     actual = bmqf.search.to_dict()
@@ -4188,9 +4161,6 @@ def test_searches_queries_missing_matrix_query_factory_with_facets_add_matrix_ag
                     }
                 }
             }
-        },
-        'query': {
-            'match_all': {}
         }
     }
     actual = mmqf.search.to_dict()
@@ -4299,9 +4269,6 @@ def test_searches_queries_missing_matrix_query_factory_with_facets_add_matrix_ag
                     }
                 }
             }
-        },
-        'query': {
-            'match_all': {}
         }
     }
     actual = mmqf.search.to_dict()

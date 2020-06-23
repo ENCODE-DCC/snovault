@@ -413,7 +413,7 @@ def test_reportv2_view_values_no_type(workbook, testapp):
 def test_matrixv2_raw_view_raw_response(workbook, testapp):
     r = testapp.get('/matrixv2_raw/?type=Snowball')
     assert 'hits' in r.json
-    assert r.json['hits']['total'] >= 22
+    assert r.json['hits']['total']['value'] >= 22
     assert len(r.json['hits']['hits']) == 0
     assert 'aggregations' in r.json
     assert 'x' in r.json['aggregations']
