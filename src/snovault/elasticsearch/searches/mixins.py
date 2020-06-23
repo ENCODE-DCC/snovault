@@ -114,7 +114,7 @@ class AggsToFacetsMixin:
             TOTAL: self._get_aggregation_total(facet_name),
             TYPE_KEY: self._get_facet_type(facet_name),
             APPENDED: JS_FALSE,
-            OPEN_ON_LOAD: self._get_facet_type(facet_name),
+            OPEN_ON_LOAD: self._get_facet_open_on_load(facet_name),
         }
         if facet.get(TERMS):
             self.facets.append(facet)
