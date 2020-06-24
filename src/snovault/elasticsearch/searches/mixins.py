@@ -58,7 +58,7 @@ class AggsToFacetsMixin:
         return self._get_facets().get(facet_name, {}).get(TYPE_KEY, TERMS)
 
     def _get_facet_open_on_load(self, facet_name):
-        return self._get_facets().get(facet_name, {}).get(OPEN_ON_LOAD, 'False')
+        return self._get_facets().get(facet_name, {}).get(OPEN_ON_LOAD, False)
 
     def _parse_aggregation_bucket_to_list(self, aggregation_bucket):
         '''
