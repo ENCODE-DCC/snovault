@@ -17,6 +17,7 @@ from snovault import (
 from snovault.storage import (
     TransactionRecord,
 )
+from snovault.util import get_uuids_from_file
 from urllib3.exceptions import ReadTimeoutError
 from .interfaces import (
     ELASTIC_SEARCH,
@@ -796,6 +797,11 @@ def all_uuids(registry, types=None):
             continue
         for uuid in collection:
             yield str(uuid)
+    small_db_path = registry.settings.get('small_db_path', None)
+    if small_db_path:
+        for uuid in get_uuids_from_file(small_db_path):
+            yield uuid
+        return
     uuid_generator_map = {}
     for collection_name in sorted(collections.by_item_type):
         if collection_name in initial:
