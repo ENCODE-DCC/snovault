@@ -289,3 +289,13 @@ def test_util_path_expand_exclude(dummy_request, threadlocals, posted_custom_emb
             }
         ]
     }
+
+
+def test_get_uuids_from_file():
+    from snovault.util import get_uuids_from_file
+    from pkg_resources import resource_filename
+    small_db_path = resource_filename('snowflakes', 'tests/data/inserts/small_db.tsv')
+    assert get_uuids_from_file(small_db_path) == [
+        '7a5e9183-b52f-4f75-9708-8e077b086b4e',
+        'e2f35c88-a792-4dea-b5d2-30dc52ed2495'
+    ]
