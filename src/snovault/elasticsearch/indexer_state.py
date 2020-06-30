@@ -797,9 +797,8 @@ def all_uuids(registry, types=None):
             continue
         for uuid in collection:
             yield str(uuid)
-    small_db_path = registry.settings.get('small_db_path', None)
-    if small_db_path:
-        for uuid in get_uuids_from_file(small_db_path):
+    if asbool(registry.settings.get('use_small_db', False)):
+        for uuid in get_uuids_from_file(registry.settings.get('small_db_path')):
             yield uuid
         return
     uuid_generator_map = {}
