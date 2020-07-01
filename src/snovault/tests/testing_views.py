@@ -200,7 +200,8 @@ class TestingSearchSchema(Item):
         'additionalProperties': False,
         'facets': {
             'status': {
-                'title': 'Status'
+                'title': 'Status',
+                'open_on_load': True
             },
             'name': {
                 'title': 'Name'

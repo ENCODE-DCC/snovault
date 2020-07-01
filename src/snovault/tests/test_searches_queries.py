@@ -277,7 +277,7 @@ def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params
     facets = aq._get_facets_for_item_type('TestingSearchSchema')
     expected = [
         ('name', {'title': 'Name'}),
-        ('status', {'title': 'Status'})
+        ('status', {'title': 'Status', 'open_on_load': True})
     ]
     assert all(e in facets for e in expected)
     assert len(expected) == len(facets)
@@ -566,7 +566,7 @@ def test_searches_queries_abstract_query_factory_get_default_and_maybe_item_face
         ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
         ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
         ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
-        ('status', {'title': 'Status'}),
+        ('status', {'title': 'Status', 'open_on_load': True}),
         ('name', {'title': 'Name'})
     ]
     actual = aq._get_default_and_maybe_item_facets()
@@ -1239,7 +1239,7 @@ def test_searches_queries_abstract_query_factory_get_facets(params_parser_snovau
         ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
         ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
         ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
-        ('status', {'title': 'Status'}), ('name', {'title': 'Name'})
+        ('status', {'title': 'Status', 'open_on_load': True}), ('name', {'title': 'Name'})
     ]
     actual = aq._get_facets()
     assert all(e in actual for e in expected)
