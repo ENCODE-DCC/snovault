@@ -121,7 +121,7 @@ class Snowball(Snowset):
         }
     }
     
-    summary = {
+    summary_matrix = {
         'x': {
             'group_by': 'status'
         },
