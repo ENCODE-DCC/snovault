@@ -1582,7 +1582,7 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregation(
             ],
             'total': 35,
             'field': 'status',
-            'appended': False,
+            'appended': 'false',
             'type': 'terms',
             'title': 'Snowflake status',
             'open_on_load': True,
@@ -1616,7 +1616,7 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
                 {'doc_count': 2, 'key': 'revoked'},
                 {'doc_count': 1, 'key': 'deleted'}
             ],
-            'appended': False,
+            'appended': 'false',
             'title': 'Snowflake status',
             'total': 35,
             'type': 'terms',
@@ -1627,7 +1627,7 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
             'terms': [
                 {'doc_count': 35, 'key': 'J. Michael Cherry, Stanford'}
             ],
-            'appended': False,
+            'appended': 'false',
             'title': 'Lab',
             'total': 35,
             'type': 'terms',
@@ -1639,7 +1639,7 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
                 {'doc_count': 35, 'key': 'Item'},
                 {'doc_count': 35, 'key': 'Snowflake'}
             ],
-            'appended': False,
+            'appended': 'false',
             'title': 'Snowflake type',
             'total': 35,
             'type': 'terms',
@@ -1691,8 +1691,8 @@ def test_searches_mixins_aggs_to_facets_mixin_get_fake_facets(
 def test_searches_mixins_aggs_to_facets_mixin_make_fake_bucket():
     from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
     am = AggsToFacetsMixin()
-    am._make_fake_bucket('target.name', 'ctcf', False)
-    assert am.fake_buckets['target.name'][0] == {'key': 'ctcf', 'isEqual': False}
+    am._make_fake_bucket('target.name', 'ctcf', 'false')
+    assert am.fake_buckets['target.name'][0] == {'key': 'ctcf', 'isEqual': 'false'}
 
 
 def test_searches_mixins_aggs_to_facets_mixin_make_fake_buckets():
@@ -1700,18 +1700,18 @@ def test_searches_mixins_aggs_to_facets_mixin_make_fake_buckets():
     am = AggsToFacetsMixin()
     am._make_fake_buckets(
         params=[('status', 'released'), ('treated', '*'), ('biosample.organism', 'human')],
-        is_equal=True
+        is_equal='true'
     )
     actual = dict(am.fake_buckets)
     expected = {
         'biosample.organism': [
-            {'key': 'human', 'isEqual': True}
+            {'key': 'human', 'isEqual': 'true'}
         ],
         'status': [
-            {'key': 'released', 'isEqual': True}
+            {'key': 'released', 'isEqual': 'true'}
         ],
         'treated': [
-            {'key': '*', 'isEqual': True}
+            {'key': '*', 'isEqual': 'true'}
         ]
     }
     assert actual == expected
@@ -1731,15 +1731,15 @@ def test_searches_mixins_aggs_to_facets_mixin_make_fake_buckets_from_fake_facet(
     )
     expected = {
         'file_format': [
-            {'key': '*', 'isEqual': True}
+            {'key': '*', 'isEqual': 'true'}
         ],
         'status': [
-            {'key': 'released', 'isEqual': True},
-            {'key': 'in progress', 'isEqual': True},
-            {'key': 'archived', 'isEqual': False}
+            {'key': 'released', 'isEqual': 'true'},
+            {'key': 'in progress', 'isEqual': 'true'},
+            {'key': 'archived', 'isEqual': 'false'}
         ],
         'restricted': [
-            {'key': '*', 'isEqual': False}
+            {'key': '*', 'isEqual': 'false'}
         ]
     }
     actual = dict(basic_query_response_with_facets.fake_buckets)
@@ -1749,14 +1749,14 @@ def test_searches_mixins_aggs_to_facets_mixin_make_fake_buckets_from_fake_facet(
 
 
 def test_searches_mixins_aggs_to_facets_mixin_make_fake_facet(basic_query_response_with_facets):
-    basic_query_response_with_facets._make_fake_facet('target.name', [{'key': '*', 'isEqual': True}])
+    basic_query_response_with_facets._make_fake_facet('target.name', [{'key': '*', 'isEqual': 'true'}])
     assert basic_query_response_with_facets.fake_facets[0] == {
         'field': 'target.name',
-        'appended': True,
+        'appended': 'true',
         'title': 'target.name',
         'total': 2,
         'terms': [
-            {'key': '*', 'isEqual': True}
+            {'key': '*', 'isEqual': 'true'}
         ]
     }
 
