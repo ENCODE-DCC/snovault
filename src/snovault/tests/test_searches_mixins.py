@@ -1469,7 +1469,7 @@ def test_searches_mixins_aggs_to_facets_mixin_get_facet_type(basic_query_respons
     assert basic_query_response_with_facets._get_facet_type('status') == 'exists'
 
 
-def test_searches_mixins_aggs_to_facets_mixin_get_facet_open_on_load(basic_query_response_with_facets, mocker):
+def test_searches_mixins_aggs_to_facets_mixin_get_facet_open_on_load(basic_query_response_with_facets):
     assert basic_query_response_with_facets._get_facet_open_on_load('status') == True
     assert basic_query_response_with_facets._get_facet_open_on_load('type') == False
     assert basic_query_response_with_facets._get_facet_open_on_load('audit.WARNING.category') == False
