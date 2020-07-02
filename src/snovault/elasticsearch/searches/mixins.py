@@ -13,6 +13,7 @@ from .interfaces import JS_IS_EQUAL
 from .interfaces import JS_TRUE
 from .interfaces import JS_FALSE
 from .interfaces import KEY
+from .interfaces import OPEN_ON_LOAD
 from .interfaces import PERIOD
 from .interfaces import TERMS
 from .interfaces import TITLE
@@ -55,6 +56,9 @@ class AggsToFacetsMixin:
 
     def _get_facet_type(self, facet_name):
         return self._get_facets().get(facet_name, {}).get(TYPE_KEY, TERMS)
+
+    def _get_facet_open_on_load(self, facet_name):
+        return self._get_facets().get(facet_name, {}).get(OPEN_ON_LOAD, False)
 
     def _parse_aggregation_bucket_to_list(self, aggregation_bucket):
         '''
@@ -109,7 +113,8 @@ class AggsToFacetsMixin:
             TERMS: self._get_aggregation_bucket(facet_name),
             TOTAL: self._get_aggregation_total(facet_name),
             TYPE_KEY: self._get_facet_type(facet_name),
-            APPENDED: JS_FALSE
+            APPENDED: JS_FALSE,
+            OPEN_ON_LOAD: self._get_facet_open_on_load(facet_name),
         }
         if facet.get(TERMS):
             self.facets.append(facet)

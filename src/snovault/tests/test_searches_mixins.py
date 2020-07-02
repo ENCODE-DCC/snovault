@@ -10,9 +10,9 @@ def snowflakes_facets():
                 ('audit.ERROR.category', {'title': 'Audit category: ERROR'}),
                 ('audit.NOT_COMPLIANT.category', {'title': 'Audit category: NOT COMPLIANT'}),
                 ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
-                ('status', {'title': 'Snowflake status'}),
-                ('type', {'title': 'Snowflake type'}),
-                ('lab.title', {'title': 'Lab'})
+                ('status', {'title': 'Snowflake status', 'open_on_load': True}),
+                ('type', {'title': 'Snowflake type', 'open_on_load': False}),
+                ('lab.title', {'title': 'Lab', 'open_on_load': False})
         ]
     }
 
@@ -1415,7 +1415,8 @@ def test_searches_mixins_aggs_to_facets_mixin_get_facets(basic_query_response_wi
             'title': 'Audit category: WARNING'
         },
         'status': {
-            'title': 'Status'
+            'title': 'Status',
+            'open_on_load': True
         }
     }
     assert basic_query_response_with_facets._get_facets() == expected
@@ -1466,6 +1467,12 @@ def test_searches_mixins_aggs_to_facets_mixin_get_facet_type(basic_query_respons
         }
     }
     assert basic_query_response_with_facets._get_facet_type('status') == 'exists'
+
+
+def test_searches_mixins_aggs_to_facets_mixin_get_facet_open_on_load(basic_query_response_with_facets):
+    assert basic_query_response_with_facets._get_facet_open_on_load('status') == True
+    assert basic_query_response_with_facets._get_facet_open_on_load('type') == False
+    assert basic_query_response_with_facets._get_facet_open_on_load('audit.WARNING.category') == False
 
 
 def test_searches_mixins_aggs_to_facets_mixin_parse_aggregation_bucket_to_list(raw_response):
@@ -1577,7 +1584,8 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregation(
             'field': 'status',
             'appended': 'false',
             'type': 'terms',
-            'title': 'Snowflake status'
+            'title': 'Snowflake status',
+            'open_on_load': True,
         }
     ]
     actual = basic_query_response_with_facets.facets
@@ -1587,6 +1595,7 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregation(
     assert expected[0]['title'] == actual[0]['title']
     assert expected[0]['type'] == actual[0]['type']
     assert expected[0]['appended'] == actual[0]['appended']
+    assert expected[0]['open_on_load'] == actual[0]['open_on_load']
 
 
 def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
@@ -1610,7 +1619,8 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
             'appended': 'false',
             'title': 'Snowflake status',
             'total': 35,
-            'type': 'terms'
+            'type': 'terms',
+            'open_on_load': True,
         },
         {
             'field': 'lab.title',
@@ -1620,7 +1630,8 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
             'appended': 'false',
             'title': 'Lab',
             'total': 35,
-            'type': 'terms'
+            'type': 'terms',
+            'open_on_load': False,
         },
         {
             'field': 'type',
@@ -1631,7 +1642,8 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
             'appended': 'false',
             'title': 'Snowflake type',
             'total': 35,
-            'type': 'terms'
+            'type': 'terms',
+            'open_on_load': False,
         }
     ]
     actual = basic_query_response_with_facets.facets
@@ -1644,6 +1656,7 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
         assert e['title'] == a['title']
         assert e['type'] == a['type']
         assert e['appended'] == a['appended']
+        assert e['open_on_load'] == a['open_on_load']
 
 
 def test_searches_mixins_aggs_to_facets_mixin_get_fake_facets(
