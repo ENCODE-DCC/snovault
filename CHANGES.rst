@@ -1,6 +1,12 @@
 Changes
 =======
 
+Snovault 1.0.46 (released) encoded v103.0 (unreleased)
+----------------------------------------
+1. SNO-160-use-boolean-values-in-facets (#280)
+2. SNO-116 Use summary_matrix instead of summary (#278)
+3. SNO-157-make-facets-collapsable (#275)
+
 Snovault 1.0.45 (released) encoded v102.0
 ----------------------------------------
 1. SNO-154-fix-magic-json-bug (#272)
