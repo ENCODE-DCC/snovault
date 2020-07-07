@@ -5,6 +5,7 @@ from elasticsearch.exceptions import (
     TransportError,
 )
 from pyramid.view import view_config
+from pyramid.settings import asbool
 from sqlalchemy.exc import StatementError
 from snovault import (
     COLLECTIONS,
@@ -27,8 +28,16 @@ import copy
 import json
 import requests
 import re
+import boto3
+import socket
 
+
+AWS_REGION = 'us-west-2'
+_HOSTNAME = socket.gethostname()
 SEARCH_MAX = 99999  # OutOfMemoryError if too high
+HEAD_NODE_INDEX = 'head_node'
+INDEXING_NODE_INDEX = 'indexing_node'
+
 
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
@@ -37,6 +46,107 @@ log = logging.getLogger('snovault.elasticsearch.es_index_listener')
 def includeme(config):
     config.add_route('_indexer_state', '/_indexer_state')
     config.scan(__name__)
+
+
+def _get_this_instance_name(instance_name=None):
+    ec2 = boto3.client('ec2', region_name=AWS_REGION)
+    if not instance_name:
+        hostname = _HOSTNAME.replace('ip-', '').replace('-', '.')
+        response = ec2.describe_instances(Filters=[
+                {'Name': 'private-ip-address', 'Values': [hostname]},
+        ])
+    else:
+        response = ec2.describe_instances(Filters=[
+            {'Name': 'tag:Name', 'Values': [instance_name]},
+        ])
+    if not response.get('ResponseMetadata', {}).get('HTTPStatusCode') == 200:
+        return None 
+    instance_name = None
+    instance_state = None
+    for reservation in response.get('Reservations', []):
+        for instance in reservation.get('Instances', []):
+            instance_state = instance['State']['Name']
+            for tag_obj in instance.get('Tags', []):
+                if tag_obj.get('Key') == 'Name':
+                    instance_name = tag_obj.get('Value')
+                    break
+    return instance_name, instance_state
+
+
+def setup_indexing_nodes(request, indexer_state, reset=False):
+    time_now = float(time.time())
+    did_fail = False
+    is_indexing_node = False
+    node_state_template = {
+        'node_index': None,
+        'instance_name': None,
+        'instance_state': None,
+        'waiting_on_remote': False,
+        'started_indexing': False,
+        'done_indexing': False,
+        'last_run_time': str(time_now),
+    }
+    # Get/Setup head node state in local elasticsearch meta data
+    head_node = indexer_state.get_obj(HEAD_NODE_INDEX)
+    indexing_node = indexer_state.get_obj(INDEXING_NODE_INDEX)
+    indexer_tag = '-indexer'
+    # Check which node this is
+    instance_name, instance_state = _get_this_instance_name()
+    if not instance_name:
+        did_fail = True
+        return head_node, indexing_node, time_now, did_fail, is_indexing_node
+    elif not instance_name.replace(indexer_tag, '') == instance_name:
+        # indexing node does not manage states
+        is_indexing_node = True
+        return head_node, indexing_node, time_now, did_fail, is_indexing_node
+    # Handle Setup or Refresh
+    if not head_node or not indexing_node or reset:
+        # Setup node state in elasticsearch
+        # Save this node as head node
+        head_node = copy.deepcopy(node_state_template)
+        head_node['node_index'] = HEAD_NODE_INDEX
+        head_node['instance_name'] = instance_name
+        head_node['instance_state'] = instance_state
+        indexer_state.put_obj(head_node['node_index'], head_node)
+        # Create indexing node
+        indexer_name = f"{instance_name}{indexer_tag}"
+        indexer_instance_name, indexer_instance_state = _get_this_instance_name(
+            instance_name=indexer_name
+        )
+        if not indexer_instance_name:
+            did_fail = True
+            return head_node, indexing_node, time_now, did_fail, is_indexing_node
+        indexing_node = copy.deepcopy(node_state_template)
+        indexing_node['node_index'] = INDEXING_NODE_INDEX
+        indexing_node['instance_name'] = indexer_instance_name
+        indexing_node['instance_state'] = indexer_instance_state
+        indexing_node['last_run_time'] = str(float(time.time()))
+        indexer_state.put_obj(indexing_node['node_index'], indexing_node)
+    else:
+        # Refresh aws instance state
+        # Head
+        instance_name, instance_state = _get_this_instance_name(
+            instance_name=head_node['instance_name']
+        )
+        if instance_name and instance_state:
+            head_node['instance_state'] = instance_state
+            indexer_state.put_obj(head_node['node_index'], head_node)
+        else:
+            log.warning('Remote indexer failed to update head node')
+        # Indexer
+        instance_name, instance_state = _get_this_instance_name(
+            instance_name=indexing_node['instance_name']
+        )
+        if instance_name and instance_state:
+            indexing_node['instance_state'] = instance_state
+            if instance_state == 'stopped':
+                # reset clock if stopped
+                indexing_node['last_run_time'] = str(float(time.time()))
+            indexer_state.put_obj(indexing_node['node_index'], indexing_node)
+        else:
+            log.warning('Remote indexer failed to update indexer node')
+    return head_node, indexing_node, time_now, did_fail, is_indexing_node
+
 
 class IndexerState(object):
     _is_reindex_base = '_is_reindex'
@@ -595,6 +705,12 @@ def indexer_state_show(request):
         msg = state.request_reindex(reindex)
         if msg is not None:
             return msg
+
+    # requesting reset on remote indexing
+    reset_remote = request.params.get("reset_remote")
+    if reset_remote is not None:
+        setup_indexing_nodes(request, state, reset=True)
+        return 'did reset indexing nodes'
 
     # Requested notification
     who = request.params.get("notify")
