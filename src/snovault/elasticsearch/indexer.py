@@ -224,7 +224,7 @@ def _send_sqs_msg(
 
 
 def _get_nodes(request, indexer_state):
-    label = 'nothing'
+    label = ''
     continue_on = False
     did_timeout = False
     # Get local/remote indexing state
@@ -254,7 +254,8 @@ def _get_nodes(request, indexer_state):
             # not catching if instance is on but app not running?  maybe the indexer state
             #  needs update a flag saying it is still running
             if other_node['instance_state'] in ['running', 'pending']:
-                label = 'Head node with remote indexing running'
+                # label = 'Head node with remote indexing running'
+                pass
             else:
                 label = 'Head node with remote indexing running, permature shutdown'
                 log.warning(f"Indexer permature shutdown: sleep {_REMOTE_INDEXING_SHUTDOWN_SLEEP} seconds")
@@ -281,10 +282,11 @@ def _get_nodes(request, indexer_state):
                     log.warning(f"Indexer failed start shutdown sleep: {_REMOTE_INDEXING_SHUTDOWN_SLEEP} seconds")
                     time.sleep(_REMOTE_INDEXING_SHUTDOWN_SLEEP)
                 else:
-                    log.warning('Indexer failed start shutdown: Already stopped')
+                    # log.warning('Indexer failed start shutdown: Already stopped')
+                    pass
                 did_timeout = True
         else:
-            label = 'Head node says no indexing going on'
+            # label = 'Head node says no indexing going on'
             if this_time_in_state > _REMOTE_INDEXING_SHUTDOWN:
                 this_node, other_node, time_now, did_fail, is_indexing_node = setup_indexing_nodes(
                     request,
@@ -292,7 +294,7 @@ def _get_nodes(request, indexer_state):
                     reset=True
                 )
                 if not other_node['instance_state'] in ['stopped', 'stopping']:
-                    label += ' - and shutting down indexer'
+                    label = 'Head node says no indexing going on - and shutting down indexer'
                     instance_name = this_node['instance_name']
                     remote_indexing = False
                     _ = _send_sqs_msg(
@@ -305,7 +307,8 @@ def _get_nodes(request, indexer_state):
                     log.warning(f"Indexer timeout shutdown: sleep {_REMOTE_INDEXING_SHUTDOWN_SLEEP} seconds")
                     time.sleep(_REMOTE_INDEXING_SHUTDOWN_SLEEP)
                 else:
-                    log.warning('Indexer timeout shutdown: Already stopped')
+                    # log.warning('Indexer timeout shutdown: Already stopped')
+                    pass
             continue_on = True
     elif this_node['node_index'] == INDEXING_NODE_INDEX:
         if other_node['waiting_on_remote']:
@@ -323,10 +326,11 @@ def _get_nodes(request, indexer_state):
                 label = 'Index node is in limbo with head node waiting_on_remote.  May correct on next loop.'
         else:
             label = 'Index node finished indexing and has been reset by head node.  Waiting to be shutdown by head node.'
-    if other_node['instance_state'] == 'stopped':
-        log.warning(f"Remote indexing _get_nodes: {label}. this_time: {this_time_in_state:0.6f}, other_time: stopped")
-    else:
-        log.warning(f"Remote indexing _get_nodes: {label}. this_time: {this_time_in_state:0.6f}, other_time: {other_time_in_state:0.6f}")
+    if label:
+        if other_node['instance_state'] == 'stopped':
+            log.warning(f"Remote indexing _get_nodes: {label}. this_time: {this_time_in_state:0.6f}, other_time: stopped")
+        else:
+            log.warning(f"Remote indexing _get_nodes: {label}. this_time: {this_time_in_state:0.6f}, other_time: {other_time_in_state:0.6f}")
     return this_node, other_node, continue_on, did_timeout
 
 
