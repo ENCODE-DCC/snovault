@@ -1,5 +1,8 @@
 import os
+import boto3
 
+from botocore.config import Config
+from botocore.exceptions import ClientError
 from elasticsearch.exceptions import (
     ConflictError,
     ConnectionError,
@@ -27,7 +30,11 @@ from .indexer_state import (
     IndexerState,
     all_uuids,
     all_types,
-    SEARCH_MAX
+    SEARCH_MAX,
+    setup_indexing_nodes,
+    HEAD_NODE_INDEX,
+    INDEXING_NODE_INDEX,
+    AWS_REGION,
 )
 from .simple_queue import SimpleUuidServer
 
@@ -44,6 +51,14 @@ es_logger.setLevel(logging.ERROR)
 log = logging.getLogger('snovault.elasticsearch.es_index_listener')
 MAX_CLAUSES_FOR_ES = 8192
 DEFAULT_QUEUE = 'Simple'
+# Allow three minutes for indexer to stop before head indexer process continues
+_REMOTE_INDEXING_SHUTDOWN_SLEEP = 3*60
+# Allow indexer to remain up for 30 minutes after indexing before being shutdown
+_REMOTE_INDEXING_SHUTDOWN = 15*60
+# Allow indexer 20 minutes to startup before head indexer thread takes over indexing
+_REMOTE_INDEXING_STARTUP = 10*60
+# The number of uuids needed to start a remote indexer
+_REMOTE_INDEXING_THRESHOLD = 10000
 
 
 def _update_for_uuid_queues(registry):
@@ -75,6 +90,7 @@ def includeme(config):
         _update_for_uuid_queues(registry)
         if not processes:
             registry[INDEXER] = Indexer(registry)
+
 
 def get_related_uuids(request, es, updated, renamed):
     '''Returns (set of uuids, False) or (list of all uuids, True) if full reindex triggered'''
@@ -143,140 +159,342 @@ def get_related_uuids(request, es, updated, renamed):
     return (related_set, False)
 
 
+def _determine_indexing_protocol(request, uuid_count):
+    remote_indexing = asbool(request.registry.settings.get('remote_indexing', False))
+    if not remote_indexing:
+        return False
+    try:
+        indexer_short_uuids = int(request.registry.settings.get('indexer_short_uuids', 0))
+        remote_indexing_threshold = int(
+            request.registry.settings.get(
+                'remote_indexing_threshold',
+                _REMOTE_INDEXING_THRESHOLD,
+            )
+        )
+        if indexer_short_uuids > 0:
+            uuid_count = indexer_short_uuids
+    except ValueError:
+        log.warning('ValueError casting remote indexing threshold to an int')
+        remote_indexing_threshold = _REMOTE_INDEXING_THRESHOLD
+    if uuid_count < remote_indexing_threshold:
+        return False
+    return True
+
+
+def _send_sqs_msg(
+            cluster_name,
+            remote_indexing,
+            body,
+            delay_seconds=0,
+            save_event=False,
+        ):
+    did_fail = True
+    msg_attrs = {
+        'cluster_name': cluster_name,
+        'remote_indexing': '0' if remote_indexing else '1',
+        'save_event': '0' if save_event else '1',
+    }
+    msg_attrs = {
+        key: {'DataType': 'String', 'StringValue': val}
+        for key, val in msg_attrs.items()
+    }
+    boto_session = boto3.Session(region_name=AWS_REGION)
+    sqs_resource = boto_session.resource('sqs')
+    watch_dog = 3
+    attempts = 0
+    while attempts < watch_dog:
+        attempts += 1
+        try: 
+            queue_arn = sqs_resource.get_queue_by_name(QueueName='ec2_scheduler_input')
+            if queue_arn:
+                response = sqs_resource.meta.client.send_message(
+                    QueueUrl=queue_arn.url,
+                    DelaySeconds=delay_seconds,
+                    MessageAttributes=msg_attrs,
+                    MessageBody=body,
+                )
+                if response.get('ResponseMetadata', {}).get('HTTPStatusCode') == 200:
+                    log.warning(f"Remote indexing _send_sqs_msg: {body}")
+                    did_fail = False
+                    break
+        except ClientError as ecp:
+            error_str = e.response.get('Error', {}).get('Code', 'Unknown')
+            log.warning(f"({attempts} of {watch_dog}) Indexer could not send message to queue: {error_str}")
+    return did_fail
+
+
+def _get_nodes(request, indexer_state):
+    label = ''
+    continue_on = False
+    did_timeout = False
+    # Get local/remote indexing state
+    head_node, indexing_node, time_now, did_fail, is_indexing_node = setup_indexing_nodes(
+        request, indexer_state
+    )
+    this_node = head_node
+    other_node = indexing_node
+    if is_indexing_node:
+        this_node = indexing_node
+        other_node = head_node
+    if did_fail:
+        did_timeout = True
+        return this_node, other_node, continue_on, did_timeout
+    this_time_in_state = time_now - float(this_node['last_run_time'])
+    other_time_in_state = time_now - float(other_node['last_run_time'])
+    # Check for early return if indexing is running
+    if this_node['node_index'] == HEAD_NODE_INDEX:
+        if other_node['done_indexing']:
+            label = 'Head node with remote finished indexing.  Reset both es node states.'
+            this_node, other_node, time_now, did_fail, is_indexing_node = setup_indexing_nodes(
+                request,
+                indexer_state,
+                reset=True
+            )
+        elif other_node['started_indexing']:
+            # not catching if instance is on but app not running?  maybe the indexer state
+            #  needs update a flag saying it is still running
+            if other_node['instance_state'] in ['running', 'pending']:
+                # label = 'Head node with remote indexing running'
+                pass
+            else:
+                label = 'Head node with remote indexing running, permature shutdown'
+                log.warning(f"Indexer permature shutdown: sleep {_REMOTE_INDEXING_SHUTDOWN_SLEEP} seconds")
+                time.sleep(_REMOTE_INDEXING_SHUTDOWN_SLEEP)
+                continue_on = True
+        elif this_node['waiting_on_remote']:
+            label = 'Head node waiting on remote indexing to start'
+            if this_time_in_state > _REMOTE_INDEXING_STARTUP:
+                this_node, other_node, time_now, did_fail, is_indexing_node = setup_indexing_nodes(
+                    request,
+                    indexer_state,
+                    reset=True
+                )
+                if not other_node['instance_state'] in ['stopped', 'stopping']:
+                    instance_name = this_node['instance_name']
+                    remote_indexing = False
+                    _ = _send_sqs_msg(
+                        f"{instance_name}-indexer",
+                        remote_indexing,
+                        'Turn OFF remote indexer for failed start',
+                        delay_seconds=0,
+                        save_event=False
+                    )
+                    log.warning(f"Indexer failed start shutdown sleep: {_REMOTE_INDEXING_SHUTDOWN_SLEEP} seconds")
+                    time.sleep(_REMOTE_INDEXING_SHUTDOWN_SLEEP)
+                else:
+                    # log.warning('Indexer failed start shutdown: Already stopped')
+                    pass
+                did_timeout = True
+        else:
+            # label = 'Head node says no indexing going on'
+            if this_time_in_state > _REMOTE_INDEXING_SHUTDOWN:
+                this_node, other_node, time_now, did_fail, is_indexing_node = setup_indexing_nodes(
+                    request,
+                    indexer_state,
+                    reset=True
+                )
+                if not other_node['instance_state'] in ['stopped', 'stopping']:
+                    label = 'Head node says no indexing going on - and shutting down indexer'
+                    instance_name = this_node['instance_name']
+                    remote_indexing = False
+                    _ = _send_sqs_msg(
+                        f"{instance_name}-indexer",
+                        remote_indexing,
+                        'Turn OFF remote indexer for shutdown',
+                        delay_seconds=0,
+                        save_event=False
+                    )
+                    log.warning(f"Indexer timeout shutdown: sleep {_REMOTE_INDEXING_SHUTDOWN_SLEEP} seconds")
+                    time.sleep(_REMOTE_INDEXING_SHUTDOWN_SLEEP)
+                else:
+                    # log.warning('Indexer timeout shutdown: Already stopped')
+                    pass
+            continue_on = True
+    elif this_node['node_index'] == INDEXING_NODE_INDEX:
+        if other_node['waiting_on_remote']:
+            if not this_node['started_indexing']:
+                label = 'Index node received signal to start indexing'
+                continue_on = True
+            elif this_node['done_indexing']:
+                label = 'Index node finished indexing.  Waiting on head node to pick up status.'
+            elif this_node['started_indexing']:
+                label = 'Index node has just finished indexing'
+                this_node['done_indexing'] = True
+                this_node['last_run_time'] = str(float(time.time()))
+                indexer_state.put_obj(this_node['node_index'], this_node)
+            else:
+                label = 'Index node is in limbo with head node waiting_on_remote.  May correct on next loop.'
+        else:
+            label = 'Index node finished indexing and has been reset by head node.  Waiting to be shutdown by head node.'
+    if label:
+        if other_node['instance_state'] == 'stopped':
+            log.warning(f"Remote indexing _get_nodes: {label}. this_time: {this_time_in_state:0.6f}, other_time: stopped")
+        else:
+            log.warning(f"Remote indexing _get_nodes: {label}. this_time: {this_time_in_state:0.6f}, other_time: {other_time_in_state:0.6f}")
+    return this_node, other_node, continue_on, did_timeout
+
 
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
-    INDEX = request.registry.settings['snovault.elasticsearch.index']
     # Setting request.datastore here only works because routed views are not traversed.
     request.datastore = 'database'
-    record = request.json.get('record', False)
-    dry_run = request.json.get('dry_run', False)
-    recovery = request.json.get('recovery', False)
-    es = request.registry[ELASTIC_SEARCH]
-    indexer = request.registry[INDEXER]
     session = request.registry[DBSESSION]()
     connection = session.connection()
-    first_txn = None
-    snapshot_id = None
-    restart=False
-    invalidated = []
-    xmin = -1
-    is_testing = asbool(request.registry.settings.get('testing', False))
-    is_testing_full = request.json.get('is_testing_full', False)
-
     # Currently 2 possible followup indexers (base.ini [set stage_for_followup = vis_indexer, region_indexer])
     stage_for_followup = list(request.registry.settings.get("stage_for_followup", '').replace(' ','').split(','))
-
     # May have undone uuids from prior cycle
-    state = IndexerState(es, INDEX, followups=stage_for_followup)
+    indexer_state = IndexerState(
+        request.registry[ELASTIC_SEARCH],
+        request.registry.settings['snovault.elasticsearch.index'],
+        followups=stage_for_followup,
+    )
+    # Check remote indexing and set head/indexing nodes
+    this_node = indexer_state.get_obj(INDEXING_NODE_INDEX)
+    other_node = indexer_state.get_obj(HEAD_NODE_INDEX)
+    remote_indexing = asbool(request.registry.settings.get('remote_indexing', False))
+    did_timeout = False
+    if remote_indexing:
+        this_node, other_node, continue_on, did_timeout = _get_nodes(request, indexer_state)
+        if not did_timeout and not continue_on:
+            # Node state implies we do not need to run any code right now
+            return {'this_node': this_node, 'other_node': other_node}
+    elif this_node and other_node:
+        # if remote node states exists and remote_indexing false then this is the remote indexer
+        this_node, other_node, continue_on, did_timeout = _get_nodes(request, indexer_state)
+        if not did_timeout and not continue_on:
+            # Node state implies we do not need to run any code right now
+            return {'this_node': this_node, 'other_node': other_node}
 
-    (xmin, invalidated, restart) = state.priority_cycle(request)
-    state.log_reindex_init_state()
-    # OPTIONAL: restart support
-    if restart:  # Currently not bothering with restart!!!
-        xmin = -1
-        invalidated = []
-    # OPTIONAL: restart support
+    def _load_indexing(request, session, connection, indexer_state):
+        first_txn = None
+        snapshot_id = None
+        (xmin, invalidated, restart) = indexer_state.priority_cycle(request)
+        indexer_state.log_reindex_init_state()
+        # OPTIONAL: restart support
+        if restart:  # Currently not bothering with restart!!!
+            xmin = -1
+            invalidated = []
+        # OPTIONAL: restart support
 
-    result = state.get_initial_state()  # get after checking priority!
+        result = indexer_state.get_initial_state()  # get after checking priority!
 
-    if xmin == -1 or len(invalidated) == 0:
-        xmin = get_current_xmin(request)
+        if xmin == -1 or len(invalidated) == 0:
+            xmin = get_current_xmin(request)
 
-        last_xmin = None
-        if 'last_xmin' in request.json:
-            last_xmin = request.json['last_xmin']
-        else:
-            status = es.get(index=INDEX, doc_type='meta', id='indexing', ignore=[400, 404])
-            if status['found'] and 'xmin' in status['_source']:
-                last_xmin = status['_source']['xmin']
-        if last_xmin is None:  # still!
-            if 'last_xmin' in result:
-                last_xmin = result['last_xmin']
-            elif 'xmin' in result and result['xmin'] < xmin:
-                last_xmin = result['state']
+            last_xmin = None
+            if 'last_xmin' in request.json:
+                last_xmin = request.json['last_xmin']
+            else:
+                status = request.registry[ELASTIC_SEARCH].get(
+                    index=request.registry.settings['snovault.elasticsearch.index'],
+                    doc_type='meta',
+                    id='indexing',
+                    ignore=[400, 404]
+                )
+                if status['found'] and 'xmin' in status['_source']:
+                    last_xmin = status['_source']['xmin']
+            if last_xmin is None:  # still!
+                if 'last_xmin' in result:
+                    last_xmin = result['last_xmin']
+                elif 'xmin' in result and result['xmin'] < xmin:
+                    last_xmin = result['state']
 
-        result.update(
-            xmin=xmin,
-            last_xmin=last_xmin,
-        )
-
-    if len(invalidated) > SEARCH_MAX:  # Priority cycle already set up
-        flush = True
-    else:
-
-        flush = False
-        if last_xmin is None:
-            result['types'] = types = request.json.get('types', None)
-            invalidated = list(all_uuids(request.registry, types))
-            flush = True
-        else:
-            txns = session.query(TransactionRecord).filter(
-                TransactionRecord.xid >= last_xmin,
+            result.update(
+                xmin=xmin,
+                last_xmin=last_xmin,
             )
 
-            invalidated = set(invalidated)  # not empty if API index request occurred
-            updated = set()
-            renamed = set()
-            max_xid = 0
-            txn_count = 0
-            for txn in txns.all():
-                txn_count += 1
-                max_xid = max(max_xid, txn.xid)
-                if first_txn is None:
-                    first_txn = txn.timestamp
-                else:
-                    first_txn = min(first_txn, txn.timestamp)
-                renamed.update(txn.data.get('renamed', ()))
-                updated.update(txn.data.get('updated', ()))
+        if len(invalidated) > SEARCH_MAX:  # Priority cycle already set up
+            flush = True
+        else:
 
-            if invalidated:        # reindex requested, treat like updated
-                updated |= invalidated
-
-            result['txn_count'] = txn_count
-            if txn_count == 0 and len(invalidated) == 0:
-                state.send_notices()
-                return result
-
-            if is_testing and is_testing_full:
-                full_reindex = False
-                related_set = set(all_uuids(request.registry))
-            else:
-                (related_set, full_reindex) = get_related_uuids(request, es, updated, renamed)
-            if full_reindex:
-                invalidated = related_set
+            flush = False
+            if last_xmin is None:
+                result['types'] = types = request.json.get('types', None)
+                invalidated = list(all_uuids(request.registry, types))
                 flush = True
             else:
-                invalidated = related_set | updated
-                result.update(
-                    max_xid=max_xid,
-                    renamed=renamed,
-                    updated=updated,
-                    referencing=len(related_set),
-                    invalidated=len(invalidated),
-                    txn_count=txn_count
+                txns = session.query(TransactionRecord).filter(
+                    TransactionRecord.xid >= last_xmin,
                 )
-                if first_txn is not None:
-                    result['first_txn_timestamp'] = first_txn.isoformat()
 
-            if invalidated and not dry_run:
-                # Exporting a snapshot mints a new xid, so only do so when required.
-                # Not yet possible to export a snapshot on a standby server:
-                # http://www.postgresql.org/message-id/CAHGQGwEtJCeHUB6KzaiJ6ndvx6EFsidTGnuLwJ1itwVH0EJTOA@mail.gmail.com
-                if snapshot_id is None and not recovery:
-                    snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
+                invalidated = set(invalidated)  # not empty if API index request occurred
+                updated = set()
+                renamed = set()
+                max_xid = 0
+                txn_count = 0
+                for txn in txns.all():
+                    txn_count += 1
+                    max_xid = max(max_xid, txn.xid)
+                    if first_txn is None:
+                        first_txn = txn.timestamp
+                    else:
+                        first_txn = min(first_txn, txn.timestamp)
+                    renamed.update(txn.data.get('renamed', ()))
+                    updated.update(txn.data.get('updated', ()))
 
-    indexing_update_infos = []
-    if invalidated and not dry_run:
+                if invalidated:        # reindex requested, treat like updated
+                    updated |= invalidated
+
+                result['txn_count'] = txn_count
+                if txn_count == 0 and len(invalidated) == 0:
+                    indexer_state.send_notices()
+                    return_now = True
+                    return result, return_now, flush, invalidated, first_txn, snapshot_id, restart, xmin
+
+                is_testing = asbool(request.registry.settings.get('testing', False))
+                is_testing_full = request.json.get('is_testing_full', False)
+                if is_testing and is_testing_full:
+                    full_reindex = False
+                    related_set = set(all_uuids(request.registry))
+                else:
+                    (related_set, full_reindex) = get_related_uuids(request, request.registry[ELASTIC_SEARCH], updated, renamed)
+                if full_reindex:
+                    invalidated = related_set
+                    flush = True
+                else:
+                    invalidated = related_set | updated
+                    result.update(
+                        max_xid=max_xid,
+                        renamed=renamed,
+                        updated=updated,
+                        referencing=len(related_set),
+                        invalidated=len(invalidated),
+                        txn_count=txn_count
+                    )
+                    if first_txn is not None:
+                        result['first_txn_timestamp'] = first_txn.isoformat()
+
+                if invalidated and not request.json.get('dry_run', False):
+                    # Exporting a snapshot mints a new xid, so only do so when required.
+                    # Not yet possible to export a snapshot on a standby server:
+                    # http://www.postgresql.org/message-id/CAHGQGwEtJCeHUB6KzaiJ6ndvx6EFsidTGnuLwJ1itwVH0EJTOA@mail.gmail.com
+                    if snapshot_id is None and not request.json.get('recovery', False):
+                        snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
+        return_now = False
+        return result, invalidated, flush, first_txn, snapshot_id, restart, xmin, return_now
+
+
+    def _run_indexing(
+            request,
+            indexer_state,
+            result,
+            invalidated,
+            stage_for_followup,
+            flush,
+            snapshot_id,
+            restart,
+            xmin,
+        ):
         if len(stage_for_followup) > 0:
             # Note: undones should be added before, because those uuids will (hopefully) be indexed in this cycle
-            state.prep_for_followup(xmin, invalidated)
+            indexer_state.prep_for_followup(xmin, invalidated)
 
-        result = state.start_cycle(invalidated, result)
+        result = indexer_state.start_cycle(invalidated, result)
 
         # Do the work...
 
-        indexing_update_infos, errors, err_msg = indexer.serve_objects(
+        indexing_update_infos, errors, err_msg = request.registry[INDEXER].serve_objects(
             request,
             invalidated,
             xmin,
@@ -285,18 +503,28 @@ def index(request):
         )
         if err_msg:
             log.warning('Could not start indexing: %s', err_msg)
-        result = state.finish_cycle(result,errors)
+        result = indexer_state.finish_cycle(result,errors)
 
         if errors:
             result['errors'] = errors
 
-        if record:
+        if request.json.get('record', False):
             try:
-                es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
+                request.registry[ELASTIC_SEARCH].index(
+                    index=request.registry.settings['snovault.elasticsearch.index'],
+                    doc_type='meta',
+                    body=result,
+                    id='indexing'
+                )
             except:
                 error_messages = copy.deepcopy(result['errors'])
                 del result['errors']
-                es.index(index=INDEX, doc_type='meta', body=result, id='indexing')
+                request.registry[ELASTIC_SEARCH].index(
+                    index=request.registry.settings['snovault.elasticsearch.index'],
+                    doc_type='meta',
+                    body=result,
+                    id='indexing'
+                )
                 for item in error_messages:
                     if 'error_message' in item:
                         log.error('Indexing error for {}, error message: {}'.format(item['uuid'], item['error_message']))
@@ -304,22 +532,99 @@ def index(request):
                 result['errors'] = error_messages
 
 
-        es.indices.refresh(RESOURCES_INDEX)
+        request.registry[ELASTIC_SEARCH].indices.refresh(RESOURCES_INDEX)
         if flush:
             try:
-                es.indices.flush_synced(index=RESOURCES_INDEX)  # Faster recovery on ES restart
+                request.registry[ELASTIC_SEARCH].indices.flush_synced(index=RESOURCES_INDEX)  # Faster recovery on ES restart
             except ConflictError:
                 pass
+        return result, indexing_update_infos
 
+    # Load indexing
+    output_tuple = _load_indexing(request, session, connection, indexer_state)
+    result, invalidated, flush, first_txn, snapshot_id, restart, xmin, return_now = output_tuple
+    if return_now:
+        return result
+    indexing_update_infos = []
+    dry_run = request.json.get('dry_run', False)
+    if invalidated and not dry_run:
+        run_indexing_vars = (
+            request,
+            indexer_state,
+            result,
+            invalidated,
+            stage_for_followup,
+            flush,
+            snapshot_id,
+            restart,
+            xmin,
+        )
+        if this_node:
+            if this_node['node_index'] == HEAD_NODE_INDEX:
+                # Check remote indexing
+                uuids_count = len(invalidated)
+                do_remote_indexing = _determine_indexing_protocol(request, uuids_count)
+                if did_timeout:
+                    log.warning(f"Remote indexing index: did_timeout.  Run on head node.")
+                    head_node, indexing_node, time_now, did_fail, is_indexing_node  = setup_indexing_nodes(
+                        request,
+                        indexer_state,
+                        reset=True
+                    )
+                    result, indexing_update_infos = _run_indexing(*run_indexing_vars)
+                elif do_remote_indexing:
+                    log.warning(f"Remote indexing run indexing: Defer to remote.")
+                    instance_name = this_node['instance_name']
+                    did_fail = False
+                    if not other_node['instance_state'] in ['running', 'pending']:
+                        did_fail = _send_sqs_msg(
+                            f"{instance_name}-indexer",
+                            remote_indexing,
+                            'Turn ON remote indexer',
+                            delay_seconds=0,
+                            save_event=False
+                        )
+                    else:
+                        log.warning(f"Remote indexing run indexing: Already on.")
+                    if not did_fail:
+                        this_node['waiting_on_remote'] = True
+                        this_node['last_run_time'] = str(float(time.time()))
+                        indexer_state.put_obj(this_node['node_index'], this_node)
+                    else:
+                        log.warning(f"Remote indexing index: Failed sqs queue.  Run on head node.")
+                        result, indexing_update_infos = _run_indexing(*run_indexing_vars)
+                else:
+                    log.warning(f"Remote indexing index: Below threshold. Run on head node.")
+                    result, indexing_update_infos = _run_indexing(*run_indexing_vars)
+                    # Do not reset state for local indexing below threshold.
+            elif this_node['node_index'] == INDEXING_NODE_INDEX:
+                log.warning(f"Remote indexing indexing node: Start indexing")
+                this_node['started_indexing'] = True
+                this_node['last_run_time'] = str(float(time.time()))
+                indexer_state.put_obj(this_node['node_index'], this_node)
+                result, indexing_update_infos = _run_indexing(*run_indexing_vars)
+                this_node['done_indexing'] = True
+                this_node['last_run_time'] = str(float(time.time()))
+                indexer_state.put_obj(this_node['node_index'], this_node)
+                log.warning(f"Remote indexing indexing node: Done indexing")
+        else:
+            log.warning(f"Non remote indexing")
+            result, indexing_update_infos = _run_indexing(*run_indexing_vars)
+    elif invalidated:
+        log.warning(f"Load indexing have uuids but dry_run")
+    elif dry_run:
+        log.warning(f"Load indexing no uuids on dry_run")
+    # Add transaction lag to result
     if first_txn is not None:
         result['txn_lag'] = str(datetime.datetime.now(pytz.utc) - first_txn)
-
-    state.send_notices()
+    # Send slack notifications
+    indexer_state.send_notices()
+    # Log indexing times
     if indexing_update_infos:
         # Check for logging of intitial indexing info here,
         #  opposed to in the indexer or just after serve_objects,
         #  so a crash in logging does not interupt indexing complietion
-        indexer.check_log_indexing_times(indexing_update_infos)
+        request.registry[INDEXER].check_log_indexing_times(indexing_update_infos)
     return result
 
 
