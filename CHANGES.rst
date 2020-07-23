@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.47 (released) encoded v104.0
+----------------------------------------
+1. SNO-159-allow-remote-indexing (#282)
+
 Snovault 1.0.46 (released) encoded v103.0 (unreleased)
 ----------------------------------------
 1. SNO-160-use-boolean-values-in-facets (#280)
