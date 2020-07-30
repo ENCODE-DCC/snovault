@@ -1,15 +1,23 @@
+import logging
+
+from subprocess import (
+    Popen,
+    PIPE,
+    call as subprocess_call
+)
+
 from collections import defaultdict
 from past.builtins import basestring
 from pyramid.response import Response
 from pyramid.view import view_config
-from subprocess import Popen, PIPE
 from xml.sax.saxutils import quoteattr, escape
 from snovault import TYPES
 
+log = logging.getLogger(__name__)
 
 def includeme(config):
-    config.add_route('graph_dot', '/profiles/graph.dot')
     config.add_route('graph_svg', '/profiles/graph.svg')
+    config.add_route('graph_dot', '/profiles/graph.dot')
     config.scan(__name__)
 
 
@@ -84,8 +92,17 @@ def schema_dot(request):
 
 @view_config(route_name='graph_svg', request_method='GET')
 def schema_svg(request):
-    dot = digraph(request.registry[TYPES].by_item_type, request.params.getall('exclude'))
-    p = Popen(['dot', '-Tsvg'], stdin=PIPE, stdout=PIPE, stderr=PIPE)
-    svg, err = p.communicate(dot.encode('utf-8'))
-    assert p.returncode == 0, err.decode('utf-8')
-    return Response(svg, content_type='image/svg+xml', charset='utf-8')
+    try:
+        return_code = subprocess_call(['which', 'dot'])
+        if return_code == 0:
+            dot = digraph(request.registry[TYPES].by_item_type, request.params.getall('exclude'))
+            p = Popen(['dot', '-Tsvg'], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            svg, err = p.communicate(dot.encode('utf-8'))
+            assert p.returncode == 0, err.decode('utf-8')
+            return Response(svg, content_type='image/svg+xml', charset='utf-8')
+    except Exception as excpt:
+        log.warning("graph.svg is not available exception: {repr(excpt)}")
+        pass
+    msg = 'graph.svg is not available'
+    log.warning(msg)
+    return {'status_code': 404, 'message': msg}
