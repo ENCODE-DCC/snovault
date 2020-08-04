@@ -6,9 +6,9 @@ def test_graph_dot(testapp):
 
 def test_graph_svg(testapp):
     res = testapp.get('/profiles/graph.svg', status=200)
-    res_json = res.json
-    if res_json.get('status_code') == 404:
-        msg = res_json.get('message')
+    if not res.content_type == 'image/svg+xml' and res.json.get('status_code') == 404:
+        # graphviz is probably not installed
+        msg = res.json.get('message')
         assert msg == 'graph.svg is not available'
         # Force fail since graphviz is not installed on the system
         assert False
