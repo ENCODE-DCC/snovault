@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.48 (released) encoded v105.0
+----------------------------------------
+1. SNO-163-install-graphviz (#285)
+
 Snovault 1.0.47 (released) encoded v104.0
 ----------------------------------------
 1. SNO-159-allow-remote-indexing (#282)
