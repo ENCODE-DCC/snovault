@@ -1040,3 +1040,20 @@ def test_searches_parsers_query_string__repr__(dummy_request):
     dummy_request.query_string = 'type=Snowball&status%21=revoked&files.file_type=bed+bed6%2B'
     qs = QueryString(dummy_request)
     assert str(qs) == 'type=Snowball&status%21=revoked&files.file_type=bed+bed6%2B'
+
+
+def test_searches_parsers_mutable_params_parser_clear(dummy_request):
+    from snovault.elasticsearch.searches.parsers import MutableParamsParser
+    dummy_request.query_string = 'type=Snowflake&status=released&format=json'
+    mpp = MutableParamsParser(dummy_request)
+    assert mpp.get_query_string() == 'type=Snowflake&status=released&format=json'
+    assert mpp.get_request_with_new_query_string().query_string == 'type=Snowflake&status=released&format=json'
+    assert mpp.params == [
+        ('type', 'Snowflake'),
+        ('status', 'released'),
+        ('format', 'json')
+    ]
+    mpp.clear()
+    assert mpp.get_query_string() == ''
+    assert mpp.get_request_with_new_query_string().query_string == ''
+    assert mpp.params == []
