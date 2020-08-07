@@ -426,6 +426,8 @@ class MutableParamsParser(ParamsParser):
             self.deduplicate()
         request = self._request.copy()
         request.query_string = self.get_query_string()
+        if hasattr(self._request, 'registry'):
+            request.registry = self._request.registry
         return request
 
 
