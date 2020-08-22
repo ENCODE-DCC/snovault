@@ -64,7 +64,6 @@ def mixinProperties(schema, resolver):
 
 def linkTo(validator, linkTo, instance, schema):
     # avoid circular import
-    import pdb;pdb.set_trace()
     from snovault import Item, COLLECTIONS
 
     if not validator.is_type(instance, "string"):
@@ -124,6 +123,8 @@ def linkTo(validator, linkTo, instance, schema):
                 yield ValidationError(error)
                 return
 
+    validator.UUIDS[instance] = str(item.uuid)
+
 
 def linkFrom(validator, linkFrom, instance, schema):
     # avoid circular import
@@ -151,7 +152,6 @@ def linkFrom(validator, linkFrom, instance, schema):
             yield ValidationError(error)
             return
     else:
-
         # Look for an existing item;
         # if found use the schema for its type,
         # which may be a subtype of an abstract linkType
@@ -275,6 +275,7 @@ class SchemaValidator(DefaultValidatingDraft4Validator):
     VALIDATORS['uniqueItems'] = uniqueItems
     VALIDATORS['validators'] = validators
     SERVER_DEFAULTS = SERVER_DEFAULTS
+    UUIDS = {}
 
 
 format_checker = FormatChecker()
@@ -295,6 +296,25 @@ def load_schema(filename):
     # SchemaValidator is not thread safe for now
     SchemaValidator(schema, resolver=resolver)
     return schema
+
+
+# replace all key values in data that has an associated UUID
+def replace_uuids(data, uuids):
+    if isinstance(data, list):
+        for i in range(len(data)):
+            if isinstance(data[i], str):
+                if uuids.get(data[i]):
+                    data[i] = uuids.get(data[i])
+            else:
+                data[i] = replace_uuids(data[i], uuids)
+    elif isinstance(data, dict):
+        for key in data.keys():
+            if isinstance(data[key], str):
+                if uuids.get(data[key]):
+                    data[key] = uuids.get(data[key])
+            else:
+                data[key] = replace_uuids(data[key], uuids)
+    return data
 
 
 def validate(schema, data, current=None):
@@ -319,6 +339,10 @@ def validate(schema, data, current=None):
                 if validated_value == current_value:
                     continue
         filtered_errors.append(error)
+
+    if sv.UUIDS != {}:
+        data = replace_uuids(data, sv.UUIDS)
+        sv.UUIDS = {}
 
     # default properties are added during iter_errors
     validated.update(data)

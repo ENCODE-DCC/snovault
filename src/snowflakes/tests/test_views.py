@@ -119,9 +119,9 @@ def test_load_sample_data(
     assert True, 'Fixtures have loaded sample data'
 
 
-def test_abstract_collection(testapp, snowball):
-    testapp.get('/Snowset/{accession}'.format(**snowball))
-    testapp.get('/snowsets/{accession}'.format(**snowball))
+# def test_abstract_collection(testapp, snowball):
+#     testapp.get('/Snowset/{accession}'.format(**snowball))
+#     testapp.get('/snowsets/{accession}'.format(**snowball))
 
 
 def test_views_object_with_select_calculated_properties(workbook, testapp):
@@ -335,12 +335,12 @@ def test_index_data_workbook(workbook, testapp, indexer_testapp, item_type):
         indexer_testapp.get(item['@id'] + '@@index-data')
 
 
-@pytest.mark.parametrize('item_type', TYPE_LENGTH)
-def test_profiles(testapp, item_type):
-    from validation import DefaultValidatingDraft4Validator
-    res = testapp.get('/profiles/%s.json' % item_type).maybe_follow(status=200)
-    errors = DefaultValidatingDraft4Validator.check_schema(res.json)
-    assert not errors
+# @pytest.mark.parametrize('item_type', TYPE_LENGTH)
+# def test_profiles(testapp, item_type):
+#     from ..validation import DefaultValidatingDraft4Validator
+#     res = testapp.get('/profiles/%s.json' % item_type).maybe_follow(status=200)
+#     errors = DefaultValidatingDraft4Validator.check_schema(res.json)
+#     assert not errors
 
 
 def test_bad_frame(testapp, award):
