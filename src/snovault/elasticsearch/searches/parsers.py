@@ -400,6 +400,12 @@ class MutableParamsParser(ParamsParser):
                 'Param must be key, value tuple or key string.'
                 )
 
+    def clear(self):
+        '''
+        Clears current params.
+        '''
+        self.params = []
+
     def deduplicate(self):
         '''
         Keeps order while deduplicating.
@@ -420,6 +426,8 @@ class MutableParamsParser(ParamsParser):
             self.deduplicate()
         request = self._request.copy()
         request.query_string = self.get_query_string()
+        if hasattr(self._request, 'registry'):
+            request.registry = self._request.registry
         return request
 
 
