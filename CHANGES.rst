@@ -1,10 +1,6 @@
 Changes
 =======
 
-Snovault 1.0.49 (released) encoded v106.0
-----------------------------------------
-1. SNO-166-update-query-string (#288)
-
 Snovault 1.0.48 (released) encoded v105.0
 ----------------------------------------
 1. SNO-163-install-graphviz (#285)
