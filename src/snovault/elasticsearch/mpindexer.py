@@ -21,6 +21,9 @@ from .interfaces import (
     APP_FACTORY,
     ELASTIC_SEARCH,
 )
+import psutil
+import random
+
 
 log = logging.getLogger('snovault.elasticsearch.es_index_listener')
 
@@ -138,15 +141,36 @@ class MPIndexer(Indexer):
         super(MPIndexer, self).__init__(registry)
         self.initargs = (registry[APP_FACTORY], registry.settings,)
 
+    def new_repopulate_pool(self, old_repopulate_pool):
+        def wrapper():
+            if psutil.virtual_memory().percent >= 60:
+                print('removing worker')
+                self.pool._processes = max(self.pool._processes - 1, 1)
+            else:
+                if psutil.virtual_memory().percent <= 50:
+                    time.sleep(random.randint(20, 45))
+                    if psutil.virtual_memory().percent <= 50:
+                        print('adding worker')
+                        self.pool._processes = min(self.pool._processes + 1, 36)
+                old_repopulate_pool()
+        return wrapper
+
+    def monkey_patch_repopulate_pool(self, pool):
+        pool._repopulate_pool = self.new_repopulate_pool(pool._repopulate_pool)
+        return pool
+
     @reify
     def pool(self):
-        return Pool(
+        pool = Pool(
             processes=self.queue_worker.processes,
             initializer=initializer,
             initargs=self.initargs,
             maxtasksperchild=self.maxtasks,
             context=get_context('forkserver'),
         )
+        pool = self.monkey_patch_repopulate_pool(pool)
+        return pool
+
 
     def update_objects(
             self,
@@ -187,6 +211,8 @@ class MPIndexer(Indexer):
                     errors.append(error)
                 if (i + 1) % 1000 == 0:
                     log.info('Indexing %d', i + 1)
+                    log.info('memory used', psutil.virtual_memory().percent)
+                    log.info('number of workers', len(self.pool._pool))
         except:
             self.shutdown()
             raise
