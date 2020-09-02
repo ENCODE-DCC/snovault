@@ -211,8 +211,8 @@ class MPIndexer(Indexer):
                     errors.append(error)
                 if (i + 1) % 1000 == 0:
                     log.info('Indexing %d', i + 1)
-                    log.info('memory used', psutil.virtual_memory().percent)
-                    log.info('number of workers', len(self.pool._pool))
+                    log.info(f'memory used {psutil.virtual_memory().percent}')
+                    log.info(f'number of workers {len(self.pool._pool)}')
         except:
             self.shutdown()
             raise
