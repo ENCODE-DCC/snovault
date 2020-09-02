@@ -142,14 +142,16 @@ class MPIndexer(Indexer):
         self.initargs = (registry[APP_FACTORY], registry.settings,)
 
     def new_repopulate_pool(self, old_repopulate_pool):
+        flipped = False
         def wrapper():
             if psutil.virtual_memory().percent >= 60:
                 print('removing worker')
                 self.pool._processes = max(self.pool._processes - 1, 1)
             else:
                 if psutil.virtual_memory().percent <= 50:
-                    time.sleep(random.randint(20, 45))
-                    if psutil.virtual_memory().percent <= 50:
+                    if flipped:
+                        flipped = not flipped
+                    else:
                         print('adding worker')
                         self.pool._processes = min(self.pool._processes + 1, 36)
                 old_repopulate_pool()
