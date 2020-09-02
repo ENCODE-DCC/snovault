@@ -144,6 +144,7 @@ class MPIndexer(Indexer):
     def new_repopulate_pool(self, old_repopulate_pool):
         flipped = False
         def wrapper():
+            nonlocal flipped
             if psutil.virtual_memory().percent >= 60:
                 print('removing worker')
                 self.pool._processes = max(self.pool._processes - 1, 1)
