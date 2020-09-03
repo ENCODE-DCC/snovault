@@ -132,6 +132,38 @@ def update_object_in_snapshot(args):
         return update_info
 
 
+class MemoryAwarePool(Pool):
+
+    def __init__(self, *args, min_memory=50, max_memory=60, max_processes=psutil.cpu_count(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.min_memory = min_memory
+        self.max_memory = max_memory
+        self.max_processes = max_processes
+
+    @property
+    def memory(slef):
+        return psutil.virtual_memory().percent
+
+    def _should_add_worker(self):
+        return self.memory <= self.min_memory
+
+    def _should_remove_worker(self):
+        return self.memory >= self.max_memory
+
+    def _add_worker(self):
+        self.pool._processes = min(self.pool._processes + 1, self.max_processes)
+
+    def _remove_worker(self):
+        self.pool._processes = max(self.pool._processes - 1, 1)
+
+    def _repopulate_pool(self):
+        if self._should_add_worker():
+            self._add_worker()
+        elif self._should_remove_worker():
+            self._remove_worker()
+        super()._repopulate_pool()
+
+
 # Running in main process
 
 class MPIndexer(Indexer):
@@ -141,39 +173,15 @@ class MPIndexer(Indexer):
         super(MPIndexer, self).__init__(registry)
         self.initargs = (registry[APP_FACTORY], registry.settings,)
 
-    def new_repopulate_pool(self, old_repopulate_pool):
-        flipped = False
-        def wrapper():
-            nonlocal flipped
-            if psutil.virtual_memory().percent >= 60:
-                print('removing worker')
-                self.pool._processes = max(self.pool._processes - 1, 1)
-            else:
-                if psutil.virtual_memory().percent <= 50:
-                    if flipped:
-                        flipped = not flipped
-                    else:
-                        print('adding worker')
-                        self.pool._processes = min(self.pool._processes + 1, 36)
-                old_repopulate_pool()
-        return wrapper
-
-    def monkey_patch_repopulate_pool(self, pool):
-        pool._repopulate_pool = self.new_repopulate_pool(pool._repopulate_pool)
-        return pool
-
     @reify
     def pool(self):
-        pool = Pool(
+        return MemoryAwarePool(
             processes=self.queue_worker.processes,
             initializer=initializer,
             initargs=self.initargs,
             maxtasksperchild=self.maxtasks,
             context=get_context('forkserver'),
         )
-        pool = self.monkey_patch_repopulate_pool(pool)
-        return pool
-
 
     def update_objects(
             self,
