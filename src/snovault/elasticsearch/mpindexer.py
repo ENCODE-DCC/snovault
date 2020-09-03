@@ -22,7 +22,6 @@ from .interfaces import (
     ELASTIC_SEARCH,
 )
 import psutil
-import random
 
 
 log = logging.getLogger('snovault.elasticsearch.es_index_listener')
