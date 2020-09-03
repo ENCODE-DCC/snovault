@@ -140,7 +140,7 @@ class MemoryAwarePool(Pool):
         self.max_processes = max_processes
 
     @property
-    def memory(slef):
+    def memory(self):
         return psutil.virtual_memory().percent
 
     def _should_add_worker(self):
