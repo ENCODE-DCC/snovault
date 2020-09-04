@@ -133,7 +133,7 @@ def update_object_in_snapshot(args):
 
 class MemoryAwarePool(Pool):
 
-    def __init__(self, *args, min_memory=50, max_memory=60, max_processes=psutil.cpu_count(), **kwargs):
+    def __init__(self, *args, min_memory=45, max_memory=70, max_processes=psutil.cpu_count(), **kwargs):
         self.min_memory = min_memory
         self.max_memory = max_memory
         self.max_processes = max_processes
@@ -149,6 +149,9 @@ class MemoryAwarePool(Pool):
     def _should_remove_worker(self):
         return self.memory >= self.max_memory
 
+    def _should_repopulate(self):
+        return self.memory <= self.max_memory - 10
+
     def _add_worker(self):
         self._processes = min(self._processes + 1, self.max_processes)
 
@@ -160,7 +163,8 @@ class MemoryAwarePool(Pool):
             self._add_worker()
         elif self._should_remove_worker():
             self._remove_worker()
-        super()._repopulate_pool()
+        if self._should_repopulate():
+            super()._repopulate_pool()
 
 
 # Running in main process
