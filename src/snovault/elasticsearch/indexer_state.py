@@ -759,7 +759,7 @@ def all_types(registry):
 def all_uuids(registry, types=None):
     # First index user and access_key so people can log in
     collections = registry[COLLECTIONS]
-    initial = ['user', 'access_key']
+    initial = ['user', 'access_key', 'experiment']
     for collection_name in initial:
         collection = collections.by_item_type.get(collection_name, [])
         # for snovault test application, there are no users or keys
