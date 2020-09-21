@@ -762,11 +762,11 @@ def heterogeneous_stream(generator_map):
     '''
     Will zip together generators and yield until all are exhausted, e.g.:
 
-    generator_map = {
+    >>> generator_map = {
         'experiments': (e for e in experiment_uuids},
         'files': (f for f in file_uuids)
     }
-    list(heterogeneous_stream(generator_map)) == [e1, f1, e2, f2, ..., eN, fM]
+    >>> assert list(heterogeneous_stream(generator_map)) == [e1, f1, e2, f2, ..., eN, fM]
 
     where:
          N is number of experiment uuids
