@@ -18,3 +18,10 @@ def test_heterogeneous_stream():
     assert list(heterogeneous_stream(gm)) == [
         1, 'a', 2, 'b', True, 3, 'c', False, 4, 5, True
     ]
+    gm = {
+        'e': [1.0, 2.0, 3.0],
+        'f': [x for x in range(10)]
+    }
+    assert list(heterogeneous_stream(gm)) == [
+        1.0, 0, 2.0, 1, 3.0, 2, 3, 4, 5, 6, 7, 8, 9
+    ]
