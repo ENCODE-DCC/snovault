@@ -106,7 +106,7 @@ def test_searches_configs_terms_aggregation_config_allowed_kwargs():
     from snovault.elasticsearch.searches.configs import TermsAggregationConfig
     from snovault.elasticsearch.searches.defaults import DEFAULT_TERMS_AGGREGATION_KWARGS
     tac = TermsAggregationConfig()
-    assert tac._allowed_kwargs == ['size', 'exclude', 'missing']
+    assert tac._allowed_kwargs == ['size', 'exclude', 'missing', 'include', 'aggs']
     tac = TermsAggregationConfig(allowed_kwargs=['size'])
     assert tac._allowed_kwargs == ['size']
 
