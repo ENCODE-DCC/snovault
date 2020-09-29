@@ -95,6 +95,7 @@ setup(
         profile = snowflakes.commands.profile:main
         spreadsheet-to-json = snowflakes.commands.spreadsheet_to_json:main
         migrate-attachments-aws = snowflakes.commands.migrate_attachments_aws:main
+        create-admin-user = snowflakes.commands.create_admin_user:main 
 
         [paste.app_factory]
         main = snowflakes:main
