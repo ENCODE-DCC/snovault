@@ -57,7 +57,7 @@ def invalidate_new_back_revs(event):
         for path in context.type_info.merged_back_rev
     }
     for rel, uuids in current.items():
-        for uuid in uuids.difference(initial.get(rel, ())):
+        for uuid in uuids.symmetric_difference(initial.get(rel, ())):
             updated[uuid]
 
 
