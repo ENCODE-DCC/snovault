@@ -37,6 +37,7 @@ from .indexer_state import (
     AWS_REGION,
 )
 from .simple_queue import SimpleUuidServer
+from . import LocalStoreClient
 
 import datetime
 import logging
@@ -49,6 +50,8 @@ import requests
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
 log = logging.getLogger('snovault.elasticsearch.es_index_listener')
+INDEX_ENDPOINT_INFO = 'indexer_info'
+INDEX_EVENT_TAGS = 'indexing_tags_list'
 MAX_CLAUSES_FOR_ES = 8192
 DEFAULT_QUEUE = 'Simple'
 # Allow three minutes for indexer to stop before head indexer process continues
@@ -79,6 +82,7 @@ def _update_for_uuid_queues(registry):
 
 def includeme(config):
     """Add index listener endpoint and setup Indexer"""
+    config.add_route('_indexer_info', '/_indexer_info')
     config.add_route('index', '/index')
     config.scan(__name__)
     registry = config.registry
@@ -334,8 +338,96 @@ def _get_nodes(request, indexer_state):
     return this_node, other_node, continue_on, did_timeout
 
 
+class IndexerInfo(LocalStoreClient):
+    """
+    IndexerInfo specific wrapper for LocalStoreClient
+    - Stores one state hash with managed states
+    - Stores indexing events in list with predetermined keys
+    """
+    state_waiting = ('state_waiting', 'Waiting to call endpoint')
+    state_endpoint_start = ('state_endpoint_start', 'Endpoint started running')
+    state_load_indexing = ('state_load_indexing', 'Endpoint checking for uuids to index')
+    state_run_indexing = ('state_run_indexing', 'Endpoint Found uuids and started indexing')
+    state_hash_keys = [
+        'endpoint_start',
+        'endpoint_end',
+        'invalidated',
+        'loop_time',
+        'pg_ip',
+        'remote_indexing',
+        'state',
+        'state_desc',
+    ]
+
+    def __init__(self, local_store=None):
+        super().__init__(redis_db=3, local_store=local_store)
+
+    def update_indexer_info(self, state, update):
+        local_store_state = self.hash_get(INDEX_ENDPOINT_INFO)
+        if not local_store_state: 
+            local_store_state = {
+                key: 'empty'
+                for key in self.state_hash_keys
+            }
+        if update:
+            for key, val in update.items():
+                if key in self.state_hash_keys:
+                    local_store_state[key] = val
+        if not hasattr(self, state):
+            state = f"{state} is not a valid state."
+        local_store_state['state'] = getattr(self, state)[0]
+        local_store_state['state_desc'] = getattr(self, state)[1]
+        self.hash_set(INDEX_ENDPOINT_INFO, local_store_state)
+
+    def get_indexing_events(self, start, stop):
+        events = []
+        event_tags_list = self.list_get(INDEX_EVENT_TAGS, start, stop)
+        for event_tag in event_tags_list:
+            end = self.item_get(event_tag + ':end')
+            invalidated = self.item_get(event_tag + ':invalidated')
+            duration = self.item_get(event_tag + ':duration')
+            events.append(f"{event_tag}: Indexed {invalidated} uuids in {duration} seconds. {end}")
+        return events
+
+
+@view_config(route_name='_indexer_info', request_method='GET')
+def indexer_info(request):
+    events_range = request.params.get("events", '0:10')
+    try:
+        colon = events_range.index(":")
+        start = int(events_range[:colon])
+        stop = int(events_range[colon+1:])
+    except:
+        start = 0
+        stop = 10
+    result = {
+        'now_utc': str(datetime.datetime.utcnow()),
+        'now_pst': str(datetime.datetime.now(pytz.timezone('US/Pacific'))),
+        'indexer_info': 'not initialized',
+    }
+    result[f"events_{start}_to_{stop}"] = 'not initialized',
+    indexer_info = IndexerInfo(local_store='redis')
+    try:
+        result['indexer_info'] = indexer_info.hash_get(INDEX_ENDPOINT_INFO)
+        result[f"events_{start}_to_{stop}"] = indexer_info.get_indexing_events(start, stop)
+    except:
+        result['error'] = 'Cloud not connect to redis db'
+    return result
+
+
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
+    local_store = request.registry.settings.get('local_store')
+    indexer_info = IndexerInfo(local_store=local_store)
+    indexer_info.update_indexer_info(
+        indexer_info.state_endpoint_start[0],
+        {
+            'local_store': local_store,
+            'pg_ip': str(request.registry.settings.get('pg_ip', 'localhost')),
+            'remote_indexing': str(request.registry.settings.get('remote_indexing', 'false')),
+            'timeout': request.registry.settings.get('timeout', 'unknown'),
+        }
+    )
     # Setting request.datastore here only works because routed views are not traversed.
     request.datastore = 'database'
     session = request.registry[DBSESSION]()
@@ -493,7 +585,15 @@ def index(request):
         result = indexer_state.start_cycle(invalidated, result)
 
         # Do the work...
-
+        local_tag = indexer_info.get_tag(num_bytes=4)
+        start_time = time.time()
+        len_invalidated = len(invalidated)
+        indexer_info.list_add(INDEX_EVENT_TAGS, local_tag)
+        indexer_info.item_set(f"{local_tag}:invalidated", str(len_invalidated))
+        indexer_info.update_indexer_info(
+            indexer_info.state_run_indexing[0],
+            {'invalidated': len_invalidated}
+        )
         indexing_update_infos, errors, err_msg = request.registry[INDEXER].serve_objects(
             request,
             invalidated,
@@ -501,6 +601,9 @@ def index(request):
             snapshot_id=snapshot_id,
             restart=restart,
         )
+        end_time = time.time()
+        indexer_info.item_set(f"{local_tag}:end",  str(datetime.datetime.utcnow()))
+        indexer_info.item_set(f"{local_tag}:duration",  f"{end_time - start_time:.6f}")
         if err_msg:
             log.warning('Could not start indexing: %s', err_msg)
         result = indexer_state.finish_cycle(result,errors)
@@ -541,9 +644,14 @@ def index(request):
         return result, indexing_update_infos
 
     # Load indexing
+    indexer_info.update_indexer_info(indexer_info.state_load_indexing[0], {})
     output_tuple = _load_indexing(request, session, connection, indexer_state)
     result, invalidated, flush, first_txn, snapshot_id, restart, xmin, return_now = output_tuple
     if return_now:
+        indexer_info.update_indexer_info(
+            indexer_info.state_waiting[0],
+            {'endpoint_end': str(datetime.datetime.utcnow())}
+        )
         return result
     indexing_update_infos = []
     dry_run = request.json.get('dry_run', False)
@@ -625,6 +733,10 @@ def index(request):
         #  opposed to in the indexer or just after serve_objects,
         #  so a crash in logging does not interupt indexing complietion
         request.registry[INDEXER].check_log_indexing_times(indexing_update_infos)
+    indexer_info.update_indexer_info(
+        indexer_info.state_waiting[0],
+        {'endpoint_end': str(datetime.datetime.utcnow())}
+    )
     return result
 
 
