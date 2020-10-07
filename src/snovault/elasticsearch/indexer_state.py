@@ -1,3 +1,5 @@
+from itertools import chain
+from itertools import zip_longest
 from elasticsearch.exceptions import (
     ConflictError,
     ConnectionError,
@@ -756,6 +758,30 @@ def all_types(registry):
     return sorted(collections.by_item_type)
 
 
+def heterogeneous_stream(generator_map):
+    '''
+    Will zip together generators and yield until all are exhausted, e.g.:
+
+    >>> generator_map = {
+        'experiments': (e for e in experiment_uuids),
+        'files': (f for f in file_uuids)
+    }
+    >>> assert list(heterogeneous_stream(generator_map)) == [e1, f1, e2, f2, ..., eN, fM]
+
+    where:
+         N is number of experiment uuids
+         M is number of file uuids
+         N doesn't have to equal M
+
+    This allows for structured mixing of collections, though the stream will become
+    more homogeneous as shorter collections are exhausted.
+    '''
+    for x in chain(*zip_longest(*generator_map.values())):
+        if x is None:
+            continue
+        yield x
+
+
 def all_uuids(registry, types=None):
     # First index user and access_key so people can log in
     collections = registry[COLLECTIONS]
@@ -767,11 +793,16 @@ def all_uuids(registry, types=None):
             continue
         for uuid in collection:
             yield str(uuid)
+    uuid_generator_map = {}
     for collection_name in sorted(collections.by_item_type):
         if collection_name in initial:
             continue
         if types is not None and collection_name not in types:
             continue
         collection = collections.by_item_type[collection_name]
-        for uuid in collection:
-            yield str(uuid)
+        uuid_generator_map[collection_name] = (
+            uuid
+            for uuid in collection
+        )
+    for uuid in heterogeneous_stream(uuid_generator_map):
+        yield str(uuid)
