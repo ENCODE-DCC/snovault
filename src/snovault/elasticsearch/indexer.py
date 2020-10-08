@@ -342,12 +342,12 @@ class IndexerInfo(LocalStoreClient):
     """
     IndexerInfo specific wrapper for LocalStoreClient
     - Stores one state hash with managed states
-    - Stores indexing events in list with predetermined keys
+    - Stores indexing events in list
     """
     state_waiting = ('state_waiting', 'Waiting to call endpoint')
     state_endpoint_start = ('state_endpoint_start', 'Endpoint started running')
     state_load_indexing = ('state_load_indexing', 'Endpoint checking for uuids to index')
-    state_run_indexing = ('state_run_indexing', 'Endpoint Found uuids and started indexing')
+    state_run_indexing = ('state_run_indexing', 'Endpoint found uuids and started indexing')
     state_hash_keys = [
         'endpoint_start',
         'endpoint_end',
@@ -384,9 +384,11 @@ class IndexerInfo(LocalStoreClient):
         event_tags_list = self.list_get(INDEX_EVENT_TAGS, start, stop)
         for event_tag in event_tags_list:
             end = self.item_get(event_tag + ':end')
-            invalidated = self.item_get(event_tag + ':invalidated')
-            duration = self.item_get(event_tag + ':duration')
-            events.append(f"{event_tag}: Indexed {invalidated} uuids in {duration} seconds. {end}")
+            invalidated = self.item_get(event_tag + ':invalidated', 'pending')
+            duration = self.item_get(event_tag + ':duration', 'pending')
+            events.append(
+                f"{event_tag}: Indexed {invalidated} uuids in {duration} seconds. Ended at {end}"
+            )
         return events
 
 
@@ -422,10 +424,11 @@ def index(request):
     indexer_info.update_indexer_info(
         indexer_info.state_endpoint_start[0],
         {
+            'endpoint_start': str(datetime.datetime.utcnow()),
             'local_store': local_store,
             'pg_ip': str(request.registry.settings.get('pg_ip', 'localhost')),
             'remote_indexing': str(request.registry.settings.get('remote_indexing', 'false')),
-            'timeout': request.registry.settings.get('timeout', 'unknown'),
+            'loop_time': request.registry.settings.get('timeout', 'unknown'),
         }
     )
     # Setting request.datastore here only works because routed views are not traversed.
