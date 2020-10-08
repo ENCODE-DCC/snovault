@@ -1,6 +1,10 @@
 import pytest
 import os
+
+from time import sleep
 from subprocess import TimeoutExpired
+
+from pyramid.paster import get_appsettings
 
 
 def pytest_configure():
@@ -74,6 +78,31 @@ def elasticsearch_server(request, elasticsearch_host_port):
     print('PORT CHANGED')
     yield 'http://%s:%d' % (host, 9201)
 
+    if 'process' in locals() and process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except TimeoutExpired:
+            process.kill()
+
+
+@pytest.mark.fixture_cost(10)
+@pytest.yield_fixture(scope='session')
+def redis_server(request):
+    from .redis_storage_fixture import initdb, server_process
+    datadir = str(request.config._tmpdirhandler.mktemp('redisdatatest', numbered=True))
+    appsettings = get_appsettings('development.ini', name='app')
+    # Required settings in config
+    local_storage_host = appsettings['local_storage_host']
+    local_storage_port = appsettings['local_storage_port']
+    local_storage_redis_index = appsettings['local_storage_redis_index']
+    local_storage_timeout = appsettings['local_storage_timeout']
+    # Build fixture
+    redis_config_path = initdb(datadir, local_storage_port, echo=True)
+    process = server_process(redis_config_path, local_storage_port, local_storage_redis_index, echo=True)
+    # Sleep for short time to allow redis db to initialize
+    sleep(0.25)
+    yield f"Redis testing: redis-cli -p {local_storage_port} -n {local_storage_redis_index})"
     if 'process' in locals() and process.poll() is None:
         process.terminate()
         try:
