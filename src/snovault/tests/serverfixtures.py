@@ -1,5 +1,7 @@
 import pytest
 import os
+
+from time import sleep
 from subprocess import TimeoutExpired
 
 
@@ -73,6 +75,37 @@ def elasticsearch_server(request, elasticsearch_host_port):
     process = server_process(str(tmpdir), host=host, port=9201, echo=True)
     print('PORT CHANGED')
     yield 'http://%s:%d' % (host, 9201)
+
+    if 'process' in locals() and process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except TimeoutExpired:
+            process.kill()
+
+
+@pytest.mark.fixture_cost(10)
+@pytest.yield_fixture(scope='session')
+def redis_server(request, app_settings):
+    from .local_storage_fixture import initdb, server_process
+    local_storage_testdata = str(
+        request.config._tmpdirhandler.mktemp('local_storage_testdata', numbered=True)
+    )
+    local_storage_testdata = '/tmp/snovault/local_storage_data'
+    redis_testdb = app_settings['local_storage_db']
+    redis_testport = app_settings['local_storage_port']
+    local_storage_config_testpath = initdb(
+        local_storage_testdata,
+        redis_testport,
+        echo=True,
+    )
+    process = server_process(
+        local_storage_config_testpath,
+        redis_testport,
+        echo=True,
+    )
+    sleep(0.25)
+    yield f"local test storage: redis-cli -p {redis_testport} -n {redis_testdb})"
 
     if 'process' in locals() and process.poll() is None:
         process.terminate()
