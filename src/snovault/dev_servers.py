@@ -6,7 +6,7 @@ For the development.ini you must supply the paster app name:
 
 """
 from pkg_resources import resource_filename
-from pyramid.paster import get_app
+from pyramid.paster import get_app, get_appsettings
 from multiprocessing import Process
 
 import atexit
@@ -62,17 +62,20 @@ def main():
     parser.add_argument('--datadir', default='/tmp/snovault', help="path to datadir")
     args = parser.parse_args()
 
+    appsettings = get_appsettings(args.config_uri, name='app')
+
     logging.basicConfig()
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.INFO)
 
-    from snovault.tests import elasticsearch_fixture, postgresql_fixture
+    from snovault.tests import elasticsearch_fixture, postgresql_fixture, local_storage_fixture
     from snovault.elasticsearch import create_mapping
     datadir = os.path.abspath(args.datadir)
     pgdata = os.path.join(datadir, 'pgdata')
     esdata = os.path.join(datadir, 'esdata')
+    local_storage_data = os.path.join(datadir, 'local_storage_data')
     if args.clear:
-        for dirname in [pgdata, esdata]:
+        for dirname in [pgdata, esdata, local_storage_data]:
             if os.path.exists(dirname):
                 shutil.rmtree(dirname)
     if args.init:
@@ -81,7 +84,18 @@ def main():
     postgres = postgresql_fixture.server_process(pgdata, echo=True)
     elasticsearch = elasticsearch_fixture.server_process(esdata, echo=True)
     nginx = nginx_server_process(echo=True)
-    processes = [postgres, elasticsearch, nginx]
+    local_storage_port = appsettings.get('local_storage_port', 6379)
+    local_storage_config_path = local_storage_fixture.initdb(
+        local_storage_data,
+        local_storage_port,
+        echo=True,
+    )
+    local_storage = local_storage_fixture.server_process(
+        local_storage_config_path,
+        local_storage_port,
+        echo=True,
+    )
+    processes = [postgres, elasticsearch, nginx, local_storage]
 
     print_processes = []
 

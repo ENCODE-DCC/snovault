@@ -24,10 +24,14 @@ def autouse_external_tx(external_tx):
 
 
 @pytest.fixture(scope='session')
-def app(DBSession):
+def app(DBSession, app_settings):
     from pyramid.config import Configurator
     from snovault import DBSESSION
     config = Configurator()
+    config.registry.settings['local_storage_db'] = app_settings['local_storage_db']
+    config.registry.settings['local_storage_host'] = app_settings['local_storage_host']
+    config.registry.settings['local_storage_port'] = app_settings['local_storage_port']
+    config.registry.settings['local_storage_timeout'] = app_settings['local_storage_timeout']
     config.registry[DBSESSION] = DBSession
     config.include('snovault')
     config.include('.testing_key')
