@@ -1,6 +1,11 @@
 Changes
 =======
 
+Snovault 1.0.50 (released) encoded v108.0
+-----------------------------------------
+1. SNO-168-stream-heterogeneous-uuids  (#292)
+2. SNO-169 Creating a command for admin user creation (#293)
+
 Snovault 1.0.49 (released) encoded v106.0
 ----------------------------------------
 1. SNO-166-update-query-string (#288)
