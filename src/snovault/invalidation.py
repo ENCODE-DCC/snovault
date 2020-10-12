@@ -43,10 +43,11 @@ def record_initial_back_revs(event):
 
 @subscriber(Created)
 @subscriber(AfterModified)
-def invalidate_new_back_revs(event):
+def invalidate_changed_back_revs(event):
     ''' Invalidate objects that rev_link to us
 
     Catch those objects which newly rev_link us
+    or no longer rev_link us
     '''
     context = event.object
     updated = event.request._updated_uuid_paths
@@ -57,7 +58,7 @@ def invalidate_new_back_revs(event):
         for path in context.type_info.merged_back_rev
     }
     for rel, uuids in current.items():
-        for uuid in uuids.difference(initial.get(rel, ())):
+        for uuid in uuids.symmetric_difference(initial.get(rel, ())):
             updated[uuid]
 
 
