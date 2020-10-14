@@ -223,3 +223,26 @@ def calculate_select_properties(context, request, ns=None, category='object', se
         if value is not None
     }
     return select_calculated_properties
+
+
+def _should_render_property(include, exclude, name):
+    conditions = [
+        include is None or name in include,
+        exclude is None or name not in exclude,
+    ]
+    return all(conditions)
+
+
+def calculate_filtered_properties(context, request, ns=None, category='object', include=None, exclude=None):
+    namespace, props = _init_property_calculation(context, request, ns=ns, category=category)
+    filtered_properties = (
+        (name, prop(namespace))
+        for name, prop in props.items()
+        if _should_render_property(include, exclude, name)
+    )
+    filtered_calculated_properties = {
+        name: value
+        for name, value in filtered_properties
+        if value is not None
+    }
+    return filtered_calculated_properties

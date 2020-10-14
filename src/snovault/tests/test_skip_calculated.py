@@ -45,3 +45,20 @@ def test_object_view_embed_object_with_select_calculated_properties_reverse(dumm
         '@@object_with_select_calculated_properties?field=reverse&field=nonsense'
     )
     assert 'reverse' in res
+
+
+def test_calculated_should_render_property():
+    from snovault.calculated import _should_render_property
+    assert _should_render_property(None, None, 'abc')
+    assert _should_render_property(None, [], 'abc')
+    assert not _should_render_property([], None, 'abc')
+    assert not _should_render_property([], [], 'abc')
+    assert _should_render_property(['abc'], None, 'abc')
+    assert _should_render_property(['abc', 'xyz'], None, 'abc')
+    assert not _should_render_property(['xyz'], None, 'abc')
+    assert not _should_render_property(['xyz'], None, 'abc')
+    assert not _should_render_property(['xyz'], [], 'abc')
+    assert not _should_render_property(['xyz'], ['abc'], 'abc')
+    assert not _should_render_property(['xyz'], ['abc'], 'abc')
+    assert _should_render_property(['abc', 'xyz'], [], 'abc')
+    assert _should_render_property(['xyz'], [], 'xyz')
