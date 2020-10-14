@@ -26,6 +26,7 @@ from snovault.elasticsearch.searches.responses import FieldedResponse
 from .calculated import calculate_properties
 from .calculated import calculate_select_properties
 from .calculated import calculate_filtered_properties
+from .calculated import _should_render_property
 from .etag import etag_tid
 from .interfaces import CONNECTION
 from .elasticsearch.interfaces import ELASTIC_SEARCH
@@ -251,12 +252,12 @@ def item_view_filtered_object(context, request):
         params=qs.get_key_filters(
             key='include'
         )
-    )
+    ) or None
     exclude = qs.param_values_to_list(
         params=qs.get_key_filters(
             key='exclude'
         )
-    )
+    ) or None
     calculated = calculate_filtered_properties(
         context,
         request,

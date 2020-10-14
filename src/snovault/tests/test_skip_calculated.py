@@ -62,3 +62,89 @@ def test_calculated_should_render_property():
     assert not _should_render_property(['xyz'], ['abc'], 'abc')
     assert _should_render_property(['abc', 'xyz'], [], 'abc')
     assert _should_render_property(['xyz'], [], 'xyz')
+
+
+def test_filtered_object_view_get_default(testapp, dummy_request, posted_targets_and_sources):
+    r = testapp.get('/testing-link-targets/one/')
+    expected_keys = [
+        'name',
+        '@id',
+        '@type',
+        'uuid',
+        'reverse',
+        '@context'
+    ]
+    assert all(
+        [
+            e in r.json
+            for e in expected_keys
+        ]
+    )
+
+
+def test_filtered_object_view_get_filtered_object(testapp, dummy_request, posted_targets_and_sources):
+    r = testapp.get('/testing-link-targets/one/@@filtered_object')
+    expected_keys = [
+        'name',
+        '@id',
+        '@type',
+        'uuid',
+        'reverse',
+    ]
+    assert all(
+        [
+            e in r.json
+            for e in expected_keys
+        ]
+    )
+
+
+def test_filtered_object_view_get_filtered_object_with_exclude(testapp, dummy_request, posted_targets_and_sources):
+    r = testapp.get('/testing-link-targets/one/@@filtered_object?exclude=reverse')
+    expected_keys = [
+        'name',
+        '@id',
+        '@type',
+        'uuid',
+    ]
+    assert all(
+        [
+            e in r.json
+            for e in expected_keys
+        ]
+    )
+    assert 'reverse' not in r.json
+
+
+def test_filtered_object_view_get_filtered_object_with_more_exclude(testapp, dummy_request, posted_targets_and_sources):
+    r = testapp.get('/testing-link-targets/one/@@filtered_object?exclude=reverse&exclude=@id')
+    expected_keys = [
+        'name',
+        '@type',
+        'uuid',
+    ]
+    assert all(
+        [
+            e in r.json
+            for e in expected_keys
+        ]
+    )
+    assert 'reverse' not in r.json
+    assert '@id' not in r.json
+
+
+def test_filtered_object_view_get_filtered_object_with_exclude_and_include(testapp, dummy_request, posted_targets_and_sources):
+    r = testapp.get('/testing-link-targets/one/@@filtered_object?exclude=reverse&exclude=@id&include=uuid')
+    expected_keys = [
+        'uuid',
+    ]
+    assert all(
+        [
+            e in r.json
+            for e in expected_keys
+        ]
+    )
+    assert 'reverse' not in r.json
+    assert '@id' not in r.json
+    assert 'name' not in r.json
+    assert '@type' not in r.json
