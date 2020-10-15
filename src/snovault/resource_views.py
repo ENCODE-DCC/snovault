@@ -280,6 +280,8 @@ def item_view_embedded(context, request):
     properties = request.embed(item_path, '@@object')
     for path in context.embedded:
         expand_path(request, properties, path)
+    for path in context.embedded_with_frame:
+        path.expand(request, properties)
     return properties
 
 
