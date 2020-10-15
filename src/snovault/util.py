@@ -161,7 +161,7 @@ class Path:
     def _build_frame(self):
         qs = urlencode(self._params, doseq=True)
         if qs:
-            return f'{FILTER_FRAME}?{qs}'
+            return f'{self.FILTER_FRAME}?{qs}'
         return self._frame
 
     def expand_path_with_frame(self, request, properties, path, frame):
@@ -171,7 +171,7 @@ class Path:
             return
         name = path[0]
         remaining = path[1:]
-        value = obj.get(name, None)
+        value = properties.get(name, None)
         if value is None:
             return
         if isinstance(value, list):
@@ -181,7 +181,7 @@ class Path:
                 self.expand_path_with_frame(request, member, remaining, frame)
         else:
             if not isinstance(value, dict):
-                value = obj[name] = request.embed(value, frame)
+                value = properties[name] = request.embed(value, frame)
             self.expand_path_with_frame(request, value, remaining, frame)
 
     def expand(self, request, properties):

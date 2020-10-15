@@ -148,3 +148,30 @@ def test_filtered_object_view_get_filtered_object_with_exclude_and_include(testa
     assert '@id' not in r.json
     assert 'name' not in r.json
     assert '@type' not in r.json
+
+
+def test_embedded_with_frame_custom_embed(testapp, dummy_request, posted_custom_embed_targets_and_sources):
+    r = testapp.get('/testing-custom-embed-targets/one/')
+    assert r.json['reverse'][0] == {
+        'name': 'A',
+        'status': 'current',
+        'target': '/testing-custom-embed-targets/one/',
+        '@id': '/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/',
+        '@type': ['TestingCustomEmbedSource', 'Item'],
+        'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd'
+    }
+    assert r.json['filtered_reverse'][0] == {
+        'status': 'current',
+        'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd'
+    }
+    assert r.json['filtered_reverse1'][0] == {
+        'name': 'A',
+        'status': 'current',
+        'target': '/testing-custom-embed-targets/one/',
+        '@id': '/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/'
+    }
+    assert r.json['reverse_uncalculated'][0] == {
+        'name': 'A',
+        'status': 'current',
+        'target': '/testing-custom-embed-targets/one/'
+    }

@@ -9,6 +9,7 @@ from snovault import (
 )
 from snowflakes.types.base import paths_filtered_by_status
 from snovault.attachment import ItemWithAttachment
+from snovault.util import Path
 
 
 def includeme(config):
@@ -447,3 +448,108 @@ def testing_retry(context, request):
         'retry.attempts': attempt,
         'detached': inspect(model).detached,
     }
+
+
+@collection('testing-custom-embed-sources')
+class TestingCustomEmbedSource(Item):
+    item_type = 'testing_custom_embed_source'
+    schema = {
+        'type': 'object',
+        'properties': {
+            'name': {
+                'type': 'string',
+            },
+            'uuid': {
+                'type': 'string',
+            },
+            'target': {
+                'type': 'string',
+                'linkTo': 'TestingCustomEmbedTarget',
+            },
+            'status': {
+                'type': 'string',
+            },
+            'condition1': {
+                'type': 'boolean',
+            },
+        },
+        'required': ['target'],
+        'additionalProperties': False,
+    }
+
+
+@collection('testing-custom-embed-targets', unique_key='testing_custom_embed_target:name')
+class TestingCustomEmbedTarget(Item):
+    item_type = 'testing_custom_embed_target'
+    name_key = 'name'
+    schema = {
+        'type': 'object',
+        'properties': {
+            'name': {
+                'type': 'string',
+                'uniqueKey': True,
+            },
+            'uuid': {
+                'type': 'string',
+            },
+            'status': {
+                'type': 'string',
+            },
+        },
+        'additionalProperties': False,
+    }
+    rev = {
+        'reverse': ('TestingCustomEmbedSource', 'target'),
+    }
+    embedded_with_frame = [
+        Path('reverse'),
+        Path('filtered_reverse', include=['uuid', 'status']),
+        Path('filtered_reverse1', exclude=['uuid', '@type']),
+        Path('reverse_uncalculated', frame='@@object?skip_calculated=true'),
+    ]
+    audit_inherit = ['*']
+
+    @calculated_property(schema={
+        "title": "Sources",
+        "type": "array",
+        "items": {
+            "type": ['string', 'object'],
+            "linkFrom": "TestingCustomEmbedSource.target",
+        },
+    })
+    def reverse(self, request, reverse):
+        return paths_filtered_by_status(request, reverse)
+
+
+    @calculated_property(schema={
+        "title": "Filtered sources",
+        "type": "array",
+        "items": {
+            "type": ['string', 'object'],
+            "linkFrom": "TestingCustomEmbedSource.target",
+        },
+    })
+    def filtered_reverse(self, request, reverse):
+        return paths_filtered_by_status(request, reverse)
+
+    @calculated_property(schema={
+        "title": "Filtered sources1",
+        "type": "array",
+        "items": {
+            "type": ['string', 'object'],
+            "linkFrom": "TestingCustomEmbedSource.target",
+        },
+    })
+    def filtered_reverse1(self, request, reverse):
+        return paths_filtered_by_status(request, reverse)
+
+    @calculated_property(schema={
+        "title": "Uncalculated sources",
+        "type": "array",
+        "items": {
+            "type": ['string', 'object'],
+            "linkFrom": "TestingCustomEmbedSource.target",
+        },
+    })
+    def reverse_uncalculated(self, request, reverse):
+        return paths_filtered_by_status(request, reverse)
