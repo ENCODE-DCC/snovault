@@ -100,3 +100,9 @@ def test_util_path_include_and_exclude_and_frame():
         frame='@@embedded',
     )
     assert p.frame == '@@embedded'
+
+def test_util_path_build_frame():
+    from snovault.util import Path
+    p = Path('/snoflakes/SNS123ABC/', include=['@id', '@type', 'uuid'])
+    p._params = {'field': ['a', 'b', 'c']}
+    assert p._build_frame() == '@@filtered_object?field=a&field=b&field=c'
