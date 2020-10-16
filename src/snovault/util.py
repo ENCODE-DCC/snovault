@@ -165,6 +165,7 @@ class Path:
         return self._frame
 
     def expand_path_with_frame(self, request, properties, path, frame):
+        # Modified from snovault.util.expand_path.
         if isinstance(path, basestring):
              path = path.split('.')
         if not path:
