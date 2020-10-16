@@ -106,3 +106,120 @@ def test_util_path_build_frame():
     p = Path('/snoflakes/SNS123ABC/', include=['@id', '@type', 'uuid'])
     p._params = {'field': ['a', 'b', 'c']}
     assert p._build_frame() == '@@filtered_object?field=a&field=b&field=c'
+
+
+def test_util_path_expand_path_with_frame(dummy_request, threadlocals, posted_custom_embed_targets_and_sources):
+    from snovault.util import Path
+    properties = {'targets': ['/testing-custom-embed-targets/one/']}
+    p = Path('targets')
+    p.expand_path_with_frame(dummy_request, properties, p.path, p.frame)
+    assert properties['targets'][0] == {
+        'name': 'one',
+        '@id': '/testing-custom-embed-targets/one/',
+        '@type': ['TestingCustomEmbedTarget', 'Item'],
+        'uuid': '775795d3-4410-4114-836b-8eeecf1d0c2f',
+        'reverse': ['/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/'],
+        'filtered_reverse': ['/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/'],
+        'filtered_reverse1': ['/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/'],
+        'reverse_uncalculated': ['/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/']
+    }
+    p = Path('targets.reverse')
+    p.expand_path_with_frame(dummy_request, properties, p.path, p.frame)
+    assert properties['targets'][0]['reverse'][0] == {
+        'name': 'A',
+        'status': 'current',
+        'target': '/testing-custom-embed-targets/one/',
+        '@id': '/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/',
+        '@type': ['TestingCustomEmbedSource', 'Item'], 'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd'
+    }
+    p = Path('targets.reverse.target', include=['name', 'uuid'])
+    p.expand_path_with_frame(dummy_request, properties, p.path, p.frame)
+    assert properties['targets'][0]['reverse'][0]['target'] == {
+        'name': 'one',
+        'uuid': '775795d3-4410-4114-836b-8eeecf1d0c2f'
+    }
+
+
+def test_util_path_expand_path_with_frame_include(dummy_request, threadlocals, posted_custom_embed_targets_and_sources):
+    from snovault.util import Path
+    properties = {'targets': ['/testing-custom-embed-targets/one/']}
+    p = Path('targets.reverse.target')
+    p.expand_path_with_frame(dummy_request, properties, p.path, p.frame)
+    assert properties['targets'][0]['reverse'][0]['target'] == {
+        'name': 'one',
+        '@id': '/testing-custom-embed-targets/one/',
+        '@type': ['TestingCustomEmbedTarget', 'Item'],
+        'uuid': '775795d3-4410-4114-836b-8eeecf1d0c2f',
+        'reverse': ['/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/'],
+        'filtered_reverse': ['/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/'],
+        'filtered_reverse1': ['/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/'],
+        'reverse_uncalculated': ['/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/']
+    }
+    properties = {'targets': ['/testing-custom-embed-targets/one/']}
+    p = Path('targets.reverse.target', include=['@id'])
+    p.expand_path_with_frame(dummy_request, properties, p.path, p.frame)
+    assert properties == {
+        'targets': [
+            {'@id': '/testing-custom-embed-targets/one/'}
+        ]
+    }
+    properties = {'targets': ['/testing-custom-embed-targets/one/']}
+    p = Path('targets.reverse.target', include=['@id', 'reverse'])
+    p.expand_path_with_frame(dummy_request, properties, p.path, p.frame)
+    assert properties == {
+        'targets': [
+            {
+                '@id': '/testing-custom-embed-targets/one/',
+                'reverse': [
+                    {
+                        '@id': '/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/'
+                    }
+                ]
+            }
+        ]
+    }
+    properties = {'targets': ['/testing-custom-embed-targets/one/']}
+    p = Path('targets.reverse.target', include=['@id', 'reverse', 'target'])
+    p.expand_path_with_frame(dummy_request, properties, p.path, p.frame)
+    assert properties == {
+        'targets': [
+            {
+                '@id': '/testing-custom-embed-targets/one/',
+                'reverse': [
+                    {
+                        'target': {
+                            '@id': '/testing-custom-embed-targets/one/',
+                            'reverse': [
+                                '/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/'
+                            ]
+                        },
+                        '@id': '/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/'
+                    }
+                ]
+            }
+        ]
+    }
+
+
+def test_util_path_expand_path_slim_embedding(dummy_request, threadlocals, posted_custom_embed_targets_and_sources):
+    from snovault.util import Path
+    properties = {'targets': ['/testing-custom-embed-targets/one/']}
+    p = Path('targets', include=['reverse'])
+    p.expand_path_with_frame(dummy_request, properties, p.path, p.frame)
+    p = Path('targets.reverse', include=['target'])
+    p.expand_path_with_frame(dummy_request, properties, p.path, p.frame)
+    p = Path('targets.reverse.target', include=['name'])
+    p.expand_path_with_frame(dummy_request, properties, p.path, p.frame)
+    assert properties == {
+        'targets': [
+            {
+                'reverse': [
+                    {
+                        'target': {
+                            'name': 'one'
+                        }
+                    }
+                ]
+            }
+        ]
+    }
