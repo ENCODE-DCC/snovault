@@ -64,3 +64,39 @@ def test_types_utils_take_one_or_return_none():
     assert take_one_or_return_none(['just one']) == 'just one'
     assert take_one_or_return_none(['one', 'and', 'two']) is None
     assert take_one_or_return_none('just one') is None
+
+
+def test_util_path_init():
+    from snovault.util import Path
+    p = Path('abc')
+    assert isinstance(p, Path)
+    assert p.path == 'abc'
+    assert p._frame == '@@object'
+    assert p._params == {
+        'include': [],
+        'exclude': []
+    }
+    assert p.frame == '@@object'
+
+
+def test_util_path_include_and_exclude_and_frame():
+    from snovault.util import Path
+    p = Path('/snoflakes/SNS123ABC/', include=['@id', '@type', 'uuid'])
+    assert p.frame == '@@filtered_object?include=%40id&include=%40type&include=uuid'
+    assert p.path == '/snoflakes/SNS123ABC/'
+    p = Path('/snoflakes/SNS123ABC/', exclude=['description'])
+    assert p.frame == '@@filtered_object?exclude=description'
+    p = Path('/snoflakes/SNS123ABC/', include=['title', 'name'], exclude=['description', 'notes'])
+    assert p.frame == '@@filtered_object?include=title&include=name&exclude=description&exclude=notes'
+    p = Path(
+        '/snoflakes/SNS123ABC/',
+        frame='@@embedded',
+        include=['title', 'name'],
+        exclude=['description', 'notes']
+    )
+    assert p.frame == '@@filtered_object?include=title&include=name&exclude=description&exclude=notes'
+    p = Path(
+        '/snoflakes/SNS123ABC/',
+        frame='@@embedded',
+    )
+    assert p.frame == '@@embedded'
