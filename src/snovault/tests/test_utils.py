@@ -201,7 +201,7 @@ def test_util_path_expand_path_with_frame_include(dummy_request, threadlocals, p
     }
 
 
-def test_util_path_expand_path_slim_embedding(dummy_request, threadlocals, posted_custom_embed_targets_and_sources):
+def test_util_path_expand_path_with_frame_slim_embedding(dummy_request, threadlocals, posted_custom_embed_targets_and_sources):
     from snovault.util import Path
     properties = {'targets': ['/testing-custom-embed-targets/one/']}
     p = Path('targets', include=['reverse'])
@@ -219,6 +219,72 @@ def test_util_path_expand_path_slim_embedding(dummy_request, threadlocals, poste
                             'name': 'one'
                         }
                     }
+                ]
+            }
+        ]
+    }
+
+
+def test_util_path_expand_explicit_frame(dummy_request, threadlocals, posted_custom_embed_targets_and_sources):
+    from snovault.util import Path
+    properties = {'targets': ['/testing-custom-embed-targets/one/']}
+    p = Path('targets', frame='@@embedded')
+    p.expand(dummy_request, properties)
+    assert properties == {
+        'targets': [
+            {
+                'name': 'one',
+                '@id': '/testing-custom-embed-targets/one/',
+                '@type': ['TestingCustomEmbedTarget', 'Item'],
+                'uuid': '775795d3-4410-4114-836b-8eeecf1d0c2f',
+                'reverse': [
+                    {
+                        'name': 'A',
+                        'status': 'current',
+                        'target': '/testing-custom-embed-targets/one/',
+                        '@id': '/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/',
+                        '@type': ['TestingCustomEmbedSource', 'Item'],
+                        'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd'}
+                ],
+                'filtered_reverse': [
+                    {
+                        'status': 'current',
+                        'uuid': '16157204-8c8f-4672-a1a4-14f4b8021fcd'
+                    }
+                ],
+                'filtered_reverse1': [
+                    {
+                        'name': 'A',
+                        'status': 'current',
+                        'target': '/testing-custom-embed-targets/one/',
+                        '@id': '/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/'
+                    }
+                ],
+                'reverse_uncalculated': [
+                    {
+                        'name': 'A',
+                        'status': 'current',
+                        'target': '/testing-custom-embed-targets/one/'
+                    }
+                ]
+            }
+        ]
+    }
+
+
+def test_util_path_expand_exclude(dummy_request, threadlocals, posted_custom_embed_targets_and_sources):
+    from snovault.util import Path
+    properties = {'targets': ['/testing-custom-embed-targets/one/']}
+    p = Path('targets', exclude=['reverse', 'filtered_reverse', 'reverse_uncalculated', '@type'])
+    p.expand(dummy_request, properties)
+    assert properties == {
+        'targets': [
+            {
+                'name': 'one',
+                '@id': '/testing-custom-embed-targets/one/',
+                'uuid': '775795d3-4410-4114-836b-8eeecf1d0c2f',
+                'filtered_reverse1': [
+                    '/testing-custom-embed-sources/16157204-8c8f-4672-a1a4-14f4b8021fcd/'
                 ]
             }
         ]
