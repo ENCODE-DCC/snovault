@@ -10,7 +10,6 @@ from redis import StrictRedis
 def base_result(local_store):
     local_dt = datetime.now(timezone(local_store.local_tz))
     return {
-        '@type': ['result'],
         'utc_now': str(datetime.utcnow()),
         'lcl_now': f"{local_store.local_tz}: {local_dt}",
     }
