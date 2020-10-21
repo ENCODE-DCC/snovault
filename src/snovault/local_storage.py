@@ -10,6 +10,7 @@ from redis import StrictRedis
 def base_result(local_store):
     local_dt = datetime.now(timezone(local_store.local_tz))
     return {
+        '@type': ['result'],
         'utc_now': str(datetime.utcnow()),
         'lcl_now': f"{local_store.local_tz}: {local_dt}",
     }
@@ -20,33 +21,22 @@ class LocalStoreClient():
     Light redis wrapper and redis examples
     - get_tag function was added to return hex str
     - Can access client directly for full functionality
-    - Server connection issues do not occur until accessing redis post __init__
     '''
-    def __init__(
-            self,
-            db_index=0,
-            host='localhost',
-            local_tz='GMT',
-            port=6379,
-            timeout=5
-        ):
-        self.local_tz = local_tz
-        redis_info = {
-            'db': db_index,
-            'host': host,
-            'port': port,
-            'socket_timeout': timeout,
-        }
+    def __init__(self, **kwargs):
+        self.local_tz = kwargs.get('local_tz', 'GMT')
         self.client = StrictRedis(
             charset='utf-8',
             decode_responses=True,
-            **redis_info
+            db=kwargs['db_index'],
+            host=kwargs['host'],
+            port=kwargs['port'],
+            socket_timeout=kwargs['socket_timeout'],
         )
 
     @staticmethod
-    def get_tag(tag, num_bytes=8):
+    def get_tag(tag, num_bytes=2):
         '''
-        Tags are the tag and a bytes string
+        Tags are the tag plus a random hex bytes string
         - Bytes string length is 2 * num bytes
         '''
         rand_hex_str = binascii.b2a_hex(urandom(num_bytes)).decode('utf-8')

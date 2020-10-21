@@ -39,20 +39,22 @@ _app_settings = {
     'multiauth.policy.webuser.namespace' : 'webuser',
     'multiauth.policy.webuser.base' : 'snovault.authentication.WebUserAuthenticationPolicy',
     'load_test_only': True,
-    'local_storage_db': 0,
-    'local_storage_host': 'localhost',
-    'local_storage_port': 6378,
-    'local_storage_timeout': 5,
     'testing': True,
     'pyramid.debug_authorization': True,
     'postgresql.statement_timeout': 20,
     'retry.attempts': 3,
     'ontology_path': pkg_resources.resource_filename('snowflakes', '../../ontology.json'),
+    # Local Storage
+    'local_storage_host': 'localhost',
+    'local_storage_port': 6378,
+    'local_storage_redis_index': 0,
+    'local_storage_timeout': 5,
+    'local_tz': 'GMT',
 }
 
 
 @fixture(scope='session')
-def app_settings(request, wsgi_server_host_port, conn, DBSession):
+def app_settings(request, wsgi_server_host_port, conn, DBSession, redis_server):
     from snovault import DBSESSION
     settings = _app_settings.copy()
     settings[DBSESSION] = DBSession
