@@ -5,16 +5,17 @@ import sys
 import subprocess
 
 
+# Commented out config is added in 'initdb' below
 REDIS_DEFAULTS = [
-    # 'bind 127.0.0.1 ::1',  Disabled ipv6 since circleci does not support
+    # 'bind 127.0.0.1 ::1',                         Disabled ipv6 since circleci does not support
     'protected-mode yes',
-    # port 6379',
+    # port 6379',                                   Port change
     'tcp-backlog 511',
     'timeout 0',
     'tcp-keepalive 300',
     'daemonize no',
     'supervised no',
-    # 'pidfile /var/run/redis_6379.pid',
+    # 'pidfile /var/run/redis_6379.pid',            Port change
     'loglevel notice',
     'logfile ""',
     'databases 16',
@@ -26,7 +27,7 @@ REDIS_DEFAULTS = [
     'rdbcompression yes',
     'rdbchecksum yes',
     'dbfilename dump.rdb',
-    # 'dir /usr/local/var/db/redis/',
+    # 'dir /usr/local/var/db/redis/',               Variable database location
     'slave-serve-stale-data yes',
     'slave-read-only yes',
     'repl-diskless-sync no',
@@ -83,15 +84,15 @@ def initdb(datadir, redis_port, echo=False):
     return redis_config_path
 
 
-def server_process(redis_config_path, redis_port, echo=False):
+def server_process(redis_config_path, redis_port, redis_index, echo=False):
     '''Start redis server'''
     args = [
         os.path.join('redis-server'),
-        redis_config_path,
+        f"{redis_config_path}",
     ]
     if echo:
         print(f"Starting redis server: {' '.join(args)}")
-        print(f"Connect with 'redis-cli -p {redis_port}'")
+        print(f"Connect with 'redis-cli -p {redis_port} -n {redis_index}'")
     redis_process = subprocess.Popen(
         args,
         close_fds=True,
@@ -113,8 +114,8 @@ def _main():
 
     try:
         print(f"Starting in dir: {datadir}")
-        redis_config_dir = initdb(datadir, 6378, echo=True)
-        redis_process = server_process(redis_config_dir, 6378, echo=True)
+        redis_config_path = initdb(datadir, 6378, echo=True)
+        redis_process = server_process(redis_config_path, 6378, echo=True)
     except Exception as ecp:  # pylint: disable=broad-except
         _cleanup()
         shutil.rmtree(datadir)

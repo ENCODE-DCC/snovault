@@ -4,10 +4,6 @@ _app_settings = {
     'collection_datastore': 'database',
     'item_datastore': 'database',
     'load_test_only': True,
-    'local_storage_db': 0,
-    'local_storage_host': 'localhost',
-    'local_storage_port': 6378,
-    'local_storage_timeout': 5,
     'testing': True,
     'pyramid.debug_authorization': True,
     'postgresql.statement_timeout': 20,
@@ -26,12 +22,18 @@ _app_settings = {
     'multiauth.policy.accesskey.check': 'snovault.authentication.basic_auth_check',
     'multiauth.policy.webuser.use':  'snovault.authentication.NamespacedAuthenticationPolicy',
     'multiauth.policy.webuser.namespace': 'webuser',
-    'multiauth.policy.webuser.base': 'snovault.authentication.WebUserAuthenticationPolicy'
+    'multiauth.policy.webuser.base': 'snovault.authentication.WebUserAuthenticationPolicy',
+    # Local Storage
+    'local_storage_host': 'localhost',
+    'local_storage_port': 6378,
+    'local_storage_redis_index': 0,
+    'local_storage_timeout': 5,
+    'local_tz': 'GMT',
 }
 
 
 @pytest.fixture(scope='session')
-def app_settings(request, wsgi_server_host_port, conn, DBSession):
+def app_settings(request, wsgi_server_host_port, conn, DBSession, redis_server):
     from snovault import DBSESSION
     settings = _app_settings.copy()
     settings[DBSESSION] = DBSession

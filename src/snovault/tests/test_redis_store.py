@@ -1,17 +1,23 @@
 import pytest
 
+from redis import StrictRedis
+
 from snovault.local_storage import LocalStoreClient
 
 
-def test_local_storage_server(redis_server, app_settings):
-    local_store = LocalStoreClient(
-        db_index=app_settings['local_storage_db'],
-        host=app_settings['local_storage_host'],
-        port=app_settings['local_storage_port'],
-        timeout=app_settings['local_storage_timeout'],
+def _get_client(local_settings):
+    return LocalStoreClient(
+        db_index=local_settings['local_storage_redis_index'],
+        host=local_settings['local_storage_host'],
+        port=local_settings['local_storage_port'],
+        socket_timeout=local_settings['local_storage_timeout'],
     )
+
+
+def test_local_storage_server_fixture(app_settings):
+    local_store = _get_client(app_settings)
     try:
-        local_store.client.ping()
+        local_store.ping()
     except Exception as excp:  # pylint: disable=broad-except
         print(excp)
         assert False
@@ -22,20 +28,14 @@ class TestLocalStore():
     dict_key = 'fakedictkey'
     item_key = 'fakeitemkey'
     list_key = 'fakelistkey'
-    local_store = None
 
     @pytest.fixture(autouse=True)
-    def setup_method(self, redis_server, app_settings):
+    def setup_method(self, app_settings):
         '''
         Add local store to test class and cleans up standard redis keys
         - Uses the exposed redis client directly
         '''
-        self.local_store = LocalStoreClient(
-            db=app_settings['local_storage_db'],
-            host=app_settings['local_storage_host'],
-            port=app_settings['local_storage_port'],
-            timeout=app_settings['local_storage_timeout'],
-        ) 
+        self.local_store = _get_client(app_settings)
         self.local_store.client.delete(self.dict_key)
         self.local_store.client.delete(self.item_key)
         for item in self.local_store.client.lrange(self.list_key, 0, -1):
@@ -43,18 +43,26 @@ class TestLocalStore():
         self.local_store.client.delete(self.list_key)
 
     def test_init(self):
+        assert hasattr(self.local_store, 'local_tz')
+        assert isinstance(self.local_store.local_tz, str)
+        assert self.local_store.local_tz == 'GMT'
+        assert hasattr(self.local_store, 'client')
+        assert isinstance(self.local_store.client, StrictRedis)
+
+    def test_get_tag(self):
+        config_tag = 'localtesting'
+        tag = self.local_store.get_tag(config_tag)
+        assert isinstance(tag, str)
+        assert len(tag) == len(config_tag) + len(':') + 4
+        tag = self.local_store.get_tag(config_tag, num_bytes=4)
+        assert len(tag) == len(config_tag) + len(':') + 8
+
+    def test_ping(self):
         try:
             self.local_store.ping()
         except Exception as excp:  # pylint: disable=broad-except
             assert False
         assert True
-
-    def test_get_tag(self):
-        tag = self.local_store.get_tag()
-        assert isinstance(tag, str)
-        assert len(tag) == 16
-        tag = self.local_store.get_tag(num_bytes=4)
-        assert len(tag) == 8
 
     def test_dict_get(self):
         hash_dict = self.local_store.dict_get(self.dict_key)

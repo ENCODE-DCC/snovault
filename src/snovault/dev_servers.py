@@ -63,19 +63,24 @@ def main():
     args = parser.parse_args()
 
     appsettings = get_appsettings(args.config_uri, name='app')
+    # Required settings in config
+    local_storage_host = appsettings['local_storage_host']
+    local_storage_port = appsettings['local_storage_port']
+    local_storage_redis_index = appsettings['local_storage_redis_index']
+    local_storage_timeout = appsettings['local_storage_timeout']
 
     logging.basicConfig()
     # Loading app will have configured from config file. Reconfigure here:
     logging.getLogger('snovault').setLevel(logging.INFO)
 
-    from snovault.tests import elasticsearch_fixture, postgresql_fixture, local_storage_fixture
+    from snovault.tests import elasticsearch_fixture, postgresql_fixture, redis_storage_fixture
     from snovault.elasticsearch import create_mapping
     datadir = os.path.abspath(args.datadir)
     pgdata = os.path.join(datadir, 'pgdata')
     esdata = os.path.join(datadir, 'esdata')
-    local_storage_data = os.path.join(datadir, 'local_storage_data')
+    redisdata = os.path.join(datadir, 'redisdata')
     if args.clear:
-        for dirname in [pgdata, esdata, local_storage_data]:
+        for dirname in [pgdata, esdata, redisdata]:
             if os.path.exists(dirname):
                 shutil.rmtree(dirname)
     if args.init:
@@ -84,18 +89,9 @@ def main():
     postgres = postgresql_fixture.server_process(pgdata, echo=True)
     elasticsearch = elasticsearch_fixture.server_process(esdata, echo=True)
     nginx = nginx_server_process(echo=True)
-    local_storage_port = appsettings.get('local_storage_port', 6379)
-    local_storage_config_path = local_storage_fixture.initdb(
-        local_storage_data,
-        local_storage_port,
-        echo=True,
-    )
-    local_storage = local_storage_fixture.server_process(
-        local_storage_config_path,
-        local_storage_port,
-        echo=True,
-    )
-    processes = [postgres, elasticsearch, nginx, local_storage]
+    redis_config_path = redis_storage_fixture.initdb(redisdata, local_storage_port, echo=True)
+    redis = redis_storage_fixture.server_process(redis_config_path, local_storage_port, local_storage_redis_index, echo=True)
+    processes = [postgres, elasticsearch, nginx, redis]
 
     print_processes = []
 
