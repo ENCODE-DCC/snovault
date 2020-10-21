@@ -20,10 +20,13 @@ from snovault import (
 from snovault.storage import (
     TransactionRecord,
 )
+from snovault.elasticsearch.local_indexer_store import IndexerStore
+
 from urllib3.exceptions import ReadTimeoutError
 from .interfaces import (
     ELASTIC_SEARCH,
     INDEXER,
+    INDEXER_STORE,
     RESOURCES_INDEX,
 )
 from .indexer_state import (
@@ -90,6 +93,9 @@ def includeme(config):
         _update_for_uuid_queues(registry)
         if not processes:
             registry[INDEXER] = Indexer(registry)
+        if not registry.get(INDEXER_STORE):
+            registry[INDEXER_STORE] = IndexerStore(config.registry.settings)
+        
 
 
 def get_related_uuids(request, es, updated, renamed):
@@ -336,6 +342,8 @@ def _get_nodes(request, indexer_state):
 
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
+    indexer_store = request.registry[INDEXER_STORE]
+    indexer_store.set_state(indexer_store.state_endpoint_start)
     # Setting request.datastore here only works because routed views are not traversed.
     request.datastore = 'database'
     session = request.registry[DBSESSION]()
@@ -366,6 +374,7 @@ def index(request):
             return {'this_node': this_node, 'other_node': other_node}
 
     def _load_indexing(request, session, connection, indexer_state):
+        indexer_store.set_state(indexer_store.state_load_indexing)
         first_txn = None
         snapshot_id = None
         (xmin, invalidated, restart) = indexer_state.priority_cycle(request)
@@ -493,13 +502,22 @@ def index(request):
         result = indexer_state.start_cycle(invalidated, result)
 
         # Do the work...
-
+        local_state, event_tag = indexer_store.set_state(
+            indexer_store.state_run_indexing,
+            # 'invalidated' indicates the start of indexing
+            invalidated_cnt=len(invalidated)
+        )
         indexing_update_infos, errors, err_msg = request.registry[INDEXER].serve_objects(
             request,
             invalidated,
             xmin,
             snapshot_id=snapshot_id,
             restart=restart,
+        )
+        indexer_store.set_state(
+            indexer_store.state_run_indexing,
+            errors_cnt=len(errors),
+            event_tag=event_tag,
         )
         if err_msg:
             log.warning('Could not start indexing: %s', err_msg)
@@ -544,6 +562,7 @@ def index(request):
     output_tuple = _load_indexing(request, session, connection, indexer_state)
     result, invalidated, flush, first_txn, snapshot_id, restart, xmin, return_now = output_tuple
     if return_now:
+        indexer_store.set_state(indexer_store.state_waiting)
         return result
     indexing_update_infos = []
     dry_run = request.json.get('dry_run', False)
@@ -625,6 +644,7 @@ def index(request):
         #  opposed to in the indexer or just after serve_objects,
         #  so a crash in logging does not interupt indexing complietion
         request.registry[INDEXER].check_log_indexing_times(indexing_update_infos)
+    indexer_store.set_state(indexer_store.state_waiting)
     return result
 
 
