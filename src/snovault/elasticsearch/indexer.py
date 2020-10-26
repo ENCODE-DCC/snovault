@@ -378,6 +378,7 @@ def index(request):
         first_txn = None
         snapshot_id = None
         (xmin, invalidated, restart) = indexer_state.priority_cycle(request)
+        indexer_store.set_state(indexer_store.state_load_indexing)
         indexer_state.log_reindex_init_state()
         # OPTIONAL: restart support
         if restart:  # Currently not bothering with restart!!!
