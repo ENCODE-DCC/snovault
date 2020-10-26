@@ -1474,7 +1474,8 @@ def test_searches_queries_abstract_query_factory_make_bool_filter_and_query_cont
                     }
                 ]
             }
-        }
+        },
+        'track_total_hits': True,
     }
     fa = aq._make_filter_aggregation(
         filter_context=aq._make_must_equal_terms_query(
@@ -2240,7 +2241,8 @@ def test_searches_queries_abstract_query_factory_add_must_equal_terms_filter(par
                     }
                 ]
             }
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2255,6 +2257,7 @@ def test_searches_queries_abstract_query_factory_add_must_equal_terms_post_filte
         'query': {
             'match_all': {}
         },
+        'track_total_hits': True,
         'post_filter': {
             'terms': {'status': ['released', 'archived']}}
     }
@@ -2271,6 +2274,7 @@ def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_post_f
         'query': {
             'match_all': {}
         },
+        'track_total_hits': True,
         'post_filter': {
             'bool': {
                 'filter': [
@@ -2307,7 +2311,8 @@ def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_filter
                     }
                 ]
             }
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2322,7 +2327,8 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_filter(par
             'bool': {
                 'filter': [{'exists': {'field': 'embedded.status'}}]
                 }
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2341,7 +2347,8 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_post_filte
         },
         'query': {
             'match_all': {}
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2362,7 +2369,8 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_filter_mul
                     {'exists': {'field': 'embedded.lab'}}
                 ]
             }
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2377,7 +2385,8 @@ def test_searches_queries_abstract_query_factory_add_field_must_not_exist_filter
             'bool': {
                 'filter': [{'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}}]
             }
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2391,6 +2400,7 @@ def test_searches_queries_abstract_query_factory_add_field_must_not_exist_post_f
         'query': {
             'match_all': {}
         },
+        'track_total_hits': True,
         'post_filter': {
             'bool': {
                 'filter': [
@@ -2417,7 +2427,8 @@ def test_searches_queries_abstract_query_factory_add_field_must_and_must_not_exi
                     {'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}}
                 ]
             }
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2434,7 +2445,8 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_pa
                 }
             }
         },
-        'query': {'match_all': {}}
+        'query': {'match_all': {}},
+        'track_total_hits': True,
     }
 
 
@@ -2527,6 +2539,7 @@ def test_searches_queries_abstract_query_factory_add_must_equal_terms_post_filte
         'query': {
             'match_all': {}
         },
+        'track_total_hits': True,
         'post_filter': {
             'terms': {'status': ['released', 'archived']}}
     }
@@ -2545,6 +2558,7 @@ def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_post_f
         'query': {
             'match_all': {}
         },
+        'track_total_hits': True,
         'post_filter': {
             'bool': {
                 'filter': [
@@ -2583,7 +2597,8 @@ def test_searches_queries_abstract_query_factory_add_must_not_equal_terms_filter
                     }
                 ]
             }
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2600,7 +2615,8 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_filter(par
             'bool': {
                 'filter': [{'exists': {'field': 'embedded.status'}}]
                 }
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2621,7 +2637,8 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_post_filte
         },
         'query': {
             'match_all': {}
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2644,7 +2661,8 @@ def test_searches_queries_abstract_query_factory_add_field_must_exist_filter_mul
                     {'exists': {'field': 'embedded.lab'}}
                 ]
             }
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2661,7 +2679,8 @@ def test_searches_queries_abstract_query_factory_add_field_must_not_exist_filter
             'bool': {
                 'filter': [{'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}}]
             }
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2677,6 +2696,7 @@ def test_searches_queries_abstract_query_factory_add_field_must_not_exist_post_f
         'query': {
             'match_all': {}
         },
+        'track_total_hits': True,
         'post_filter': {
             'bool': {
                 'filter': [
@@ -2705,7 +2725,8 @@ def test_searches_queries_abstract_query_factory_add_field_must_and_must_not_exi
                     {'bool': {'must_not': [{'exists': {'field': 'embedded.file_size'}}]}}
                 ]
             }
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2724,7 +2745,8 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_pa
                 }
             }
         },
-        'query': {'match_all': {}}
+        'query': {'match_all': {}},
+        'track_total_hits': True,
     }
 
 
@@ -2744,7 +2766,8 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation_with_excl
                 }
             }
         },
-        'query': {'match_all': {}}
+        'query': {'match_all': {}},
+        'track_total_hits': True,
     }
 
 
@@ -2779,7 +2802,8 @@ def test_searches_queries_abstract_query_factory_add_exists_aggregation(params_p
                 }
             }
         },
-        'query': {'match_all': {}}
+        'query': {'match_all': {}},
+        'track_total_hits': True,
     }
 
 
@@ -2803,7 +2827,8 @@ def test_searches_queries_abstract_query_factory_add_filters(params_parser, mock
                     }
                 ]
             }
-        }
+        },
+        'track_total_hits': True,
     }
 
 
@@ -2936,35 +2961,35 @@ def test_searches_queries_abstract_query_factory_add_slice(params_parser, dummy_
     AbstractQueryFactory._get_index.return_value = 'snovault-resources'
     aq = AbstractQueryFactory(params_parser)
     aq.add_slice()
-    assert aq.search.to_dict() == {'from': 0, 'size': 10, 'query': {'match_all': {}}}
+    assert aq.search.to_dict() == {'from': 0, 'size': 10, 'query': {'match_all': {}}, 'track_total_hits': True}
     dummy_request.environ['QUERY_STRING'] = (
         'searchTerm=chip-seq&type=TestingSearchSchema&frame=object&limit=all'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     aq.add_slice()
-    assert aq.search.to_dict() == {'from': 0, 'size': 25, 'query': {'match_all': {}}}
+    assert aq.search.to_dict() == {'from': 0, 'size': 25, 'query': {'match_all': {}}, 'track_total_hits': True}
     dummy_request.environ['QUERY_STRING'] = (
         'searchTerm=chip-seq&type=TestingSearchSchema&frame=object&limit=3000'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     aq.add_slice()
-    assert aq.search.to_dict() == {'from': 0, 'size': 3000, 'query': {'match_all': {}}}
+    assert aq.search.to_dict() == {'from': 0, 'size': 3000, 'query': {'match_all': {}}, 'track_total_hits': True}
     dummy_request.environ['QUERY_STRING'] = (
         'searchTerm=chip-seq&type=TestingSearchSchema&frame=object&limit=blah'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     aq.add_slice()
-    assert aq.search.to_dict() == {'from': 0, 'size': 25, 'query': {'match_all': {}}}
+    assert aq.search.to_dict() == {'from': 0, 'size': 25, 'query': {'match_all': {}}, 'track_total_hits': True}
     dummy_request.environ['QUERY_STRING'] = (
         'searchTerm=chip-seq&type=TestingSearchSchema&frame=object&limit=10000'
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
     aq.add_slice()
-    assert aq.search.to_dict() == {'from': 0, 'size': 25, 'query': {'match_all': {}}}
+    assert aq.search.to_dict() == {'from': 0, 'size': 25, 'query': {'match_all': {}}, 'track_total_hits': True}
 
 
 def test_searches_queries_abstract_query_factory_subaggregation_factory(params_parser_snovault_types):
@@ -4008,6 +4033,7 @@ def test_searches_queries_basic_matrix_query_factory_with_facets_build_query(par
                 ]
             }
         },
+        'track_total_hits': True,
         'size': 0
     }
     actual = bmqf.search.to_dict()
