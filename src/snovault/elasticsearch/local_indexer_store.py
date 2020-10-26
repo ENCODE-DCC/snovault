@@ -29,44 +29,6 @@ def includeme(config):
     config.registry[INDEXER_STORE] = IndexerStore(config.registry.settings)
 
 
-def _convert_dt_str_to_ts(dt_str):
-    '''Expecting dt_str to be in the format 2020-10-23 17:09:36.442405'''
-    try:
-        return datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S.%f').timestamp()
-    except ValueError:
-        return None
-
-
-def _duration_with_unis_str(ts_start, ts_end=None):
-    '''
-    Return duration in seconds, minutes, or hours
-    - From now by default
-    - from provided end timestamp
-    '''
-    try:
-        ts_start = int(ts_start)
-    except ValueError:
-        ts_start = _convert_dt_str_to_ts(ts_start)
-    if not ts_start:
-        return f"Could not determine duration with ts_start={ts_start}"
-    try:
-        if not ts_end:
-            ts_end = time.time()
-        ts_end = int(ts_end)
-    except ValueError:
-        ts_end = _convert_dt_str_to_ts(ts_end)
-    if not ts_end:
-        return f"Could not determine duration with ts_end={ts_end}"
-    seconds = float(int(ts_end) - int(ts_start))
-    div = 1.0
-    unit = 'seconds'
-    if seconds > 60:
-        div = 60.0
-        unit = 'minutes'
-    if seconds > 3600:
-        div = 3600.0
-        unit = 'hours'
-    return f"{seconds/div:0.2f} {unit}"
 
 
 @view_config(route_name='indexer_store', request_method='GET', request_param='events')
@@ -103,7 +65,7 @@ def indexer_store_events(request):
         event_tags = indexer_store.list_get(INDEXER_EVENTS_LIST, start, stop)
         result['events'] = []
         for event_tag in event_tags:
-            result['events'].append(indexer_store.get_event(event_tag))
+            result['events'].append(indexer_store.get_event_msg(event_tag))
     else:
         # Events arg is bad format?
         result['error'] = f"Bad events value '{request_argument}'"
@@ -148,27 +110,27 @@ def indexer_store_state_split(request):
         result['dynamic'][key] = state_obj[key]
     # Determine if run events and run state
     event_key = None
-    formatted_duration = None
+    duration = None
     if current_state in [
             IndexerStore.state_endpoint_start[0],
             IndexerStore.state_waiting[0],
             IndexerStore.state_load_indexing[0],
     ]:
         event_key = 'previous_event'
-        formatted_duration = _duration_with_unis_str(state_obj['start_ts'], ts_end=state_obj['end_time'])
+        duration = indexer_store._duration_with_unis_str(state_obj['start_dt'], ts_end=state_obj['end_dt'])
     elif current_state == IndexerStore.state_run_indexing[0]:
-        if state_obj['end_time'] == 'tbd':
+        if state_obj['end_dt'] == 'tbd':
             event_key = 'current_event'
-            formatted_duration = _duration_with_unis_str(state_obj['start_ts'])
+            duration = indexer_store._duration_with_unis_str(state_obj['start_dt'])
         else:
             event_key = 'previous_event'
-            formatted_duration = _duration_with_unis_str(state_obj['start_ts'], ts_end=state_obj['end_time'])
+            duration = indexer_store._duration_with_unis_str(state_obj['start_dt'], ts_end=state_obj['end_dt'])
     # Add current or previous run event keys
     if event_key:
         result[event_key] = {}
         for key in indexer_store.event_keys:
             result[event_key][key] = state_obj[key]
-        result[event_key]['formated_duration'] = formatted_duration
+        result[event_key]['duration'] = duration
     request.query_string = "format=json"
     return result
 
@@ -176,35 +138,36 @@ def indexer_store_state_split(request):
 @view_config(route_name='indexer_store', request_method='GET')
 def indexer_store_state(request):
     '''Minimal view for current state and additional info if running'''
-    state_obj = request.registry[INDEXER_STORE].get_state()
+    indexer_store = request.registry[INDEXER_STORE]
+    state_obj = indexer_store.get_state()
     current_state = state_obj.get('state', 'not initialized')
     result = {
         'state': current_state,
-        'state_duration': 'could not calculate',
+        'time_in_state': 'could not calculate',
     }
-    if current_state == IndexerStore.state_initialized[0]:
-        result['state_duration'] = _duration_with_unis_str(state_obj['init_dt'])
+    if current_state == IndexerStore.state_waiting[0]:
+        result['time_in_state'] = indexer_store._duration_with_unis_str(state_obj['endpoint_end_dt'])
+        result['description'] = f"Remains in state for {state_obj['loop_time']} seconds."
+    elif current_state == IndexerStore.state_initialized[0]:
+        result['time_in_state'] = indexer_store._duration_with_unis_str(state_obj['init_dt'])
         result['description'] = 'Very short duration.  Happens once during deployment'
     elif current_state == IndexerStore.state_endpoint_start[0]:
-        result['state_duration'] = _duration_with_unis_str(state_obj['endpoint_start'])
+        result['time_in_state'] = indexer_store._duration_with_unis_str(state_obj['endpoint_start'])
         result['description'] = 'Very short duration.  Happens once a minute.'
     elif current_state == IndexerStore.state_load_indexing[0]:
-        result['state_duration'] = _duration_with_unis_str(state_obj['endpoint_start'])
+        result['time_in_state'] = indexer_store._duration_with_unis_str(state_obj['endpoint_start'])
         result['description'] = 'Time depends on number of uuids to index.  Could take minutes.'
     elif current_state == IndexerStore.state_run_indexing[0]:
-        if state_obj['end_time'] == 'tbd':
-            result['state_duration'] = _duration_with_unis_str(state_obj['start_ts'])
+        if state_obj['end_dt'] == 'tbd':
+            result['time_in_state'] = indexer_store._duration_with_unis_str(state_obj['start_dt'])
             result['description'] = 'Time depends on number of uuids to index.  Could take hours.'
             result['current_event_tag'] = state_obj['event_tag']
             result['current_invalidated_cnt'] = state_obj['invalidated_cnt']
         else:
-            result['state_duration'] = _duration_with_unis_str(state_obj['end_time'])
+            result['time_in_state'] = indexer_store._duration_with_unis_str(state_obj['end_dt'])
             result['description'] = 'Short duration.  Should go to waiting soon.'
             result['just_finished_event_tag'] = state_obj.get('event_tag', 'not initialized')
             result['just_finished_invalidated_cnt'] = state_obj['invalidated_cnt']
-    elif current_state == IndexerStore.state_waiting[0]:
-        result['state_duration'] = _duration_with_unis_str(state_obj['endpoint_end'])
-        result['description'] = f"Remains in state for {state_obj['loop_time']} seconds."
     request.query_string = "format=json"
     return result
 
@@ -227,21 +190,19 @@ class IndexerStore(LocalStoreClient):
         'state_key',
     ]
     dynamic_keys = [
-        'endpoint_end',
-        'endpoint_start',
-        'endpoint_start_ts',
+        'endpoint_end_dt',
+        'endpoint_start_dt',
         'state',
         'state_desc',
         'state_error',
-        'sub_state',
     ]
     event_keys = [
         'duration',
-        'end_time',
+        'end_dt',
         'errors_cnt',
         'event_tag',
         'invalidated_cnt',
-        'start_ts',
+        'start_dt',
     ]
     
     def __init__(self, settings):
@@ -260,6 +221,43 @@ class IndexerStore(LocalStoreClient):
             curr_state = self.get_state()
             if not curr_state:
                 self._init_state()
+
+    @staticmethod
+    def _dt_now():
+        return str(datetime.datetime.utcnow())
+
+    @staticmethod
+    def _convert_dt_to_ts(dt_str):
+        '''Expecting dt_str to be in the format 2020-10-23 17:09:36.442405'''
+        try:
+            return datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S.%f').timestamp()
+        except ValueError:
+            return None
+
+    def _duration_with_unis_str(self, start_dt, end_dt=None):
+        '''
+        Return duration in seconds, minutes, or hours
+        - Input expected to be in '2020-10-23 17:09:36.442405' format
+        - From now if end_dt not provided
+        '''
+        start_ts = self._convert_dt_to_ts(start_dt)
+        if not start_ts:
+            return f"Could not determine duration with start_dt={start_dt}"
+        if not end_dt:
+            end_dt = self._dt_now()
+        end_ts = self._convert_dt_to_ts(end_dt)
+        if not end_ts:
+            return f"Could not determine duration with end_dt={end_dt}"
+        seconds = float(end_ts - start_ts)
+        div = 1.0
+        unit = 'seconds'
+        if seconds > 60:
+            div = 60.0
+            unit = 'minutes'
+        if seconds > 3600:
+            div = 3600.0
+            unit = 'hours'
+        return f"{seconds/div:0.2f} {unit}"
 
     def _init_state(self):
         '''Indexer state in redis is named after the process in the config'''
@@ -285,7 +283,7 @@ class IndexerStore(LocalStoreClient):
 
     def _end_event(self, event_tag, state):
         '''Close event with only certain event keys in state.  Also add human readable date time'''
-        for event_key in ['duration', 'end_time', 'errors_cnt']:
+        for event_key in ['end_dt', 'errors_cnt']:
             self.item_set(f"{event_tag}:{event_key}",  state[event_key])
         self.item_set(f"{event_tag}:end",  str(datetime.datetime.utcnow()))
     
@@ -296,11 +294,16 @@ class IndexerStore(LocalStoreClient):
         for event_key in self.event_keys:
             self.item_set(f"{event_tag}:{event_key}", state[event_key])
 
-    def get_event(self, event_tag):
-        end = str(self.item_get(event_tag + ':end'))
+    def get_event_msg(self, event_tag):
+        end_dt = str(self.item_get(event_tag + ':end_dt'))
+        start_dt = str(self.item_get(event_tag + ':start_dt'))
+        errors_cnt = str(self.item_get(event_tag + ':errors_cnt'))
         invalidated_cnt = str(self.item_get(event_tag + ':invalidated_cnt'))
-        duration = str(self.item_get(event_tag + ':duration'))
-        msg = f"Indexed '{invalidated_cnt}' uuids in '{duration}' seconds. Ended at '{end}'"
+        duration = self._duration_with_unis_str(start_dt, end=end_dt)
+        msg = (
+            f"Indexed '{invalidated_cnt}' uuids in '{duration}'"
+            f"with '{errors_cnt}' errors. Ended at '{end_dt}'."
+        )
         return f"{event_tag}: {msg}"
 
     def get_state(self):
@@ -312,30 +315,19 @@ class IndexerStore(LocalStoreClient):
         new_state['state_desc'] = state_tuple[1]
         self.dict_set(INDEXER_STATE_TAG, new_state)
 
-    def _set_state_load_indexing(self, **kwargs):
-        state = self.get_state()
-        state['sub_state'] = kwargs.get('sub_state', 'where is your sub_state!?')
-        # Set sub state keys
-        allowed_keys = []
-        if state['sub_state'] == 'priority_cycle':
-            allowed_keys = ['priority_xmin', 'priority_invalidated', 'priority_did_restart']
-        elif state['sub_state'] == 'current_cycle':
-            allowed_keys = ['xmin', 'last_xmin']
-        # Update state
-        for key in allowed_keys:
-            if key in kwargs:
-                if isinstance(kwargs[key], list):
-                    kwargs[key] = f"[{', '.join(kwargs[key])}]"
-                state[key] = str(kwargs[key])
-        self._set_state(self.state_load_indexing, state)
-        return self.get_state(), None
-
     def set_state(self, state_tuple, **kwargs):
         state = self.get_state()
+        state['state_error'] = ''
         if not isinstance(state_tuple, tuple):
             # Invalid State type
             state['state_error'] = f"state, '{str(state_tuple)}', is not a tuple"
             self.dict_set(INDEXER_STATE_TAG, state)
+            return self.get_state(), None
+        elif state_tuple[0] == self.state_waiting[0]:
+            # Waiting in es_index_listener for timeout
+            state['endpoint_start_dt'] = 'tbd'
+            state['endpoint_end_dt'] = self._dt_now()
+            self._set_state(state_tuple, state)
             return self.get_state(), None
         elif not len(state_tuple) == 2:
             # Invalid State len
@@ -344,15 +336,13 @@ class IndexerStore(LocalStoreClient):
             return self.get_state(), None
         elif state_tuple[0] == self.state_endpoint_start[0]:
             # Reset
-            state['endpoint_end'] = 'tbd'
-            state['endpoint_start'] = str(datetime.datetime.utcnow())
-            state['endpoint_start_ts'] = str(int(time.time()))
-            state['state_error'] = 'tbd'
+            state['endpoint_end_dt'] = 'tbd'
+            state['endpoint_start_dt'] = self._dt_now()
             self._set_state(state_tuple, state)
             return self.get_state(), None
         elif state_tuple[0] == self.state_load_indexing[0]:
             # Indexer is checking for uuids to index
-            return self._set_state_load_indexing(**kwargs)
+            pass
         elif state_tuple[0] == self.state_run_indexing[0] and kwargs.get('invalidated_cnt'):
             # Reset event keys
             for event_key in self.event_keys:
@@ -360,24 +350,17 @@ class IndexerStore(LocalStoreClient):
             # Start indexing
             state['event_tag'] = self.get_tag(INDEXER_EVENTS_TAG, num_bytes=_EVENT_TAG_LEN)
             state['invalidated_cnt'] = str(kwargs['invalidated_cnt'])
-            state['start_ts'] = str(int(time.time()))
+            state['start_dt'] = self._dt_now()
             self._start_event(state['event_tag'], state)
             self._set_state(state_tuple, state)
             return self.get_state(), state['event_tag']
         elif state_tuple[0] == self.state_run_indexing[0] and kwargs.get('event_tag'):
             # End indexing
-            state['end_time'] = str(datetime.datetime.utcnow()) 
-            state['end_ts'] = int(time.time())
+            state['end_dt'] = self._dt_now() 
             state['errors_cnt'] = str(kwargs.get('errors_cnt', 0))
-            state['duration'] = _duration_with_unis_str(state['start_ts'], ts_end=state['end_ts'])
             self._end_event(kwargs['event_tag'], state)
             self._set_state(state_tuple, state)
             return self.get_state(), kwargs['event_tag']
-        elif state_tuple[0] == self.state_waiting[0]:
-            # Waiting in es_index_listener for timeout
-            state['endpoint_end'] = str(datetime.datetime.utcnow())
-            self._set_state(state_tuple, state)
-            return self.get_state(), None
         elif state_tuple[0] == self.state_run_indexing[0]:
             # Invalid State
             state['state_error'] = f"{str(state_tuple)} requries additional arguments"
