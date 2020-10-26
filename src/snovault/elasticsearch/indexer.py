@@ -561,6 +561,8 @@ def index(request):
 
     # Load indexing
     output_tuple = _load_indexing(request, session, connection, indexer_state)
+    print('sleeping 20 to check load indexing')
+    time.sleep(20)
     result, invalidated, flush, first_txn, snapshot_id, restart, xmin, return_now = output_tuple
     if return_now:
         indexer_store.set_state(indexer_store.state_waiting)
