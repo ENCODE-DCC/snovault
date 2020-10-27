@@ -1,6 +1,7 @@
 # See http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/resources.html
 import logging
 from collections import Mapping
+from itertools import chain
 from pyramid.decorator import reify
 from pyramid.httpexceptions import HTTPInternalServerError
 from pyramid.security import (
@@ -254,6 +255,18 @@ class Item(Resource):
     @property
     def tid(self):
         return self.model.tid
+
+    @property
+    def embedded_paths(self):
+        return list(
+            chain(
+                self.embedded,
+                (
+                    p.path
+                    for p in self.embedded_with_frame
+                )
+            )
+        )
 
     def links(self, properties):
         return {

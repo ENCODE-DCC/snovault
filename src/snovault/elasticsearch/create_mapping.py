@@ -6,14 +6,12 @@ To load the initial data:
     %(prog)s production.ini
 
 """
-from itertools import chain
 from pyramid.paster import get_app
 from functools import reduce
 from snovault import (
     COLLECTIONS,
     TYPES,
 )
-from snovault.util import Path
 from snovault.schema_utils import combine_schemas
 from .interfaces import (
     ELASTIC_SEARCH,
@@ -418,9 +416,7 @@ def type_mapping(types, item_type, embed=True):
     mapping = schema_mapping(item_type, schema)
     if not embed:
         return mapping
-    for prop in chain(type_info.embedded, type_info.embedded_with_frame):
-        if isinstance(prop, Path):
-            prop = prop.path
+    for prop in type_info.embedded_paths:
         s = schema
         m = mapping
 
