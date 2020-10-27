@@ -256,14 +256,14 @@ class Item(Resource):
     def tid(self):
         return self.model.tid
 
-    @property
-    def embedded_paths(self):
+    @classmethod
+    def embedded_paths(cls):
         return list(
             chain(
-                self.embedded,
+                cls.embedded,
                 (
                     p.path
-                    for p in self.embedded_with_frame
+                    for p in cls.embedded_with_frame
                 )
             )
         )
