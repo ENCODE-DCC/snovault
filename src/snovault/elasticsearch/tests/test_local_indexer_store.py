@@ -1,6 +1,5 @@
 import datetime
 import pytest
-import time
 
 from copy import copy
 from unittest.mock import Mock, patch
@@ -71,10 +70,10 @@ def test_init_indexer_config(app_settings):
         assert state_hash['remote_indexing'] == 'false'
         assert state_hash['state_key'] == INDEXER_STATE_TAG
         # Dynamic
-        assert state_hash['endpoint_end'] == 'unknown'
-        assert state_hash['endpoint_start'] == 'unknown'
+        assert state_hash['endpoint_end_dt'] == 'unknown'
+        assert state_hash['endpoint_start_dt'] == 'unknown'
         assert state_hash['state'] == indexer_store.state_initialized[0]
-        assert state_hash['state_error'] == 'unknown'
+        assert state_hash['state_error'] == ''
         assert state_hash['state_desc'] == indexer_store.state_initialized[1]
         # Event
         for key in IndexerStore.event_keys:
@@ -102,38 +101,57 @@ class TestLocalStore():
         self.local_store = IndexerStore(local_settings)
 
     def test_end_event(self):
+        state = self.local_store.get_state()
+        end_dt = datetime.datetime(1999, 1, 1)
         datetime_mock = Mock(wraps=datetime.datetime)
-        datetime_mock.utcnow.return_value = datetime.datetime(1999, 1, 1)
+        datetime_mock.utcnow.return_value = end_dt
         with patch('datetime.datetime', new=datetime_mock):
-            duration = '4'
-            self.local_store._end_event(self.fake_event_tag, duration)
-            event_duration_tag = f"{self.fake_event_tag}:duration"
-            assert self.local_store.client.get(event_duration_tag) == duration
-            event_end_tag = f"{self.fake_event_tag}:end"
-            assert self.local_store.client.get(event_end_tag), str(datetime.datetime(1999, 1, 1))
+            state['errors_cnt'] = str(39)
+            state['end_dt'] = str(end_dt)
+            self.local_store._end_event(
+                self.fake_event_tag,
+                state,
+            )
+            tag_end_dt = f"{self.fake_event_tag}:end_dt"
+            assert self.local_store.client.get(tag_end_dt) == state['end_dt']
+            tag_errors_cnt = f"{self.fake_event_tag}:errors_cnt"
+            assert self.local_store.client.get(tag_errors_cnt) == state['errors_cnt']
 
     def test_start_event(self):
-        invalidated_cnt = '4'
-        self.local_store._start_event(self.fake_event_tag, invalidated_cnt)
-        event_invalidated_cnt_tag = f"{self.fake_event_tag}:invalidated_cnt"
-        assert self.local_store.client.get(event_invalidated_cnt_tag) == invalidated_cnt
+        state = self.local_store.get_state()
+        state['event_tag'] = self.fake_event_tag
+        state['invalidated_cnt'] ='4' 
+        state['start_dt'] = str(datetime.datetime(1999, 1, 1))
+        self.local_store._start_event(self.fake_event_tag, state)
+        for event_key in self.local_store.event_keys:
+            tag = f"{self.fake_event_tag}:{event_key}"
+            assert self.local_store.client.get(tag) == state[event_key]
         all_keys = self.local_store.client.lrange(INDEXER_EVENTS_LIST, 0, -1)
         assert len(all_keys) == 1
         assert all_keys[0] == self.fake_event_tag
 
-    def test_get_event(self):
-        datetime_mock = Mock(wraps=datetime.datetime)
-        datetime_mock.utcnow.return_value = datetime.datetime(1999, 1, 1)
-        with patch('datetime.datetime', new=datetime_mock):
-            invalidated_cnt = '14'
-            self.local_store._start_event(self.fake_event_tag, invalidated_cnt)
-            duration = '2'
-            self.local_store._end_event(self.fake_event_tag, duration)
-            event_str = self.local_store.get_event(self.fake_event_tag)
-            expected_event_str = f"Indexed '{invalidated_cnt}' uuids in '{duration}' seconds."
-            expected_event_str = f"{expected_event_str} Ended at '{datetime.datetime.utcnow()}'"
-            expected_event_str = f"{self.fake_event_tag}: {expected_event_str}"
-            assert event_str == expected_event_str
+    def test_get_event_msg(self):
+        # expected values
+        end_dt = datetime.datetime.utcnow()
+        start_dt = datetime.datetime.utcnow()
+        errors_cnt = 123
+        invalidated_cnt = 1234
+        duration = self.local_store._duration_with_unis_str(
+            str(start_dt),
+            end_dt=str(end_dt),
+        )
+        # Add to store directly 
+        self.local_store.item_set(self.fake_event_tag + ':end_dt', str(end_dt))
+        self.local_store.item_set(self.fake_event_tag + ':start_dt', str(start_dt))
+        self.local_store.item_set(self.fake_event_tag + ':errors_cnt', str(errors_cnt))
+        self.local_store.item_set(self.fake_event_tag + ':invalidated_cnt', str(invalidated_cnt))
+        expected_event_str = (
+            f"{self.fake_event_tag}: "
+            f"Indexed '{invalidated_cnt}' uuids in '{duration}' "
+            f"with '{errors_cnt}' errors. Ended at '{end_dt}'."
+        )
+        event_str = self.local_store.get_event_msg(self.fake_event_tag)
+        assert event_str == expected_event_str
 
     def test_get_state(self):
         test_dict = {'test': 'testing'}
@@ -151,9 +169,9 @@ class TestLocalStore():
             for key, val in original_state.items():
                 if key not in IndexerStore.dynamic_keys:
                     assert val == new_state[key]
-            assert new_state['endpoint_end'] == 'tbd'
-            assert new_state['endpoint_start'] == str(datetime.datetime(1999, 1, 1))
-            assert new_state['state_error'] == 'tbd'
+            assert new_state['endpoint_end_dt'] == 'tbd'
+            assert new_state['endpoint_start_dt'] == str(datetime.datetime(1999, 1, 1))
+            assert new_state['state_error'] == ''
             assert new_state['state'] == self.local_store.state_endpoint_start[0]
             assert new_state['state_desc'] == self.local_store.state_endpoint_start[1]
 
@@ -170,12 +188,12 @@ class TestLocalStore():
     def test_set_state_run_indexing_start(self):
         invalidated_cnt = 9
         original_state = self.local_store.get_state()
-        time_mock = Mock(wraps=time.time)
-        time_start = time.time()
-        time_mock.return_value = time_start
         new_event_tag = None
         new_state = None
-        with patch('time.time', new=time_mock):
+        start_dt = datetime.datetime(1999, 1, 1)
+        datetime_mock = Mock(wraps=datetime.datetime)
+        datetime_mock.utcnow.return_value = start_dt
+        with patch('datetime.datetime', new=datetime_mock):
             new_state, new_event_tag = self.local_store.set_state(
                 self.local_store.state_run_indexing,
                 invalidated_cnt=invalidated_cnt,
@@ -183,42 +201,41 @@ class TestLocalStore():
             for key in IndexerStore.static_keys:
                 assert original_state[key] == new_state[key]
             
-            assert new_state['endpoint_end'] == original_state['endpoint_end']
-            assert new_state['endpoint_start'] == original_state['endpoint_start']
+            assert new_state['endpoint_end_dt'] == original_state['endpoint_end_dt']
+            assert new_state['endpoint_start_dt'] == original_state['endpoint_start_dt']
             assert new_state['state_error'] == original_state['state_error']
             assert new_state['state'] == self.local_store.state_run_indexing[0]
             assert new_state['state_desc'] == self.local_store.state_run_indexing[1]
             
-            assert new_state['end_time'] == original_state['end_time']
-            assert new_state['errors_cnt'] == original_state['errors_cnt']
+            assert new_state['end_dt'] == 'tbd'
+            assert new_state['errors_cnt'] == 'tbd'
             some_tag = self.local_store.get_tag(INDEXER_EVENTS_TAG, num_bytes=_EVENT_TAG_LEN)
             assert len(new_state['event_tag']) == len(some_tag)
             assert new_state['event_tag'] == new_event_tag
-            assert new_state['duration'] == original_state['duration']
             assert new_state['invalidated_cnt'] == str(invalidated_cnt)
-            assert new_state['start_ts'] == str(int(time_start))
+            assert new_state['start_dt'] == str(start_dt)
 
     def test_set_state_run_indexing_end(self):
         # start event
         invalidated_cnt = 11
-        time_mock = Mock(wraps=time.time)
-        time_start = 30 
-        time_mock.return_value = time_start
         event_tag = None
         original_state = None
-        with patch('time.time', new=time_mock):
+        start_dt = datetime.datetime(1999, 1, 1)
+        datetime_mock = Mock(wraps=datetime.datetime)
+        datetime_mock.utcnow.return_value = start_dt
+        with patch('datetime.datetime', new=datetime_mock):
             original_state, event_tag = self.local_store.set_state(
                 self.local_store.state_run_indexing,
                 invalidated_cnt=invalidated_cnt,
             )
         # end event
         errors_cnt = 3
-        time_mock = Mock(wraps=time.time)
-        time_end= 40
-        time_mock.return_value = time_end
         new_event_tag = None
         new_state = None
-        with patch('time.time', new=time_mock):
+        end_dt = datetime.datetime(1999, 1, 1)
+        datetime_mock = Mock(wraps=datetime.datetime)
+        datetime_mock.utcnow.return_value = end_dt
+        with patch('datetime.datetime', new=datetime_mock):
             new_state, new_event_tag = self.local_store.set_state(
                 self.local_store.state_run_indexing,
                 errors_cnt=errors_cnt,
@@ -229,42 +246,42 @@ class TestLocalStore():
             for key in IndexerStore.dynamic_keys:
                 assert original_state[key] == new_state[key]
             
-            assert isinstance(new_state['end_time'], str)
+            assert isinstance(new_state['end_dt'], str)
             assert new_state['errors_cnt'] == str(errors_cnt)
             assert new_state['event_tag'] == event_tag
-            assert new_state['duration'] == str(time_end - time_start)
             assert new_state['invalidated_cnt'] == original_state['invalidated_cnt']
-            assert new_state['start_ts'] == original_state['start_ts']
+            assert new_state['start_dt'] == original_state['start_dt']
 
     def test_set_state_waiting(self):
+        start_dt = datetime.datetime(1999, 1, 2)
+        end_dt = datetime.datetime(1999, 1, 3)
         # Start endpoint
-        original_state, _ = self.local_store.set_state(self.local_store.state_endpoint_start)
+        _, _ = self.local_store.set_state(self.local_store.state_endpoint_start)
         # Load indexing
         datetime_mock = Mock(wraps=datetime.datetime)
         datetime_mock.utcnow.return_value = datetime.datetime(1999, 1, 1)
         with patch('datetime.datetime', new=datetime_mock):
             self.local_store.set_state(self.local_store.state_load_indexing)
-        # Start Event
-        time_mock = Mock(wraps=time.time)
-        time_start = int(500)
-        time_mock.return_value = time_start
+        # Run Indexing Start
         event_tag = None
-        original_state = None
-        with patch('time.time', new=time_mock):
-            _, event_tag = self.local_store.set_state(
-                self.local_store.state_run_indexing,
-                invalidated_cnt=7,
-            )
-        # End Event
-        time_end = int(700)
-        time_mock.return_value = time_end
-        with patch('time.time', new=time_mock):
+        datetime_mock = Mock(wraps=datetime.datetime)
+        datetime_mock.utcnow.return_value = start_dt
+        with patch('datetime.datetime', new=datetime_mock):
+                _, event_tag = self.local_store.set_state(
+                    self.local_store.state_run_indexing,
+                    invalidated_cnt=7,
+                )
+        # Run Indexing End
+        datetime_mock = Mock(wraps=datetime.datetime)
+        datetime_mock.utcnow.return_value = end_dt
+        with patch('datetime.datetime', new=datetime_mock):
             self.local_store.set_state(self.local_store.state_run_indexing, event_tag=event_tag)
         # Endpoint End
         new_state, _ = self.local_store.set_state(self.local_store.state_waiting)
         # Make sure the last event exists during waiting state
         assert new_state['event_tag'] == event_tag
-        assert new_state['duration'] == str(time_end - time_start)
+        assert new_state['end_dt'] == str(end_dt)
+        assert new_state['start_dt'] == str(start_dt)
         # Check state
         assert new_state['state'] == self.local_store.state_waiting[0]
         assert new_state['state_desc'] == self.local_store.state_waiting[1]
@@ -283,22 +300,6 @@ class TestLocalStore():
 
         bad_state = IndexerStore
         expected_state_error = f"state, '{str(bad_state)}', is not a tuple"
-        state, _ = self.local_store.set_state(bad_state)
-        assert state['state_error'] == expected_state_error
-
-    def test_set_state_error_len(self):
-        bad_state = tuple()
-        expected_state_error = f"state, {bad_state}, is wrong length"
-        state, _ = self.local_store.set_state(bad_state)
-        assert state['state_error'] == expected_state_error
-
-        bad_state = tuple(['a'])
-        expected_state_error = f"state, {bad_state}, is wrong length"
-        state, _ = self.local_store.set_state(bad_state)
-        assert state['state_error'] == expected_state_error
-
-        bad_state = tuple(['a', 'b', 'c'])
-        expected_state_error = f"state, {bad_state}, is wrong length"
         state, _ = self.local_store.set_state(bad_state)
         assert state['state_error'] == expected_state_error
 

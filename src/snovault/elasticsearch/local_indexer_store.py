@@ -117,14 +117,20 @@ def indexer_store_state_split(request):
             IndexerStore.state_load_indexing[0],
     ]:
         event_key = 'previous_event'
-        duration = indexer_store._duration_with_unis_str(state_obj['start_dt'], ts_end=state_obj['end_dt'])
+        duration = indexer_store._duration_with_unis_str(
+            state_obj['start_dt'],
+            end_dt=state_obj['end_dt']
+        )
     elif current_state == IndexerStore.state_run_indexing[0]:
         if state_obj['end_dt'] == 'tbd':
             event_key = 'current_event'
             duration = indexer_store._duration_with_unis_str(state_obj['start_dt'])
         else:
             event_key = 'previous_event'
-            duration = indexer_store._duration_with_unis_str(state_obj['start_dt'], ts_end=state_obj['end_dt'])
+            duration = indexer_store._duration_with_unis_str(
+                state_obj['start_dt'],
+                end_dt=state_obj['end_dt']
+            )
     # Add current or previous run event keys
     if event_key:
         result[event_key] = {}
@@ -197,7 +203,6 @@ class IndexerStore(LocalStoreClient):
         'state_error',
     ]
     event_keys = [
-        'duration',
         'end_dt',
         'errors_cnt',
         'event_tag',
@@ -276,6 +281,7 @@ class IndexerStore(LocalStoreClient):
             init_state[key] = 'unknown'
         init_state['state'] = self.state_initialized[0]
         init_state['state_desc'] = self.state_initialized[1]
+        init_state['state_error'] = ''
         # Run event
         for key in self.event_keys:
             init_state[key] = 'unknown'
@@ -285,10 +291,8 @@ class IndexerStore(LocalStoreClient):
         '''Close event with only certain event keys in state.  Also add human readable date time'''
         for event_key in ['end_dt', 'errors_cnt']:
             self.item_set(f"{event_tag}:{event_key}",  state[event_key])
-        self.item_set(f"{event_tag}:end",  str(datetime.datetime.utcnow()))
     
     def _start_event(self, event_tag, state):
-        print(state)
         '''Create new event with info from state in events keys'''
         self.list_add(INDEXER_EVENTS_LIST, event_tag)
         for event_key in self.event_keys:
@@ -299,9 +303,9 @@ class IndexerStore(LocalStoreClient):
         start_dt = str(self.item_get(event_tag + ':start_dt'))
         errors_cnt = str(self.item_get(event_tag + ':errors_cnt'))
         invalidated_cnt = str(self.item_get(event_tag + ':invalidated_cnt'))
-        duration = self._duration_with_unis_str(start_dt, end=end_dt)
+        duration = self._duration_with_unis_str(start_dt, end_dt=end_dt)
         msg = (
-            f"Indexed '{invalidated_cnt}' uuids in '{duration}'"
+            f"Indexed '{invalidated_cnt}' uuids in '{duration}' "
             f"with '{errors_cnt}' errors. Ended at '{end_dt}'."
         )
         return f"{event_tag}: {msg}"
@@ -342,7 +346,8 @@ class IndexerStore(LocalStoreClient):
             return self.get_state(), None
         elif state_tuple[0] == self.state_load_indexing[0]:
             # Indexer is checking for uuids to index
-            pass
+            self._set_state(state_tuple, state)
+            return self.get_state(), None
         elif state_tuple[0] == self.state_run_indexing[0] and kwargs.get('invalidated_cnt'):
             # Reset event keys
             for event_key in self.event_keys:
