@@ -223,3 +223,14 @@ def posted_targets_and_sources(testapp, targets, sources):
     url = '/testing-link-sources/'
     for item in sources:
         testapp.post_json(url, item, status=201)
+
+
+@pytest.fixture
+def posted_custom_embed_targets_and_sources(testapp, targets, sources):
+    url = '/testing-custom-embed-targets/'
+    for item in targets:
+        testapp.post_json(url, item, status=201)
+
+    url = '/testing-custom-embed-sources/'
+    for item in sources:
+        testapp.post_json(url, item, status=201)

@@ -416,7 +416,7 @@ def type_mapping(types, item_type, embed=True):
     mapping = schema_mapping(item_type, schema)
     if not embed:
         return mapping
-    for prop in type_info.embedded:
+    for prop in type_info.embedded_paths:
         s = schema
         m = mapping
 

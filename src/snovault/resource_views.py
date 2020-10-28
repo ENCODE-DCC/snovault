@@ -25,6 +25,8 @@ from snovault.elasticsearch.searches.parsers import QueryString
 from snovault.elasticsearch.searches.responses import FieldedResponse
 from .calculated import calculate_properties
 from .calculated import calculate_select_properties
+from .calculated import calculate_filtered_properties
+from .calculated import _should_render_property
 from .etag import etag_tid
 from .interfaces import CONNECTION
 from .elasticsearch.interfaces import ELASTIC_SEARCH
@@ -237,6 +239,40 @@ def item_view_object_with_select_calculated_properties(context, request):
     return properties
 
 
+@view_config(
+    context=Item,
+    permission='view',
+    request_method='GET',
+    name='filtered_object'
+)
+def item_view_filtered_object(context, request):
+    properties = item_links(context, request)
+    qs = QueryString(request)
+    include = qs.param_values_to_list(
+        params=qs.get_key_filters(
+            key='include'
+        )
+    ) or None
+    exclude = qs.param_values_to_list(
+        params=qs.get_key_filters(
+            key='exclude'
+        )
+    ) or None
+    calculated = calculate_filtered_properties(
+        context,
+        request,
+        ns=properties,
+        include=include,
+        exclude=exclude,
+    )
+    properties.update(calculated)
+    return {
+        k: v
+        for k, v in properties.items()
+        if _should_render_property(include, exclude, k)
+    }
+
+
 @view_config(context=Item, permission='view', request_method='GET',
              name='embedded')
 def item_view_embedded(context, request):
@@ -244,6 +280,8 @@ def item_view_embedded(context, request):
     properties = request.embed(item_path, '@@object')
     for path in context.embedded:
         expand_path(request, properties, path)
+    for path in context.embedded_with_frame:
+        path.expand(request, properties)
     return properties
 
 

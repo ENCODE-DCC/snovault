@@ -54,6 +54,8 @@ class TypeInfo(AbstractTypeInfo):
         self.factory = factory
         self.base_types = factory.base_types
         self.embedded = factory.embedded
+        self.embedded_with_frame = factory.embedded_with_frame
+        self.embedded_paths = factory.embedded_paths()
 
     @reify
     def calculated_properties(self):

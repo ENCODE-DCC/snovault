@@ -249,6 +249,8 @@ def test_searches_queries_abstract_query_factory_get_subtypes_for_item_type(para
     subtypes = aq._get_subtypes_for_item_type('Item')
     assert sorted(subtypes) == sorted([
         'TestingServerDefault',
+        'TestingCustomEmbedSource',
+        'TestingCustomEmbedTarget',
         'TestingPostPutPatch',
         'TestingDependencies',
         'TestingLinkTarget',

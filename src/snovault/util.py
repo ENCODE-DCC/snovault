@@ -1,6 +1,7 @@
 from past.builtins import basestring
 from pyramid.threadlocal import manager as threadlocal_manager
 from snovault.interfaces import ROOT
+from urllib.parse import urlencode
 
 
 def includeme(config):
@@ -142,3 +143,47 @@ def ensure_list_and_filter_none(values):
 def take_one_or_return_none(values):
     if isinstance(values, list) and len(values) == 1:
         return values[0]
+
+
+class Path:
+
+    FILTER_FRAME = '@@filtered_object'
+
+    def __init__(self, path, frame='@@object', include=None, exclude=None):
+        self.path = path
+        self._frame = frame
+        self._params = {
+            'include': include or [],
+            'exclude': exclude or [],
+        }
+        self.frame = self._build_frame()
+
+    def _build_frame(self):
+        qs = urlencode(self._params, doseq=True)
+        if qs:
+            return f'{self.FILTER_FRAME}?{qs}'
+        return self._frame
+
+    def expand_path_with_frame(self, request, properties, path, frame):
+        # Modified from snovault.util.expand_path.
+        if isinstance(path, basestring):
+             path = path.split('.')
+        if not path:
+            return
+        name = path[0]
+        remaining = path[1:]
+        value = properties.get(name, None)
+        if value is None:
+            return
+        if isinstance(value, list):
+            for index, member in enumerate(value):
+                if not isinstance(member, dict):
+                    member = value[index] = request.embed(member, frame)
+                self.expand_path_with_frame(request, member, remaining, frame)
+        else:
+            if not isinstance(value, dict):
+                value = properties[name] = request.embed(value, frame)
+            self.expand_path_with_frame(request, value, remaining, frame)
+
+    def expand(self, request, properties):
+        self.expand_path_with_frame(request, properties, self.path, self.frame)
