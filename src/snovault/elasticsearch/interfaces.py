@@ -9,6 +9,8 @@ INDEXER_STORE = f"{INDEXER}_store"
 INDEXER_STATE_TAG = f"{INDEXER}_state:hash"
 INDEXER_EVENTS_TAG = f"{INDEXER}_event"
 INDEXER_EVENTS_LIST = f"{INDEXER_EVENTS_TAG}:list"
+INDEXER_REINDEX_TAG = f"{INDEXER}_reindex:hash"
+INDEXER_REINDEX_UUIDS_LIST = f"{INDEXER}_reindex_uuids:list"
 RESOURCES_INDEX = 'snovault-resources'
 
 

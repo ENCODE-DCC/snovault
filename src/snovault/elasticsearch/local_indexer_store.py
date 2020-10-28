@@ -1,3 +1,4 @@
+import copy
 import datetime
 import re
 import time
@@ -9,11 +10,21 @@ from snovault.local_storage import (
     base_result,
 )
 from snovault.elasticsearch.interfaces import (
+    ELASTIC_SEARCH,
     INDEXER,
     INDEXER_STORE,
     INDEXER_STATE_TAG,
     INDEXER_EVENTS_TAG,
     INDEXER_EVENTS_LIST,
+    INDEXER_REINDEX_TAG,
+    INDEXER_REINDEX_UUIDS_LIST,
+)
+from snovault.elasticsearch.indexer_state import all_uuids
+
+from snovault.elasticsearch.esstorage import (
+    MAX_CLAUSES_FOR_ES,
+    SEARCH_MAX,
+    get_related_uuids,
 )
 
 
@@ -27,7 +38,6 @@ def includeme(config):
     config.scan(__name__)
     config.add_route('indexer_store', '/indexer_store')
     config.registry[INDEXER_STORE] = IndexerStore(config.registry.settings)
-
 
 
 @view_config(route_name='indexer_store', request_method='GET', request_param='events')
@@ -143,6 +153,71 @@ def indexer_store_state_split(request):
     return result
 
 
+def _indexer_store_reindex(indexer_store, request_argument, primary_override=False):
+    elastic_search = indexer_store.elastic_search
+    registry_collections = indexer_store.registry_collections
+    reindex_hash = indexer_store.get_reindex()
+    updated = None
+    related_set = set()
+    related_set_total = 0
+    updated = []
+    status = 'Failed'
+    status_msg = 'Could not set reindex'
+    if reindex_hash.get('invalidated_cnt'):
+        status = 'Failed'
+        status_msg = 'Reindex already queued'
+    elif request_argument == 'all':
+        updated = set(all_uuids(registry_collections))
+        status = 'Queued'
+        status_msg = "Reindex 'all'"
+    else:
+        updated = {
+            uuid
+            for uuid in str(uuids).split(',')
+        }
+        if uuids > SEARCH_MAX:
+            updated = set(all_uuids(registry_collections))
+            status = 'Queued'
+            status_msg = "Reindex {len(uuids)}>{SEARCH_MAX} triggered 'all'"
+        else:
+            related_set, related_set_total = get_related_uuids(
+                elastic_search,
+                updated,
+                [],
+                search_max=SEARCH_MAX,
+            )
+            status = 'Queued'
+            status_msg = "Reindex {len(updated)} uuids with {related_set_total} related"
+    _reindex_hash = copy.copy(indexer_store._reindex_hash)
+    if updated:
+        _reindex_hash['updated_cnt'] = len(updated)
+        _reindex_hash['updated'] = f"[{','.join(list(updated))[0:100]}]"
+        if related_set:
+            _reindex_hash['related_cnt'] = related_set_total
+            _reindex_hash['related'] = f"[{','.join(list(related_set))[0:100]}]"
+        invalidated = updated | related_set
+        _reindex_hash['invalidated_cnt'] = len(invalidated)
+        _reindex_hash['updated'] = f"[{','.join(list(updated))[0:100]}]"
+        indexer_store.set_reindex(_reindex_hash, invalidated)
+    return status, status_msg
+
+
+@view_config(route_name='indexer_store', request_method='GET', request_param='reindex')
+def indexer_store_reindex(request):
+    '''Request a reindex of uuids'''
+    result = {
+        'status': 'Success',
+        'status_msg': 'get reindex hash okay',
+    }
+    if request.params.get('reindex'):
+        result['status'], result['status_msg'] = _indexer_store_reindex(
+            request.registry[INDEXER_STORE],
+            request.params.get("reindex"),
+        )
+    result['reindex_hash'] = request.registry[INDEXER_STORE].get_reindex()
+    return result
+
+
 @view_config(route_name='indexer_store', request_method='GET')
 def indexer_store_state(request):
     '''Minimal view for current state and additional info if running'''
@@ -220,10 +295,19 @@ class IndexerStore(LocalStoreClient):
         'event_errors_cnt',
         'event_tag',
         'event_invalidated_cnt',
+        'event_invalidated',
         'event_start_dt',
     ]
-    
-    def __init__(self, settings):
+    _reindex_hash = {
+        'invalidated_cnt': '',
+        'related_set': '',
+        'related_set_total': '',
+        'last_update_dt': '',
+    }
+
+    def __init__(self, elastic_search, registry_collections, settings):
+        self.elastic_search = elastic_search
+        self.registry_collections = registry_collections
         super().__init__(
             db_index=settings['local_storage_redis_index'],
             host=settings['local_storage_host'],
@@ -233,6 +317,7 @@ class IndexerStore(LocalStoreClient):
         )
         if settings.get('config_name', 'no name') == IndexerStore.config_name:
             # only the indexer process should set these attributes and initialize this store 
+            self.dict_set(INDEXER_REINDEX_TAG, self._reindex_hash)
             self.pg_ip = str(settings.get('pg_ip', 'localhost'))
             self.remote_indexing = str(settings.get('remote_indexing', 'false'))
             self.loop_time = str(settings.get('timeout', 'unknown'))
@@ -310,7 +395,6 @@ class IndexerStore(LocalStoreClient):
         self.item_set(f"{event_tag}:end",  str(datetime.datetime.utcnow()))
     
     def _start_event(self, event_tag, state):
-        print(state)
         '''Create new event with info from state in events keys'''
         self.list_add(INDEXER_EVENTS_LIST, event_tag)
         for event_key in self.event_keys:
@@ -327,6 +411,21 @@ class IndexerStore(LocalStoreClient):
             f"with '{errors_cnt}' errors. Ended at '{end_dt}'."
         )
         return f"{event_tag}: {msg}"
+
+    def get_reindex(self):
+        return self.dict_get(INDEXER_REINDEX_TAG)
+
+    def set_reindex(self, reindex_hash, invalidated):
+        _reindex_hash = {
+            'last_update_dt': self._dt_now(),
+        }
+        for key, val in reindex_hash.items():
+            if key in self._reindex_hash:
+                _reindex_hash[key] = val
+        for uuid in reversed(list(invalidated)):
+            # List add is LIFO
+            self.list_add(INDEXER_REINDEX_UUIDS_LIST, uuid)
+        self.dict_set(INDEXER_REINDEX_TAG, _reindex_hash)
 
     def get_state(self):
         return self.dict_get(INDEXER_STATE_TAG)
@@ -368,13 +467,17 @@ class IndexerStore(LocalStoreClient):
             state['load_end_dt'] = self._dt_now()
             self._set_state(state_tuple, state, start_dt=self._dt_now())
             return self.get_state(), None
-        elif state_tuple[0] == self.state_run_indexing[0] and kwargs.get('invalidated_cnt'):
+        elif state_tuple[0] == self.state_run_indexing[0] and 'invalidated' in kwargs:
+            result['status'], result['status_msg'] = _indexer_store_reindex(
+                self,
+                kwargs['invalidated'],
+            )
             # Reset event keys
             for event_key in self.event_keys:
                 state[event_key] = 'tbd'
             # Start indexing
             state['event_tag'] = self.get_tag(INDEXER_EVENTS_TAG, num_bytes=_EVENT_TAG_LEN)
-            state['event_invalidated_cnt'] = str(kwargs['invalidated_cnt'])
+            state['event_invalidated_cnt'] = str(len(kwargs['invalidated']))
             state['event_start_dt'] = self._dt_now()
             self._start_event(state['event_tag'], state)
             self._set_state(state_tuple, state, start_dt=self._dt_now())

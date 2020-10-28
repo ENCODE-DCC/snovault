@@ -70,6 +70,25 @@ baked_query_unique_key = bakery(
 )
 
 
+def get_transactions(session, last_xmin):
+    txns = session.query(TransactionRecord).filter(TransactionRecord.xid >= last_xmin)
+    updated = set()
+    renamed = set()
+    first_txn = None
+    txn_count = 0
+    max_xid = None
+    for txn in txns.all():
+        txn_count += 1
+        max_xid = max(max_xid, txn.xid)
+        if first_txn is None:
+            first_txn = txn.timestamp
+        else:
+            first_txn = min(first_txn, txn.timestamp)
+        renamed.update(txn.data.get('renamed', ()))
+        updated.update(txn.data.get('updated', ()))
+    return updated, renamed, first_txn, txn_count, max_xid
+
+
 class RDBStorage(object):
     batchsize = 1000
 
