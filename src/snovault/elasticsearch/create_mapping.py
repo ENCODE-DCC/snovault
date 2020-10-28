@@ -85,16 +85,10 @@ def schema_mapping(name, schema, depth=0, parent=None):
             mapping = schema_mapping(k, v, depth=depth + 1)
             if mapping is not None:
                 properties[k] = mapping
-        if properties:
-            return {
-                'type': 'object',
-                'properties': properties,
-            }
-        else:
-            return {
-                'type': 'object',
-                'enabled': False
-            }
+        return {
+            'type': 'object',
+            'properties': properties,
+        }
 
     if type_ == ["number", "string"]:
         return {
