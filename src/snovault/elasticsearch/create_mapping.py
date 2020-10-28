@@ -45,9 +45,6 @@ META_MAPPING = {
 }
 
 
-PATH_FIELDS = ['submitted_file_name']
-NON_SUBSTRING_FIELDS = ['uuid', '@id', 'submitted_by', 'md5sum',
-                        'references', 'submitted_file_name']
 TEXT_FIELDS = ['pipeline_error_detail', 'description', 'notes']
 
 
@@ -59,7 +56,7 @@ def sorted_dict(d):
     return json.loads(json.dumps(d), object_pairs_hook=sorted_pairs_hook)
 
 
-def schema_mapping(name, schema, depth=0, parent=None):
+def schema_mapping(name, schema):
     # If a mapping is explicitly defined, use it
     if 'mapping' in schema:
         return schema['mapping']
@@ -73,16 +70,12 @@ def schema_mapping(name, schema, depth=0, parent=None):
 
     # Elasticsearch handles multiple values for a field
     if type_ == 'array':
-        return schema_mapping(
-            name,
-            schema['items'],
-            depth=depth + 1,
-            parent=type_)
+        return schema_mapping(name, schema['items'])
 
     if type_ == 'object':
         properties = {}
         for k, v in schema.get('properties', {}).items():
-            mapping = schema_mapping(k, v, depth=depth + 1)
+            mapping = schema_mapping(k, v)
             if mapping is not None:
                 properties[k] = mapping
         return {
@@ -126,12 +119,6 @@ def schema_mapping(name, schema, depth=0, parent=None):
         sub_mapping = {
             'type': field_type
         }
-
-        if name not in NON_SUBSTRING_FIELDS:
-            if depth == 1 or (depth == 2 and parent == 'array'):
-                sub_mapping.update({
-                    'copy_to': '_all'
-                })
 
         return sub_mapping
 
@@ -286,6 +273,7 @@ def es_mapping(mapping):
                     'match_mapping_type': "string",
                     'mapping': {
                         'type': 'keyword',
+                        'copy_to': '_all'
                     },
                 },
             },
@@ -295,6 +283,7 @@ def es_mapping(mapping):
                     'match_mapping_type': "string",
                     'mapping': {
                         'type': 'keyword',
+                        'copy_to': '_all'
                     },
                 },
             },
@@ -436,7 +425,7 @@ def type_mapping(types, item_type, embed=True):
             # Check if mapping for property is already an object
             # multiple subobjects may be embedded, so be carful here
             if m['properties'][p]['type'] in ['keyword', 'text']:
-                m['properties'][p] = schema_mapping(p, s, depth=1)
+                m['properties'][p] = schema_mapping(p, s)
 
             m = m['properties'][p]
 
