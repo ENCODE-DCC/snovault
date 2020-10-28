@@ -17,20 +17,25 @@ from snovault import (
     DBSESSION,
     STORAGE
 )
-from snovault.storage import (
-    TransactionRecord,
+from snovault.storage import get_transactions
+from snovault.elasticsearch.local_indexer_store import IndexerStore
+from snovault.elasticsearch.esstorage import (
+    MAX_CLAUSES_FOR_ES,
+    SEARCH_MAX,
+    get_related_uuids,
 )
+
 from urllib3.exceptions import ReadTimeoutError
 from .interfaces import (
     ELASTIC_SEARCH,
     INDEXER,
+    INDEXER_STORE,
     RESOURCES_INDEX,
 )
 from .indexer_state import (
     IndexerState,
     all_uuids,
     all_types,
-    SEARCH_MAX,
     setup_indexing_nodes,
     HEAD_NODE_INDEX,
     INDEXING_NODE_INDEX,
@@ -49,7 +54,6 @@ import requests
 es_logger = logging.getLogger("elasticsearch")
 es_logger.setLevel(logging.ERROR)
 log = logging.getLogger('snovault.elasticsearch.es_index_listener')
-MAX_CLAUSES_FOR_ES = 8192
 DEFAULT_QUEUE = 'Simple'
 # Allow three minutes for indexer to stop before head indexer process continues
 _REMOTE_INDEXING_SHUTDOWN_SLEEP = 3*60
@@ -90,74 +94,13 @@ def includeme(config):
         _update_for_uuid_queues(registry)
         if not processes:
             registry[INDEXER] = Indexer(registry)
-
-
-def get_related_uuids(request, es, updated, renamed):
-    '''Returns (set of uuids, False) or (list of all uuids, True) if full reindex triggered'''
-
-    updated_count = len(updated)
-    renamed_count = len(renamed)
-    if (updated_count + renamed_count) > MAX_CLAUSES_FOR_ES:
-        return (list(all_uuids(request.registry)), True)  # guaranteed unique
-    elif (updated_count + renamed_count) == 0:
-        return (set(), False)
-
-    es.indices.refresh(RESOURCES_INDEX)
-
-    # TODO: batching may allow us to drive a partial reindexing much greater than 99999
-    #BATCH_COUNT = 100  # NOTE: 100 random uuids returned > 99999 results!
-    #beg = 0
-    #end = BATCH_COUNT
-    #related_set = set()
-    #updated_list = list(updated)  # Must be lists
-    #renamed_list = list(renamed)
-    #while updated_count > beg or renamed_count > beg:
-    #    if updated_count > end or beg > 0:
-    #        log.error('Indexer looking for related uuids by BATCH[%d,%d]' % (beg, end))
-    #
-    #    updated = []
-    #    if updated_count > beg:
-    #        updated = updated_list[beg:end]
-    #    renamed = []
-    #    if renamed_count > beg:
-    #        renamed = renamed_list[beg:end]
-    #
-    #     search ...
-    #     accumulate...
-    #
-    #    beg += BATCH_COUNT
-    #    end += BATCH_COUNT
-
-    query = {
-        'query': {
-            'bool': {
-                'should': [
-                    {
-                        'terms': {
-                            'embedded_uuids': updated,
-                            '_cache': False,
-                        },
-                    },
-                    {
-                        'terms': {
-                            'linked_uuids': renamed,
-                            '_cache': False,
-                        },
-                    },
-                ],
-            },
-        },
-        '_source': False,
-    }
-    res = es.search(index=RESOURCES_INDEX, size=SEARCH_MAX, request_timeout=60, body=query)
-
-    if res['hits']['total'] > SEARCH_MAX:
-        return (list(all_uuids(request.registry)), True)  # guaranteed unique
-
-    related_set = {hit['_id'] for hit in res['hits']['hits']}
-
-    return (related_set, False)
-
+        if not registry.get(INDEXER_STORE):
+            registry[INDEXER_STORE] = IndexerStore(
+                registry[ELASTIC_SEARCH],
+                registry[COLLECTIONS],
+                config.registry.settings,
+            )
+        
 
 def _determine_indexing_protocol(request, uuid_count):
     remote_indexing = asbool(request.registry.settings.get('remote_indexing', False))
@@ -336,6 +279,8 @@ def _get_nodes(request, indexer_state):
 
 @view_config(route_name='index', request_method='POST', permission="index")
 def index(request):
+    indexer_store = request.registry[INDEXER_STORE]
+    indexer_store.set_state(indexer_store.state_endpoint_start)
     # Setting request.datastore here only works because routed views are not traversed.
     request.datastore = 'database'
     session = request.registry[DBSESSION]()
@@ -368,17 +313,24 @@ def index(request):
     def _load_indexing(request, session, connection, indexer_state):
         first_txn = None
         snapshot_id = None
-        (xmin, invalidated, restart) = indexer_state.priority_cycle(request)
+        last_xmin = None
+        (xmin, priority_invalidated, restart) = indexer_state.priority_cycle(request)
         indexer_state.log_reindex_init_state()
         # OPTIONAL: restart support
         if restart:  # Currently not bothering with restart!!!
             xmin = -1
-            invalidated = []
+            priority_invalidated = []
         # OPTIONAL: restart support
+        
+        # Initialize load state
+        indexer_store.set_state(
+            indexer_store.state_load_indexing,
+            priority_invalidated=priority_invalidated
+        )
 
         result = indexer_state.get_initial_state()  # get after checking priority!
 
-        if xmin == -1 or len(invalidated) == 0:
+        if xmin == -1 or len(priority_invalidated) == 0:
             xmin = get_current_xmin(request)
 
             last_xmin = None
@@ -404,7 +356,15 @@ def index(request):
                 last_xmin=last_xmin,
             )
 
-        if len(invalidated) > SEARCH_MAX:  # Priority cycle already set up
+        invalidated = set()
+        raw_updated = set()
+        raw_renamed = set()
+        raw_related_set = set()
+        related_set_total = 0
+        max_xid = 0
+        txn_count = 0
+        if len(priority_invalidated) > SEARCH_MAX:  # Priority cycle already set up
+            invalidated = priority_invalidated
             flush = True
         else:
 
@@ -414,25 +374,10 @@ def index(request):
                 invalidated = list(all_uuids(request.registry, types))
                 flush = True
             else:
-                txns = session.query(TransactionRecord).filter(
-                    TransactionRecord.xid >= last_xmin,
-                )
-
-                invalidated = set(invalidated)  # not empty if API index request occurred
-                updated = set()
-                renamed = set()
-                max_xid = 0
-                txn_count = 0
-                for txn in txns.all():
-                    txn_count += 1
-                    max_xid = max(max_xid, txn.xid)
-                    if first_txn is None:
-                        first_txn = txn.timestamp
-                    else:
-                        first_txn = min(first_txn, txn.timestamp)
-                    renamed.update(txn.data.get('renamed', ()))
-                    updated.update(txn.data.get('updated', ()))
-
+                invalidated = set(priority_invalidated)  # not empty if API index request occurred
+                updated, renamed, first_txn, txn_count, max_xid = get_transactions(session, last_xmin)
+                raw_updated = copy.copy(renamed)
+                raw_renamed = copy.copy(updated)
                 if invalidated:        # reindex requested, treat like updated
                     updated |= invalidated
 
@@ -440,15 +385,43 @@ def index(request):
                 if txn_count == 0 and len(invalidated) == 0:
                     indexer_state.send_notices()
                     return_now = True
+                    # Nothing to do
+                    indexer_store.set_state(
+                        indexer_store.state_load_indexing,
+                        first_txn=first_txn,
+                        snapshot_id=snapshot_id,
+                        xim=xmin,
+                        last_xmin=last_xmin,
+                        txn_count=txn_count,
+                        updated=raw_updated,
+                        renamed=raw_renamed,
+                        related_set=raw_related_set,
+                    )
                     return result, return_now, flush, invalidated, first_txn, snapshot_id, restart, xmin
 
                 is_testing = asbool(request.registry.settings.get('testing', False))
                 is_testing_full = request.json.get('is_testing_full', False)
+                full_reindex = False
+                related_set = set()
                 if is_testing and is_testing_full:
-                    full_reindex = False
                     related_set = set(all_uuids(request.registry))
                 else:
-                    (related_set, full_reindex) = get_related_uuids(request, request.registry[ELASTIC_SEARCH], updated, renamed)
+                    updated_count = len(updated)
+                    renamed_count = len(renamed)
+                    if (updated_count + renamed_count) > MAX_CLAUSES_FOR_ES:
+                        related_set = list(all_uuids(request.registry))
+                        full_reindex = True
+                    elif updated_count + renamed_count > 0:
+                        related_set, related_set_total = get_related_uuids(
+                            request.registry[ELASTIC_SEARCH],
+                            updated,
+                            renamed,
+                            search_max=SEARCH_MAX,
+                        )
+                        raw_related_set = copy.copy(related_set)
+                        if related_set_total > SEARCH_MAX:
+                            related_set = list(all_uuids(request.registry))
+                            full_reindex = True
                 if full_reindex:
                     invalidated = related_set
                     flush = True
@@ -472,6 +445,18 @@ def index(request):
                     if snapshot_id is None and not request.json.get('recovery', False):
                         snapshot_id = connection.execute('SELECT pg_export_snapshot();').scalar()
         return_now = False
+        indexer_store.set_state(
+            indexer_store.state_load_indexing,
+            first_txn=first_txn,
+            snapshot_id=snapshot_id,
+            xim=xmin,
+            last_xmin=last_xmin,
+            txn_count=txn_count,
+            updated=raw_updated,
+            renamed=raw_renamed,
+            related_set=raw_related_set,
+            related_set_total=related_set_total,
+        )
         return result, invalidated, flush, first_txn, snapshot_id, restart, xmin, return_now
 
 
@@ -493,13 +478,23 @@ def index(request):
         result = indexer_state.start_cycle(invalidated, result)
 
         # Do the work...
+        local_state, event_tag = indexer_store.set_state(
+            indexer_store.state_run_indexing,
+            invalidated,
 
+        )
         indexing_update_infos, errors, err_msg = request.registry[INDEXER].serve_objects(
             request,
+            indexer_store,
             invalidated,
             xmin,
             snapshot_id=snapshot_id,
             restart=restart,
+        )
+        indexer_store.set_state(
+            indexer_store.state_run_indexing,
+            errors_cnt=len(errors),
+            event_tag=event_tag,
         )
         if err_msg:
             log.warning('Could not start indexing: %s', err_msg)
@@ -542,8 +537,11 @@ def index(request):
 
     # Load indexing
     output_tuple = _load_indexing(request, session, connection, indexer_state)
+    print('sleeping 20 to check load indexing')
+    time.sleep(20)
     result, invalidated, flush, first_txn, snapshot_id, restart, xmin, return_now = output_tuple
     if return_now:
+        indexer_store.set_state(indexer_store.state_waiting)
         return result
     indexing_update_infos = []
     dry_run = request.json.get('dry_run', False)
@@ -625,6 +623,7 @@ def index(request):
         #  opposed to in the indexer or just after serve_objects,
         #  so a crash in logging does not interupt indexing complietion
         request.registry[INDEXER].check_log_indexing_times(indexing_update_infos)
+    indexer_store.set_state(indexer_store.state_waiting)
     return result
 
 

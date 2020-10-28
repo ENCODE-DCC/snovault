@@ -68,6 +68,7 @@ def includeme(config):
     config.include('.crud_views')
     config.include('.indexing_views')
     config.include('.resource_views')
+    config.include('.elasticsearch.local_indexer_store')
 
 
 def main(global_config, **local_config):

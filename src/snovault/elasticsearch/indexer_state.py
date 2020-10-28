@@ -33,10 +33,11 @@ import re
 import boto3
 import socket
 
+from snovault.elasticsearch.esstorage import SEARCH_MAX
+
 
 AWS_REGION = 'us-west-2'
 _HOSTNAME = socket.gethostname()
-SEARCH_MAX = 99999  # OutOfMemoryError if too high
 HEAD_NODE_INDEX = 'head_node'
 INDEXING_NODE_INDEX = 'indexing_node'
 

@@ -42,6 +42,7 @@ def includeme(config):
 
     config.include('.indexer')
     config.include('.indexer_state')
+    config.include('.local_indexer_store')
     if asbool(settings.get('indexer')) and not PY2:
         config.include('.mpindexer')
 

@@ -9,7 +9,8 @@ from .interfaces import (
 )
 
 
-SEARCH_MAX = (2 ** 31) - 1
+SEARCH_MAX = 99999  # OutOfMemoryError if too high
+MAX_CLAUSES_FOR_ES = 8192
 
 
 def includeme(config):
@@ -19,6 +20,36 @@ def includeme(config):
     es_index = RESOURCES_INDEX
     wrapped_storage = registry[STORAGE]
     registry[STORAGE] = PickStorage(ElasticSearchStorage(es, es_index), wrapped_storage)
+
+
+def get_related_uuids(es, updated, renamed, search_max=SEARCH_MAX):
+    '''Returns releated set from elasticserach'''
+    es.indices.refresh(RESOURCES_INDEX)
+    query = {
+        'query': {
+            'bool': {
+                'should': [
+                    {
+                        'terms': {
+                            'embedded_uuids': updated,
+                            '_cache': False,
+                        },
+                    },
+                    {
+                        'terms': {
+                            'linked_uuids': renamed,
+                            '_cache': False,
+                        },
+                    },
+                ],
+            },
+        },
+        '_source': False,
+    }
+    res = es.search(index=RESOURCES_INDEX, size=search_max, request_timeout=60, body=query)
+    total_hits = res['hits']['total']
+    related_set = {hit['_id'] for hit in res['hits']['hits']}
+    return related_set, total_hits
 
 
 def force_database_for_request():
