@@ -54,7 +54,7 @@ SnoVault JSON-LD Database Framework
 
 1. Brew dependencies
     ```
-    $ brew install libmagic nginx graphviz
+    $ brew install libmagic nginx graphviz redis
     ```
 
 1. Chrome driver for Testing
