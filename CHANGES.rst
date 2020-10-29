@@ -1,6 +1,13 @@
 Changes
 =======
 
+Snovault 1.0.51 (released) encoded v109.0
+-----------------------------------------
+1. SNO-174-add-local-storage-redis (#299)
+2. SNO-176-invalidate-object-when-unlinked (#303)
+3. SNO-177-add-view-with-specified-fields (#300)
+4. SNO-178-fix-indexer-test (#304)
+
 Snovault 1.0.50 (released) encoded v108.0
 -----------------------------------------
 1. SNO-168-stream-heterogeneous-uuids  (#292)
