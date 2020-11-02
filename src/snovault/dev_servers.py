@@ -60,6 +60,13 @@ def main():
     parser.add_argument('--init', action="store_true", help="Init database")
     parser.add_argument('--load', action="store_true", help="Load test set")
     parser.add_argument('--datadir', default='/tmp/snovault', help="path to datadir")
+    parser.add_argument(
+        '-e',
+        '--es-version',
+        default=5,
+        type=int,
+        help='Override defult elasticsearch_fixture es version'
+    )
     args = parser.parse_args()
 
     appsettings = get_appsettings(args.config_uri, name='app')
@@ -77,17 +84,19 @@ def main():
     from snovault.elasticsearch import create_mapping
     datadir = os.path.abspath(args.datadir)
     pgdata = os.path.join(datadir, 'pgdata')
-    esdata = os.path.join(datadir, 'esdata')
     redisdata = os.path.join(datadir, 'redisdata')
     if args.clear:
-        for dirname in [pgdata, esdata, redisdata]:
-            if os.path.exists(dirname):
-                shutil.rmtree(dirname)
+        if os.path.exists(args.datadir):
+            shutil.rmtree(args.datadir)
     if args.init:
         postgresql_fixture.initdb(pgdata, echo=True)
-
     postgres = postgresql_fixture.server_process(pgdata, echo=True)
-    elasticsearch = elasticsearch_fixture.server_process(esdata, echo=True)
+    elasticsearch = elasticsearch_fixture.server_process(
+        datadir,
+        clear=args.clear,
+        echo=True,
+        version=args.es_version,
+    )
     nginx = nginx_server_process(echo=True)
     redis_config_path = redis_storage_fixture.initdb(redisdata, local_storage_port, echo=True)
     redis = redis_storage_fixture.server_process(redis_config_path, local_storage_port, local_storage_redis_index, echo=True)
