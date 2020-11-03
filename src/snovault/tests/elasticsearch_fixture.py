@@ -8,12 +8,12 @@ except ImportError:
     import subprocess
 
 
-# This is required for local osx testing, circle version is sepearte
+# This is required for local osx testing, circle version is seperate
 _OSX_ES_VERSION = 5
-# These are set in .circleci/config
+# These are set in .circleci/config.  es version may not be in circle config
 _CIRCLE_BUILD = os.environ.get('BASH_ENV') == '/home/circleci/.bashrc'
 _CIRCLE_ES_VERSION = os.environ.get('ES_MAJOR_VERSION', str(_OSX_ES_VERSION))
-# Encoded configuraion repo
+# Optional Encoded configuraion repo
 _ENCD_CONFIG_DIR = os.environ.get('ENCD_CONFIG_DIR')
 
 
@@ -32,6 +32,7 @@ def _get_args_and_env(esdata, esdata_override, kwargs):
         else:
             # How elasticsearch 6+ sets config path
             env["ES_PATH_CONF"] = esconfig
+        # How to add jvm options.  Must remove/rename default jvm.options file
         jvm_options = _get_jvm_options(f"{esconfig}/jvm.options")
         if jvm_options:
             env['ES_JAVA_OPTS'] = jvm_options
