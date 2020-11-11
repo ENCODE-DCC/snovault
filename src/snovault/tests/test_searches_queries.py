@@ -1697,6 +1697,18 @@ def test_searches_queries_abstract_query_factory_make_field_must_exist_query(par
         }
     }
 
+def test_searches_queries_abstract_query_factory_make_field_must_exist_query_with_wildcard(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    meq = aq._make_field_must_exist_query(
+        field='embedded.files'
+    )
+    assert meq.to_dict() == {
+        'exists': {
+            'field': 'embedded.files.@id'
+        }
+    }
+
 
 def test_searches_queries_abstract_query_factory_make_field_must_exist_queries_from_params(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
@@ -1793,6 +1805,29 @@ def test_searches_queries_abstract_query_factory_make_exists_aggregation(params_
                 },
                 'yes': {
                     'exists': {'field': 'embedded.file_available'}
+                }
+            }
+        }
+    }
+
+def test_searches_queries_abstract_query_factory_make_exists_aggregation_with_wildcard(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    eq = aq._make_exists_aggregation(
+        field='embedded.files'
+    )
+    assert eq.to_dict() == {
+        'filters': {
+            'filters': {
+                'no': {
+                    'bool': {
+                        'must_not': [
+                            {'exists': {'field': 'embedded.files.@id'}}
+                        ]
+                    }
+                },
+                'yes': {
+                    'exists': {'field': 'embedded.files.@id'}
                 }
             }
         }

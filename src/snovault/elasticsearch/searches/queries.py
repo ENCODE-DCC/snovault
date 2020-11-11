@@ -75,6 +75,7 @@ from .interfaces import WILDCARD
 from .interfaces import X
 from .interfaces import Y
 from .interfaces import YES
+from .interfaces import SHORT_CIRCUITS
 
 
 class AbstractQueryFactory:
@@ -535,6 +536,8 @@ class AbstractQueryFactory:
         )
 
     def _make_field_must_exist_query(self, field, **kwargs):
+        if field in SHORT_CIRCUITS:
+            field = field + '.@id'
         return Q(
             EXISTS,
             field=field
@@ -588,6 +591,8 @@ class AbstractQueryFactory:
         )
 
     def _make_exists_aggregation(self, field, **kwargs):
+        if field in SHORT_CIRCUITS:
+            field = field + '.@id'
         return A(
             FILTERS,
             filters={
