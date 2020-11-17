@@ -60,10 +60,14 @@ SnoVault JSON-LD Database Framework
 
 1. Elasticsearch 5.x
     ```
-    $ https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-5.6.0.tar.gz
+    Download tar: https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-5.6.0.tar.gz
+
+    # Decompress
     $ tar -xvf ~/Downloads/elasticsearch-5.6.0.tar.gz -C /usr/local/opt/
-    # Add to you PATH in terminal profile, i.e. ~/.bash_profile or ~/.zshrc
+
+    # Add to PATH in your terminal profile, i.e. ~/.bash_profile or ~/.zshrc
     $ export PATH="/usr/local/opt/elasticsearch-5.6.0/bin:$PATH"
+
     # Restart terminal and check versions
     $ elasticsearch -V
     ```
