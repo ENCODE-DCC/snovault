@@ -1,7 +1,7 @@
 SnoVault JSON-LD Database Framework
 ===================================
 
-## System Installation (OSX Catlina~10.15.2, Mojave~10.14.6)
+## System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
     We will try to keep this updated as OSX, Xcode, and brew update.  However the steps below are
     examples and not guaranteed to work for your specific system.  See the dependency's website for
     detailed instructions or let us know of any changes with a pull request.
@@ -12,6 +12,9 @@ SnoVault JSON-LD Database Framework
     ```
 
 1. brew: https://brew.sh/
+    ```
+    Make sure git is installed
+    ```
 
 1. Python3
     ```
@@ -32,24 +35,41 @@ SnoVault JSON-LD Database Framework
 1. Ruby - Non system version to install compass while avoiding permission errors
     ```
     $ brew install ruby
+    # May need to add ruby to your bash_profile/zshrc and restart terminal
     ```
 
 1. Compass
     ```
     $ gem install compass
-    # Only do the following commands if the compass location does not exist
+    # Test the install
+    $ compass -v
+    # If the command is not found then find your ruby bin directory
+    $ ls /usr/local/lib/ruby/gem/
+    # If you have two versions use the active one
+    ruby -v
+    # Using the correct ruby version bin diretory, make a sym link
     $ ln -s /usr/local/lib/ruby/gems/2.6.0/bin/compass /usr/local/opt/ruby/bin/compass
     ```
 
 1. Java 8 (Java 11 has also been used)
     ```
-    $ brew tap AdoptOpenJDK/openjdk
-    $ brew cask install adoptopenjdk8
+    $ brew install adoptopenjdk8
+    # Add to you PATH in terminal profile, i.e. ~/.bash_profile or ~/.zshrc
+    export JAVA_HOME=$(/usr/libexec/java_home -v 1.8)
     ```
 
 1. Elasticsearch 5.x
     ```
-    $ brew install elasticsearch@5.6
+    Download tar: https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-5.6.0.tar.gz
+
+    # Decompress
+    $ tar -xvf ~/Downloads/elasticsearch-5.6.0.tar.gz -C /usr/local/opt/
+
+    # Add to PATH in your terminal profile, i.e. ~/.bash_profile or ~/.zshrc
+    $ export PATH="/usr/local/opt/elasticsearch-5.6.0/bin:$PATH"
+
+    # Restart terminal and check versions
+    $ elasticsearch -V
     ```
 
 1. Brew dependencies
