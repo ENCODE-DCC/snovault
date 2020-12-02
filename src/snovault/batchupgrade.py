@@ -19,6 +19,8 @@ from itertools import groupby
 from pyramid import paster
 from pyramid.traversal import find_resource
 from pyramid.view import view_config
+from webtest import TestApp
+from webtest.app import AppError
 
 from snovault import (
     CONNECTION,
@@ -30,7 +32,8 @@ from snovault.schema_utils import validate
 
 BATCH_UPGRADE_LOG = logging.getLogger('snovault.batchupgrade')
 EPILOG = __doc__
-testapp = None
+APP_HEALTH_MAX_RETRIES = 10
+APP_HEALTH_SLEEP_DURATION = 1
 
 
 def includeme(config):
@@ -117,18 +120,14 @@ def batch_upgrade(request):
     return {'results': results}
 
 
-def _pool_batch_results(iterable, n=1):
+def _pool_batch_results(iterable, testapp, n=1):
     l = len(iterable)
     for ndx in range(0, l, n):
-        yield iterable[ndx:min(ndx+n, l)]
+        yield iterable[ndx:min(ndx+n, l)], testapp
 
 
-def _pool_initializer(*args, **kw):
-    global testapp
-    testapp = _internal_app(*args, **kw)
-
-
-def _pool_worker(batch):
+def _pool_worker(batch_and_app):
+    batch, testapp = batch_and_app
     res = testapp.post_json('/batch_upgrade', {'batch': batch})
     return res.json
 
@@ -140,14 +139,12 @@ def _pool_chunksize(uuid_count, chunksize, processes):
     return chunkiness
 
 
-def _run_pool(uuids, args):
+def _run_pool(uuids, args, testapp):
     from multiprocessing import get_context
     from multiprocessing.pool import Pool
     transaction.abort()
     pool = Pool(
         processes=args.processes,
-        initializer=_pool_initializer,
-        initargs=(args.config_uri, args.app_name, args.username),
         context=get_context('forkserver'),
         maxtasksperchild=args.maxtasksperchild,
     )
@@ -156,7 +153,7 @@ def _run_pool(uuids, args):
     try:
         pool_gen = pool.imap_unordered(
             _pool_worker,
-            _pool_batch_results(uuids, args.batchsize),
+            _pool_batch_results(uuids, testapp, args.batchsize),
             chunksize=args.chunksize,
         )
         for loop, result in enumerate(pool_gen, 1):
@@ -225,8 +222,6 @@ def _summarize_results(all_results, runtime_str=None, verbose=False):
 
 
 def _internal_app(configfile, app_name=None, username=None):
-    from webtest import TestApp
-    from pyramid import paster
     app = paster.get_app(configfile, app_name)
     if not username:
         username = 'UPGRADE'
@@ -237,6 +232,20 @@ def _internal_app(configfile, app_name=None, username=None):
     return TestApp(app, environ)
 
 
+def _wait_for_app(testapp):
+    retries_left = APP_HEALTH_MAX_RETRIES
+    while True:
+        try:
+            testapp.post_json('/batch_upgrade', {'batch': []})
+            return
+        except AppError:
+            if not retries_left:
+                raise
+            time.sleep(APP_HEALTH_SLEEP_DURATION)
+            retries_left -= 1
+            continue
+
+
 def main():
     args = _parse_args()
     # Setup Logger
@@ -244,6 +253,7 @@ def main():
     logging.getLogger('snovault').setLevel(logging.INFO)
     # Get Uuids
     testapp = _internal_app(args.config_uri, app_name=args.app_name, username=args.username)
+    _wait_for_app(testapp)
     connection = testapp.app.registry[CONNECTION]
     uuids = [str(uuid) for uuid in connection.__iter__(*args.item_types)]
     if uuids:
@@ -256,7 +266,7 @@ def main():
         )
         BATCH_UPGRADE_LOG.info(log_msg)
         pool_start = time.time()
-        all_results = _run_pool(uuids, args)
+        all_results = _run_pool(uuids, args, testapp)
         runtime_mins_str = "{:0.2f} minutes".format(
             (time.time() - pool_start) / 60
         )
