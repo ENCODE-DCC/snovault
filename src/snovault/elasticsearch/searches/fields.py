@@ -572,11 +572,12 @@ class SearchBaseResponseField(ResponseField):
     (Same query_string, different path.)
     '''
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, search_base=SEARCH_PATH, *args, **kwargs):
+        self.search_base = search_base
         super().__init__(*args, **kwargs)
 
     def _get_search_base(self):
-        search_base = SEARCH_PATH
+        search_base = self.search_base
         qs = self.get_request().query_string
         if qs:
             search_base += '?' + qs
