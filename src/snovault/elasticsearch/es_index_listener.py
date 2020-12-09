@@ -24,7 +24,7 @@ import threading
 import time
 from urllib.parse import parse_qsl
 
-log = logging.getLogger(__name__)
+log = logging.getLogger('snovault.elasticsearch.es_index_listener')
 
 EPILOG = __doc__
 DEFAULT_TIMEOUT = 60
