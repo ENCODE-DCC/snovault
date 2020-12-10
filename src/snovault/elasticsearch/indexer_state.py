@@ -218,8 +218,11 @@ class IndexerState(object):
     def put_obj(self, id, obj, doc_type='meta'):
         try:
             self.es.index(index=self.index, doc_type=doc_type, id=id, body=obj)
-        except:
-            log.warn("Failed to save to es: " + id, exc_info=True)
+        except ConnectionError as ecp:
+            log.warn(f"Failed to save {id} to es due ConnectionError")
+        except Exception as ecp:
+            ecp_name = ecp.__class__.__name__
+            log.warn(f"Failed to save {id} to es due to exception {ecp_name}: {repr(ecp)}")
 
     def delete_objs(self, ids, doc_type='meta'):
         for id in ids:
