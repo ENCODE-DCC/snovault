@@ -695,6 +695,12 @@ def test_searches_fields_search_base_get_search_base(dummy_parent):
     sb = SearchBaseResponseField()
     sb.parent = dummy_parent
     assert sb._get_search_base() == '/search/'
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        ''
+    )
+    sb = SearchBaseResponseField(search_base='/different-search/')
+    sb.parent = dummy_parent
+    assert sb._get_search_base() == '/different-search/'
 
 
 def test_searches_fields_search_base_render(dummy_parent):
