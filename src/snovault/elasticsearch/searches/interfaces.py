@@ -87,3 +87,7 @@ WILDCARD = '*'
 X = 'x'
 Y = 'y'
 YES = 'yes'
+SHORT_CIRCUITS = [
+    'embedded.files',
+    'embedded.files.quality_metrics',
+    'embedded.replicate']

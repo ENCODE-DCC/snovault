@@ -141,7 +141,7 @@ class BasicSearchWithFacetsResponseField(BasicSearchResponseField):
             {
                 GRAPH: self.results.to_graph(),
                 FACETS: self.results.to_facets(),
-                TOTAL: self.results.results.hits.total
+                TOTAL: self.results.results.hits.total.value
             }
         )
 
@@ -239,7 +239,7 @@ class BasicMatrixWithFacetsResponseField(RawMatrixWithAggsResponseField):
             {
                 FACETS: self.results.to_facets(),
                 MATRIX: self.results.to_matrix(),
-                TOTAL: self.results.results.hits.total
+                TOTAL: self.results.results.hits.total.value
             }
         )
 

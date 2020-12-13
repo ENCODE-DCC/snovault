@@ -135,13 +135,11 @@ def get_related_uuids(request, es, updated, renamed):
                     {
                         'terms': {
                             'embedded_uuids': updated,
-                            '_cache': False,
                         },
                     },
                     {
                         'terms': {
                             'linked_uuids': renamed,
-                            '_cache': False,
                         },
                     },
                 ],
@@ -151,7 +149,7 @@ def get_related_uuids(request, es, updated, renamed):
     }
     res = es.search(index=RESOURCES_INDEX, size=SEARCH_MAX, request_timeout=60, body=query)
 
-    if res['hits']['total'] > SEARCH_MAX:
+    if res['hits']['total']['value'] > SEARCH_MAX:
         return (list(all_uuids(request.registry)), True)  # guaranteed unique
 
     related_set = {hit['_id'] for hit in res['hits']['hits']}
@@ -387,7 +385,6 @@ def index(request):
             else:
                 status = request.registry[ELASTIC_SEARCH].get(
                     index=request.registry.settings['snovault.elasticsearch.index'],
-                    doc_type='meta',
                     id='indexing',
                     ignore=[400, 404]
                 )
@@ -512,7 +509,6 @@ def index(request):
             try:
                 request.registry[ELASTIC_SEARCH].index(
                     index=request.registry.settings['snovault.elasticsearch.index'],
-                    doc_type='meta',
                     body=result,
                     id='indexing'
                 )
@@ -521,7 +517,6 @@ def index(request):
                 del result['errors']
                 request.registry[ELASTIC_SEARCH].index(
                     index=request.registry.settings['snovault.elasticsearch.index'],
-                    doc_type='meta',
                     body=result,
                     id='indexing'
                 )
@@ -535,7 +530,7 @@ def index(request):
         request.registry[ELASTIC_SEARCH].indices.refresh(RESOURCES_INDEX)
         if flush:
             try:
-                request.registry[ELASTIC_SEARCH].indices.flush_synced(index=RESOURCES_INDEX)  # Faster recovery on ES restart
+                request.registry[ELASTIC_SEARCH].indices.flush(index=RESOURCES_INDEX)  # Faster recovery on ES restart
             except ConflictError:
                 pass
         return result, indexing_update_infos
@@ -983,9 +978,9 @@ class Indexer(object):
                 }
                 try:
                     encoded_es.index(
-                        index=doc['item_type'], doc_type=doc['item_type'], body=doc,
-                        id=str(uuid), version=xmin, version_type='external_gte',
-                        request_timeout=30,
+                        index=doc['item_type'], body=doc,
+                        id=str(uuid), version=xmin, 
+                        version_type='external_gte', request_timeout=30
                     )
                 except StatementError:
                     # Can't reconnect until invalid transaction is rolled back

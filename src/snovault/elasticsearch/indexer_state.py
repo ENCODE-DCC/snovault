@@ -209,22 +209,22 @@ class IndexerState(object):
             log.info('%s is initially indexing', self.title)
 
     # Private-ish primitives...
-    def get_obj(self, id, doc_type='meta'):
+    def get_obj(self, id):
         try:
-            return self.es.get(index=self.index, doc_type=doc_type, id=id).get('_source',{})  # TODO: snovault/meta
+            return self.es.get(index=self.index, id=id).get('_source',{})  # TODO: snovault/meta
         except:
             return {}
 
-    def put_obj(self, id, obj, doc_type='meta'):
+    def put_obj(self, id, obj):
         try:
-            self.es.index(index=self.index, doc_type=doc_type, id=id, body=obj)
+            self.es.index(index=self.index, id=id, body=obj)
         except:
             log.warn("Failed to save to es: " + id, exc_info=True)
 
-    def delete_objs(self, ids, doc_type='meta'):
+    def delete_objs(self, ids):
         for id in ids:
             try:
-                self.es.delete(index=self.index, doc_type=doc_type, id=id)
+                self.es.delete(index=self.index, id=id)
             except:
                 pass
 
@@ -512,7 +512,7 @@ class IndexerState(object):
             else:
                 return "ERROR: unknown indexer to monitor: %s" % (which)
 
-        notify = self.get_obj('notify', 'default')
+        notify = self.get_obj('notify')
         if bot_token is not None:
             notify['bot_token'] = bot_token
 
@@ -539,7 +539,7 @@ class IndexerState(object):
                 notify[which] = indexer_notices
                 # either self.state_id: {who: [...]} or 'all_indexers': {'indexers': [...], 'who': [...]}
 
-        self.put_obj('notify', notify, 'default')
+        self.put_obj('notify', notify)
         if user_warns != '':
             user_warns = 'Unknown users: ' + user_warns[2:]
         if 'bot_token' not in notify:
@@ -551,7 +551,7 @@ class IndexerState(object):
 
     def get_notices(self, full=False):
         '''Get the notifications'''
-        notify = self.get_obj('notify','default')
+        notify = self.get_obj('notify')
         if full:
             return notify
         notify.pop('bot_token', None)
@@ -577,7 +577,7 @@ class IndexerState(object):
     def send_notices(self):
         '''Sends notifications when indexer is done.'''
         # https://slack.com/api/chat.postMessage?token=xoxb-1974789...&channel=U1KPQK1HN&text=Yay!
-        notify = self.get_obj('notify','default')
+        notify = self.get_obj('notify')
         if not notify:
             return
         if 'bot_token' not in notify or 'from' not in notify:
@@ -636,7 +636,7 @@ class IndexerState(object):
                 log.warn("Failed to notify via slack: [%s]" % (msg))
 
         if changed:  # alter notify even if error, so the same error doesn't flood log.
-            self.put_obj('notify', notify, 'default')
+            self.put_obj('notify', notify)
 
     def display(self, uuids=None):
         display = {}
