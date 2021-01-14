@@ -1,6 +1,12 @@
 Changes
 =======
 
+Snovault 1.0.52 (released) encoded v111.0
+-----------------------------------------
+1. SNO-185-Log-connection-error (#311)
+2. SNO-183-allow-specification-of-cart-in-search (#310)
+3. SNO-181-Update-install-readme (#309)
+
 Snovault 1.0.51 (released) encoded v109.0
 -----------------------------------------
 1. SNO-174-add-local-storage-redis (#299)
