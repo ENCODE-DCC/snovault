@@ -1,5 +1,4 @@
 import os
-import sys
 from setuptools import setup, find_packages
 
 here = os.path.abspath(os.path.dirname(__file__))
@@ -7,57 +6,56 @@ README = open(os.path.join(here, 'README.md')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 
 
-requires = [
-    'Pillow',
-    'PyBrowserID',
-    'SQLAlchemy>=1.0.0b1',
-    'WSGIProxy2',
-    'WebTest',
-    'botocore',
-    'jmespath',
-    'boto3',
-    'elasticsearch>=5.2',
-    'elasticsearch-dsl==5.4.0',
-    'lucenequery',
-    'future',
-    'humanfriendly',
-    'jsonschema_serialize_fork',
-    'loremipsum',
-    'netaddr',
-    'passlib',
-    'psutil',
-    'pyramid_retry',
-    'pyramid',
-    'pyramid_localroles',
-    'pyramid_multiauth',
-    'pyramid_tm',
-    'python-magic',
-    'pytz',
-    'rdflib',
-    'rdflib-jsonld',
-    'rfc3987',
-    'setuptools',
-    'simplejson',
-    'strict_rfc3339',
-    'subprocess_middleware',
-    'xlrd',
-    'zope.sqlalchemy',
-    'bcrypt',
+INSTALL_REQUIRES = [
+    "Pillow==7.0.0",
+    "SQLAlchemy==1.3.13",
+    "WSGIProxy2==0.4.6",
+    "WebTest==2.0.34",
+    "bcrypt==3.1.7",
+    "boto3==1.11.9",
+    "botocore==1.14.9",
+    "elasticsearch-dsl==5.4.0",
+    "elasticsearch==5.4.0",
+    "future==0.18.2",
+    "humanfriendly==6.1",
+    "jsonschema-serialize-fork @ git+https://github.com/lrowe/jsonschema_serialize_fork.git@2.1.1",  # noqa
+    "lucenequery==0.1",
+    "netaddr==0.7.18",
+    "passlib==1.7.2",
+    "psutil==5.6.7",
+    "psycopg2==2.8.4",
+    "pyramid-localroles==0.1",
+    "pyramid-multiauth==0.9.0",
+    "pyramid-tm==2.4",
+    "pyramid==1.10.4",
+    "pyramid_retry==2.1.1",
+    "python-magic==0.4.15",
+    "pytz==2019.3",
+    "rdflib-jsonld==0.4.0",
+    "rdflib==4.2.2",
+    "redis==3.5.3",
+    "requests==2.22.0",
+    "rfc3987==1.3.8",
+    "simplejson==3.17.0",
+    "subprocess-middleware @ git+https://github.com/lrowe/subprocess_middleware.git@0.3",  # noqa
+    "xlrd==1.2.0",
+    "zc.buildout==2.13.2",
+    "zope.sqlalchemy==1.2",
 ]
 
-if sys.version_info.major == 2:
-    requires.extend([
-        'backports.functools_lru_cache',
-        'subprocess32',
-    ])
+EXTRAS_REQUIRE = {
+    "tests": [
+        "pytest==5.3.2",
+        "pytest-bdd==3.2.1",
+        "pytest-mock==2.0.0",
+        "pytest-splinter==2.0.1",
+        "pytest-exact-fixtures==0.3",
+        "pytest-instafail==0.4.1.post0",
+        "pytest-timeout==1.3.4",
+    ]
+}
 
-tests_require = [
-    'pytest>=2.4.0',
-    'pytest-bdd',
-    'pytest-mock',
-    'pytest-splinter',
-    'pytest_exact_fixtures',
-]
+EXTRAS_REQUIRE["dev"] = EXTRAS_REQUIRE["tests"]
 
 setup(
     name='snovault',
@@ -73,11 +71,8 @@ setup(
     author_email='hitz@stanford.edu',
     url='http://github.com/ENCODE-DCC/snovault/',
     license='MIT',
-    install_requires=requires,
-    tests_require=tests_require,
-    extras_require={
-        'test': tests_require,
-    },
+    install_requires=INSTALL_REQUIRES,
+    extras_require=EXTRAS_REQUIRE,
     entry_points='''
         [console_scripts]
         batchupgrade = snovault.batchupgrade:main
@@ -108,11 +103,7 @@ setup(
         memlimit = snowflakes.memlimit:filter_app
         ''',
     classifiers=[
-        # How mature is this project? Common values are
-        #   3 - Alpha
-        #   4 - Beta
-        #   5 - Production/Stable
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 5 - Production/Stable',
 
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
@@ -126,7 +117,6 @@ setup(
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.4',
     ],

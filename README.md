@@ -95,29 +95,29 @@ SnoVault JSON-LD Database Framework
     $ source snovault-venv/bin/activate
     ```
 
-1. Clone the repo and install requirements
+2. Clone the repo and install requirements
     ```
     $ cd snovault
-    $ pip install -r requirements.osx.txt
+    $ pip install -e '.[dev]'
     ```
 
-1. Build Application
+3. Build Application
     ```
     # Make sure you are in the snovault-venv
-    $ make clean && buildout bootstrap && bin/buildout
+    $ make clean && buildout
     ```
 
-1. Run Application
+4. Run Application
     ```
     # Make sure you are in the snovault-venv
-    $ bin/dev-servers development.ini --app-name app --clear --init --load
+    $ dev-servers development.ini --app-name app --clear --init --load
     # In a separate terminal, make sure you are in the snovault-venv
-    $ bin/pserve development.ini
+    $ pserve development.ini
     ```
 
-1. Browse to the interface at http://localhost:6543
+5. Browse to the interface at http://localhost:6543
 
-1. Run Tests
+6. Run Tests
     * no argument runs non bdd tests
 
     ```

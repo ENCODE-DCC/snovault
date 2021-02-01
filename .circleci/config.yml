@@ -59,9 +59,8 @@ commands:
           name: Run buildout
           command: |
             sudo pip3 install --upgrade pip
-            sudo pip3 install -U zc.buildout setuptools==51.3.3
-            buildout bootstrap
-            bin/buildout
+            pip3 install -e '.[dev]'
+            buildout
 jobs:
   npm-non-bdd-tests:
     executor: snovault-executor
@@ -73,7 +72,7 @@ jobs:
           name: NPM and non BDD tests
           command: |
             npm test
-            bin/test -v -v --timeout=400 -m "not bdd"
+            pytest -v -v --timeout=400 -m "not bdd"
   bdd-tests:
     executor: snovault-executor
     resource_class: large
@@ -87,7 +86,7 @@ jobs:
       - run:
           name: Run bdd tests
           command: |
-            bin/test -v -v --timeout=400 -m "bdd" --tb=short \
+            pytest -v -v --timeout=400 -m "bdd" --tb=short \
               --splinter-implicit-wait 10 \
               --splinter-webdriver chrome \
               --splinter-socket-timeout 300 \
