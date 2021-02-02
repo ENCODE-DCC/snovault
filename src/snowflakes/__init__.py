@@ -1,7 +1,6 @@
 from future.standard_library import install_aliases
 install_aliases()  # NOQA
 import snowflakes.schema_formats
-import netaddr
 try:
     import subprocess32 as subprocess  # Closes pipes on failure
 except ImportError:

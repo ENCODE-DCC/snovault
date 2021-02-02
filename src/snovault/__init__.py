@@ -5,7 +5,6 @@ if sys.version_info.major == 2:
     import functools
     from backports.functools_lru_cache import lru_cache
     functools.lru_cache = lru_cache
-import netaddr
 from pyramid.config import Configurator
 from pyramid.settings import (
     asbool,

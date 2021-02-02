@@ -7,9 +7,11 @@ CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 
 
 INSTALL_REQUIRES = [
+    "PasteDeploy==2.1.0",
     "Pillow==7.0.0",
     "SQLAlchemy==1.3.13",
     "WSGIProxy2==0.4.6",
+    "WebOb==1.8.6",
     "WebTest==2.0.34",
     "bcrypt==3.1.7",
     "boto3==1.11.9",
@@ -20,7 +22,6 @@ INSTALL_REQUIRES = [
     "humanfriendly==6.1",
     "jsonschema-serialize-fork @ git+https://github.com/lrowe/jsonschema_serialize_fork.git@2.1.1",  # noqa
     "lucenequery==0.1",
-    "netaddr==0.7.18",
     "passlib==1.7.2",
     "psutil==5.6.7",
     "psycopg2==2.8.4",
@@ -34,12 +35,18 @@ INSTALL_REQUIRES = [
     "rdflib-jsonld==0.4.0",
     "rdflib==4.2.2",
     "redis==3.5.3",
+    "repoze.debug==1.1",
     "requests==2.22.0",
     "rfc3987==1.3.8",
+    "rutter==0.2",
     "simplejson==3.17.0",
     "subprocess-middleware @ git+https://github.com/lrowe/subprocess_middleware.git@0.3",  # noqa
+    "transaction==3.0.0",
+    "venusian==3.0.0",
+    "waitress==1.4.3",
     "xlrd==1.2.0",
     "zc.buildout==2.13.2",
+    "zope.interface==4.7.1",
     "zope.sqlalchemy==1.2",
 ]
 
