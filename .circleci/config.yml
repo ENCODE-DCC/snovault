@@ -92,6 +92,20 @@ jobs:
               --splinter-socket-timeout 300 \
               --chrome-options "--headless --disable-gpu --no-sandbox --disable-dev-shm-usage --disable-extensions --whitelisted-ips --window-size=1920,1080"
           no_output_timeout: 30m
+  pypi_description:
+    docker:
+      - image: circleci/python:3.7.3-stretch
+    working_directory: ~/snovault
+    steps:
+      - checkout
+      - run:
+          name: Install twine
+          command: sudo pip install -U setuptools twine==3.3.0
+      - run:
+          name: Check package with twine
+          command: |
+            python setup.py sdist
+            twine check dist/*
   release_to_pypi:
     docker:
       - image: circleci/python:3.7.3-stretch
@@ -104,13 +118,14 @@ jobs:
       - run:
           name: Run release
           command: |
+            set -euo pipefail
             VERSION=$(awk -F '=' '/^VERSION/{print $2}' setup.py | tr -d '"'\')
-            if [ "${VERSION}" -ne "${CIRCLE_TAG}" ]; then
+            if [ "${VERSION}" = "${CIRCLE_TAG}" ]; then
               echo "Version ${VERSION} in setup.py not equal to git tag ${CIRCLE_TAG}"
               exit 1
             fi
             python setup.py sdist
-            python -m twine upload -u "${PYPI_LOGIN}" -p "${PYPI_PASSWORD}" dist/*
+            twine upload -u "${PYPI_USERNAME}" -p "${PYPI_PASSWORD}" dist/*
 
 
 workflows:
@@ -119,7 +134,10 @@ workflows:
     jobs:
       - bdd-tests
       - npm-non-bdd-tests
+      - pypi_description
       - release_to_pypi:
+          requires:
+            - pypi_description
           filters:
             branches:
               ignore: /.*/
