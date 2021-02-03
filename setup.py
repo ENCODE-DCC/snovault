@@ -4,6 +4,7 @@ from setuptools import setup, find_packages
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.md')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
+VERSION = "1.0.52"
 
 
 INSTALL_REQUIRES = [
@@ -28,6 +29,7 @@ INSTALL_REQUIRES = [
     "pyramid-localroles==0.1",
     "pyramid-multiauth==0.9.0",
     "pyramid-tm==2.4",
+    "pyramid-translogger==0.1",
     "pyramid==1.10.4",
     "pyramid_retry==2.1.1",
     "python-magic==0.4.15",
@@ -66,7 +68,7 @@ EXTRAS_REQUIRE["dev"] = EXTRAS_REQUIRE["tests"]
 
 setup(
     name='snovault',
-    version='1.0.53',
+    version=VERSION,
     description='Snovault Hybrid Object Relational Database Framework',
     long_description=README + '\n\n' + CHANGES,
     packages=find_packages('src'),

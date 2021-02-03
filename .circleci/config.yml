@@ -92,6 +92,26 @@ jobs:
               --splinter-socket-timeout 300 \
               --chrome-options "--headless --disable-gpu --no-sandbox --disable-dev-shm-usage --disable-extensions --whitelisted-ips --window-size=1920,1080"
           no_output_timeout: 30m
+  release_to_pypi:
+    docker:
+      - image: circleci/python:3.7.3-stretch
+    working_directory: ~/snovault
+    steps:
+      - checkout
+      - run:
+          name: Install release requirements
+          command: sudo pip install -U setuptools twine==3.3.0
+      - run:
+          name: Run release
+          command: |
+            VERSION=$(awk -F '=' '/^VERSION/{print $2}' setup.py | tr -d '"'\')
+            if [ "${VERSION}" -ne "${CIRCLE_TAG}" ]; then
+              echo "Version ${VERSION} in setup.py not equal to git tag ${CIRCLE_TAG}"
+              exit 1
+            fi
+            python setup.py sdist
+            python -m twine upload -u "${PYPI_LOGIN}" -p "${PYPI_PASSWORD}" dist/*
+
 
 workflows:
   version: 2
@@ -99,3 +119,13 @@ workflows:
     jobs:
       - bdd-tests
       - npm-non-bdd-tests
+      - release_to_pypi:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only:
+                # Adapted from https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
+                # Valid tag examples: 1.43.0, 1.2.3-alpha, 1.2.3, 0.1.0, 1.2.3-beta.4
+                # Invalid examples: v1.2.3 (preceding v), 2.01.1 (no leading zeros)
+                - /^(0|[1-9]\d*)\.(0|[1-9]\d*)*\.(0|[1-9]\d*)*(-((0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(\.(0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?$/
