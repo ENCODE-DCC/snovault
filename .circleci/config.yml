@@ -58,7 +58,7 @@ commands:
       - run:
           name: Run buildout
           command: |
-            sudo pip3 install --upgrade pip
+            sudo pip3 install --upgrade pip setuptools==51.3.3
             pip3 install -e '.[dev]'
             buildout
 jobs:
