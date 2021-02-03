@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-    browser-tools: circleci/browser-tools@0.1.4
+    browser-tools: circleci/browser-tools@1.0.1
 
 executors:
   snovault-executor:
@@ -59,7 +59,7 @@ commands:
           name: Run buildout
           command: |
             sudo pip3 install --upgrade pip
-            sudo pip3 install -U zc.buildout setuptools
+            sudo pip3 install -U zc.buildout setuptools==51.3.3
             buildout bootstrap
             bin/buildout
 jobs:
