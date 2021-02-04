@@ -1,5 +1,9 @@
 Changes
 =======
+Snovault 1.0.53 (released) encoded v112.0
+-----------------------------------------
+1. SNO-158-create-minimally-indexed-deploy
+2. SNO-190-pin-setuptools-in-circle-ci (#315)
 
 Snovault 1.0.52 (released) encoded v111.0
 -----------------------------------------
