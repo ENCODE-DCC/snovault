@@ -72,15 +72,15 @@ System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
         elasticsearch -V
 
 10. Brew dependencies
-    .. code-block:: bash
+        .. code-block:: bash
 
-        brew install libmagic nginx graphviz redis
+            brew install libmagic nginx graphviz redis
 
 11. Chrome driver for Testing
 
-    `Chromedriver <https://chromedriver.chromium.org/downloads>`_ is needed in your PATH.
-    If working in a python virtual environment, then the chromedriver can be added to
-    your-venv-dir/bin directory.
+        `Chromedriver <https://chromedriver.chromium.org/downloads>`_ is needed in your PATH.
+        If working in a python virtual environment, then the chromedriver can be added to
+        your-venv-dir/bin directory.
 
 
 Application Installation
