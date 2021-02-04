@@ -187,3 +187,12 @@ class Path:
 
     def expand(self, request, properties):
         self.expand_path_with_frame(request, properties, self.path, self.frame)
+
+
+def get_uuids_from_file(path):
+    with open(path, 'r') as f:
+        uuids = [
+            uuid.strip()
+            for uuid in f.readlines()
+        ]
+    return uuids
