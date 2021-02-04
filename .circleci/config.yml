@@ -134,7 +134,10 @@ workflows:
     jobs:
       - bdd-tests
       - npm-non-bdd-tests
-      - pypi_description
+      - pypi_description:
+          filters:
+            tags:
+              only: /.*/
       - release_to_pypi:
           requires:
             - pypi_description
