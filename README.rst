@@ -21,7 +21,7 @@ System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
         3.6.9 and 3.7.6 have been tested
         3.8 does not work as of Feb 2020
 
-4. Postgres@11 (Postgres@9.3 also works)
+4. Postgres\@11 (Postgres\@9.3 also works)
     .. code-block:: bash
 
         brew install postgresql@11
@@ -72,11 +72,12 @@ System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
         elasticsearch -V
 
 10. Brew dependencies
-    .. code-block:: bash
+    .. code-block:: console
 
         brew install libmagic nginx graphviz redis
 
-11. Chrome driver for Testing
+11. Chrome driver for Testing::
+
     `Chromedriver <https://chromedriver.chromium.org/downloads>`_ is needed in your PATH.
     If working in a python virtual environment, then the chromedriver can be added to
     your-venv-dir/bin directory.
@@ -85,9 +86,8 @@ System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
 Application Installation
 ========================
 
-1. Create a virtual env in your work directory.  
-    Here we use python3 venv module.  Use venv, like conda, if you please
-    .. code-block:: bash
+1. Create a virtual env in your work directory. Here we use python3 venv module.  Use venv, like conda, if you please
+    .. code-block:: console
 
         cd your-work-dir
         python3 -m venv snovault-venv
