@@ -119,7 +119,7 @@ jobs:
           name: Run release
           command: |
             set -euo pipefail
-            VERSION=$(awk -F '=' '/^VERSION/{print $2}' setup.py | tr -d '"'\')
+            VERSION=$(awk -F '=' '/^VERSION/{print $2}' setup.py | tr -d ' "'\')
             if [ "${VERSION}" != "${CIRCLE_TAG}" ]; then
               echo "Version ${VERSION} in setup.py not equal to git tag ${CIRCLE_TAG}"
               exit 1
