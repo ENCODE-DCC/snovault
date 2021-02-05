@@ -21,7 +21,6 @@ requires = [
     'lucenequery',
     'future',
     'humanfriendly',
-    'jsonschema_serialize_fork',
     'loremipsum',
     'netaddr',
     'passlib',
@@ -43,6 +42,7 @@ requires = [
     'xlrd',
     'zope.sqlalchemy',
     'bcrypt',
+    'jsonschema',
 ]
 
 if sys.version_info.major == 2:

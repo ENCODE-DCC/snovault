@@ -227,7 +227,6 @@ def test_searches_queries_abstract_query_factory_get_properties_for_item_type(pa
             'type': 'string',
             'description': 'Unique identifier',
             'title': 'UUID',
-            'requestMethod': 'POST'
         },
         'name': {
             'uniqueKey': True,

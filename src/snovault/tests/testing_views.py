@@ -185,7 +185,6 @@ class TestingSearchSchema(Item):
                 'type': 'string',
                 'format': 'uuid',
                 'permission': 'import_items',
-                'requestMethod': 'POST',
             },
             'accession': {
                 'title': 'Accession',
@@ -276,7 +275,6 @@ class TestingPostPutPatch(Item):
             "schema_version": {
                 "type": "string",
                 "pattern": "^\\d+(\\.\\d+)*$",
-                "requestMethod": [],
                 "default": "1",
             },
             "uuid": {
@@ -285,7 +283,6 @@ class TestingPostPutPatch(Item):
                 "type": "string",
                 "format": "uuid",
                 "permission": "import_items",
-                "requestMethod": "POST",
             },
             "accession": {
                 "title": "Accession",
@@ -331,7 +328,6 @@ class TestingServerDefault(Item):
             "schema_version": {
                 "type": "string",
                 "pattern": "^\\d+(\\.\\d+)*$",
-                "requestMethod": [],
             },
             "uuid": {
                 "title": "UUID",
@@ -339,7 +335,6 @@ class TestingServerDefault(Item):
                 "type": "string",
                 "format": "uuid",
                 "permission": "import_items",
-                "requestMethod": "POST",
             },
             'user': {
                 'serverDefault': 'userid',
@@ -377,7 +372,6 @@ class TestingBadAccession(Item):
                 "type": "string",
                 "format": "uuid",
                 "permission": "import_items",
-                "requestMethod": "POST",
             },
             'thing': {
                 'type': "number",

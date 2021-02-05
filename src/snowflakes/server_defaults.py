@@ -1,5 +1,5 @@
 from datetime import datetime
-from jsonschema_serialize_fork import NO_DEFAULT
+from pyramid.security import effective_principals
 from pyramid.threadlocal import get_current_request
 from string import (
     digits,
@@ -31,12 +31,12 @@ def userid(instance, subschema):
     for principal in principals:
         if principal.startswith('userid.'):
             return principal[7:]
-    return NO_DEFAULT
+    return object() # do not default
 
 
 @server_default
 def now(instance, subschema):
-    # from jsonschema_serialize_fork date-time format requires a timezone
+    # from jsonschema date-time format requires a timezone
     return datetime.utcnow().isoformat() + '+00:00'
 
 
@@ -48,7 +48,7 @@ def uuid4(instance, subschema):
 @server_default
 def accession(instance, subschema):
     if 'external_accession' in instance:
-        return NO_DEFAULT
+        return object() # do not default
     request = get_current_request()
     factory = request.registry[ACCESSION_FACTORY]
     # With 17 576 000 options
