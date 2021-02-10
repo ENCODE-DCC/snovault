@@ -160,7 +160,10 @@ def get_related_uuids(request, es, updated, renamed):
 
 
 def _determine_indexing_protocol(request, uuid_count):
-    remote_indexing = asbool(request.registry.settings.get('remote_indexing', False))
+    remote_indexing = asbool(
+        os.environ.get("REMOTE_INDEXING")
+        or request.registry.settings.get('remote_indexing', False)
+    )
     if not remote_indexing:
         return False
     try:
@@ -351,7 +354,10 @@ def index(request):
     # Check remote indexing and set head/indexing nodes
     this_node = indexer_state.get_obj(INDEXING_NODE_INDEX)
     other_node = indexer_state.get_obj(HEAD_NODE_INDEX)
-    remote_indexing = asbool(request.registry.settings.get('remote_indexing', False))
+    remote_indexing = asbool(
+        os.environ.get("REMOTE_INDEXING")
+        or request.registry.settings.get('remote_indexing', False)
+    )
     did_timeout = False
     if remote_indexing:
         this_node, other_node, continue_on, did_timeout = _get_nodes(request, indexer_state)

@@ -1,4 +1,5 @@
 import logging
+import os
 
 from snovault.json_renderer import json_renderer
 from snovault.util import get_root_request
@@ -28,7 +29,9 @@ def includeme(config):
 
     config.add_request_method(datastore, 'datastore', reify=True)
 
-    addresses = aslist(settings['elasticsearch.server'])
+    addresses = aslist(
+        os.environ.get("ELASTICSEARCH_URL") or settings['elasticsearch.server']
+    )
     config.registry[ELASTIC_SEARCH] = Elasticsearch(
         addresses,
         serializer=PyramidJSONSerializer(json_renderer),
