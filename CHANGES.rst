@@ -1,5 +1,11 @@
 Changes
 =======
+Snovault 1.0.54 (released) encoded v113.0
+-----------------------------------------
+1. SNO-27-pip-installable (#316)
+2. SNO-191-pyramid-env-vars (#318)
+3. SNO-117-search-as-you-type (#220)
+
 Snovault 1.0.53 (released) encoded v112.0
 -----------------------------------------
 1. SNO-158-create-minimally-indexed-deploy
