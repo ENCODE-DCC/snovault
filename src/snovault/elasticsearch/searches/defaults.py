@@ -113,6 +113,8 @@ DEFAULT_TERMS_AGGREGATION_KWARGS = [
     'size',
     'exclude',
     'missing',
+    'include',
+    'aggs',
 ]
 
 DEFAULT_EXISTS_AGGREGATION_KWARGS = []

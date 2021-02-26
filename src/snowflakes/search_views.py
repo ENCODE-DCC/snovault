@@ -26,6 +26,7 @@ from snovault.elasticsearch.searches.fields import RawSearchWithAggsResponseFiel
 from snovault.elasticsearch.searches.fields import SearchBaseResponseField
 from snovault.elasticsearch.searches.fields import SortResponseField
 from snovault.elasticsearch.searches.fields import TitleResponseField
+from snovault.elasticsearch.searches.fields import RawTopHitsResponseField
 from snovault.elasticsearch.searches.fields import TypeOnlyClearFiltersResponseField
 from snovault.elasticsearch.searches.fields import TypeResponseField
 from snovault.elasticsearch.searches.parsers import ParamsParser
@@ -43,6 +44,7 @@ def includeme(config):
     config.add_route('missing_matrix', '/missing_matrix{slash:/?}')
     config.add_route('summary', '/summary{slash:/?}')
     config.add_route('audit', '/audit{slash:/?}')
+    config.add_route('top_hits_raw', '/top_hits_raw{slash:/?}')
     config.scan(__name__)
 
 
@@ -288,6 +290,21 @@ def audit(context, request):
             FiltersResponseField(),
             TypeOnlyClearFiltersResponseField(),
             DebugQueryResponseField()
+        ]
+    )
+    return fr.render()
+
+
+@view_config(route_name='top_hits_raw', request_method='GET', permission='search')
+def top_hits_raw(context, request):
+    fr = FieldedResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
+        response_fields=[
+            RawTopHitsResponseField(
+                default_item_types=DEFAULT_ITEM_TYPES
+            )
         ]
     )
     return fr.render()

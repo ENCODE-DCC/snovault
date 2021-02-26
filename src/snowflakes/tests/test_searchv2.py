@@ -643,3 +643,14 @@ def test_auditv2_view_no_matrix_defined(workbook, testapp):
         status=400
     )
     assert r.json['description'] == 'Item type does not have requested view defined: {}'
+
+
+def test_top_hits_raw_view_response(workbook, testapp):
+    r = testapp.get('/top_hits_raw/?searchTerm=cherry')
+    assert not r.json['hits']['hits']
+    assert 'aggregations' in r.json
+    assert '_shards' in r.json
+    assert 'timed_out' in r.json
+    assert 'took' in r.json
+    assert len(r.json['aggregations']['types']['types']['buckets']) == 1
+    assert r.json['aggregations']['types']['types']['buckets'][0]['key'] == 'Lab'
