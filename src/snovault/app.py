@@ -1,5 +1,6 @@
 import base64
 import codecs
+import copy
 import json
 import os
 
@@ -52,7 +53,9 @@ def changelogs(config):
 
 
 def configure_engine(settings):
-    engine_url = settings['sqlalchemy.url']
+    settings = copy.deepcopy(settings)
+    engine_url = os.environ.get("SQLALCHEMY_URL") or settings['sqlalchemy.url']
+    settings["sqlalchemy.url"] = engine_url
     engine_opts = {}
     if engine_url.startswith('postgresql'):
         if settings.get('indexer_worker'):
