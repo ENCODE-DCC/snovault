@@ -1,7 +1,6 @@
 from future.standard_library import install_aliases
 install_aliases()  # NOQA
 import snowflakes.schema_formats
-import netaddr
 try:
     import subprocess32 as subprocess  # Closes pipes on failure
 except ImportError:
@@ -99,10 +98,6 @@ def main(global_config, **local_config):
 
     config.include(static_resources)
     config.include(changelogs)
-
-    aws_ip_ranges = json_from_path(settings.get('aws_ip_ranges_path'), {'prefixes': []})
-    config.registry['aws_ipset'] = netaddr.IPSet(
-        record['ip_prefix'] for record in aws_ip_ranges['prefixes'] if record['service'] == 'AMAZON')
 
     if asbool(settings.get('testing', False)):
         config.include('snovault.tests.testing_views')

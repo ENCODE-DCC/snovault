@@ -1,7 +1,7 @@
 '''
 For each object, count the number of objects in which it is embedded.
 
-Usage: bin/py embeds.py > embeds.jsonlines
+Usage: python embeds.py > embeds.jsonlines
 '''
 
 from elasticsearch import Elasticsearch

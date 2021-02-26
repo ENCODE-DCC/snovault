@@ -4,9 +4,9 @@ Also run this when the links or keys are changed in the schema.
 Example:
 
 Demo
-    bin/batchupgrade development.ini --app-name app
+    batchupgrade development.ini --app-name app
 Production or Release Candidate
-    bin/batchupgrade production.ini --app-name app --processes 16 --batchsize 1000
+    batchupgrade production.ini --app-name app --processes 16 --batchsize 1000
 
 """
 import logging

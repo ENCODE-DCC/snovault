@@ -58,10 +58,9 @@ commands:
       - run:
           name: Run buildout
           command: |
-            sudo pip3 install --upgrade pip
-            sudo pip3 install -U zc.buildout setuptools==51.3.3
-            buildout bootstrap
-            bin/buildout
+            sudo pip3 install --upgrade pip setuptools==51.3.3
+            pip3 install -e '.[dev]'
+            buildout
 jobs:
   npm-non-bdd-tests:
     executor: snovault-executor
@@ -73,7 +72,7 @@ jobs:
           name: NPM and non BDD tests
           command: |
             npm test
-            bin/test -v -v --timeout=400 -m "not bdd"
+            pytest -v -v --timeout=400 -m "not bdd"
   bdd-tests:
     executor: snovault-executor
     resource_class: large
@@ -87,12 +86,46 @@ jobs:
       - run:
           name: Run bdd tests
           command: |
-            bin/test -v -v --timeout=400 -m "bdd" --tb=short \
+            pytest -v -v --timeout=400 -m "bdd" --tb=short \
               --splinter-implicit-wait 10 \
               --splinter-webdriver chrome \
               --splinter-socket-timeout 300 \
               --chrome-options "--headless --disable-gpu --no-sandbox --disable-dev-shm-usage --disable-extensions --whitelisted-ips --window-size=1920,1080"
           no_output_timeout: 30m
+  pypi_description:
+    docker:
+      - image: circleci/python:3.7.3-stretch
+    working_directory: ~/snovault
+    steps:
+      - checkout
+      - run:
+          name: Install twine
+          command: sudo pip install -U setuptools twine==3.3.0
+      - run:
+          name: Check package with twine
+          command: |
+            python setup.py sdist
+            twine check dist/*
+  release_to_pypi:
+    docker:
+      - image: circleci/python:3.7.3-stretch
+    working_directory: ~/snovault
+    steps:
+      - checkout
+      - run:
+          name: Install release requirements
+          command: sudo pip install -U setuptools twine==3.3.0
+      - run:
+          name: Run release
+          command: |
+            VERSION=$(awk -F '=' '/^VERSION/{print $2}' setup.py | tr -d ' "'\')
+            if [ "${VERSION}" != "${CIRCLE_TAG}" ]; then
+              echo "Version ${VERSION} in setup.py not equal to git tag ${CIRCLE_TAG}"
+              exit 1
+            fi
+            python setup.py sdist
+            twine upload -u "${PYPI_USERNAME}" -p "${PYPI_PASSWORD}" dist/*
+
 
 workflows:
   version: 2
@@ -100,3 +133,18 @@ workflows:
     jobs:
       - bdd-tests
       - npm-non-bdd-tests
+      - pypi_description:
+          filters:
+            tags:
+              only: /.*/
+      - release_to_pypi:
+          requires:
+            - pypi_description
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only:
+                # From https://www.python.org/dev/peps/pep-0440/
+                # Only publish tags with PEP-440 compliant version specifiers to PyPI
+                - /^([1-9][0-9]*!)?(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*))*((a|b|rc)(0|[1-9][0-9]*))?(\.post(0|[1-9][0-9]*))?(\.dev(0|[1-9][0-9]*))?$/

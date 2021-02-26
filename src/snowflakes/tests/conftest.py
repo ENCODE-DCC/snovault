@@ -3,6 +3,8 @@
 http://pyramid.readthedocs.org/en/latest/narr/testing.html
 '''
 import pkg_resources
+import tempfile
+
 import pytest
 from pytest import fixture
 
@@ -14,6 +16,7 @@ pytest_plugins = [
     'snovault.tests.pyramidfixtures',
 ]
 
+tempfile.tempdir = '/tmp'
 
 @pytest.fixture(autouse=True)
 def autouse_external_tx(external_tx):

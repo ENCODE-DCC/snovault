@@ -24,25 +24,25 @@ Snovault 1.0.50 (released) encoded v108.0
 2. SNO-169 Creating a command for admin user creation (#293)
 
 Snovault 1.0.49 (released) encoded v106.0
-----------------------------------------
+-----------------------------------------
 1. SNO-166-update-query-string (#288)
 
 Snovault 1.0.48 (released) encoded v105.0
-----------------------------------------
+-----------------------------------------
 1. SNO-163-install-graphviz (#285)
 
 Snovault 1.0.47 (released) encoded v104.0
-----------------------------------------
+-----------------------------------------
 1. SNO-159-allow-remote-indexing (#282)
 
 Snovault 1.0.46 (released) encoded v103.0 (unreleased)
-----------------------------------------
+------------------------------------------------------
 1. SNO-160-use-boolean-values-in-facets (#280)
 2. SNO-116 Use summary_matrix instead of summary (#278)
 3. SNO-157-make-facets-collapsable (#275)
 
 Snovault 1.0.45 (released) encoded v102.0
-----------------------------------------
+-----------------------------------------
 1. SNO-154-fix-magic-json-bug (#272)
 2. SNO-156 Use pyramid_retry 2.1.1 (#273)
 3. SNO-137-add-search-doc (#267)
@@ -117,7 +117,7 @@ Snovault 1.0.33 (released) encoded v87.0
 2. SNO-102 use-openjdk-java-for-circleci (#205)
 
 Snovault 1.0.32 (released) encoded v87rc1
-----------------------------------------
+-----------------------------------------
 1. SNO-99 port travis tests to circleci (#202)
 2. SNO-100 Parallelize batchupgrade script (#201)
 3. SNO-92 Fix batch upgrade logging (#201)
@@ -134,7 +134,7 @@ Snovault 1.0.30 (released) encoded v85x2
 1. SNO-96 fix indexing tests (#196)
 
 Snovault 1.0.29 (released) encoded v85rc1
-----------------------------------------
+-----------------------------------------
 1. SNO-91 update-travis-java-ref (#188)
 2. SNO-87 fixed-issue-while-profile-url-does-not-work (#179)
 3. SNO-86 escape-search-text (#178)
@@ -146,50 +146,50 @@ Snovault 1.0.28 (released) encoded v84rc1
 2. SNO-85 facet-reappearing (#175)
 
 Snovault 1.0.27 (released) encoded v83.0
------------------
+----------------------------------------
 1. SNO-83 Rotate img attachment for EXIF (#174)
 
 Snovault 1.0.26 (released) encoded v82.0
------------------
+----------------------------------------
 1. SNO-78 add long facet type (#168)
 2. SNO-80 typeahead for facets (#168)
 3. SNO-73 Add uuid queue module (#162)
 
 Snovault 1.0.25 (released) encoded v81.0
------------------
+----------------------------------------
 1. SNO-77 Add review to submit_for validation (#166)
 
 Snovault 1.0.24 (released) encoded v80.0
------------------
+----------------------------------------
 1. SNO-75-fix-linux-travis-option (#163)
 
 Snovault 1.0.23 (released) encoded v79.0 also
------------------
+---------------------------------------------
 1. SNO-72 Update simple for uuid module (#158)
 
 Snovault 1.0.22 (released) encoded v79.0 also
------------------
+---------------------------------------------
 1. SNO-68 Stop using _all for indexing (#155)
 2. SNO-74 Remove npm shrinkwrap json (#157)
 
 Snovault 1.0.21 (released) encoded v78.0 also
------------------
+---------------------------------------------
 1. SNO-65 Refactor indexer uuids as server client (#151)
 
 Snovault 1.0.20 (released) encoded v78.0
------------------
+----------------------------------------
 1. SNO-63 Update pip requests and remove wal-e reqs (#150)
 2. SNO-66 Add new endpoint to map schema to schema titles (#152)
 
 Snovault 1.0.19 (released) encoded v77.0
------------------
+----------------------------------------
 1. SNO-60-check-report-res-has-view (#147)
 2. SNO-50 Initial shopping cart (#142)
 3. SNO-59-fix-index-logger-name (#137)
 4. SNO-53 Add index flags to indexers (#137)
 
 Snovault 1.0.18 (released) encoded v76.0
------------------
+----------------------------------------
 1. SNO-49 Change audit inherit default (#132)
 2. SNO-31 Refactor search related views (#141) (#143)
 
