@@ -18,7 +18,7 @@ INSTALL_REQUIRES = [
     "elasticsearch-dsl==5.4.0",
     "elasticsearch==5.4.0",
     "future==0.18.2",
-    "jsonschema-serialize-fork @ git+https://github.com/lrowe/jsonschema_serialize_fork.git@2.1.1",  # noqa
+    "jsonschema_serialize_fork==2.1.1",
     "lucenequery==0.1",
     "passlib==1.7.2",
     "psutil==5.6.7",
@@ -59,7 +59,7 @@ EXTRAS_REQUIRE = {
         "repoze.debug==1.1",
         "rfc3987==1.3.8",
         "rutter==0.2",
-        "subprocess-middleware @ git+https://github.com/lrowe/subprocess_middleware.git@0.3",  # noqa
+        "subprocess_middleware==0.3",
         "waitress==1.4.3",
         "xlrd==1.2.0",
         "zc.buildout==2.13.2",
