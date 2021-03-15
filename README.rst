@@ -103,9 +103,9 @@ Application Installation
         pip install -e '.[dev]'
 
     If psycopg2 fails to compile, you may need to set LDFLAGS to the output of ``pg_config --ldflags`` before pip installation.
-    .. code-block:: bash
+        .. code-block:: bash
 
-        env LDFLAGS=$(pg_config --ldflags) pip install -e '.[dev]'
+            env LDFLAGS=$(pg_config --ldflags) pip install -e '.[dev]'
 
 3. Build Application
     .. code-block:: bash
