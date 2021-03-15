@@ -18,13 +18,15 @@ System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
 3. Python3
     .. code-block:: bash
 
-        3.6.9 and 3.7.6 have been tested
+        3.6.9, 3.7.6, and 3.7.10 have been tested
         3.8 does not work as of Feb 2020
 
 4. Postgres\@11 (Postgres\@9.3 also works)
     .. code-block:: bash
 
         brew install postgresql@11
+        # May need to add postgres to PATH in your shell profile, e.g. ~/.bash_profile, ~/.zshrc
+        # echo 'export PATH="/usr/local/opt/postgresql@11/bin:$PATH"' >> YOUR_SHELL_PROFILE
 
 5. Node 10.x.x
     .. code-block:: bash
@@ -50,11 +52,11 @@ System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
         # Using the correct ruby version bin diretory, make a sym link
         ln -s /usr/local/lib/ruby/gems/2.6.0/bin/compass /usr/local/opt/ruby/bin/compass
 
-8. Java 8 (Java 11 has also been used)
+8. Java 11
     .. code-block:: bash
 
-        brew install adoptopenjdk8
-        # Add to you PATH in terminal profile, i.e. ~/.bash_profile or ~/.zshrc
+        brew install openjdk@11
+        # Add to your PATH in terminal profile, i.e. ~/.bash_profile or ~/.zshrc
         export JAVA_HOME=$(/usr/libexec/java_home -v 1.8)
 
 9. Elasticsearch 5.x
@@ -92,12 +94,18 @@ Application Installation
         cd your-work-dir
         python3 -m venv snovault-venv
         source snovault-venv/bin/activate
+        pip install -U pip==21.0.1
 
 2. Clone the repo and install requirements
     .. code-block:: bash
 
         cd snovault
         pip install -e '.[dev]'
+
+    If psycopg2 fails to compile, you may need to set LDFLAGS to the output of ``pg_config --ldflags`` before pip installation.
+    .. code-block:: bash
+
+        env LDFLAGS=$(pg_config --ldflags) pip install -e '.[dev]'
 
 3. Build Application
     .. code-block:: bash
