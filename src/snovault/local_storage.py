@@ -25,7 +25,7 @@ class LocalStoreClient():
     def __init__(self, **kwargs):
         self.local_tz = kwargs.get('local_tz', 'GMT')
         self.client = StrictRedis(
-            charset='utf-8',
+            encoding='utf-8',
             decode_responses=True,
             db=kwargs['db_index'],
             host=kwargs['host'],
