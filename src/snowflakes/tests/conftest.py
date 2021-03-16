@@ -47,7 +47,7 @@ _app_settings = {
     'postgresql.statement_timeout': 20,
     'retry.attempts': 3,
     "ontology_path": (
-        pkg_resources.resource_filename("snowflakes", "") + "/../../ontology.json",
+        pkg_resources.resource_filename("snowflakes", "") + "/../../ontology.json"
     ),
     # Local Storage
     'local_storage_host': 'localhost',
