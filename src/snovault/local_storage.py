@@ -49,7 +49,7 @@ class LocalStoreClient():
         return self.client.hgetall(key)
 
     def dict_set(self, key, hash_dict):
-        return self.client.hmset(key, hash_dict)
+        return self.client.hset(key, hash_dict)
     
     def get_tag_keys(self, tag):
         return self.client.keys(f"{tag}:*")
