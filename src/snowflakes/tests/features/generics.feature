@@ -1,4 +1,4 @@
-@generics @usefixtures(workbook)
+@generics
 Feature: Generics
 
     Scenario Outline: Generics
