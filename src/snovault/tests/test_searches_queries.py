@@ -399,10 +399,10 @@ def test_searches_queries_abstract_query_factory_escape_regex_slashes(params_par
     ) == '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (@type:File)'
     assert aq._escape_regex_slashes(
         'Wnt/β-catenin'
-    ) == 'Wnt\/β-catenin'
+    ) == 'Wnt\\/β-catenin'
     assert aq._escape_regex_slashes(
         '/targets/H3K9me3-human/'
-    ) == '\/targets\/H3K9me3-human\/'
+    ) == '\\/targets\\/H3K9me3-human\\/'
 
 
 def test_searches_queries_abstract_query_factory_escape_fuzzy_tilde(params_parser_snovault_types):
@@ -415,13 +415,13 @@ def test_searches_queries_abstract_query_factory_escape_fuzzy_tilde(params_parse
     ) == '@type:Experiment date_created:[01-01-2018 TO 01-02-2018]'
     assert aq._escape_fuzzy_tilde(
         '(ctcf) AND (myers)~ AND NOT (~snyder or pacha) AND (@type:File)'
-    ) == '(ctcf) AND (myers)\~ AND NOT (\~snyder or pacha) AND (@type:File)'
+    ) == '(ctcf) AND (myers)\\~ AND NOT (\\~snyder or pacha) AND (@type:File)'
     assert aq._escape_fuzzy_tilde(
         'Wnt/β-~catenin'
-    ) == 'Wnt/β-\~catenin'
+    ) == 'Wnt/β-\\~catenin'
     assert aq._escape_fuzzy_tilde(
         '/targets/H3K9me3-human/~'
-    ) == '/targets/H3K9me3-human/\~'
+    ) == '/targets/H3K9me3-human/\\~'
 
 
 def test_searches_queries_abstract_query_factory_escape_boost_caret(params_parser_snovault_types):
@@ -431,13 +431,13 @@ def test_searches_queries_abstract_query_factory_escape_boost_caret(params_parse
     assert aq._escape_boost_caret('ctcf') == 'ctcf'
     assert aq._escape_boost_caret(
         'eclip^'
-    ) == 'eclip\^'
+    ) == 'eclip\\^'
     assert aq._escape_boost_caret(
         '(ctcf) AND (my^ers)^'
-    ) == '(ctcf) AND (my\^ers)\^'
+    ) == '(ctcf) AND (my\\^ers)\\^'
     assert aq._escape_boost_caret(
         '^^Wnt/β-catenin'
-    ) == '\^\^Wnt/β-catenin'
+    ) == '\\^\\^Wnt/β-catenin'
     assert aq._escape_boost_caret(
         '/targets/H3K9me3-human/'
     ) == '/targets/H3K9me3-human/'
@@ -456,19 +456,19 @@ def test_searches_queries_abstract_query_factory_escape_reserved_query_string_ch
     ) == '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (@type:File)'
     assert aq._escape_reserved_query_string_characters(
         'Wnt/β-catenin'
-    ) == 'Wnt\/β-catenin'
+    ) == 'Wnt\\/β-catenin'
     assert aq._escape_reserved_query_string_characters(
         '/targets/H3K9me3-human/'
-    ) == '\/targets\/H3K9me3-human\/'
+    ) == '\\/targets\\/H3K9me3-human\\/'
     assert aq._escape_reserved_query_string_characters(
         '(ctcf)~ AND (myers) AND NOT^ (snyder or pacha) AND (@type:File)'
-    ) == '(ctcf)\~ AND (myers) AND NOT\^ (snyder or pacha) AND (@type:File)'
+    ) == '(ctcf)\\~ AND (myers) AND NOT\\^ (snyder or pacha) AND (@type:File)'
     assert aq._escape_reserved_query_string_characters(
         '^Wnt/β-catenin~~'
-    ) == '\^Wnt\/β-catenin\~\~'
+    ) == '\\^Wnt\\/β-catenin\\~\\~'
     assert aq._escape_reserved_query_string_characters(
         '/targets/H3K9me3-human~/'
-    ) == '\/targets\/H3K9me3-human\~\/'
+    ) == '\\/targets\\/H3K9me3-human\\~\\/'
 
 
 def test_searches_queries_abstract_query_factory_validated_query_string_query(params_parser_snovault_types):
@@ -483,9 +483,9 @@ def test_searches_queries_abstract_query_factory_validated_query_string_query(pa
         '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (@type:File)'
     ) == '(ctcf) AND (myers) AND NOT (snyder or pacha) AND (embedded.@type:File)'
     assert aq._validated_query_string_query(
-        'Wnt\/β-catenin'
-    ) == 'Wnt\/β-catenin'
-    special_chars = '&& || > < ! ( ) { } [ ] ^ " ~ \ :'
+        'Wnt\\/β-catenin'
+    ) == 'Wnt\\/β-catenin'
+    special_chars = '&& || > < ! ( ) { } [ ] ^ " ~ \\ :'
     for c in special_chars.split(' '):
         with pytest.raises(HTTPBadRequest):
             aq._validated_query_string_query(c)
@@ -1932,7 +1932,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_re
                 'fields': [
                     '_all'
                 ],
-                'query': '(cherry\^)'
+                'query': '(cherry\\^)'
             }
         }
     }
@@ -1954,7 +1954,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_re
                 'fields': [
                     '_all'
                 ],
-                'query': '(cherry\~)'
+                'query': '(cherry\\~)'
             }
         }
     }
@@ -1976,7 +1976,7 @@ def test_searches_queries_abstract_query_factory_add_query_string_query(dummy_re
                 'fields': [
                     '_all'
                 ],
-                'query': '(\/cherry\^\~)'
+                'query': '(\\/cherry\\^\\~)'
             }
         }
     }
