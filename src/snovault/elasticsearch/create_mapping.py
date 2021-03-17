@@ -80,7 +80,7 @@ def schema_mapping(name, schema):
         type_ = schema['type']
 
     # Elasticsearch handles multiple values for a field
-    if type_ == 'array':
+    if type_ == 'array' or 'array' in type_:
         return schema_mapping(name, schema['items'])
 
     if type_ == 'object':
