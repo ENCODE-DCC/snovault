@@ -105,7 +105,16 @@ Application Installation
     If psycopg2 fails to compile, you may need to set LDFLAGS to the output of ``pg_config --ldflags`` before pip installation.
         .. code-block:: bash
 
-            env LDFLAGS=$(pg_config --ldflags) pip install -e '.[dev]'
+            LDFLAGS=$(pg_config --ldflags) pip install -e '.[dev]'
+
+    If you have errors at runtime that look like this::
+
+        ImportError: dlopen(/Users/foo/venv/lib/python3.7/site-packages/psycopg2/_psycopg.cpython-37m-darwin.so, 2): Symbol not found: _PQencryptPasswordConn
+        Referenced from: /Users/foo/venv/lib/python3.7/site-packages/psycopg2/_psycopg.cpython-37m-darwin.so
+        Expected in: /usr/lib/libpq.5.dylib
+        in /Users/foo/venv/lib/python3.7/site-packages/psycopg2/_psycopg.cpython-37m-darwin.so
+
+    you may need to add the ``brew``-installed Postgres headers, usually ``-L/usr/local/opt/postgresql@11/lib``, to the ``LDFLAGS`` in addition to the ones given by ``pg_config --ldflags``.
 
 3. Build Application
     .. code-block:: bash
