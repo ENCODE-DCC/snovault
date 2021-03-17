@@ -8,10 +8,8 @@ VERSION = "1.0.54"
 
 
 INSTALL_REQUIRES = [
-    "PasteDeploy==2.1.0",
     "Pillow==7.0.0",
     "SQLAlchemy==1.3.13",
-    "WSGIProxy2==0.4.6",
     "WebOb==1.8.6",
     "WebTest==2.0.34",
     "bcrypt==3.1.7",
@@ -20,8 +18,7 @@ INSTALL_REQUIRES = [
     "elasticsearch-dsl==5.4.0",
     "elasticsearch==5.4.0",
     "future==0.18.2",
-    "humanfriendly==6.1",
-    "jsonschema-serialize-fork @ git+https://github.com/lrowe/jsonschema_serialize_fork.git@2.1.1",  # noqa
+    "jsonschema_serialize_fork==2.1.1",
     "lucenequery==0.1",
     "passlib==1.7.2",
     "psutil==5.6.7",
@@ -29,7 +26,6 @@ INSTALL_REQUIRES = [
     "pyramid-localroles==0.1",
     "pyramid-multiauth==0.9.0",
     "pyramid-tm==2.4",
-    "pyramid-translogger==0.1",
     "pyramid==1.10.4",
     "pyramid_retry==2.1.1",
     "python-magic==0.4.15",
@@ -37,17 +33,10 @@ INSTALL_REQUIRES = [
     "rdflib-jsonld==0.4.0",
     "rdflib==4.2.2",
     "redis==3.5.3",
-    "repoze.debug==1.1",
     "requests==2.22.0",
-    "rfc3987==1.3.8",
-    "rutter==0.2",
     "simplejson==3.17.0",
-    "subprocess-middleware @ git+https://github.com/lrowe/subprocess_middleware.git@0.3",  # noqa
     "transaction==3.0.0",
     "venusian==3.0.0",
-    "waitress==1.4.3",
-    "xlrd==1.2.0",
-    "zc.buildout==2.13.2",
     "zope.interface==4.7.1",
     "zope.sqlalchemy==1.2",
 ]
@@ -61,10 +50,23 @@ EXTRAS_REQUIRE = {
         "pytest-exact-fixtures==0.3",
         "pytest-instafail==0.4.1.post0",
         "pytest-timeout==1.3.4",
+    ],
+    "snowflakes": [
+        "PasteDeploy==2.1.0",
+        "WSGIProxy2==0.4.6",
+        "humanfriendly==6.1",
+        "pyramid-translogger==0.1",
+        "repoze.debug==1.1",
+        "rfc3987==1.3.8",
+        "rutter==0.2",
+        "subprocess_middleware==0.3",
+        "waitress==1.4.3",
+        "xlrd==1.2.0",
+        "zc.buildout==2.13.2",
     ]
 }
 
-EXTRAS_REQUIRE["dev"] = EXTRAS_REQUIRE["tests"]
+EXTRAS_REQUIRE["dev"] = EXTRAS_REQUIRE["tests"] + EXTRAS_REQUIRE["snowflakes"]
 
 setup(
     name='snovault',
