@@ -1,5 +1,10 @@
 Changes
 =======
+
+Snovault 1.0.55 (released) encoded v114.0
+-----------------------------------------
+1. SNO-192-update-pip-install (#321)
+
 Snovault 1.0.54 (released) encoded v113.0
 -----------------------------------------
 1. SNO-27-pip-installable (#316)
