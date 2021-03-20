@@ -115,6 +115,7 @@ DEFAULT_TERMS_AGGREGATION_KWARGS = [
     'missing',
     'include',
     'aggs',
+    'order',
 ]
 
 DEFAULT_EXISTS_AGGREGATION_KWARGS = []
