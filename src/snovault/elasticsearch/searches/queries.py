@@ -1139,6 +1139,9 @@ class TopHitsQueryFactory(BasicSearchQueryFactory):
     def _make_top_hits_by_type_aggregation(self):
         return self._make_terms_aggregation(
             field=EMBEDDED_TYPE,
+            order={
+                MAX_SCORE: DESC,
+            },
             include=self.params_parser.param_values_to_list(
                 params=self._get_item_types() or self._get_default_item_types()
             ),
