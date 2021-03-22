@@ -29,9 +29,14 @@ System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
         # echo 'export PATH="/usr/local/opt/postgresql@11/bin:$PATH"' >> YOUR_SHELL_PROFILE
 
 5. Node 10.x.x
+    Node 12 is known to work as well.
+
     .. code-block:: bash
 
         brew install node@10
+
+    .. note::
+        You may need to link ``node``/``npm`` with ``brew link node@10`` then add it to your ``PATH``
 
 6. Ruby - Non system version to install compass while avoiding permission errors
     .. code-block:: bash
@@ -84,6 +89,8 @@ System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
         If working in a python virtual environment, then the chromedriver can be added to
         your-venv-dir/bin directory.
 
+        You also need to install Chrome (if not already installed).
+        In addition, allow ``chromedriver`` (System Preferences->Security & Privacy) to run to run bdd tests
 
 Application Installation
 ========================
