@@ -261,6 +261,36 @@ def test_searches_parsers_params_parser_get_must_not_match_filters(dummy_request
         ('type!', 'Experiment')
     ]
 
+def test_searches_parsers_params_parser_get_inequality_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&files.file_type!=fastq&field=status'
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_inequality_filters() == [
+        ('file_size', 'gte:30000'),
+        ('file_size', 'lt:2560000'),
+        ('replicates.read_count', 'lte:99999999'),
+        ('biosample.replicate.size', 'gt:2')
+    ]
+
+def test_searches_parsers_params_parser_get_non_inequality_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&files.file_type!=fastq&field=status'
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&file_size=*'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_non_inequality_filters() == [
+        ('type', 'Experiment'),
+        ('type', 'File'),
+        ('files.file_type!', 'fastq'),
+        ('field', 'status'),
+        ('file_size', '*')
+    ]
 
 def test_searches_parsers_params_parser_get_must_filters(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser

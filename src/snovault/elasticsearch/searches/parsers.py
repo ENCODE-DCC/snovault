@@ -7,6 +7,7 @@ from .interfaces import DEBUG_KEY
 from .interfaces import FIELD_KEY
 from .interfaces import FROM_KEY
 from .interfaces import FRAME_KEY
+from .interfaces import INEQUALITY_REGEX
 from .interfaces import LIMIT_KEY
 from .interfaces import MODE_KEY
 from .interfaces import NOT_FLAG
@@ -156,6 +157,24 @@ class ParamsParser:
         '''
         return self.get_filters_by_condition(
             key_and_value_condition=lambda k, _: k.endswith(NOT_FLAG),
+            params=params
+        )
+
+    def get_inequality_filters(self, params=None):
+        '''
+        Returns params with (lt:|lte:|gt:|gte:) syntax.
+        '''
+        return self.get_filters_by_condition(
+            key_and_value_condition=lambda _, v: bool(INEQUALITY_REGEX.match(v)),
+            params=params
+        )
+
+    def get_non_inequality_filters(self, params=None):
+        '''
+        Returns params without (lt:|lte:|gt:|gte:) syntax.
+        '''
+        return self.get_filters_by_condition(
+            key_and_value_condition=lambda _, v: INEQUALITY_REGEX.match(v) is None,
             params=params
         )
 
