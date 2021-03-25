@@ -1,3 +1,6 @@
+import re
+
+
 ADVANCED_QUERY_KEY = 'advancedQuery'
 ALL = 'all'
 AND = 'AND'
@@ -37,6 +40,7 @@ GROUP_BY = 'group_by'
 GROUP_SUBMITTER = 'group.submitter'
 HITS = 'hits'
 ITEM = 'Item'
+INEQUALITY_REGEX = re.compile('(lt|lte|gt|gte):')
 JS_IS_EQUAL = 'isEqual'
 JS_TRUE = True
 JS_FALSE = False
