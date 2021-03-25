@@ -58,7 +58,11 @@ from .interfaces import LONG
 from .interfaces import MATRIX
 from .interfaces import MAX
 from .interfaces import MAX_SCORE
+from .interfaces import MUST
+from .interfaces import MUST_NOT
+from .interfaces import NOT_EXISTS
 from .interfaces import NOT_JOIN
+from .interfaces import NOT_RANGES
 from .interfaces import NO
 from .interfaces import NO_LIMIT
 from .interfaces import ORDER
@@ -67,6 +71,7 @@ from .interfaces import PICKER
 from .interfaces import PRINCIPALS_ALLOWED_VIEW
 from .interfaces import PROPERTIES
 from .interfaces import QUERY_STRING
+from .interfaces import RANGES
 from .interfaces import _SCORE
 from .interfaces import SEARCH_AUDIT
 from .interfaces import SIMPLE_QUERY_STRING
@@ -580,13 +585,21 @@ class AbstractQueryFactory:
         '''
         Returns appropriate queries from param filters.
         '''
-        _must, _must_not, _exists, _not_exists = self.params_parser.split_filters_by_must_and_exists(
+        split_filters = self.params_parser.split_filters(
             params=params or self._get_post_filters()
         )
-        must = self._make_must_equal_terms_queries_from_params(_must)
-        must_not = self._make_must_equal_terms_queries_from_params(_must_not)
-        exists = self._make_field_must_exist_query_from_params(_exists)
-        not_exists = self._make_field_must_exist_query_from_params(_not_exists)
+        must = self._make_must_equal_terms_queries_from_params(
+            split_filters[MUST]
+        )
+        must_not = self._make_must_equal_terms_queries_from_params(
+            split_filters[MUST_NOT]
+        )
+        exists = self._make_field_must_exist_query_from_params(
+            split_filters[EXISTS]
+        )
+        not_exists = self._make_field_must_exist_query_from_params(
+            split_filters[NOT_EXISTS]
+        )
         return must, must_not, exists, not_exists
 
     def _make_terms_aggregation(self, field, **kwargs):

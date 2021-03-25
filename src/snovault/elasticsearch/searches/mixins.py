@@ -8,13 +8,19 @@ from .interfaces import APPENDED
 from .interfaces import BUCKETS
 from .interfaces import DASH
 from .interfaces import DOC_COUNT
+from .interfaces import EXISTS
 from .interfaces import FIELD_KEY
 from .interfaces import JS_IS_EQUAL
 from .interfaces import JS_TRUE
 from .interfaces import JS_FALSE
 from .interfaces import KEY
+from .interfaces import MUST
+from .interfaces import MUST_NOT
+from .interfaces import NOT_EXISTS
+from .interfaces import NOT_RANGES
 from .interfaces import OPEN_ON_LOAD
 from .interfaces import PERIOD
+from .interfaces import RANGES
 from .interfaces import TERMS
 from .interfaces import TITLE
 from .interfaces import TOTAL
@@ -139,16 +145,24 @@ class AggsToFacetsMixin:
             )
 
     def _make_fake_buckets_from_fake_facets(self, fake_facets):
-        must, must_not, exists, not_exists = self.query_builder.params_parser.split_filters_by_must_and_exists(
+        split_filters = self.query_builder.params_parser.split_filters(
             params=fake_facets
         )
         self._make_fake_buckets(
-            params=must + exists,
+            params=(
+                split_filters[MUST] +
+                split_filters[EXISTS] +
+                split_filters[RANGES]
+            ),
             is_equal=JS_TRUE
         )
         self._make_fake_buckets(
             params=self.query_builder.params_parser.remove_not_flag(
-                params=must_not + not_exists
+                params=(
+                    split_filters[MUST_NOT] +
+                    split_filters[NOT_EXISTS] +
+                    split_filters[NOT_RANGES]
+                ),
             ),
             is_equal=JS_FALSE
         )
