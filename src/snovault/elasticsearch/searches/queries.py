@@ -556,7 +556,7 @@ class AbstractQueryFactory:
             field=field
         )
 
-    def _make_field_must_exist_query_from_params(self, params):
+    def _make_field_must_exist_queries_from_params(self, params):
         return self._make_queries_from_params(
             query_context=self._make_field_must_exist_query,
             params=params
@@ -578,7 +578,7 @@ class AbstractQueryFactory:
             }
         )
 
-    def _make_range_query_from_params(self, params):
+    def _make_range_queries_from_params(self, params):
         return self._make_queries_from_params(
             query_context=self._make_range_query,
             params=params
@@ -618,13 +618,19 @@ class AbstractQueryFactory:
         must_not = self._make_must_equal_terms_queries_from_params(
             split_filters[MUST_NOT]
         )
-        exists = self._make_field_must_exist_query_from_params(
+        exists = self._make_field_must_exist_queries_from_params(
             split_filters[EXISTS]
         )
-        not_exists = self._make_field_must_exist_query_from_params(
+        not_exists = self._make_field_must_exist_queries_from_params(
             split_filters[NOT_EXISTS]
         )
-        return must, must_not, exists, not_exists
+        ranges = self._make_range_queries_from_params(
+            split_filters[RANGES]
+        )
+        not_ranges = self._make_range_queries_from_params(
+            split_filters[NOT_RANGES]
+        )
+        return must, must_not, exists, not_exists, ranges, not_ranges
 
     def _make_terms_aggregation(self, field, **kwargs):
         return A(
@@ -838,7 +844,7 @@ class AbstractQueryFactory:
                 not_keys=[facet_name],
                 params=params
             )
-            must, must_not, exists, not_exists = self._make_split_filter_queries(
+            must, must_not, exists, not_exists, ranges, not_ranges = self._make_split_filter_queries(
                 params=filtered_params
             )
             subaggregation = self._subaggregation_factory(
@@ -853,8 +859,8 @@ class AbstractQueryFactory:
             agg = self._make_filter_and_subaggregation(
                 title=facet_name.replace(PERIOD, DASH),
                 filter_context=self._make_bool_query(
-                    must=must + exists,
-                    must_not=must_not + not_exists
+                    must=must + exists + ranges,
+                    must_not=must_not + not_exists + not_ranges
                 ),
                 subaggregation=subaggregation
             )
@@ -865,11 +871,11 @@ class AbstractQueryFactory:
         These filters apply to the final results returned, after aggregation
         has been computed.
         '''
-        must, must_not, exists, not_exists = self._make_split_filter_queries()
+        must, must_not, exists, not_exists, ranges, not_ranges = self._make_split_filter_queries()
         self.search = self._get_or_create_search().post_filter(
             self._make_bool_query(
-                must=must + exists,
-                must_not=must_not + not_exists
+                must=must + exists + ranges,
+                must_not=must_not + not_exists + not_ranges
             )
         )
 
@@ -1066,12 +1072,12 @@ class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
         ]
 
     def add_matrix_aggregations(self):
-        must, must_not, exists, not_exists = self._make_split_filter_queries(
+        must, must_not, exists, not_exists, ranges, not_ranges = self._make_split_filter_queries(
             params=self._get_post_filters()
         )
         filter_context = self._make_bool_query(
-            must=must + exists,
-            must_not=must_not + not_exists
+            must=must + exists + ranges,
+            must_not=must_not + not_exists + not_ranges
         )
         group_by_names = self._get_group_by_names()
         for axis, names in group_by_names:
@@ -1196,12 +1202,12 @@ class TopHitsQueryFactory(BasicSearchQueryFactory):
         )
 
     def add_filtered_top_hits_aggregation(self):
-        must, must_not, exists, not_exists = self._make_split_filter_queries(
+        must, must_not, exists, not_exists, ranges, not_ranges = self._make_split_filter_queries(
             params=self._get_post_filters()
         )
         filter_context = self._make_bool_query(
-            must=must + exists,
-            must_not=must_not + not_exists
+            must=must + exists + ranges,
+            must_not=must_not + not_exists + not_ranges
         )
         subaggregation = self._make_top_hits_by_type_aggregation()
         filter_agg = self._make_filter_and_subaggregation(

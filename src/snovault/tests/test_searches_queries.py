@@ -1773,7 +1773,7 @@ def test_searches_queries_abstract_query_factory_make_field_must_exist_query(par
 def test_searches_queries_abstract_query_factory_make_field_must_exist_queries_from_params(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    meqs = aq._make_field_must_exist_query_from_params(
+    meqs = aq._make_field_must_exist_queries_from_params(
         params=aq._get_filters()
     )
     actual = [m.to_dict() for m in meqs]
@@ -1826,7 +1826,7 @@ def test_searches_queries_abstract_query_factory_make_range_query(params_parser)
     }
 
 
-def test_searches_queries_abstract_query_factory_make_range_query_from_params(dummy_request):
+def test_searches_queries_abstract_query_factory_make_range_queries_from_params(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     dummy_request.environ['QUERY_STRING'] = (
@@ -1835,7 +1835,7 @@ def test_searches_queries_abstract_query_factory_make_range_query_from_params(du
     )
     params_parser = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(params_parser)
-    rqs = aq._make_range_query_from_params(
+    rqs = aq._make_range_queries_from_params(
         params=sorted(aq._get_filters())
     )
     actual = [r.to_dict() for r in rqs]
@@ -2599,7 +2599,7 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_pa
 def test_searches_queries_abstract_query_factory_make_split_filter_queries(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    must, must_not, exists, not_exists = aq._make_split_filter_queries()
+    must, must_not, exists, not_exists, ranges, not_ranges = aq._make_split_filter_queries()
     expected_must = [
         {'terms': {'embedded.award.project': ['Roadmap']}},
         {'terms': {'embedded.target.label': ['H3K27me3']}},
@@ -2624,6 +2624,8 @@ def test_searches_queries_abstract_query_factory_make_split_filter_queries(param
     assert all(e in actual_must_not for e in expected_must_not)
     assert [e.to_dict() for e in exists] == []
     assert [e.to_dict() for e in not_exists] == []
+    assert [e.to_dict() for e in ranges] == []
+    assert [e.to_dict() for e in not_ranges] == []
 
 
 def test_searches_queries_abstract_query_factory_make_split_filter_queries_wildcards(dummy_request):
@@ -2635,7 +2637,7 @@ def test_searches_queries_abstract_query_factory_make_split_filter_queries_wildc
     )
     p = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(p)
-    must, must_not, exists, not_exists = aq._make_split_filter_queries()
+    must, must_not, exists, not_exists, ranges, not_ranges = aq._make_split_filter_queries()
     actual_must = [m.to_dict() for m in must]
     expected_must = [
         {'terms': {'embedded.file_type': ['bam']}},
@@ -2652,6 +2654,8 @@ def test_searches_queries_abstract_query_factory_make_split_filter_queries_wildc
     ]
     actual_not_exists = [e.to_dict() for e in not_exists]
     assert all(e in actual_not_exists for e in expected_not_exists)
+    assert [r.to_dict() for r in ranges] == []
+    assert [r.to_dict() for r in not_ranges] == []
 
 
 def test_searches_queries_abstract_query_factory_make_filter_aggregation(params_parser):
