@@ -1789,6 +1789,90 @@ def test_searches_queries_abstract_query_factory_make_field_must_exist_queries_f
     assert all(e in actual for e in expected)
 
 
+def test_searches_queries_abstract_query_factory_convert_terms_to_range_syntax(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    ranges = aq._convert_terms_to_range_syntax(
+        [
+            'lt:5',
+            'lte:3000',
+            'gt:9999999999999',
+            'gte:2022', # Test duplicate key overridden.
+            'gte:3033',
+        ]
+    )
+    assert ranges == {
+        'lt': '5',
+        'lte': '3000',
+        'gt': '9999999999999',
+        'gte': '3033'
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_range_query(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    rq = aq._make_range_query(
+        field='embedded.read_count',
+        terms=['gt:5', 'lte:30']
+    )
+    assert rq.to_dict() == {
+        'range': {
+            'embedded.read_count': {
+                'gt': '5',
+                'lte': '30'
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_range_query_from_params(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    rqs = aq._make_range_query_from_params(
+        params=sorted(aq._get_filters())
+    )
+    actual = [r.to_dict() for r in rqs]
+    expected = [
+        {
+            'range': {
+                'embedded.biosample.replicate.size': {
+                    'gt': '2'
+                }
+            }
+        },
+        {
+            'range': {
+                'embedded.file_size': {
+                    'gte': '30000',
+                    'lt': '2560000'
+                }
+            }
+        },
+        {
+            'range': {
+                'embedded.quality_metric.RSC1': {
+                    'lt': '30'
+                }
+            }
+        },
+        {
+            'range': {
+                'embedded.replicates.read_count': {
+                    'lte': '99999999'
+                }
+            }
+        }
+    ]
+    assert all(e in actual for e in expected)
+
+
 def test_searches_queries_abstract_query_factory_make_default_filters(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)

@@ -39,6 +39,7 @@ from .interfaces import AUDIT
 from .interfaces import BOOL
 from .interfaces import BOOST_VALUES
 from .interfaces import COLLECTION_NAME
+from .interfaces import COLON
 from .interfaces import COLUMNS
 from .interfaces import DASH
 from .interfaces import DESC
@@ -71,6 +72,7 @@ from .interfaces import PICKER
 from .interfaces import PRINCIPALS_ALLOWED_VIEW
 from .interfaces import PROPERTIES
 from .interfaces import QUERY_STRING
+from .interfaces import RANGE
 from .interfaces import RANGES
 from .interfaces import _SCORE
 from .interfaces import SEARCH_AUDIT
@@ -557,6 +559,28 @@ class AbstractQueryFactory:
     def _make_field_must_exist_query_from_params(self, params):
         return self._make_queries_from_params(
             query_context=self._make_field_must_exist_query,
+            params=params
+        )
+
+    @staticmethod
+    def _convert_terms_to_range_syntax(terms):
+        return dict(
+            term.split(COLON)
+            for term in terms
+        )
+
+
+    def _make_range_query(self, field, terms, **kwargs):
+        return Q(
+            RANGE,
+            **{
+                field: self._convert_terms_to_range_syntax(terms)
+            }
+        )
+
+    def _make_range_query_from_params(self, params):
+        return self._make_queries_from_params(
+            query_context=self._make_range_query,
             params=params
         )
 
