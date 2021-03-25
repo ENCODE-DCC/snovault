@@ -869,33 +869,59 @@ def test_searches_parsers_params_parser_group_values_by_key(dummy_request):
     }
 
 
-def test_searchers_parsers_params_parser_split_filters_by_must_and_exists(dummy_request):
+def test_searchers_parsers_params_parser_split_filters(dummy_request):
     from snovault.elasticsearch.searches.defaults import NOT_FILTERS
     from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=*&status=released&status!=submitted&type=File&file_size=*'
         '&file_format%21=bigWig&restricted!=*&no_file_available!=*&limit=all'
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30'
     )
     p = ParamsParser(dummy_request)
-    must, must_not, exists, not_exists = p.split_filters_by_must_and_exists(
+    params = p.split_filters(
         params=p.get_not_keys_filters(not_keys=NOT_FILTERS) + p.get_type_filters()
     )
-    assert must == [
+    assert params['must'] == [
         ('status', 'released'),
         ('type', 'File')
     ]
-    assert must_not == [
+    assert params['must_not'] == [
         ('status!', 'submitted'),
         ('file_format!', 'bigWig')
     ]
-    assert exists == [
+    assert params['exists'] == [
         ('file_size', '*'),
         ('type', '*')
     ]
-    assert not_exists == [
+    assert params['not_exists'] == [
         ('restricted!', '*'),
         ('no_file_available!', '*')
     ]
+    assert params['ranges'] == [
+        ('file_size', 'gte:30000'),
+        ('file_size', 'lt:2560000'),
+        ('replicates.read_count', 'lte:99999999'),
+        ('biosample.replicate.size', 'gt:2'),
+    ]
+    assert params['not_ranges'] == [
+        ('quality_metric.RSC1!', 'lt:30'),
+    ]
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=File&status=released'
+    )
+    p = ParamsParser(dummy_request)
+    params = p.split_filters(
+        params=p.get_not_keys_filters(not_keys=NOT_FILTERS) + p.get_type_filters()
+    )
+    for k, v in params.items():
+        if k == 'must':
+            assert v == [
+                ('status', 'released'),
+                ('type', 'File'),
+            ]
+        else:
+            assert v == []
 
 
 def test_searches_parsers_mutable_params_parser_init(dummy_request):
