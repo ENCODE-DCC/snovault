@@ -565,7 +565,7 @@ class AbstractQueryFactory:
     @staticmethod
     def _convert_terms_to_range_syntax(terms):
         return dict(
-            term.split(COLON)
+            term.split(COLON, 1)
             for term in terms
         )
 

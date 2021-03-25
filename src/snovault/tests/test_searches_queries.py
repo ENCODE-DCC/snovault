@@ -1805,7 +1805,10 @@ def test_searches_queries_abstract_query_factory_convert_terms_to_range_syntax(p
         'lt': '5',
         'lte': '3000',
         'gt': '9999999999999',
-        'gte': '3033'
+        'gte': '3033',
+    }
+    assert aq._convert_terms_to_range_syntax(['lte:3000:asd']) == {
+        'lte': '3000:asd'
     }
 
 
