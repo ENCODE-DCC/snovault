@@ -2658,6 +2658,47 @@ def test_searches_queries_abstract_query_factory_make_split_filter_queries_wildc
     assert [r.to_dict() for r in not_ranges] == []
 
 
+def test_searches_queries_abstract_query_factory_make_split_filter_queries_ranges(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=*&restricted!=*&no_file_available!=*'
+        '&limit=10&field=@id&field=accession&lab.name=*&file_type=bam'
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30'
+    )
+    p = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(p)
+    must, must_not, exists, not_exists, ranges, not_ranges = aq._make_split_filter_queries()
+    actual_must = [m.to_dict() for m in must]
+    expected_must = [
+        {'terms': {'embedded.file_type': ['bam']}},
+        {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+    ]
+    assert all(e in actual_must for e in expected_must)
+    assert [m.to_dict() for m in must_not] == []
+    expected_exists = [
+        {'exists': {'field': 'embedded.lab.name'}},
+        {'exists': {'field': 'embedded.status'}}
+    ]
+    actual_exists = [e.to_dict() for e in exists]
+    assert all(e in actual_exists for e in expected_exists)
+    expected_not_exists = [
+        {'exists': {'field': 'embedded.restricted'}},
+        {'exists': {'field': 'embedded.no_file_available'}}
+    ]
+    actual_not_exists = [e.to_dict() for e in not_exists]
+    assert all(e in actual_not_exists for e in expected_not_exists)
+    assert [r.to_dict() for r in ranges] == [
+        {'range': {'embedded.file_size': {'gte': '30000', 'lt': '2560000'}}},
+        {'range': {'embedded.replicates.read_count': {'lte': '99999999'}}},
+        {'range': {'embedded.biosample.replicate.size': {'gt': '2'}}}
+    ]
+    assert [r.to_dict() for r in not_ranges] == [
+        {'range': {'embedded.quality_metric.RSC1': {'lt': '30'}}}
+    ]
+
+
 def test_searches_queries_abstract_query_factory_make_filter_aggregation(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
