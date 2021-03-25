@@ -266,14 +266,15 @@ def test_searches_parsers_params_parser_get_inequality_filters(dummy_request):
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&files.file_type!=fastq&field=status'
         '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
-        '&biosample.replicate.size=gt:2'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30&file_size=*'
     )
     p = ParamsParser(dummy_request)
     assert p.get_inequality_filters() == [
         ('file_size', 'gte:30000'),
         ('file_size', 'lt:2560000'),
         ('replicates.read_count', 'lte:99999999'),
-        ('biosample.replicate.size', 'gt:2')
+        ('biosample.replicate.size', 'gt:2'),
+        ('quality_metric.RSC1!', 'lt:30'),
     ]
 
 def test_searches_parsers_params_parser_get_non_inequality_filters(dummy_request):
@@ -281,7 +282,7 @@ def test_searches_parsers_params_parser_get_non_inequality_filters(dummy_request
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&files.file_type!=fastq&field=status'
         '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
-        '&biosample.replicate.size=gt:2&file_size=*'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30&file_size=*'
     )
     p = ParamsParser(dummy_request)
     assert p.get_non_inequality_filters() == [
@@ -289,13 +290,15 @@ def test_searches_parsers_params_parser_get_non_inequality_filters(dummy_request
         ('type', 'File'),
         ('files.file_type!', 'fastq'),
         ('field', 'status'),
-        ('file_size', '*')
+        ('file_size', '*'),
     ]
 
 def test_searches_parsers_params_parser_get_must_filters(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&files.file_type!=fastq&field=status&type=*'
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30&file_size=*'
     )
     p = ParamsParser(dummy_request)
     assert p.get_must_filters() == [
@@ -310,6 +313,8 @@ def test_searches_parsers_params_parser_get_must_not_filters(dummy_request):
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&files.file_type!=fastq'
         '&field=status&type=*&file_size!=*'
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30&file_size=*'
     )
     p = ParamsParser(dummy_request)
     assert p.get_must_not_filters() == [
@@ -322,10 +327,13 @@ def test_searches_parsers_params_parser_get_exists_filters(dummy_request):
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&files.file_type!=fastq'
         '&field=status&type=*&file_size!=*'
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30&file_size=*'
     )
     p = ParamsParser(dummy_request)
     assert p.get_exists_filters() == [
-        ('type', '*')
+        ('type', '*'),
+        ('file_size', '*'),
     ]
 
 
@@ -334,10 +342,43 @@ def test_searches_parsers_params_parser_get_not_exists_filters(dummy_request):
     dummy_request.environ['QUERY_STRING'] = (
         'type=Experiment&type=File&files.file_type!=fastq'
         '&field=status&type=*&file_size!=*'
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30&file_size=*'
     )
     p = ParamsParser(dummy_request)
     assert p.get_not_exists_filters() == [
         ('file_size!', '*')
+    ]
+
+
+def test_searches_parsers_params_parser_get_range_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&files.file_type!=fastq'
+        '&field=status&type=*&file_size!=*'
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30&file_size=*'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_range_filters() == [
+        ('file_size', 'gte:30000'),
+        ('file_size', 'lt:2560000'),
+        ('replicates.read_count', 'lte:99999999'),
+        ('biosample.replicate.size', 'gt:2')
+    ]
+
+
+def test_searches_parsers_params_parser_get_not_range_filters(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=Experiment&type=File&files.file_type!=fastq'
+        '&field=status&type=*&file_size!=*'
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30&file_size=*'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_not_range_filters() == [
+        ('quality_metric.RSC1!', 'lt:30')
     ]
 
 

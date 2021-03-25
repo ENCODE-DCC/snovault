@@ -180,21 +180,25 @@ class ParamsParser:
 
     def get_must_filters(self, params=None):
         '''
-        Like get_must_match_filters but wildcard values are excluded.
+        Only params with equals sign (excluding wildcard and range values).
         '''
-        return self.get_not_wildcard_filters(
-            params=self.get_must_match_filters(
-                params=params
+        return self.get_non_inequality_filters(
+            params=self.get_not_wildcard_filters(
+                params=self.get_must_match_filters(
+                    params=params
+                )
             )
         )
 
     def get_must_not_filters(self, params=None):
         '''
-        Like get_must_not_match_filters but wildcard values are excluded.
+        Only params with not equals sign (excluding wildcard and range values).
         '''
-        return self.get_not_wildcard_filters(
-            params=self.get_must_not_match_filters(
-                params=params
+        return self.get_non_inequality_filters(
+            params=self.get_not_wildcard_filters(
+                params=self.get_must_not_match_filters(
+                    params=params
+                )
             )
         )
 
@@ -213,6 +217,26 @@ class ParamsParser:
         Like get_must_not_match_filters but only wildcard values are included.
         '''
         return self.get_wildcard_filters(
+            params=self.get_must_not_match_filters(
+                params=params
+            )
+        )
+
+    def get_range_filters(self, params=None):
+        '''
+        Only params with range syntax and equals sign.
+        '''
+        return self.get_inequality_filters(
+            params=self.get_must_match_filters(
+                params=params
+            )
+        )
+
+    def get_not_range_filters(self, params=None):
+        '''
+        Only params with range syntax and not equals sign.
+        '''
+        return self.get_inequality_filters(
             params=self.get_must_not_match_filters(
                 params=params
             )
