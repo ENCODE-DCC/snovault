@@ -83,7 +83,7 @@ class ParamsParser:
             params=params
         )
 
-    def get_not_wildcard_filters(self, params=None):
+    def get_non_wildcard_filters(self, params=None):
         '''
         Returns params without wildcard value.
         '''
@@ -183,7 +183,7 @@ class ParamsParser:
         Only params with equals sign (excluding wildcard and range values).
         '''
         return self.get_non_inequality_filters(
-            params=self.get_not_wildcard_filters(
+            params=self.get_non_wildcard_filters(
                 params=self.get_must_match_filters(
                     params=params
                 )
@@ -195,7 +195,7 @@ class ParamsParser:
         Only params with not equals sign (excluding wildcard and range values).
         '''
         return self.get_non_inequality_filters(
-            params=self.get_not_wildcard_filters(
+            params=self.get_non_wildcard_filters(
                 params=self.get_must_not_match_filters(
                     params=params
                 )
