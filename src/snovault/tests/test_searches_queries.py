@@ -257,7 +257,8 @@ def test_searches_queries_abstract_query_factory_get_subtypes_for_item_type(para
         'TestingLinkSource',
         'TestingSearchSchema',
         'TestingDownload',
-        'TestingBadAccession'
+        'TestingBadAccession',
+        'TestingSearchSchemaSpecialFacets'
     ])
 
 
@@ -1958,6 +1959,19 @@ def test_searches_queries_abstract_query_factory_make_exists_aggregation(params_
     }
 
 
+def test_searches_queries_abstract_query_factory_make_stats_aggregation(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    sa = aq._make_stats_aggregation(
+        field='embedded.files.read_count',
+    )
+    assert sa.to_dict() == {
+        'stats': {
+            'field': 'embedded.files.read_count'
+        }
+    }
+
+
 def test_searches_queries_abstract_query_factory_map_param_to_elasticsearch_field():
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory({})
@@ -3175,7 +3189,7 @@ def test_searches_queries_abstract_query_factory_add_slice(params_parser, dummy_
 
 def test_searches_queries_abstract_query_factory_subaggregation_factory(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    from elasticsearch_dsl.aggs import Filters, Terms
+    from elasticsearch_dsl.aggs import Filters, Terms, Stats
     aq = AbstractQueryFactory(params_parser_snovault_types)
     sa = aq._subaggregation_factory('exists')(field='')
     assert isinstance(sa, Filters)
@@ -3183,6 +3197,8 @@ def test_searches_queries_abstract_query_factory_subaggregation_factory(params_p
     assert isinstance(sa, Terms)
     sa = aq._subaggregation_factory('typeahead')(field='')
     assert isinstance(sa, Terms)
+    sa = aq._subaggregation_factory('stats')(field='')
+    assert isinstance(sa, Stats)
 
 
 def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregation_filters(params_parser_snovault_types):
@@ -3311,6 +3327,147 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
         for k in expected.get('aggs', {}).keys()
     )
     assert actual['aggs']['Data Type']['aggs']['type']['terms']['exclude'] == ['Item']
+
+
+def test_searches_queries_basic_search_query_factory_add_aggregations_and_aggregation_filters_special_facets(dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.testing import DummyResource
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchemaSpecialFacets&status=released&dbxref=*&replcate.biosample.title=cell'
+        '&read_count=gte:3000&size!=lt:555'
+        '&limit=10'
+    )
+    dummy_request.context = DummyResource()
+    params_parser = ParamsParser(dummy_request)
+    bsqf = BasicSearchQueryFactory(params_parser)
+    bsqf.add_aggregations_and_aggregation_filters()
+    partial_expected = {
+        'query': {
+            'match_all': {}
+        },
+        'aggs': {
+            'Data Type': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released', 'archived']}},
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'exists': {'field': 'embedded.dbxref'}},
+                            {'range': {'embedded.read_count': {'gte': '3000'}}}
+                        ],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}},
+                            {'range': {'embedded.size': {'lt': '555'}}}
+                        ]
+                    }
+                },
+                'aggs': {
+                    'type': {
+                        'terms': {
+                            'field': 'embedded.@type', 'exclude': ['Item'], 'size': 200
+                        }
+                    }
+                }
+            },
+            'Status': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchemaSpecialFacets']}},
+                            {'exists': {'field': 'embedded.dbxref'}},
+                            {'range': {'embedded.read_count': {'gte': '3000'}}}
+                        ],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}},
+                            {'range': {'embedded.size': {'lt': '555'}}}
+                        ]
+                    }
+                },
+                'aggs': {
+                    'status': {
+                        'filters': {
+                            'filters': {
+                                'yes': {
+                                    'exists': {'field': 'embedded.status'}
+                                },
+                                'no': {
+                                    'bool': {
+                                        'must_not': [
+                                            {'exists': {'field': 'embedded.status'}}
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            'Read count range': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released', 'archived']}},
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchemaSpecialFacets']}},
+                            {'exists': {'field': 'embedded.dbxref'}}],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}},
+                            {'range': {'embedded.size': {'lt': '555'}}}
+                        ]
+                    }
+                },
+                'aggs': {
+                    'read_count': {
+                        'stats': {
+                            'field': 'embedded.read_count'
+                        }
+                    }
+                }
+            },
+            'Name': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released', 'archived']}},
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchemaSpecialFacets']}},
+                            {'exists': {'field': 'embedded.dbxref'}},
+                            {'range': {'embedded.read_count': {'gte': '3000'}}}
+                        ],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}},
+                            {'range': {'embedded.size': {'lt': '555'}}}]}},
+                'aggs': {
+                    'name': {
+                        'terms': {
+                            'field': 'embedded.name',
+                            'size': 200
+                        }
+                    }
+                }
+            }
+        }
+    }
+    actual = bsqf.search.to_dict()
+    assert all(
+        k in actual.get('aggs', {}).keys()
+        for k in partial_expected.get('aggs', {}).keys()
+    )
+    assert (
+        actual['aggs']['Read count range']['aggs']['read_count']['stats']['field'] == 'embedded.read_count'
+    )
+
+
 
 
 def test_searches_queries_abstract_query_factory_build_query():

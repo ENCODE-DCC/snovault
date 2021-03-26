@@ -553,3 +553,72 @@ class TestingCustomEmbedTarget(Item):
     })
     def reverse_uncalculated(self, request, reverse):
         return paths_filtered_by_status(request, reverse)
+
+
+@collection(
+    'testing-search-schema-special-facets',
+    unique_key='testing_search_schema-special-facets:name'
+)
+class TestingSearchSchemaSpecialFacets(Item):
+    item_type = 'testing_search_schema_special_facets'
+    name_key = 'name'
+    schema = {
+        'type': 'object',
+        'properties': {
+            'name': {
+                'type': 'string',
+                'uniqueKey': True,
+            },
+            'status': {
+                'type': 'string',
+            },
+            'read_count': {
+                'type': 'number',
+            },
+            'uuid': {
+                'title': 'UUID',
+                'description': 'Unique identifier',
+                'type': 'string',
+                'format': 'uuid',
+                'permission': 'import_items',
+                'requestMethod': 'POST',
+            },
+            'accession': {
+                'title': 'Accession',
+                'description': '',
+                'type': 'string',
+                'format': 'accession',
+                'permission': 'import_items'
+            },
+            'label': {
+                'type': 'string',
+            }
+        },
+        'additionalProperties': False,
+        'facets': {
+            'status': {
+                'title': 'Status',
+                'type': 'exists',
+            },
+            'read_count': {
+                'title': 'Read count range',
+                'type': 'stats',
+            },
+            'name': {
+                'title': 'Name'
+            }
+        },
+        'boost_values': {
+            'accession': 1.0,
+            'status': 1.0,
+            'label': 1.0
+        },
+        'columns': {
+            'accession': {
+                'title': 'Accession'
+            },
+            'status': {
+                'title': 'Status'
+            }
+        }
+    }
