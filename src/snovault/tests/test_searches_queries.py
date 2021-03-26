@@ -3372,6 +3372,79 @@ def test_searches_queries_basic_search_query_factory_build_query(dummy_request):
     assert all(e in actual_must for e in expected_must)
 
 
+def test_searches_queries_basic_search_query_factory_build_query_with_ranges(dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.testing import DummyResource
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released&status=archived&file_format=bam'
+        '&lab.name!=thermo&restricted!=*&dbxref=*&replcate.biosample.title=cell'
+        '&limit=10&type=*&status!=submitted&file_size=*'
+        '&file_format%21=bigWig&restricted!=*&no_file_available!=*'
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30'
+    )
+    dummy_request.context = DummyResource()
+    params_parser = ParamsParser(dummy_request)
+    bsqf = BasicSearchQueryFactory(params_parser)
+    query = bsqf.build_query()
+    expected = {
+        'query': {
+            'bool': {
+                'filter': [
+                    {
+                        'bool': {
+                            'must': [
+                                {'terms': {'principals_allowed.view': ['system.Everyone']}},
+                                {'terms': {'embedded.@type': ['Item']}}
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        'post_filter': {
+            'bool': {
+                'must': [
+                    {'terms': {'embedded.status': ['released', 'archived']}},
+                    {'terms': {'embedded.file_format': ['bam']}},
+                    {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                    {'terms': {'embedded.@type': ['Item']}},
+                    {'exists': {'field': 'embedded.dbxref'}},
+                    {'exists': {'field': 'embedded.file_size'}},
+                    {'range': {'embedded.file_size': {'gte': '30000', 'lt': '2560000'}}},
+                    {'range': {'embedded.replicates.read_count': {'lte': '99999999'}}},
+                    {'range': {'embedded.biosample.replicate.size': {'gt': '2'}}}
+                ],
+                'must_not': [
+                    {'terms': {'embedded.lab.name': ['thermo']}},
+                    {'terms': {'embedded.status': ['submitted']}},
+                    {'terms': {'embedded.file_format': ['bigWig']}},
+                    {'exists': {'field': 'embedded.restricted'}},
+                    {'exists': {'field': 'embedded.no_file_available'}},
+                    {'range': {'embedded.quality_metric.RSC1': {'lt': '30'}}}
+                ]
+            }
+        },
+        '_source': [
+            'audit.*',
+            'embedded.@id',
+            'embedded.@type',
+            'embedded.accession',
+            'embedded.status'
+        ],
+        'from': 0,
+        'size': 10
+    }
+    actual = query.to_dict()
+    expected_must = actual['post_filter']['bool']['must']
+    actual_must = expected['post_filter']['bool']['must']
+    assert all(e in actual_must for e in expected_must)
+    expected_must_not = actual['post_filter']['bool']['must_not']
+    actual_must_not = expected['post_filter']['bool']['must_not']
+    assert all(e in actual_must_not for e in expected_must_not)
+
+
 def test_searches_queries_basic_search_query_factory_with_facets_init(params_parser):
     from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
     bsqf = BasicSearchQueryFactoryWithFacets(params_parser)
