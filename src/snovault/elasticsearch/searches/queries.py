@@ -78,6 +78,7 @@ from .interfaces import _SCORE
 from .interfaces import SEARCH_AUDIT
 from .interfaces import SIMPLE_QUERY_STRING
 from .interfaces import _SOURCE
+from .interfaces import STATS
 from .interfaces import TITLE
 from .interfaces import TERMS
 from .interfaces import TOP_HITS
@@ -649,6 +650,12 @@ class AbstractQueryFactory:
             **ExistsAggregationConfig(**kwargs)
         )
 
+    def _make_stats_aggregation(self, field, **kwargs):
+        return A(
+            STATS,
+            field=field
+        )
+
     def _make_filter_aggregation(self, filter_context, **kwargs):
         return A(
             'filter',
@@ -698,6 +705,8 @@ class AbstractQueryFactory:
     def _subaggregation_factory(self, aggregation_type):
         if aggregation_type == EXISTS:
             return self._make_exists_aggregation
+        elif aggregation_type == STATS:
+            return self._make_stats_aggregation
         return self._make_terms_aggregation
 
     def _add_must_equal_terms_filter(self, field, terms):
