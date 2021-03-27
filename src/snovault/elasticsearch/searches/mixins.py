@@ -15,6 +15,7 @@ from .interfaces import JS_FALSE
 from .interfaces import KEY
 from .interfaces import OPEN_ON_LOAD
 from .interfaces import PERIOD
+from .interfaces import STATS
 from .interfaces import TERMS
 from .interfaces import TITLE
 from .interfaces import TOTAL
@@ -78,15 +79,36 @@ class AggsToFacetsMixin:
             {}
         )
 
-    def _get_aggregation_bucket(self, facet_name):
-        aggregation_bucket = self._get_aggregation_result(
+    def _get_aggregation_details(self, facet_name):
+        return self._get_aggregation_result(
             facet_name
-        ).get(self._get_facet_name(facet_name), {}).get(BUCKETS, [])
+        ).get(self._get_facet_name(facet_name), {})
+
+    def _get_aggregation_bucket(self, facet_name):
+        aggregation_bucket = self._get_aggregation_details(
+            facet_name
+        ).get(BUCKETS, [])
         if isinstance(aggregation_bucket, dict):
             aggregation_bucket = self._parse_aggregation_bucket_to_list(
                 aggregation_bucket
             )
         return aggregation_bucket
+
+    def _get_aggregation_metric(self, facet_name):
+        return self._get_aggregation_details(
+            facet_name
+        )
+
+    def _aggregation_parser_factory(self, facet_name):
+        if self._get_facet_type(facet_name) == STATS:
+            return self._get_aggregation_metric
+        return self._get_aggregation_bucket
+
+    def _get_aggregation_terms(self, facet_name):
+        parser = self._aggregation_parser_factory(
+            facet_name
+        )
+        return parser(facet_name)
 
     def _get_aggregation_total(self, facet_name):
         return self._get_aggregation_result(
@@ -110,7 +132,7 @@ class AggsToFacetsMixin:
         facet = {
             FIELD_KEY: facet_name,
             TITLE: self._get_facet_title(facet_name),
-            TERMS: self._get_aggregation_bucket(facet_name),
+            TERMS: self._get_aggregation_terms(facet_name),
             TOTAL: self._get_aggregation_total(facet_name),
             TYPE_KEY: self._get_facet_type(facet_name),
             APPENDED: JS_FALSE,

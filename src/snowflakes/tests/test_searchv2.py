@@ -241,6 +241,7 @@ def test_searchv2_view_with_ranges(workbook, testapp):
     for snowflake in r.json['@graph']:
         assert snowflake['date_created'] == '2013-03-23'
 
+
 def test_searchv2_raw_view_raw_response(workbook, testapp):
     r = testapp.get('/searchv2_raw/?type=Snowflake')
     assert 'hits' in r.json

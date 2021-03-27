@@ -12,7 +12,9 @@ def snowflakes_facets():
                 ('audit.WARNING.category', {'title': 'Audit category: WARNING'}),
                 ('status', {'title': 'Snowflake status', 'open_on_load': True}),
                 ('type', {'title': 'Snowflake type', 'open_on_load': False}),
-                ('lab.title', {'title': 'Lab', 'open_on_load': False})
+                ('lab.title', {'title': 'Lab', 'open_on_load': False}),
+                ('file_size', {'title': 'File size statistics', 'type': 'stats'}),
+                ('restricted', {'title': 'File is restricted', 'type': 'exists'}),
         ]
     }
 
@@ -545,16 +547,29 @@ def raw_response():
                         'buckets': []
                     }
                 },
-                'is_restricted': {
-                    'buckets': {
-                        'no': {
-                            'doc_count': 19908
-                        },
-                        'yes': {
-                            'doc_count': 1053
+                'File is restricted': {
+                    'doc_count': 19773,
+                    'restricted': {
+                        'buckets': {
+                            'no': {
+                                'doc_count': 19908
+                            },
+                            'yes': {
+                                'doc_count': 1053
+                            }
                         }
                     }
-                }
+                },
+                'File size statistics': {
+                    'doc_count': 161,
+                    'file_size': {
+                        'count': 161,
+                        'min': 1,
+                        'max': 473944998854,
+                        'avg': 3642979032.757764,
+                        'sum': 586519624274
+                    }
+                },
             }
         }
     }
@@ -1388,8 +1403,8 @@ def test_searches_mixins_aggs_to_facets_mixin_get_aggregations(
         assert k in actual
     for k, v in snowflakes_facets.items():
         assert (
-            len(expected[v.get('title')][basic_query_response_with_facets._get_facet_name(k)]['buckets'])
-            == len(actual[v.get('title')][basic_query_response_with_facets._get_facet_name(k)]['buckets'])
+            len(expected[v.get('title')][basic_query_response_with_facets._get_facet_name(k)].get('buckets', []))
+            == len(actual[v.get('title')][basic_query_response_with_facets._get_facet_name(k)].get('buckets', []))
         )
 
 
@@ -1480,7 +1495,7 @@ def test_searches_mixins_aggs_to_facets_mixin_parse_aggregation_bucket_to_list(r
     afm = AggsToFacetsMixin()
     expected = [{'doc_count': 1053, 'key': 'yes'}, {'key': 'no', 'doc_count': 19908}]
     actual = afm._parse_aggregation_bucket_to_list(
-        raw_response['hits']['aggregations']['is_restricted']['buckets']
+        raw_response['hits']['aggregations']['File is restricted']['restricted']['buckets']
     )
     assert all([e in actual for e in expected])
     assert len(actual) == len(expected)
@@ -1512,6 +1527,29 @@ def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_result(
     assert len(expected['status']['buckets']) == len(actual['status']['buckets'])
 
 
+def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_details(
+        basic_query_response_with_facets,
+        mocker,
+        snowflakes_facets
+):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    mocker.patch.object(AggsToFacetsMixin, '_get_facets')
+    AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
+    expected = {
+        'sum_other_doc_count': 0,
+        'doc_count_error_upper_bound': 0,
+        'buckets': [
+            {'key': 'released', 'doc_count': 21},
+            {'key': 'in progress', 'doc_count': 11},
+            {'key': 'revoked', 'doc_count': 2},
+            {'key': 'deleted', 'doc_count': 1}
+        ]
+    }
+    actual = basic_query_response_with_facets._get_aggregation_details('status')
+    assert all([e in actual for e in expected])
+    assert len(expected) == len(actual)
+
+
 def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_bucket(
         basic_query_response_with_facets,
         mocker,
@@ -1535,6 +1573,39 @@ def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_bucket(
     actual = basic_query_response_with_facets._get_aggregation_bucket('lab.title')
     assert all([e in actual for e in expected])
     assert len(expected) == len(actual)
+
+
+def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_metric(
+        basic_query_response_with_facets,
+        mocker,
+        snowflakes_facets
+):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    mocker.patch.object(AggsToFacetsMixin, '_get_facets')
+    AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
+    expected = {
+        'count': 161,
+        'min': 1,
+        'max': 473944998854,
+        'avg': 3642979032.757764,
+        'sum': 586519624274
+    }
+    actual = basic_query_response_with_facets._get_aggregation_metric('file_size')
+    assert expected == actual
+
+
+def test_searches_mixins_aggs_to_facets_mixin_aggregation_parser_factory(
+        basic_query_response_with_facets,
+        mocker,
+        snowflakes_facets
+):
+    from snovault.elasticsearch.searches.mixins import AggsToFacetsMixin
+    mocker.patch.object(AggsToFacetsMixin, '_get_facets')
+    AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
+    actual = basic_query_response_with_facets._aggregation_parser_factory('file_size')
+    assert actual.__name__ == '_get_aggregation_metric'
+    actual = basic_query_response_with_facets._aggregation_parser_factory('status')
+    assert actual.__name__ == '_get_aggregation_bucket'
 
 
 def test_searches_mixins_aggs_to_facets_mixin_get_aggregation_total(
@@ -1609,41 +1680,68 @@ def test_searches_mixins_aggs_to_facets_mixin_format_aggregations(
     basic_query_response_with_facets._format_aggregations()
     expected = [
         {
-            'field': 'status',
+            'field': 'type',
+            'title': 'Snowflake type',
             'terms': [
-                {'doc_count': 21, 'key': 'released'},
-                {'doc_count': 11, 'key': 'in progress'},
-                {'doc_count': 2, 'key': 'revoked'},
-                {'doc_count': 1, 'key': 'deleted'}
+                {'key': 'Item', 'doc_count': 35},
+                {'key': 'Snowflake', 'doc_count': 35}
             ],
-            'appended': False,
-            'title': 'Snowflake status',
             'total': 35,
             'type': 'terms',
-            'open_on_load': True,
+            'appended': False,
+            'open_on_load': False
+        },
+        {
+            'field': 'status',
+            'title': 'Snowflake status',
+            'terms': [
+                {'key': 'released', 'doc_count': 21},
+                {'key': 'in progress', 'doc_count': 11},
+                {'key': 'revoked', 'doc_count': 2},
+                {'key': 'deleted', 'doc_count': 1}
+            ],
+            'total': 35,
+            'type': 'terms',
+            'appended': False,
+            'open_on_load': True
         },
         {
             'field': 'lab.title',
-            'terms': [
-                {'doc_count': 35, 'key': 'J. Michael Cherry, Stanford'}
-            ],
-            'appended': False,
             'title': 'Lab',
+            'terms': [
+                {'key': 'J. Michael Cherry, Stanford', 'doc_count': 35}
+            ],
             'total': 35,
             'type': 'terms',
-            'open_on_load': False,
+            'appended': False,
+            'open_on_load': False
         },
         {
-            'field': 'type',
-            'terms': [
-                {'doc_count': 35, 'key': 'Item'},
-                {'doc_count': 35, 'key': 'Snowflake'}
-            ],
+            'field': 'file_size',
+            'title': 'File size statistics',
+            'terms': {
+                'count': 161,
+                'min': 1,
+                'max': 473944998854,
+                'avg': 3642979032.757764,
+                'sum': 586519624274
+            },
+            'total': 161,
+            'type': 'stats',
             'appended': False,
-            'title': 'Snowflake type',
-            'total': 35,
-            'type': 'terms',
-            'open_on_load': False,
+            'open_on_load': False
+        },
+        {
+            'field': 'restricted',
+            'title': 'File is restricted',
+            'terms': [
+                {'key': 'no', 'doc_count': 19908},
+                {'key': 'yes', 'doc_count': 1053}
+            ],
+            'total': 19773,
+            'type': 'exists',
+            'appended': False,
+            'open_on_load': False
         }
     ]
     actual = basic_query_response_with_facets.facets
@@ -1681,7 +1779,6 @@ def test_searches_mixins_aggs_to_facets_mixin_get_fake_facets(
         ('biosample.genetic_modifications', '*'),
         ('biosample.treatments!', 'ethanol'),
         ('biosample.treatments!', 'methanol'),
-        ('restricted!', '*')
     ]
     actual = basic_query_response_with_facets._get_fake_facets()
     assert all([e in actual for e in expected])
@@ -1770,7 +1867,7 @@ def test_searches_mixins_aggs_to_facets_mixin_make_fake_facets(
     mocker.patch.object(AggsToFacetsMixin, '_get_facets')
     AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
     basic_query_response_with_facets._make_fake_facets()
-    assert len(basic_query_response_with_facets.fake_facets) == 10
+    assert len(basic_query_response_with_facets.fake_facets) == 9
 
 
 def test_searches_mixins_aggs_to_facets_mixin_to_facets(
@@ -1782,7 +1879,7 @@ def test_searches_mixins_aggs_to_facets_mixin_to_facets(
     mocker.patch.object(AggsToFacetsMixin, '_get_facets')
     AggsToFacetsMixin._get_facets.return_value = snowflakes_facets
     actual = basic_query_response_with_facets.to_facets()
-    assert len(actual) == 13
+    assert len(actual) == 14
 
 
 def test_searches_mixins_hits_to_graph_mixin_init():
