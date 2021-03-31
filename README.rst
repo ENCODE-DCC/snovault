@@ -18,18 +18,24 @@ System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
 3. Python3
     .. code-block:: bash
 
-        3.6.9 and 3.7.6 have been tested
+        3.6.9, 3.7.6, and 3.7.10 have been tested
         3.8 does not work as of Feb 2020
 
 4. Postgres\@11 (Postgres\@9.3 also works)
     .. code-block:: bash
 
         brew install postgresql@11
+        # May need to add postgres to PATH in your shell profile, e.g. ~/.bash_profile, ~/.zshrc
+        # echo 'export PATH="/usr/local/opt/postgresql@11/bin:$PATH"' >> YOUR_SHELL_PROFILE
 
 5. Node 10.x.x
+    Node 12 is known to work as well.
+
     .. code-block:: bash
 
         brew install node@10
+
+    You may need to link ``node``/``npm`` with ``brew link node@10`` then add it to your ``PATH``
 
 6. Ruby - Non system version to install compass while avoiding permission errors
     .. code-block:: bash
@@ -50,11 +56,11 @@ System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
         # Using the correct ruby version bin diretory, make a sym link
         ln -s /usr/local/lib/ruby/gems/2.6.0/bin/compass /usr/local/opt/ruby/bin/compass
 
-8. Java 8 (Java 11 has also been used)
+8. Java 11
     .. code-block:: bash
 
-        brew install adoptopenjdk8
-        # Add to you PATH in terminal profile, i.e. ~/.bash_profile or ~/.zshrc
+        brew install openjdk@11
+        # Add to your PATH in terminal profile, i.e. ~/.bash_profile or ~/.zshrc
         export JAVA_HOME=$(/usr/libexec/java_home -v 1.8)
 
 9. Elasticsearch 5.x
@@ -82,6 +88,8 @@ System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
         If working in a python virtual environment, then the chromedriver can be added to
         your-venv-dir/bin directory.
 
+        You also need to install Chrome (if not already installed).
+        In addition, allow ``chromedriver`` (System Preferences->Security & Privacy) to run to run bdd tests
 
 Application Installation
 ========================
@@ -92,12 +100,27 @@ Application Installation
         cd your-work-dir
         python3 -m venv snovault-venv
         source snovault-venv/bin/activate
+        pip install -U pip==21.0.1
 
 2. Clone the repo and install requirements
     .. code-block:: bash
 
         cd snovault
         pip install -e '.[dev]'
+
+    If psycopg2 fails to compile, you may need to set LDFLAGS to the output of ``pg_config --ldflags`` before pip installation.
+        .. code-block:: bash
+
+            LDFLAGS=$(pg_config --ldflags) pip install -e '.[dev]'
+
+    If you have errors at runtime that look like this::
+
+        ImportError: dlopen(/Users/foo/venv/lib/python3.7/site-packages/psycopg2/_psycopg.cpython-37m-darwin.so, 2): Symbol not found: _PQencryptPasswordConn
+        Referenced from: /Users/foo/venv/lib/python3.7/site-packages/psycopg2/_psycopg.cpython-37m-darwin.so
+        Expected in: /usr/lib/libpq.5.dylib
+        in /Users/foo/venv/lib/python3.7/site-packages/psycopg2/_psycopg.cpython-37m-darwin.so
+
+    you may need to add the ``brew``-installed Postgres headers, usually ``-L/usr/local/opt/postgresql@11/lib``, to the ``LDFLAGS`` in addition to the ones given by ``pg_config --ldflags``.
 
 3. Build Application
     .. code-block:: bash
