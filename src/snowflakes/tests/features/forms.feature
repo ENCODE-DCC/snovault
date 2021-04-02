@@ -1,4 +1,4 @@
-@forms @usefixtures(workbook,admin_user)
+@forms
 Feature: Edit forms
 
     Scenario: Save a change to a snowflake

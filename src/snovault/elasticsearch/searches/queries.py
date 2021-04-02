@@ -198,13 +198,13 @@ class AbstractQueryFactory:
         ]
 
     def _escape_regex_slashes(self, query):
-        return query.replace('/', '\/')
+        return query.replace('/', '\\/')
 
     def _escape_fuzzy_tilde(self, query):
-        return query.replace('~', '\~')
+        return query.replace('~', '\\~')
 
     def _escape_boost_caret(self, query):
-        return query.replace('^', '\^')
+        return query.replace('^', '\\^')
 
     def _escape_reserved_query_string_characters(self, query):
         '''

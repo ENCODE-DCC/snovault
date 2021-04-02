@@ -26,7 +26,7 @@ class RedisClient(StrictRedis):
 
     def __init__(self, queue_options):
         super().__init__(
-            charset="utf-8",
+            encoding="utf-8",
             decode_responses=True,
             db=queue_options.get('db', 0),
             host=queue_options['host'],

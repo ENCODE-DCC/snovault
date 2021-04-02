@@ -1,4 +1,4 @@
-@search @usefixtures(workbook)
+@search
 Feature: Search
     Background:
         When I visit "/search"

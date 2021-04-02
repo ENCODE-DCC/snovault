@@ -25,7 +25,7 @@ class LocalStoreClient():
     def __init__(self, **kwargs):
         self.local_tz = kwargs.get('local_tz', 'GMT')
         self.client = StrictRedis(
-            charset='utf-8',
+            encoding='utf-8',
             decode_responses=True,
             db=kwargs['db_index'],
             host=kwargs['host'],
@@ -49,7 +49,8 @@ class LocalStoreClient():
         return self.client.hgetall(key)
 
     def dict_set(self, key, hash_dict):
-        return self.client.hmset(key, hash_dict)
+        for k, v in hash_dict.items():
+            self.client.hset(name=key, key=k, value=v)
     
     def get_tag_keys(self, tag):
         return self.client.keys(f"{tag}:*")

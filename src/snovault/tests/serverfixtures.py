@@ -388,6 +388,7 @@ def wsgi_server(request, wsgi_server_app, wsgi_server_host_port):
         channel_timeout=60,
         cleanup_interval=10,
         expose_tracebacks=True,
+        clear_untrusted_proxy_headers=False,
     )
     assert server.wait()
     print("wsgi server port {}".format(port))
