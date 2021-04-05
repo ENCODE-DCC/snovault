@@ -72,8 +72,6 @@ def schema_mapping(name, schema):
 
     if 'linkFrom' in schema:
         type_ = 'string'
-    # elif 'linkTo' in schema:
-    #     type_ = 'object'
     else:
         type_ = schema['type']
 
