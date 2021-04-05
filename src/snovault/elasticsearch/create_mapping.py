@@ -51,8 +51,6 @@ META_MAPPING = {
 
 
 PATH_FIELDS = ['submitted_file_name']
-NON_SUBSTRING_FIELDS = ['uuid', '@id', 'submitted_by', 'md5sum',
-                        'references', 'submitted_file_name']
 KEYWORD_FIELDS = ['schema_version', 'uuid', 'accession', 'alternate_accessions',
                   'aliases', 'status', 'date_created', 'submitted_by',
                   'internal_status', 'target', 'biosample_type']
@@ -122,22 +120,15 @@ def schema_mapping(name, schema):
         }
 
     if type_ == 'string':
-
         if name in KEYWORD_FIELDS:
             field_type = 'keyword'
         elif name in TEXT_FIELDS:
             field_type = 'text'
         else:
             field_type = 'keyword'
-
         sub_mapping = {
             'type': field_type
         }
-
-        # these fields are unintentially partially matching some small search
-        # keywords because fields are analyzed by nGram analyzer
-        if name in NON_SUBSTRING_FIELDS:
-            sub_mapping['include_in_all'] = False
         return sub_mapping
 
     if type_ == 'number':
@@ -467,10 +458,7 @@ def type_mapping(types, item_type, embed=True):
         for prop in props:
             new_mapping = new_mapping[prop]['properties']
         new_mapping[last]['boost'] = boost
-        if last in NON_SUBSTRING_FIELDS:
-            new_mapping[last]['include_in_all'] = False
-        else:
-            new_mapping[last]['include_in_all'] = True
+        new_mapping[last]['include_in_all'] = True
     return mapping
 
 
