@@ -277,6 +277,7 @@ def es_mapping(mapping):
                     'match_mapping_type': "string",
                     'mapping': {
                         'type': 'keyword',
+                        'include_in_all': False,
                     },
                 },
             },
@@ -295,6 +296,7 @@ def es_mapping(mapping):
                     'match_mapping_type': "string",
                     'mapping': {
                         'type': 'keyword',
+                        'include_in_all': False,
                     },
                 },
             },
@@ -303,6 +305,7 @@ def es_mapping(mapping):
                     'match_mapping_type': "string",
                     'mapping': {
                         'type': 'keyword',
+                        'include_in_all': False,
                     },
                 },
             },
@@ -315,7 +318,8 @@ def es_mapping(mapping):
                             'raw': {
                                 'type': 'keyword'
                             }
-                        }
+                        },
+                       'include_in_all': False,
                     },
                 },
             }
