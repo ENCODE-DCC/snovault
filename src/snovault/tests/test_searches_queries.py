@@ -641,6 +641,78 @@ def test_searches_queries_abstract_query_factory_get_simple_query_string_query(p
     assert aq._get_simple_query_string_query() == '(ctcf)'
 
 
+def test_searches_queries_abstract_query_factory_get_reserved_keys(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(
+        params_parser,
+        default_item_types=[
+            'Snowflake',
+            'Pancake'
+        ],
+        reserved_keys=[
+            'searchTerm',
+            'limit',
+        ],
+    )
+    reserved_keys = aq._get_reserved_keys()
+    assert reserved_keys == [
+        'searchTerm',
+        'limit',
+    ]
+    filters = aq._get_filters()
+    assert filters == [
+        ('type', 'Experiment'),
+        ('assay_title', 'Histone ChIP-seq'),
+        ('award.project', 'Roadmap'),
+        ('assembly', 'GRCh38'),
+        ('biosample_ontology.classification', 'primary cell'),
+        ('target.label', 'H3K27me3'),
+        ('biosample_ontology.classification!', 'cell line'),
+        ('biosample_ontology.term_name!', 'naive thymus-derived CD4-positive, alpha-beta T cell'),
+        ('status', 'released'),
+        ('sort', 'date_created'),
+        ('sort', '-files.file_size'),
+        ('field', '@id'),
+        ('field', 'accession')
+    ]
+    aq = AbstractQueryFactory(
+        params_parser,
+    )
+    reserved_keys = aq._get_reserved_keys()
+    assert reserved_keys == [
+        'type',
+        'limit',
+        'mode',
+        'annotation',
+        'format',
+        'frame',
+        'datastore',
+        'field',
+        'region',
+        'genome',
+        'sort',
+        'from',
+        'referrer',
+        'filterresponse',
+        'remove',
+        'cart',
+        'debug',
+        'searchTerm',
+        'advancedQuery'
+    ]
+    filters = aq._get_filters()
+    assert filters == [
+        ('assay_title', 'Histone ChIP-seq'),
+        ('award.project', 'Roadmap'),
+        ('assembly', 'GRCh38'),
+        ('biosample_ontology.classification', 'primary cell'),
+        ('target.label', 'H3K27me3'),
+        ('biosample_ontology.classification!', 'cell line'),
+        ('biosample_ontology.term_name!', 'naive thymus-derived CD4-positive, alpha-beta T cell'),
+        ('status', 'released')
+    ]
+
+
 def test_searches_queries_abstract_query_factory_get_filters(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
@@ -4614,7 +4686,6 @@ def test_searches_queries_top_hits_query_factory_add_filtered_top_hits_aggregati
     th.add_filtered_top_hits_aggregation()
     actual = th.search.to_dict()
     actual['aggs']['types']['aggs']['types']['aggs']['top_hits']['top_hits']['_source'] = []
-    print(actual)
     expected = {
         'query': {
             'match_all': {}

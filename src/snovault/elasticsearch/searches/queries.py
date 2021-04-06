@@ -298,8 +298,13 @@ class AbstractQueryFactory:
             must_not_match_filters=self.params_parser.get_must_not_match_advanced_query_filters()
         )
 
+    def _get_reserved_keys(self):
+        return self.kwargs.get('reserved_keys', []) or NOT_FILTERS
+
     def _get_filters(self):
-        return self.params_parser.get_not_keys_filters(not_keys=NOT_FILTERS)
+        return self.params_parser.get_not_keys_filters(
+            not_keys=self._get_reserved_keys()
+        )
 
     def _get_post_filters(self):
         return self.kwargs.get(
