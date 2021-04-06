@@ -229,6 +229,19 @@ def test_searchv2_view_no_type_debug(workbook, testapp):
     assert not r.json['debug']['raw_query']['post_filter']['bool']
 
 
+def test_searchv2_view_with_ranges(workbook, testapp):
+    r = testapp.get(
+        '/search/?type=Snowflake'
+        '&date_created=gte:2013-03-15'
+        '&date_created=lt:2013-04-01'
+        '&date_created!=gt:2013-05-30'
+        '&date_created!=lt:2013-03-01'
+    )
+    assert len(r.json['@graph']) == 2
+    for snowflake in r.json['@graph']:
+        assert snowflake['date_created'] == '2013-03-23'
+
+
 def test_searchv2_raw_view_raw_response(workbook, testapp):
     r = testapp.get('/searchv2_raw/?type=Snowflake')
     assert 'hits' in r.json

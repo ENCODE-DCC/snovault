@@ -257,7 +257,8 @@ def test_searches_queries_abstract_query_factory_get_subtypes_for_item_type(para
         'TestingLinkSource',
         'TestingSearchSchema',
         'TestingDownload',
-        'TestingBadAccession'
+        'TestingBadAccession',
+        'TestingSearchSchemaSpecialFacets'
     ])
 
 
@@ -1773,7 +1774,7 @@ def test_searches_queries_abstract_query_factory_make_field_must_exist_query(par
 def test_searches_queries_abstract_query_factory_make_field_must_exist_queries_from_params(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    meqs = aq._make_field_must_exist_query_from_params(
+    meqs = aq._make_field_must_exist_queries_from_params(
         params=aq._get_filters()
     )
     actual = [m.to_dict() for m in meqs]
@@ -1785,6 +1786,93 @@ def test_searches_queries_abstract_query_factory_make_field_must_exist_queries_f
         {'exists': {'field': 'embedded.biosample_ontology.term_name'}},
         {'exists': {'field': 'embedded.target.label'}},
         {'exists': {'field': 'embedded.award.project'}}
+    ]
+    assert all(e in actual for e in expected)
+
+
+def test_searches_queries_abstract_query_factory_convert_terms_to_range_syntax(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    ranges = aq._convert_terms_to_range_syntax(
+        [
+            'lt:5',
+            'lte:3000',
+            'gt:9999999999999',
+            'gte:2022', # Test duplicate key overridden.
+            'gte:3033',
+        ]
+    )
+    assert ranges == {
+        'lt': '5',
+        'lte': '3000',
+        'gt': '9999999999999',
+        'gte': '3033',
+    }
+    assert aq._convert_terms_to_range_syntax(['lte:3000:asd']) == {
+        'lte': '3000:asd'
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_range_query(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    rq = aq._make_range_query(
+        field='embedded.read_count',
+        terms=['gt:5', 'lte:30']
+    )
+    assert rq.to_dict() == {
+        'range': {
+            'embedded.read_count': {
+                'gt': '5',
+                'lte': '30'
+            }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_range_queries_from_params(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    rqs = aq._make_range_queries_from_params(
+        params=sorted(aq._get_filters())
+    )
+    actual = [r.to_dict() for r in rqs]
+    expected = [
+        {
+            'range': {
+                'embedded.biosample.replicate.size': {
+                    'gt': '2'
+                }
+            }
+        },
+        {
+            'range': {
+                'embedded.file_size': {
+                    'gte': '30000',
+                    'lt': '2560000'
+                }
+            }
+        },
+        {
+            'range': {
+                'embedded.quality_metric.RSC1': {
+                    'lt': '30'
+                }
+            }
+        },
+        {
+            'range': {
+                'embedded.replicates.read_count': {
+                    'lte': '99999999'
+                }
+            }
+        }
     ]
     assert all(e in actual for e in expected)
 
@@ -1867,6 +1955,19 @@ def test_searches_queries_abstract_query_factory_make_exists_aggregation(params_
                     'exists': {'field': 'embedded.file_available'}
                 }
             }
+        }
+    }
+
+
+def test_searches_queries_abstract_query_factory_make_stats_aggregation(params_parser):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser)
+    sa = aq._make_stats_aggregation(
+        field='embedded.files.read_count',
+    )
+    assert sa.to_dict() == {
+        'stats': {
+            'field': 'embedded.files.read_count'
         }
     }
 
@@ -2515,7 +2616,7 @@ def test_searches_queries_abstract_query_factory_add_terms_aggregation(params_pa
 def test_searches_queries_abstract_query_factory_make_split_filter_queries(params_parser):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser)
-    must, must_not, exists, not_exists = aq._make_split_filter_queries()
+    must, must_not, exists, not_exists, ranges, not_ranges = aq._make_split_filter_queries()
     expected_must = [
         {'terms': {'embedded.award.project': ['Roadmap']}},
         {'terms': {'embedded.target.label': ['H3K27me3']}},
@@ -2540,6 +2641,8 @@ def test_searches_queries_abstract_query_factory_make_split_filter_queries(param
     assert all(e in actual_must_not for e in expected_must_not)
     assert [e.to_dict() for e in exists] == []
     assert [e.to_dict() for e in not_exists] == []
+    assert [e.to_dict() for e in ranges] == []
+    assert [e.to_dict() for e in not_ranges] == []
 
 
 def test_searches_queries_abstract_query_factory_make_split_filter_queries_wildcards(dummy_request):
@@ -2551,7 +2654,7 @@ def test_searches_queries_abstract_query_factory_make_split_filter_queries_wildc
     )
     p = ParamsParser(dummy_request)
     aq = AbstractQueryFactory(p)
-    must, must_not, exists, not_exists = aq._make_split_filter_queries()
+    must, must_not, exists, not_exists, ranges, not_ranges = aq._make_split_filter_queries()
     actual_must = [m.to_dict() for m in must]
     expected_must = [
         {'terms': {'embedded.file_type': ['bam']}},
@@ -2568,6 +2671,49 @@ def test_searches_queries_abstract_query_factory_make_split_filter_queries_wildc
     ]
     actual_not_exists = [e.to_dict() for e in not_exists]
     assert all(e in actual_not_exists for e in expected_not_exists)
+    assert [r.to_dict() for r in ranges] == []
+    assert [r.to_dict() for r in not_ranges] == []
+
+
+def test_searches_queries_abstract_query_factory_make_split_filter_queries_ranges(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=*&restricted!=*&no_file_available!=*'
+        '&limit=10&field=@id&field=accession&lab.name=*&file_type=bam'
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30'
+    )
+    p = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(p)
+    must, must_not, exists, not_exists, ranges, not_ranges = aq._make_split_filter_queries()
+    actual_must = [m.to_dict() for m in must]
+    expected_must = [
+        {'terms': {'embedded.file_type': ['bam']}},
+        {'terms': {'embedded.@type': ['TestingSearchSchema']}}
+    ]
+    assert all(e in actual_must for e in expected_must)
+    assert [m.to_dict() for m in must_not] == []
+    expected_exists = [
+        {'exists': {'field': 'embedded.lab.name'}},
+        {'exists': {'field': 'embedded.status'}}
+    ]
+    actual_exists = [e.to_dict() for e in exists]
+    assert all(e in actual_exists for e in expected_exists)
+    expected_not_exists = [
+        {'exists': {'field': 'embedded.restricted'}},
+        {'exists': {'field': 'embedded.no_file_available'}}
+    ]
+    actual_not_exists = [e.to_dict() for e in not_exists]
+    assert all(e in actual_not_exists for e in expected_not_exists)
+    assert [r.to_dict() for r in ranges] == [
+        {'range': {'embedded.file_size': {'gte': '30000', 'lt': '2560000'}}},
+        {'range': {'embedded.replicates.read_count': {'lte': '99999999'}}},
+        {'range': {'embedded.biosample.replicate.size': {'gt': '2'}}}
+    ]
+    assert [r.to_dict() for r in not_ranges] == [
+        {'range': {'embedded.quality_metric.RSC1': {'lt': '30'}}}
+    ]
 
 
 def test_searches_queries_abstract_query_factory_make_filter_aggregation(params_parser):
@@ -3043,7 +3189,7 @@ def test_searches_queries_abstract_query_factory_add_slice(params_parser, dummy_
 
 def test_searches_queries_abstract_query_factory_subaggregation_factory(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
-    from elasticsearch_dsl.aggs import Filters, Terms
+    from elasticsearch_dsl.aggs import Filters, Terms, Stats
     aq = AbstractQueryFactory(params_parser_snovault_types)
     sa = aq._subaggregation_factory('exists')(field='')
     assert isinstance(sa, Filters)
@@ -3051,6 +3197,8 @@ def test_searches_queries_abstract_query_factory_subaggregation_factory(params_p
     assert isinstance(sa, Terms)
     sa = aq._subaggregation_factory('typeahead')(field='')
     assert isinstance(sa, Terms)
+    sa = aq._subaggregation_factory('stats')(field='')
+    assert isinstance(sa, Stats)
 
 
 def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregation_filters(params_parser_snovault_types):
@@ -3181,6 +3329,147 @@ def test_searches_queries_abstract_query_factory_add_aggregations_and_aggregatio
     assert actual['aggs']['Data Type']['aggs']['type']['terms']['exclude'] == ['Item']
 
 
+def test_searches_queries_basic_search_query_factory_add_aggregations_and_aggregation_filters_special_facets(dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.testing import DummyResource
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchemaSpecialFacets&status=released&dbxref=*&replcate.biosample.title=cell'
+        '&read_count=gte:3000&size!=lt:555'
+        '&limit=10'
+    )
+    dummy_request.context = DummyResource()
+    params_parser = ParamsParser(dummy_request)
+    bsqf = BasicSearchQueryFactory(params_parser)
+    bsqf.add_aggregations_and_aggregation_filters()
+    partial_expected = {
+        'query': {
+            'match_all': {}
+        },
+        'aggs': {
+            'Data Type': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released', 'archived']}},
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'exists': {'field': 'embedded.dbxref'}},
+                            {'range': {'embedded.read_count': {'gte': '3000'}}}
+                        ],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}},
+                            {'range': {'embedded.size': {'lt': '555'}}}
+                        ]
+                    }
+                },
+                'aggs': {
+                    'type': {
+                        'terms': {
+                            'field': 'embedded.@type', 'exclude': ['Item'], 'size': 200
+                        }
+                    }
+                }
+            },
+            'Status': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchemaSpecialFacets']}},
+                            {'exists': {'field': 'embedded.dbxref'}},
+                            {'range': {'embedded.read_count': {'gte': '3000'}}}
+                        ],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}},
+                            {'range': {'embedded.size': {'lt': '555'}}}
+                        ]
+                    }
+                },
+                'aggs': {
+                    'status': {
+                        'filters': {
+                            'filters': {
+                                'yes': {
+                                    'exists': {'field': 'embedded.status'}
+                                },
+                                'no': {
+                                    'bool': {
+                                        'must_not': [
+                                            {'exists': {'field': 'embedded.status'}}
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            'Read count range': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released', 'archived']}},
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchemaSpecialFacets']}},
+                            {'exists': {'field': 'embedded.dbxref'}}],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}},
+                            {'range': {'embedded.size': {'lt': '555'}}}
+                        ]
+                    }
+                },
+                'aggs': {
+                    'read_count': {
+                        'stats': {
+                            'field': 'embedded.read_count'
+                        }
+                    }
+                }
+            },
+            'Name': {
+                'filter': {
+                    'bool': {
+                        'must': [
+                            {'terms': {'embedded.status': ['released', 'archived']}},
+                            {'terms': {'embedded.file_format': ['bam']}},
+                            {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                            {'terms': {'embedded.@type': ['TestingSearchSchemaSpecialFacets']}},
+                            {'exists': {'field': 'embedded.dbxref'}},
+                            {'range': {'embedded.read_count': {'gte': '3000'}}}
+                        ],
+                        'must_not': [
+                            {'terms': {'embedded.lab.name': ['thermo']}},
+                            {'exists': {'field': 'embedded.restricted'}},
+                            {'range': {'embedded.size': {'lt': '555'}}}]}},
+                'aggs': {
+                    'name': {
+                        'terms': {
+                            'field': 'embedded.name',
+                            'size': 200
+                        }
+                    }
+                }
+            }
+        }
+    }
+    actual = bsqf.search.to_dict()
+    assert all(
+        k in actual.get('aggs', {}).keys()
+        for k in partial_expected.get('aggs', {}).keys()
+    )
+    assert (
+        actual['aggs']['Read count range']['aggs']['read_count']['stats']['field'] == 'embedded.read_count'
+    )
+
+
+
+
 def test_searches_queries_abstract_query_factory_build_query():
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory({})
@@ -3238,6 +3527,79 @@ def test_searches_queries_basic_search_query_factory_build_query(dummy_request):
     expected_must = actual['post_filter']['bool']['must']
     actual_must = expected['post_filter']['bool']['must']
     assert all(e in actual_must for e in expected_must)
+
+
+def test_searches_queries_basic_search_query_factory_build_query_with_ranges(dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.testing import DummyResource
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released&status=archived&file_format=bam'
+        '&lab.name!=thermo&restricted!=*&dbxref=*&replcate.biosample.title=cell'
+        '&limit=10&type=*&status!=submitted&file_size=*'
+        '&file_format%21=bigWig&restricted!=*&no_file_available!=*'
+        '&file_size=gte:30000&file_size=lt:2560000&replicates.read_count=lte:99999999'
+        '&biosample.replicate.size=gt:2&quality_metric.RSC1!=lt:30'
+    )
+    dummy_request.context = DummyResource()
+    params_parser = ParamsParser(dummy_request)
+    bsqf = BasicSearchQueryFactory(params_parser)
+    query = bsqf.build_query()
+    expected = {
+        'query': {
+            'bool': {
+                'filter': [
+                    {
+                        'bool': {
+                            'must': [
+                                {'terms': {'principals_allowed.view': ['system.Everyone']}},
+                                {'terms': {'embedded.@type': ['Item']}}
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        'post_filter': {
+            'bool': {
+                'must': [
+                    {'terms': {'embedded.status': ['released', 'archived']}},
+                    {'terms': {'embedded.file_format': ['bam']}},
+                    {'terms': {'embedded.replcate.biosample.title': ['cell']}},
+                    {'terms': {'embedded.@type': ['Item']}},
+                    {'exists': {'field': 'embedded.dbxref'}},
+                    {'exists': {'field': 'embedded.file_size'}},
+                    {'range': {'embedded.file_size': {'gte': '30000', 'lt': '2560000'}}},
+                    {'range': {'embedded.replicates.read_count': {'lte': '99999999'}}},
+                    {'range': {'embedded.biosample.replicate.size': {'gt': '2'}}}
+                ],
+                'must_not': [
+                    {'terms': {'embedded.lab.name': ['thermo']}},
+                    {'terms': {'embedded.status': ['submitted']}},
+                    {'terms': {'embedded.file_format': ['bigWig']}},
+                    {'exists': {'field': 'embedded.restricted'}},
+                    {'exists': {'field': 'embedded.no_file_available'}},
+                    {'range': {'embedded.quality_metric.RSC1': {'lt': '30'}}}
+                ]
+            }
+        },
+        '_source': [
+            'audit.*',
+            'embedded.@id',
+            'embedded.@type',
+            'embedded.accession',
+            'embedded.status'
+        ],
+        'from': 0,
+        'size': 10
+    }
+    actual = query.to_dict()
+    expected_must = actual['post_filter']['bool']['must']
+    actual_must = expected['post_filter']['bool']['must']
+    assert all(e in actual_must for e in expected_must)
+    expected_must_not = actual['post_filter']['bool']['must_not']
+    actual_must_not = expected['post_filter']['bool']['must_not']
+    assert all(e in actual_must_not for e in expected_must_not)
 
 
 def test_searches_queries_basic_search_query_factory_with_facets_init(params_parser):

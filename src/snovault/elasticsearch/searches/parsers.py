@@ -4,12 +4,19 @@ from collections import defaultdict
 from .interfaces import ADVANCED_QUERY_KEY
 from .interfaces import CART_KEY
 from .interfaces import DEBUG_KEY
+from .interfaces import EXISTS
 from .interfaces import FIELD_KEY
 from .interfaces import FROM_KEY
 from .interfaces import FRAME_KEY
+from .interfaces import INEQUALITY_REGEX
 from .interfaces import LIMIT_KEY
+from .interfaces import MUST
+from .interfaces import MUST_NOT
 from .interfaces import MODE_KEY
+from .interfaces import NOT_EXISTS
 from .interfaces import NOT_FLAG
+from .interfaces import NOT_RANGES
+from .interfaces import RANGES
 from .interfaces import SEARCH_TERM_KEY
 from .interfaces import SORT_KEY
 from .interfaces import TYPE_KEY
@@ -82,7 +89,7 @@ class ParamsParser:
             params=params
         )
 
-    def get_not_wildcard_filters(self, params=None):
+    def get_non_wildcard_filters(self, params=None):
         '''
         Returns params without wildcard value.
         '''
@@ -159,23 +166,45 @@ class ParamsParser:
             params=params
         )
 
+    def get_inequality_filters(self, params=None):
+        '''
+        Returns params with (lt:|lte:|gt:|gte:) syntax.
+        '''
+        return self.get_filters_by_condition(
+            key_and_value_condition=lambda _, v: bool(INEQUALITY_REGEX.match(v)),
+            params=params
+        )
+
+    def get_non_inequality_filters(self, params=None):
+        '''
+        Returns params without (lt:|lte:|gt:|gte:) syntax.
+        '''
+        return self.get_filters_by_condition(
+            key_and_value_condition=lambda _, v: INEQUALITY_REGEX.match(v) is None,
+            params=params
+        )
+
     def get_must_filters(self, params=None):
         '''
-        Like get_must_match_filters but wildcard values are excluded.
+        Only params with equals sign (excluding wildcard and range values).
         '''
-        return self.get_not_wildcard_filters(
-            params=self.get_must_match_filters(
-                params=params
+        return self.get_non_inequality_filters(
+            params=self.get_non_wildcard_filters(
+                params=self.get_must_match_filters(
+                    params=params
+                )
             )
         )
 
     def get_must_not_filters(self, params=None):
         '''
-        Like get_must_not_match_filters but wildcard values are excluded.
+        Only params with not equals sign (excluding wildcard and range values).
         '''
-        return self.get_not_wildcard_filters(
-            params=self.get_must_not_match_filters(
-                params=params
+        return self.get_non_inequality_filters(
+            params=self.get_non_wildcard_filters(
+                params=self.get_must_not_match_filters(
+                    params=params
+                )
             )
         )
 
@@ -194,6 +223,26 @@ class ParamsParser:
         Like get_must_not_match_filters but only wildcard values are included.
         '''
         return self.get_wildcard_filters(
+            params=self.get_must_not_match_filters(
+                params=params
+            )
+        )
+
+    def get_range_filters(self, params=None):
+        '''
+        Only params with range syntax and equals sign.
+        '''
+        return self.get_inequality_filters(
+            params=self.get_must_match_filters(
+                params=params
+            )
+        )
+
+    def get_not_range_filters(self, params=None):
+        '''
+        Only params with range syntax and not equals sign.
+        '''
+        return self.get_inequality_filters(
             params=self.get_must_not_match_filters(
                 params=params
             )
@@ -320,16 +369,20 @@ class ParamsParser:
         if isinstance(value, int):
             return value
 
-    def split_filters_by_must_and_exists(self, params=None):
+    def split_filters(self, params=None):
         '''
-        Partitions params into four groups: must, must_not, exists, not_exists.
-        This is a split based on wildcard and equals/not equals.
+        Partitions params into six groups: must, must_not, exists, not_exists,
+        range, not_range. This is based on whether the param has a wildcard
+        or range syntax value, as well as whether it's equals or not equals.
         '''
-        must = self.get_must_filters(params=params)
-        must_not = self.get_must_not_filters(params=params)
-        exists = self.get_exists_filters(params=params)
-        not_exists = self.get_not_exists_filters(params=params)
-        return must, must_not, exists, not_exists
+        return {
+            MUST: self.get_must_filters(params=params),
+            MUST_NOT: self.get_must_not_filters(params=params),
+            EXISTS: self.get_exists_filters(params=params),
+            NOT_EXISTS: self.get_not_exists_filters(params=params),
+            RANGES: self.get_range_filters(params=params),
+            NOT_RANGES: self.get_not_range_filters(params=params),
+        }
 
 
 class MutableParamsParser(ParamsParser):
