@@ -1161,12 +1161,23 @@ def test_searches_queries_abstract_query_factory_get_search_fields(params_parser
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
     search_fields = aq._get_search_fields()
-    assert all(
-        f in search_fields
-        for f in [
-                '_all'
+    assert search_fields == ['_all']
+    aq = AbstractQueryFactory(
+        params_parser_snovault_types,
+        search_fields=[
+            'embedded.title',
+            'embedded.@id',
+            '_all',
+            '_exact',
         ]
     )
+    search_fields = aq._get_search_fields()
+    assert search_fields == [
+        'embedded.title',
+        'embedded.@id',
+        '_all',
+        '_exact'
+    ]
 
 
 def test_searches_queries_abstract_query_factory_get_search_fields_mode_picker(dummy_request):
