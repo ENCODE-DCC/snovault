@@ -1,6 +1,15 @@
 Changes
 =======
 
+Snovault 1.0.56 (released) encoded v115.0
+-----------------------------------------
+1. SNO-200-remove-nonsubstring-filter-from-mapping (#332)
+2. SNO-199-allow-customization-of-search-fields (#333)
+3. SNO-197-add-range-queries-and-min-max-aggs (#329)
+4. SNO-198-allow-configuration-of-reserved-search-params (#330)
+5. SNO-138-fix-pytest-warnings (#324)
+6. SNO-182-readme-update (#323)
+
 Snovault 1.0.55 (released) encoded v114.0
 -----------------------------------------
 1. SNO-192-update-pip-install (#321)
