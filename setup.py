@@ -11,7 +11,7 @@ INSTALL_REQUIRES = [
     "Pillow==7.0.0",
     "SQLAlchemy==1.3.13",
     "WebOb==1.8.6",
-    "WebTest==2.0.34",
+    "WebTest==2.0.35",
     "bcrypt==3.1.7",
     "boto3==1.11.9",
     "botocore==1.14.9",
@@ -37,7 +37,7 @@ INSTALL_REQUIRES = [
     "simplejson==3.17.0",
     "transaction==3.0.0",
     "venusian==3.0.0",
-    "zope.interface==4.7.1",
+    "zope.interface==5.3.0",
     "zope.sqlalchemy==1.2",
 ]
 
