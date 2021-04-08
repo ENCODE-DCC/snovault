@@ -307,7 +307,7 @@ class AbstractQueryFactory:
         )
 
     def _get_reserved_keys(self):
-        return self.kwargs.get('reserved_keys', []) or NOT_FILTERS
+        return self.kwargs.get('reserved_keys', NOT_FILTERS.copy())
 
     def _get_filters(self):
         return self.params_parser.get_not_keys_filters(
@@ -451,7 +451,7 @@ class AbstractQueryFactory:
         return self.params_parser.get_field_filters()
 
     def _get_search_fields(self):
-        return BASE_SEARCH_FIELDS.copy()
+        return self.kwargs.get('search_fields', BASE_SEARCH_FIELDS.copy())
 
     def _get_return_fields_from_field_params(self, fields):
         return self.params_parser.param_values_to_list(
