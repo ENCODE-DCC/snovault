@@ -9,6 +9,7 @@ from pkg_resources import resource_filename
 from pyramid.paster import get_app, get_appsettings
 from multiprocessing import Process
 
+import multiprocessing as mp
 import atexit
 import logging
 import os.path
@@ -26,6 +27,11 @@ EPILOG = __doc__
 
 logger = logging.getLogger(__name__)
 
+
+def print_to_terminal(stdout):
+    while True:
+        for line in iter(stdout.readline, b''):
+            sys.stdout.write(line.decode('utf-8'))
 
 def nginx_server_process(prefix='', echo=False):
     args = [
@@ -123,20 +129,19 @@ def main():
     print('Started. ^C to exit.')
 
     stdouts = [p.stdout for p in processes]
-
-    def print_to_terminal(stdout):
-        while True:
-            for line in iter(stdout.readline, b''):
-                sys.stdout.write(line.decode('utf-8'))
-
-
     readable, writable, err = select.select(stdouts, [], stdouts, 5)
     for stdout in readable:
+        print("from readable")
+        print(type(stdout))
         print_processes.append(Process(target=print_to_terminal, args=(stdout,)))
     for stdout in err:
+        print("from err")
+        print(type(stdout))
         print_processes.append(Process(target=print_to_terminal, args=(stdout,)))
+#    import pdb; pdb.set_trace()
     for p in print_processes:
         p.start()
 
 if __name__ == '__main__':
+    mp.set_start_method("fork")
     main()
