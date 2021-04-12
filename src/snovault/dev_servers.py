@@ -7,9 +7,8 @@ For the development.ini you must supply the paster app name:
 """
 from pkg_resources import resource_filename
 from pyramid.paster import get_app, get_appsettings
-from multiprocessing import Process
+from multiprocessing import Process, set_start_method
 
-import multiprocessing as mp
 import atexit
 import logging
 import os.path
@@ -55,6 +54,7 @@ def nginx_server_process(prefix='', echo=False):
     return process
 
 def main():
+    set_start_method("fork")
     import argparse
     parser = argparse.ArgumentParser(
         description="Run development servers", epilog=EPILOG,
@@ -132,16 +132,12 @@ def main():
     readable, writable, err = select.select(stdouts, [], stdouts, 5)
     for stdout in readable:
         print("from readable")
-        print(type(stdout))
         print_processes.append(Process(target=print_to_terminal, args=(stdout,)))
     for stdout in err:
         print("from err")
-        print(type(stdout))
         print_processes.append(Process(target=print_to_terminal, args=(stdout,)))
-#    import pdb; pdb.set_trace()
     for p in print_processes:
         p.start()
 
 if __name__ == '__main__':
-    mp.set_start_method("fork")
     main()
