@@ -6,6 +6,7 @@ from snovault import (
     Item,
     calculated_property,
     collection,
+    abstract_collection,
 )
 from snowflakes.types.base import paths_filtered_by_status
 from snovault.attachment import ItemWithAttachment
@@ -35,6 +36,22 @@ def allowed(context, request):
     return {
         'has_permission': bool(has_permission(permission, context, request)),
         'principals_allowed_by_permission': principals_allowed_by_permission(context, permission),
+    }
+
+
+@abstract_collection(
+    name='abstract-items'
+)
+class AbstractItem(Item):
+    schema = {
+        'facets': {
+            'status': {
+                'title': 'Abstract Status',
+            },
+            'name': {
+                'title': 'Abstract Name'
+            }
+        }
     }
 
 

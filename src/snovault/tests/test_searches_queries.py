@@ -195,6 +195,13 @@ def test_searches_queries_abstract_query_factory_get_schema_for_item_type(params
     assert isinstance(schema, dict)
 
 
+def test_searches_queries_abstract_query_factory_get_raw_schema_for_item_type(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    schema = aq._get_raw_schema_for_item_type('TestingSearchSchema')
+    assert isinstance(schema, dict)
+
+
 def test_searches_queries_abstract_query_factory_get_properties_for_item_type(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
@@ -281,6 +288,13 @@ def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params
     expected = [
         ('name', {'title': 'Name'}),
         ('status', {'title': 'Status', 'open_on_load': True})
+    ]
+    assert all(e in facets for e in expected)
+    assert len(expected) == len(facets)
+    facets = aq._get_facets_for_item_type('AbstractItem')
+    expected = [
+        ('name', {'title': 'Abstract Name'}),
+        ('status', {'title': 'Abstract Status'})
     ]
     assert all(e in facets for e in expected)
     assert len(expected) == len(facets)
