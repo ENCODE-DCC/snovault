@@ -215,7 +215,7 @@ class Item(Resource):
     embedded = ()
     embedded_with_frame = ()
     audit_inherit = []
-    schema = None
+    schema = {}
     AbstractCollection = AbstractCollection
     Collection = Collection
 

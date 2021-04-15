@@ -136,6 +136,7 @@ class Item(snovault.Item):
         'active': ALLOW_CURRENT,
         'archived': ALLOW_CURRENT,
     }
+    schema = {}
 
     @property
     def __name__(self):
