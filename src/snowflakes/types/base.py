@@ -12,6 +12,7 @@ from pyramid.traversal import (
     traverse,
 )
 import snovault
+from snovault import abstract_collection
 from ..schema_formats import is_accession
 
 
@@ -104,6 +105,9 @@ class Collection(snovault.Collection, AbstractCollection):
             self.__acl__ = ALLOW_SUBMITTER_ADD
 
 
+@abstract_collection(
+    name='items',
+)
 class Item(snovault.Item):
     AbstractCollection = AbstractCollection
     Collection = Collection

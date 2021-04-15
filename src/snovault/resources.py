@@ -26,6 +26,8 @@ from .util import (
     quick_deepcopy,
     simple_path_ids,
 )
+from .config import abstract_collection
+
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +204,9 @@ class Collection(AbstractCollection):
     ''' Separate class so add views do not apply to AbstractCollection '''
 
 
+@abstract_collection(
+    name='items',
+)
 class Item(Resource):
     item_type = None
     base_types = ['Item']
