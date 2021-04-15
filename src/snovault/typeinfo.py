@@ -29,9 +29,10 @@ def extract_schema_links(schema):
 class AbstractTypeInfo(object):
     factory = None
 
-    def __init__(self, registry, name):
+    def __init__(self, registry, factory):
         self.types = registry[TYPES]
-        self.name = name
+        self.name = factory.__name__
+        self.factory = factory
 
     @reify
     def subtypes(self):
@@ -48,10 +49,9 @@ class AbstractTypeInfo(object):
 
 class TypeInfo(AbstractTypeInfo):
     def __init__(self, registry, item_type, factory):
-        super(TypeInfo, self).__init__(registry, factory.__name__)
+        super(TypeInfo, self).__init__(registry, factory)
         self.registry = registry
         self.item_type = item_type
-        self.factory = factory
         self.base_types = factory.base_types
         self.embedded = factory.embedded
         self.embedded_with_frame = factory.embedded_with_frame
@@ -134,8 +134,6 @@ class TypesTool(object):
         self.all[ti.item_type] = self.by_item_type[ti.item_type] = ti
         self.all[ti.name] = self.abstract[ti.name] = ti
         self.all[ti.factory] = ti
-        for base in ti.base_types:
-            self.register_abstract(base)
 
         # Calculate the reverse rev map
         for prop_name, spec in factory.rev.items():
@@ -145,10 +143,11 @@ class TypesTool(object):
 
         return ti
 
-    def register_abstract(self, name):
+    def register_abstract(self, factory):
+        name = factory.__name__
         ti = self.abstract.get(name)
         if ti is None:
-            ti = AbstractTypeInfo(self.registry, name)
+            ti = AbstractTypeInfo(self.registry, factory)
             self.all[name] = self.abstract[name] = ti
         return ti
 
