@@ -80,7 +80,7 @@ def abstract_collection(name, **kw):
 
     def set_collection(config, Collection, name, Item, **kw):
         registry = config.registry
-        ti = registry[TYPES].register_abstract(Item.__name__)
+        ti = registry[TYPES].register_abstract(Item)
         registry[TYPES].all[Item] = ti  # XXX Ugly this is here.
         collection = Collection(registry, name, ti, **kw)
         registry[COLLECTIONS].register(name, collection)
