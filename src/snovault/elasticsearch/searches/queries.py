@@ -268,6 +268,21 @@ class AbstractQueryFactory:
             return [(TYPE_KEY, ITEM)]
         return item_types
 
+    def _get_config_keys(self):
+        return self.kwargs.get(
+            'config',
+            self.params_parser.param_values_to_list(
+                params=self.params_parser.get_config()
+            )
+        )
+
+    def _get_configs(self):
+        return [
+            self._get_search_config_by_key(key)
+            for key in self._get_config_keys()
+            if self._get_search_config_by_key(key)
+        ]
+
     def _show_internal_audits(self):
         conditions = [
             self.params_parser._request.has_permission(SEARCH_AUDIT),
@@ -285,6 +300,13 @@ class AbstractQueryFactory:
             'default_facets',
             BASE_FIELD_FACETS.copy()
         )
+
+    def _get_facets_from_configs(self):
+        return [
+            facet
+            for config in self._get_configs()
+            for facet in config.facets.items()
+        ]
 
     def _get_default_and_maybe_item_facets(self):
         facets = self._get_default_facets()
@@ -487,7 +509,10 @@ class AbstractQueryFactory:
         return return_fields + [AUDIT + PERIOD + WILDCARD]
 
     def _get_facets(self):
-        return self.kwargs.get('facets', self._get_default_and_maybe_item_facets())
+        return self.kwargs.get(
+            'facets',
+            self._get_facets_from_configs() or self._get_default_and_maybe_item_facets()
+        )
 
     def _get_facet_size(self):
         return self.kwargs.get('facet_size')
