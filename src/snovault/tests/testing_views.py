@@ -10,6 +10,7 @@ from snovault import (
 from snowflakes.types.base import paths_filtered_by_status
 from snovault.attachment import ItemWithAttachment
 from snovault.util import Path
+from snovault.elasticsearch.searches.configs import search_config
 
 
 def includeme(config):
@@ -621,4 +622,13 @@ class TestingSearchSchemaSpecialFacets(Item):
                 'title': 'Status'
             }
         }
+    }
+
+
+@search_config(
+    name='TestConfigItem'
+)
+def new_item_search_config():
+    return {
+        'facets': {'a': 'b'}
     }
