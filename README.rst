@@ -18,8 +18,7 @@ System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
 3. Python3
     .. code-block:: bash
 
-        3.6.9, 3.7.6, and 3.7.10 have been tested
-        3.8 does not work as of Feb 2020
+        3.6.9, 3.7.6, 3.7.10 and 3.8.5
 
 4. Postgres\@11 (Postgres\@9.3 also works)
     .. code-block:: bash
