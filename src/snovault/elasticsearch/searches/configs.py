@@ -77,7 +77,13 @@ class SearchConfigRegistry:
         return self.registry.get(field, default)
 
 
-class SearchConfig(Config):
+class MutableConfig(Config):
+
+    def update(self, **kwargs):
+        self._kwargs.update(kwargs)
+
+
+class SearchConfig(MutableConfig):
 
     ITEM_CONFIG_LOCATION = 'schema'
     CONFIG_KEYS = [
