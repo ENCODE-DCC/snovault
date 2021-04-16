@@ -71,7 +71,7 @@ class SearchConfigRegistry:
         self.add(config)
 
     def clear(self):
-        self._registry = {}
+        self.registry = {}
 
     def get(self, field, default=None):
         return self.registry.get(field, default)
@@ -93,6 +93,8 @@ class SearchConfig(MutableConfig):
     ]
 
     def __init__(self, name, config):
+        if config is None:
+            config = {}
         super().__init__(
             allowed_kwargs=self.CONFIG_KEYS,
             **config

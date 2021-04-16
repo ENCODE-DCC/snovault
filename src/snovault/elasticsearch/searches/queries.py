@@ -76,6 +76,7 @@ from .interfaces import RANGE
 from .interfaces import RANGES
 from .interfaces import _SCORE
 from .interfaces import SEARCH_AUDIT
+from .interfaces import SEARCH_CONFIG
 from .interfaces import SIMPLE_QUERY_STRING
 from .interfaces import _SOURCE
 from .interfaces import STATS
@@ -127,6 +128,9 @@ class AbstractQueryFactory:
     def _get_principals(self):
         return self.params_parser._request.effective_principals
 
+    def _get_search_config(self):
+        return self.params_parser._request.registry[SEARCH_CONFIG]
+
     def _get_registered_types(self):
         return self.params_parser._request.registry[TYPES]
 
@@ -135,6 +139,9 @@ class AbstractQueryFactory:
 
     def _get_schema_for_item_type(self, item_type):
         return self._get_registered_types()[item_type].schema
+
+    def _get_search_config_for_item_type(self, item_type):
+        return self._get_search_config().get(item_type, {})
 
     def _get_subtypes_for_item_type(self, item_type):
         return self._get_registered_types()[item_type].subtypes
@@ -156,7 +163,7 @@ class AbstractQueryFactory:
         return self._get_schema_for_item_type(item_type).get(BOOST_VALUES, {})
 
     def _get_facets_for_item_type(self, item_type):
-        return self._get_schema_for_item_type(item_type).get(FACETS, {}).items()
+        return self._get_search_config_for_item_type(item_type).get(FACETS , {}).items()
 
     def _get_base_columns(self):
         return OrderedDict(BASE_COLUMNS)
