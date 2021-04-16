@@ -184,3 +184,36 @@ def test_searches_configs_search_config_registry(dummy_request):
     config.update(**{'facets': {'new': 'values'}})
     assert config.facets == {'new': 'values'}
     config._kwargs = original_kwargs
+
+
+def test_searches_configs_search_config_can_update():
+    from snovault.elasticsearch.searches.configs import SearchConfig
+    from snovault.elasticsearch.searches.configs import SearchConfigRegistry
+    registry = SearchConfigRegistry()
+    config = SearchConfig(
+        'my-custom-config',
+        {
+            'facets': {'a': 'b'},
+            'columns': ['x', 'y']
+        }
+    )
+    assert list(config.items()) == [
+        ('facets', {'a': 'b'}),
+        ('columns', ['x', 'y'])
+    ]
+    registry.add(config)
+    empty = SearchConfig('empty', {})
+    assert registry.get('my-custom-config', empty).facets == {'a': 'b'}
+    assert registry.get('my-custom-config', empty).columns == ['x', 'y']
+    assert registry.get('my-custom-config', empty).boost_values == {}
+    related_config = SearchConfig(
+        'my-custom-config',
+        {
+            'facets': {'c': 'd'},
+            'boost_values': {'t': 'z'}
+        }
+    )
+    registry.update(related_config)
+    assert registry.get('my-custom-config', empty).facets == {'c': 'd'}
+    assert registry.get('my-custom-config', empty).columns == ['x', 'y']
+    assert registry.get('my-custom-config', empty).boost_values == {'t': 'z'}

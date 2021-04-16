@@ -66,6 +66,12 @@ class SearchConfigRegistry:
     def add(self, config):
         self.registry[config.name] = config
 
+    def update(self, config):
+        if config.name in self.registry:
+            self.get(config.name).update(**config)
+        else:
+            self.add(config)
+
     def register_from_item(self, item):
         config = get_search_config().from_item(item)
         self.add(config)
@@ -90,6 +96,8 @@ class SearchConfig(MutableConfig):
         'facets',
         'columns',
         'boost_values',
+        'matrix',
+        'fields',
     ]
 
     def __init__(self, name, config):
