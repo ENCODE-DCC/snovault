@@ -93,8 +93,7 @@ class SearchConfig(MutableConfig):
     ]
 
     def __init__(self, name, config):
-        if config is None:
-            config = {}
+        config = config or {}
         super().__init__(
             allowed_kwargs=self.CONFIG_KEYS,
             **config
@@ -102,10 +101,9 @@ class SearchConfig(MutableConfig):
         self.name = name
 
     def __getattr__(self, attr):
-        value = self.get(attr)
-        if value is None:
-            raise AttributeError(attr)
-        return value
+        if attr in self.CONFIG_KEYS:
+            return self.get(attr, {})
+        super().__getattr__(attr)
 
     @classmethod
     def from_item(cls, item):

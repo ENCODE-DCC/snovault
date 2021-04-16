@@ -141,7 +141,7 @@ class AbstractQueryFactory:
         return self._get_registered_types()[item_type].schema
 
     def _get_search_config_by_key(self, key):
-        return self._get_search_config().get(key, {})
+        return self._get_search_config().get(key)
 
     def _get_subtypes_for_item_type(self, item_type):
         return self._get_registered_types()[item_type].subtypes
@@ -163,7 +163,7 @@ class AbstractQueryFactory:
         return self._get_schema_for_item_type(item_type).get(BOOST_VALUES, {})
 
     def _get_facets_for_item_type(self, item_type):
-        return self._get_search_config_by_key(item_type).get(FACETS, {}).items()
+        return self._get_search_config_by_key(item_type).facets.items()
 
     def _get_base_columns(self):
         return OrderedDict(BASE_COLUMNS)

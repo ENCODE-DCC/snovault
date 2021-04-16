@@ -176,9 +176,9 @@ def test_searches_configs_search_config_registry(dummy_request):
     ]
     original_kwargs = config._kwargs
     config._kwargs = original_kwargs.copy()
-    config._allowed_kwargs.append('fake_field')
     with pytest.raises(AttributeError):
         config.fake_field
+    config._allowed_kwargs.append('fake_field')
     config.update(fake_field={'x': 1, 'y': [1, 2]})
     assert config.fake_field == {'x': 1, 'y': [1, 2]}
     config.update(**{'facets': {'new': 'values'}})
