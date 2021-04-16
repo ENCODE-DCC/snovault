@@ -13,7 +13,7 @@ from pyramid.traversal import (
 )
 import snovault
 from ..schema_formats import is_accession
-from snovault import abstract_collection
+from snovault.elasticsearch.searches.configs import search_config
 
 
 @lru_cache()
@@ -105,9 +105,6 @@ class Collection(snovault.Collection, AbstractCollection):
             self.__acl__ = ALLOW_SUBMITTER_ADD
 
 
-@abstract_collection(
-    name='items'
-)
 class Item(snovault.Item):
     AbstractCollection = AbstractCollection
     Collection = Collection
@@ -173,6 +170,13 @@ class Item(snovault.Item):
         if properties.get('status') != 'replaced' and 'accession' in properties:
             keys['accession'].append(properties['accession'])
         return keys
+
+
+@search_config(
+    name='Item'
+)
+def item_search_config():
+    return {}
 
 
 class SharedItem(Item):
