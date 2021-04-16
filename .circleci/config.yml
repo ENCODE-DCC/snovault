@@ -41,7 +41,7 @@ commands:
           command: |
             PG_BIN="/usr/lib/postgresql/${PG_VERSION}/bin"
             sudo apt-get install -y \
-              bsdtar \
+              libarchive-tools \
               graphviz \
               nodejs \
               openjdk-11-jdk \
