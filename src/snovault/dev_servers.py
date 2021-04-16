@@ -16,10 +16,7 @@ import select
 import shutil
 import sys
 import pdb
-try:
-    import subprocess32 as subprocess
-except ImportError:
-    import subprocess
+import subprocess
 
 
 EPILOG = __doc__
@@ -131,10 +128,8 @@ def main():
     stdouts = [p.stdout for p in processes]
     readable, writable, err = select.select(stdouts, [], stdouts, 5)
     for stdout in readable:
-        print("from readable")
         print_processes.append(Process(target=print_to_terminal, args=(stdout,)))
     for stdout in err:
-        print("from err")
         print_processes.append(Process(target=print_to_terminal, args=(stdout,)))
     for p in print_processes:
         p.start()
