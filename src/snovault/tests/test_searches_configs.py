@@ -157,3 +157,20 @@ def test_searches_configs_exists_aggregation_config_pass_filtered_kwargs():
          )
      )
     assert kwargs == {}
+
+
+def test_searches_configs_search_config_registry(dummy_request):
+    from snovault.elasticsearch.searches.interfaces import SEARCH_CONFIG
+    config = dummy_request.registry[SEARCH_CONFIG].get('TestingSearchSchema')
+    assert list(config.facets.items()) == [
+        ('status', {'title': 'Status', 'open_on_load': True}),
+        ('name', {'title': 'Name'})
+    ]
+    assert list(config.boost_values.items()) == [
+        ('accession', 1.0), ('status', 1.0),
+        ('label', 1.0)
+    ]
+    assert list(config.facets.items()) == [
+        ('status', {'title': 'Status', 'open_on_load': True}),
+        ('name', {'title': 'Name'})
+    ]

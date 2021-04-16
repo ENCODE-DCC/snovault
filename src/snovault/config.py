@@ -8,6 +8,7 @@ from .interfaces import (
     ROOT,
     TYPES,
 )
+from snovault.elasticsearch.searches.interfaces import SEARCH_CONFIG
 
 
 def includeme(config):
@@ -58,6 +59,7 @@ def collection(name, **kw):
         ti = registry[TYPES].register(Item)
         collection = Collection(registry, name, ti, **kw)
         registry[COLLECTIONS].register(name, collection)
+        registry[SEARCH_CONFIG].register_from_item(Item)
 
     def decorate(Item):
 
@@ -84,6 +86,7 @@ def abstract_collection(name, **kw):
         registry[TYPES].all[Item] = ti  # XXX Ugly this is here.
         collection = Collection(registry, name, ti, **kw)
         registry[COLLECTIONS].register(name, collection)
+        registry[SEARCH_CONFIG].register_from_item(Item)
 
     def decorate(Item):
 

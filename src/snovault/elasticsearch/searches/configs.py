@@ -1,6 +1,12 @@
 from collections.abc import Mapping
 from .defaults import DEFAULT_TERMS_AGGREGATION_KWARGS
 from .defaults import DEFAULT_EXISTS_AGGREGATION_KWARGS
+from .interfaces import SEARCH_CONFIG
+
+
+def includeme(config):
+    registry = config.registry
+    registry[SEARCH_CONFIG] = SearchConfigRegistry()
 
 
 class Config(Mapping):
@@ -45,4 +51,61 @@ class ExistsAggregationConfig(Config):
         super().__init__(
             allowed_kwargs=allowed_kwargs or DEFAULT_EXISTS_AGGREGATION_KWARGS,
             **kwargs
+        )
+
+
+def get_search_config():
+    return SearchConfig
+
+
+class SearchConfigRegistry:
+
+    def __init__(self):
+        self.registry = {}
+
+    def add(self, config):
+        self.registry[config.name] = config
+
+    def register_from_item(self, item):
+        config = get_search_config().from_item(item)
+        self.add(config)
+
+    def clear(self):
+        self._registry = {}
+
+    def get(self, field, default=None):
+        return self.registry.get(field, default)
+
+
+class SearchConfig(Config):
+
+    ITEM_CONFIG_LOCATION = 'schema'
+    CONFIG_KEYS = [
+        'facets',
+        'columns',
+        'boost_values',
+    ]
+
+    def __init__(self, name, config):
+        super().__init__(
+            allowed_kwargs=self.CONFIG_KEYS,
+            **config
+        )
+        self.name = name
+
+    def __getattr__(self, attr):
+        value = self.get(attr)
+        if value is None:
+            raise AttributeError(attr)
+        return value
+
+    @classmethod
+    def from_item(cls, item):
+        return cls(
+            item.__name__,
+            getattr(
+                item,
+                cls.ITEM_CONFIG_LOCATION,
+                {}
+            )
         )
