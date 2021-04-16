@@ -46,8 +46,8 @@ commands:
               nodejs \
               openjdk-11-jdk \
               postgresql-${PG_VERSION} \
-              ruby2.3 \
-              ruby2.3-dev \
+              ruby2.7 \
+              ruby2.7-dev \
               redis-server
             sed -i "1s;^;export PATH=${ES_BIN}:${PG_BIN}:$PATH\n;" $BASH_ENV
             sed -i '1s;^;alias python=python3\n;' $BASH_ENV
