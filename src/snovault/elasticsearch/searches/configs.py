@@ -1,7 +1,6 @@
 import venusian
 
 from collections.abc import Mapping
-from collections import defaultdict
 from .defaults import DEFAULT_TERMS_AGGREGATION_KWARGS
 from .defaults import DEFAULT_EXISTS_AGGREGATION_KWARGS
 from .interfaces import SEARCH_CONFIG
@@ -61,13 +60,21 @@ class ExistsAggregationConfig(Config):
 class SortedTupleMap:
 
     def __init__(self):
-        self._map = defaultdict(list)
+        self._map = {}
 
     @staticmethod
     def _convert_key_to_sorted_tuple(key):
         if isinstance(key, str):
             key = [key]
         return tuple(sorted(key))
+
+    def __setitem__(self, key, value):
+        key = self._convert_key_to_sorted_tuple(key)
+        self._map[key] = value
+
+    def __getitem__(self, key):
+        key = self._convert_key_to_sorted_tuple(key)
+        return self._map[key]
 
     def __contains__(self, key):
         key = self._convert_key_to_sorted_tuple(key)
@@ -78,13 +85,6 @@ class SortedTupleMap:
             self._convert_key_to_sorted_tuple(key),
             default
         )
-
-    def add(self, key, value):
-        key = self._convert_key_to_sorted_tuple(key)
-        if isinstance(value, (list, tuple)):
-            self._map[key].extend(value)
-        else:
-            self._map[key].append(value)
 
     def drop(self, key):
         key = self._convert_key_to_sorted_tuple(key)

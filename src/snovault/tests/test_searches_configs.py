@@ -176,17 +176,17 @@ def test_searches_configs_sorted_tuple_map_convert_key_to_sorted_tuple(dummy_req
 def test_searches_configs_sorted_tuple_map_add_drop_get_and_as_dict(dummy_request):
     from snovault.elasticsearch.searches.configs import SortedTupleMap
     s = SortedTupleMap()
-    s.add('x', 'y')
+    s['x'] = ['y']
     assert s.as_dict() == {('x',): ['y']}
-    s.add('x', ['z', 'p'])
+    s['x'].extend(['z', 'p'])
     assert s.as_dict() == {('x',): ['y', 'z', 'p']}
     s.drop('x')
     assert s.as_dict() == {}
     s.drop(('x',))
     assert s.as_dict() == {}
-    s.add(['File', 'Experiment', 'QualityMetric'], ['FileConfig', 'OtherConfig'])
+    s[['File', 'Experiment', 'QualityMetric']] = ['FileConfig', 'OtherConfig']
     assert s.get(('File', 'Experiment', 'QualityMetric')) == ['FileConfig', 'OtherConfig']
-    s.add(['Experiment', 'QualityMetric', 'File'], {'x', 'y'})
+    s[['Experiment', 'QualityMetric', 'File']].extend([{'x', 'y'}])
     assert s.get(('File', 'Experiment', 'QualityMetric')) == ['FileConfig', 'OtherConfig', {'x', 'y'}]
     s.drop(['Experiment', 'QualityMetric', 'File'])
     assert s.get(('File', 'Experiment', 'QualityMetric')) is None
@@ -197,12 +197,12 @@ def test_searches_configs_sorted_tuple_map_contains(dummy_request):
     from snovault.elasticsearch.searches.configs import SortedTupleMap
     s = SortedTupleMap()
     assert 'x' not in s
-    s.add('x', [1, 2, 3])
+    s['x'] = [1, 2, 3]
     assert 'x' in s
     assert ('x',) in s
     assert ['x'] in s
     assert ['x', 'y', 'z'] not in s
-    s.add(('y', 'z', 'x'), 'abc')
+    s[('y', 'z', 'x')] = 'abc'
     assert ['x', 'y', 'z'] in s
 
 
