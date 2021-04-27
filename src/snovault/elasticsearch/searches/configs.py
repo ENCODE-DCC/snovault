@@ -1,5 +1,7 @@
-from collections.abc import Mapping
 import venusian
+
+from collections.abc import Mapping
+from collections import defaultdict
 from .defaults import DEFAULT_TERMS_AGGREGATION_KWARGS
 from .defaults import DEFAULT_EXISTS_AGGREGATION_KWARGS
 from .interfaces import SEARCH_CONFIG
@@ -54,6 +56,34 @@ class ExistsAggregationConfig(Config):
             allowed_kwargs=allowed_kwargs or DEFAULT_EXISTS_AGGREGATION_KWARGS,
             **kwargs
         )
+
+
+class SortedTupleMap:
+
+    def __init__(self):
+        self._map = defaultdict(list)
+
+    @staticmethod
+    def _convert_key_to_sorted_tuple(key):
+        if isinstance(key, str):
+            key = [key]
+        return tuple(sorted(key))
+
+    def get(self, key, default=None):
+        return self._map.get(
+            self._convert_key_to_sorted_tuple(key),
+            default
+        )
+
+    def add(self, key, value):
+        key = self._convert_key_to_sorted_tuple(key)
+        if isinstance(value, (list, tuple)):
+            self._map[key].extend(value)
+        else:
+            self._map[key].append(value)
+
+    def as_dict(self):
+        return dict(self._map)
 
 
 def get_search_config():
