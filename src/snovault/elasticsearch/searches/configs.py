@@ -102,6 +102,9 @@ def get_search_config():
 class SearchConfigRegistry:
 
     def __init__(self):
+        self._initialize_storage()
+
+    def _initialize_storage(self):
         self.registry = SortedTupleMap()
         self.aliases = SortedTupleMap()
         self.defaults = SortedTupleMap()
@@ -132,10 +135,42 @@ class SearchConfigRegistry:
         self.update(config)
 
     def clear(self):
-        self.registry = {}
+        self._initialize_storage()
 
-    def get(self, field, default=None):
-        return self.registry.get(field, default)
+    def get(self, name, default=None):
+        return self.registry.get(name, default)
+
+    def _resolve_config_name(self, name, use_defaults=True):
+        if name in self.aliases:
+            yield from self._resolve_config_names(
+                self.aliases[name],
+                use_defaults=use_defaults
+            )
+        elif use_defaults and name in self.defaults:
+            yield from self._resolve_config_names(
+                self.defaults[name],
+                use_defaults=use_defaults
+            )
+        else:
+            yield name
+
+    def _resolve_config_names(self, names, use_defaults=True):
+        config_names = []
+        for name in names:
+            config_names.extend(self._resolve_config_name(name, use_defaults=use_defaults))
+        return config_names
+
+    def get_configs_by_names(self, names, use_defaults=True):
+        config_names = self._resolve_config_names(names, use_defaults=use_defaults)
+        configs = (
+            self.get(config_name)
+            for config_name in config_names
+        )
+        return [
+            config
+            for config in configs
+            if config
+        ]
 
 
 class MutableConfig(Config):

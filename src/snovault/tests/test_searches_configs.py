@@ -262,6 +262,53 @@ def test_searches_configs_search_config_registry_add_aliases_and_defaults(dummy_
     }
 
 
+def test_searches_configs_search_config_registry_resolve_config_names(dummy_request):
+    from snovault.elasticsearch.searches.interfaces import SEARCH_CONFIG
+    search_registry = dummy_request.registry[SEARCH_CONFIG]
+    registry = search_registry.registry
+    config_names = search_registry._resolve_config_names(['TestingSearchSchema'])
+    assert len(config_names) == 1
+    assert config_names == ['TestingSearchSchema']
+    search_registry.add_aliases(
+        {
+            'AllConfigs': ['TestingSearchSchema']
+        }
+    )
+    config_names = search_registry._resolve_config_names(['AllConfigs'])
+    assert len(config_names) == 1
+    assert config_names == ['TestingSearchSchema']
+    search_registry.add_aliases(
+        {
+            'AllConfigs': ['TestingSearchSchema', 'TestingSearchSchema']
+        }
+    )
+    config_names = search_registry._resolve_config_names(['AllConfigs'])
+    assert len(config_names) == 2
+    assert config_names == ['TestingSearchSchema', 'TestingSearchSchema']
+    search_registry.add_defaults(
+        {
+            'TestingSearchSchema': ['SomeOtherConfig']
+        }
+    )
+    config_names = search_registry._resolve_config_names(['AllConfigs'])
+    assert len(config_names) == 2
+    assert config_names == ['SomeOtherConfig', 'SomeOtherConfig']
+    config_names = search_registry._resolve_config_names(['AllConfigs'], use_defaults=False)
+    assert len(config_names) == 2
+    assert config_names == ['TestingSearchSchema', 'TestingSearchSchema']
+    search_registry.clear()
+    search_registry.registry = registry
+
+
+def test_searches_configs_search_config_registry_get_configs_by_names(dummy_request):
+    from snovault.elasticsearch.searches.interfaces import SEARCH_CONFIG
+    search_registry = dummy_request.registry[SEARCH_CONFIG]
+    configs = search_registry.get_configs_by_names(['TestingSearchSchema'])
+    assert len(configs) == 1
+    assert list(configs[0].facets.items()) == [
+        ('status', {'title': 'Status', 'open_on_load': True}),
+        ('name', {'title': 'Name'})
+    ]
 
 def test_searches_configs_search_config_can_update():
     from snovault.elasticsearch.searches.configs import SearchConfig
