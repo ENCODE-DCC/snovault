@@ -69,6 +69,10 @@ class SortedTupleMap:
             key = [key]
         return tuple(sorted(key))
 
+    def __contains__(self, key):
+        key = self._convert_key_to_sorted_tuple(key)
+        return key in self._map
+
     def get(self, key, default=None):
         return self._map.get(
             self._convert_key_to_sorted_tuple(key),

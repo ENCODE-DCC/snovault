@@ -173,7 +173,7 @@ def test_searches_configs_sorted_tuple_map_convert_key_to_sorted_tuple(dummy_req
     assert s._convert_key_to_sorted_tuple(('File' ,'Experiment')) == ('Experiment', 'File')
 
 
-def test_searches_configs_sorted_tuple_map_convert_add_drop_get_and_as_dict(dummy_request):
+def test_searches_configs_sorted_tuple_map_add_drop_get_and_as_dict(dummy_request):
     from snovault.elasticsearch.searches.configs import SortedTupleMap
     s = SortedTupleMap()
     s.add('x', 'y')
@@ -191,6 +191,19 @@ def test_searches_configs_sorted_tuple_map_convert_add_drop_get_and_as_dict(dumm
     s.drop(['Experiment', 'QualityMetric', 'File'])
     assert s.get(('File', 'Experiment', 'QualityMetric')) is None
     assert s.get(('File', 'Experiment', 'QualityMetric'), default={}) == {}
+
+
+def test_searches_configs_sorted_tuple_map_contains(dummy_request):
+    from snovault.elasticsearch.searches.configs import SortedTupleMap
+    s = SortedTupleMap()
+    assert 'x' not in s
+    s.add('x', [1, 2, 3])
+    assert 'x' in s
+    assert ('x',) in s
+    assert ['x'] in s
+    assert ['x', 'y', 'z'] not in s
+    s.add(('y', 'z', 'x'), 'abc')
+    assert ['x', 'y', 'z'] in s
 
 
 def test_searches_configs_search_config_registry(dummy_request):
