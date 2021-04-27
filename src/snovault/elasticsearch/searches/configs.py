@@ -191,14 +191,14 @@ class SearchConfig(MutableConfig):
     ]
 
     def __init__(self, name, config):
-        config = {
-            k: v
-            for k, v in config.items()
-            if k in self.CONFIG_KEYS
-        }
+        config = config or {}
         super().__init__(
             allowed_kwargs=self.CONFIG_KEYS,
-            **config
+            **{
+                k: v
+                for k, v in config.items()
+                if k in self.CONFIG_KEYS
+            }
         )
         self.name = name
 
