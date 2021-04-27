@@ -102,10 +102,20 @@ def get_search_config():
 class SearchConfigRegistry:
 
     def __init__(self):
-        self.registry = {}
+        self.registry = SortedTupleMap()
+        self.aliases = SortedTupleMap()
+        self.defaults = SortedTupleMap()
 
     def add(self, config):
         self.registry[config.name] = config
+
+    def add_aliases(self, aliases):
+        for k, v in aliases.items():
+            self.aliases[k] = v
+
+    def add_defaults(self, defaults):
+        for k, v in defaults.items():
+            self.defaults[k] = v
 
     def update(self, config):
         if config.name in self.registry:

@@ -233,6 +233,36 @@ def test_searches_configs_search_config_registry(dummy_request):
     config._kwargs = original_kwargs
 
 
+def test_searches_configs_search_config_registry_add_aliases_and_defaults(dummy_request):
+    from snovault.elasticsearch.searches.interfaces import SEARCH_CONFIG
+    search_registry = dummy_request.registry[SEARCH_CONFIG]
+    config = search_registry.get('TestingSearchSchema')
+    assert list(config.facets.items()) == [
+        ('status', {'title': 'Status', 'open_on_load': True}),
+        ('name', {'title': 'Name'})
+    ]
+    aliases = {
+        'SomeAlias': ['AliasesItem1', 'AliasesItem2']
+    }
+    defaults = {
+        'SomeItem': ['DefaultConfig']
+    }
+    search_registry.add_aliases(aliases)
+    assert search_registry.aliases.as_dict() == {
+        ('SomeAlias',): ['AliasesItem1', 'AliasesItem2']
+    }
+    search_registry.add_defaults(defaults)
+    assert search_registry.defaults.as_dict() == {
+        ('SomeItem',): ['DefaultConfig']
+    }
+    search_registry.add_aliases({('AnotherAlias', 'Multkey', 'AndSorted'): ['XYZ']})
+    assert search_registry.aliases.as_dict() == {
+        ('AndSorted', 'AnotherAlias', 'Multkey'): ['XYZ'],
+        ('SomeAlias',): ['AliasesItem1', 'AliasesItem2']
+    }
+
+
+
 def test_searches_configs_search_config_can_update():
     from snovault.elasticsearch.searches.configs import SearchConfig
     from snovault.elasticsearch.searches.configs import SearchConfigRegistry
