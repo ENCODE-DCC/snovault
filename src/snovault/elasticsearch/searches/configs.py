@@ -82,6 +82,11 @@ class SortedTupleMap:
         else:
             self._map[key].append(value)
 
+    def drop(self, key):
+        key = self._convert_key_to_sorted_tuple(key)
+        if key in self._map:
+            del self._map[key]
+
     def as_dict(self):
         return dict(self._map)
 

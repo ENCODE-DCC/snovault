@@ -159,6 +159,40 @@ def test_searches_configs_exists_aggregation_config_pass_filtered_kwargs():
     assert kwargs == {}
 
 
+def test_searches_configs_sorted_tuple_map_init(dummy_request):
+    from snovault.elasticsearch.searches.configs import SortedTupleMap
+    s = SortedTupleMap()
+    assert isinstance(s, SortedTupleMap)
+
+
+def test_searches_configs_sorted_tuple_map_convert_key_to_sorted_tuple(dummy_request):
+    from snovault.elasticsearch.searches.configs import SortedTupleMap
+    s = SortedTupleMap()
+    assert s._convert_key_to_sorted_tuple('Experiment') == ('Experiment',)
+    assert s._convert_key_to_sorted_tuple(['File' ,'Experiment']) == ('Experiment', 'File')
+    assert s._convert_key_to_sorted_tuple(('File' ,'Experiment')) == ('Experiment', 'File')
+
+
+def test_searches_configs_sorted_tuple_map_convert_add_drop_get_and_as_dict(dummy_request):
+    from snovault.elasticsearch.searches.configs import SortedTupleMap
+    s = SortedTupleMap()
+    s.add('x', 'y')
+    assert s.as_dict() == {('x',): ['y']}
+    s.add('x', ['z', 'p'])
+    assert s.as_dict() == {('x',): ['y', 'z', 'p']}
+    s.drop('x')
+    assert s.as_dict() == {}
+    s.drop(('x',))
+    assert s.as_dict() == {}
+    s.add(['File', 'Experiment', 'QualityMetric'], ['FileConfig', 'OtherConfig'])
+    assert s.get(('File', 'Experiment', 'QualityMetric')) == ['FileConfig', 'OtherConfig']
+    s.add(['Experiment', 'QualityMetric', 'File'], {'x', 'y'})
+    assert s.get(('File', 'Experiment', 'QualityMetric')) == ['FileConfig', 'OtherConfig', {'x', 'y'}]
+    s.drop(['Experiment', 'QualityMetric', 'File'])
+    assert s.get(('File', 'Experiment', 'QualityMetric')) is None
+    assert s.get(('File', 'Experiment', 'QualityMetric'), default={}) == {}
+
+
 def test_searches_configs_search_config_registry(dummy_request):
     from snovault.elasticsearch.searches.interfaces import SEARCH_CONFIG
     config = dummy_request.registry[SEARCH_CONFIG].get('TestingSearchSchema')
