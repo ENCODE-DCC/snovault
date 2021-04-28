@@ -766,6 +766,20 @@ def test_searches_parsers_params_parser_get_cart(dummy_request):
     ]
 
 
+def test_searches_parsers_params_parser_get_configt(dummy_request):
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'frame=embedded&status!=submitted&type=File&sort=date_created'
+        '&debug=true&cart=abc123&cart=def456'
+        '&config=Experiment&config=custom'
+    )
+    p = ParamsParser(dummy_request)
+    assert p.get_config() == [
+        ('config', 'Experiment'),
+        ('config', 'custom')
+    ]
+
+
 def test_searches_parsers_params_parser_param_keys_to_list(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
