@@ -165,6 +165,14 @@ class AbstractQueryFactory:
     def _get_boost_values_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(BOOST_VALUES, {})
 
+    def _get_config_param_values(self):
+        return self.kwargs.get(
+            'config',
+            self.params_parser.param_values_to_list(
+                params=self.params_parser.get_config()
+            )
+        )
+
     def _get_configs_from_config_param_values(self):
         return self._get_search_configs_by_names(
             self._get_config_param_values(),
@@ -291,14 +299,6 @@ class AbstractQueryFactory:
         if self._wildcard_in_item_types(item_types):
             return [(TYPE_KEY, ITEM)]
         return item_types
-
-    def _get_config_param_values(self):
-        return self.kwargs.get(
-            'config',
-            self.params_parser.param_values_to_list(
-                params=self.params_parser.get_config()
-            )
-        )
 
     def _show_internal_audits(self):
         conditions = [
