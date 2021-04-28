@@ -274,10 +274,10 @@ def test_searches_queries_abstract_query_factory_get_collection_name_for_item_ty
     assert aq._get_collection_name_for_item_type('TestingSearchSchema') == 'testing_search_schema'
 
 
-def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params_parser_snovault_types):
+def test_searches_queries_abstract_query_factory_get_facets_from_configs(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
-    facets = aq._get_facets_for_item_type('TestingSearchSchema')
+    facets = aq._get_facets_from_configs()
     expected = [
         ('name', {'title': 'Name'}),
         ('status', {'title': 'Status', 'open_on_load': True})
@@ -698,6 +698,7 @@ def test_searches_queries_abstract_query_factory_get_reserved_keys(params_parser
         'remove',
         'cart',
         'debug',
+        'config',
         'searchTerm',
         'advancedQuery'
     ]
