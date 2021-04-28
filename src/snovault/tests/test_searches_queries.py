@@ -203,6 +203,16 @@ def test_searches_queries_abstract_query_factory_get_schema_for_item_type(params
     assert isinstance(schema, dict)
 
 
+def test_searches_queries_abstract_query_factory_get_search_configs_by_names(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.configs import SearchConfig
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    configs = aq._get_search_configs_by_names(['TestingSearchSchema'])
+    assert len(configs) == 1
+    assert isinstance(configs[0], SearchConfig)
+    assert configs[0].name == 'TestingSearchSchema'
+
+
 def test_searches_queries_abstract_query_factory_get_properties_for_item_type(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
