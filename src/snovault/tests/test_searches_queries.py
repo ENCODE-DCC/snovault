@@ -575,6 +575,33 @@ def test_searches_queries_abstract_query_factory_get_default_facets(params_parse
     ]
 
 
+
+def test_searches_queries_abstract_query_factory_get_facets_from_configs(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+        '&type=TestingSearchSchema'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    facets = aq._get_facets_from_configs()
+    assert facets == [
+        ('status', {'title': 'Status', 'open_on_load': True}),
+        ('name', {'title': 'Name'})
+    ]
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+        '&type=TestingSearchSchema&config=TestConfigItem'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    facets = aq._get_facets_from_configs()
+    assert facets == [
+        ('a', 'b')
+    ]
+
+
 def test_searches_queries_abstract_query_factory_get_default_and_maybe_item_facets(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from pyramid.testing import DummyResource
