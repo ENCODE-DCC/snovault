@@ -128,7 +128,7 @@ class AbstractQueryFactory:
     def _get_principals(self):
         return self.params_parser._request.effective_principals
 
-    def _get_search_config(self):
+    def _get_search_config_registry(self):
         return self.params_parser._request.registry[SEARCH_CONFIG]
 
     def _get_registered_types(self):
@@ -141,7 +141,10 @@ class AbstractQueryFactory:
         return self._get_registered_types()[item_type].schema
 
     def _get_search_configs_by_names(self, names, use_defaults=True):
-        return self._get_search_config().get_configs_by_names(names, use_defaults=use_defaults)
+        return self._get_search_config_registry().get_configs_by_names(
+            names,
+            use_defaults=use_defaults
+        )
 
     def _get_subtypes_for_item_type(self, item_type):
         return self._get_registered_types()[item_type].subtypes

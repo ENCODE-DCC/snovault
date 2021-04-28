@@ -181,6 +181,14 @@ def test_searches_queries_abstract_query_factory_get_registered_types(params_par
     assert isinstance(registered_types, TypesTool)
 
 
+def test_searches_queries_abstract_query_factory_get_search_config_registry(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.configs import SearchConfigRegistry
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    search_config_registry = aq._get_search_config_registry()
+    assert isinstance(search_config_registry, SearchConfigRegistry)
+
+
 def test_searches_queries_abstract_query_factory_get_factory_for_item_type(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
