@@ -44,6 +44,7 @@ def test_declarative_config():
     config.include('snovault.config')
     config.include('snovault.upgrader')
     config.include('.testing_upgrader')
+    config.include('snovault.elasticsearch.searches.configs')
     config.commit()
 
     upgrader = config.registry[UPGRADER]
