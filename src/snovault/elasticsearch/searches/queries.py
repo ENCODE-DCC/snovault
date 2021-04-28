@@ -518,10 +518,7 @@ class AbstractQueryFactory:
         return return_fields + [AUDIT + PERIOD + WILDCARD]
 
     def _get_facets(self):
-        return self.kwargs.get(
-            'facets',
-            self._get_default_and_maybe_item_facets()
-        )
+        return self.kwargs.get('facets', self._get_default_and_maybe_item_facets())
 
     def _get_facet_size(self):
         return self.kwargs.get('facet_size')
