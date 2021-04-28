@@ -766,7 +766,7 @@ def test_searches_parsers_params_parser_get_cart(dummy_request):
     ]
 
 
-def test_searches_parsers_params_parser_get_configt(dummy_request):
+def test_searches_parsers_params_parser_get_config(dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     dummy_request.environ['QUERY_STRING'] = (
         'frame=embedded&status!=submitted&type=File&sort=date_created'
