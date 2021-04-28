@@ -1369,6 +1369,40 @@ def test_searches_queries_abstract_query_factory_get_boost_values_for_item_type(
     ) == {'accession': 1.0, 'status': 1.0, 'label': 1.0}
 
 
+def test_searches_queries_abstract_query_factory_get_configs_from_config_param_values(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.configs import SearchConfig
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+        '&config=TestingSearchSchema'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    configs = aq._get_configs_from_config_param_values()
+    assert len(configs) == 1
+    assert isinstance(configs[0], SearchConfig)
+    assert configs[0].name == 'TestingSearchSchema'
+    assert len(aq._get_configs_from_item_types()) == 0
+
+
+def test_searches_queries_abstract_query_factory_get_configs_from_configs_from_item_types(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.configs import SearchConfig
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+        '&type=TestingSearchSchema'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    configs = aq._get_configs_from_item_types()
+    assert len(configs) == 1
+    assert isinstance(configs[0], SearchConfig)
+    assert configs[0].name == 'TestingSearchSchema'
+    assert len(aq._get_configs_from_config_param_values()) == 0
+
+
 def test_searches_queries_abstract_query_factory_get_configs_from_param_values_or_item_types(dummy_request):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from snovault.elasticsearch.searches.configs import SearchConfig

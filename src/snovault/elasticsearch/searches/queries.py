@@ -165,13 +165,15 @@ class AbstractQueryFactory:
     def _get_boost_values_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(BOOST_VALUES, {})
 
-    def _get_configs_from_param_values_or_item_types(self):
-        configs_from_param_values = self._get_search_configs_by_names(
+    def _get_configs_from_config_param_values(self):
+        return self._get_search_configs_by_names(
             self._get_config_param_values(),
             use_defaults=False,
         )
+
+    def _get_configs_from_item_types(self):
         # Passing all the item types as one key.
-        configs_from_item_types = self._get_search_configs_by_names(
+        return self._get_search_configs_by_names(
             [
                 tuple(
                     self.params_parser.param_values_to_list(
@@ -180,7 +182,12 @@ class AbstractQueryFactory:
                 )
             ]
         )
-        return configs_from_param_values or configs_from_item_types
+
+    def _get_configs_from_param_values_or_item_types(self):
+        return (
+            self._get_configs_from_config_param_values() or
+            self._get_configs_from_item_types()
+        )
 
     def _get_base_columns(self):
         return OrderedDict(BASE_COLUMNS)
