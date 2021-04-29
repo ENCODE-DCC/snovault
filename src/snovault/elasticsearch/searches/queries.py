@@ -76,6 +76,7 @@ from .interfaces import RANGE
 from .interfaces import RANGES
 from .interfaces import _SCORE
 from .interfaces import SEARCH_AUDIT
+from .interfaces import SEARCH_CONFIG
 from .interfaces import SIMPLE_QUERY_STRING
 from .interfaces import _SOURCE
 from .interfaces import STATS
@@ -127,6 +128,9 @@ class AbstractQueryFactory:
     def _get_principals(self):
         return self.params_parser._request.effective_principals
 
+    def _get_search_config_registry(self):
+        return self.params_parser._request.registry[SEARCH_CONFIG]
+
     def _get_registered_types(self):
         return self.params_parser._request.registry[TYPES]
 
@@ -135,6 +139,12 @@ class AbstractQueryFactory:
 
     def _get_schema_for_item_type(self, item_type):
         return self._get_registered_types()[item_type].schema
+
+    def _get_search_configs_by_names(self, names, use_defaults=True):
+        return self._get_search_config_registry().get_configs_by_names(
+            names,
+            use_defaults=use_defaults
+        )
 
     def _get_subtypes_for_item_type(self, item_type):
         return self._get_registered_types()[item_type].subtypes
@@ -155,8 +165,37 @@ class AbstractQueryFactory:
     def _get_boost_values_for_item_type(self, item_type):
         return self._get_schema_for_item_type(item_type).get(BOOST_VALUES, {})
 
-    def _get_facets_for_item_type(self, item_type):
-        return self._get_schema_for_item_type(item_type).get(FACETS, {}).items()
+    def _get_config_param_values(self):
+        return self.kwargs.get(
+            'config',
+            self.params_parser.param_values_to_list(
+                params=self.params_parser.get_config()
+            )
+        )
+
+    def _get_configs_from_config_param_values(self):
+        return self._get_search_configs_by_names(
+            self._get_config_param_values(),
+            use_defaults=False,
+        )
+
+    def _get_configs_from_item_types(self):
+        # Passing all the item types as one key.
+        return self._get_search_configs_by_names(
+            [
+                tuple(
+                    self.params_parser.param_values_to_list(
+                        params=self._get_item_types()
+                    )
+                )
+            ]
+        )
+
+    def _get_configs_from_param_values_or_item_types(self):
+        return (
+            self._get_configs_from_config_param_values() or
+            self._get_configs_from_item_types()
+        )
 
     def _get_base_columns(self):
         return OrderedDict(BASE_COLUMNS)
@@ -279,17 +318,16 @@ class AbstractQueryFactory:
             BASE_FIELD_FACETS.copy()
         )
 
+    def _get_facets_from_configs(self):
+        return [
+            facet
+            for config in self._get_configs_from_param_values_or_item_types()
+            for facet in config.facets.items()
+        ]
+
     def _get_default_and_maybe_item_facets(self):
         facets = self._get_default_facets()
-        item_type_values = self.params_parser.param_values_to_list(
-            params=self._get_item_types()
-        )
-        if len(item_type_values) == 1:
-            facets.extend(
-                self._get_facets_for_item_type(
-                    item_type_values[0]
-                )
-            )
+        facets.extend(self._get_facets_from_configs())
         # Add these at end.
         facets.extend(self._get_audit_facets())
         return facets

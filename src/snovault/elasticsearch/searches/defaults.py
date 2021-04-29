@@ -21,6 +21,7 @@ OPTIONAL_PARAMS = [
     'remove',
     'cart',
     'debug',
+    'config',
 ]
 
 FREE_TEXT_QUERIES = [

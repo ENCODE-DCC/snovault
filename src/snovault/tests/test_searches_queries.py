@@ -181,6 +181,14 @@ def test_searches_queries_abstract_query_factory_get_registered_types(params_par
     assert isinstance(registered_types, TypesTool)
 
 
+def test_searches_queries_abstract_query_factory_get_search_config_registry(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.configs import SearchConfigRegistry
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    search_config_registry = aq._get_search_config_registry()
+    assert isinstance(search_config_registry, SearchConfigRegistry)
+
+
 def test_searches_queries_abstract_query_factory_get_factory_for_item_type(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
@@ -193,6 +201,16 @@ def test_searches_queries_abstract_query_factory_get_schema_for_item_type(params
     aq = AbstractQueryFactory(params_parser_snovault_types)
     schema = aq._get_schema_for_item_type('TestingSearchSchema')
     assert isinstance(schema, dict)
+
+
+def test_searches_queries_abstract_query_factory_get_search_configs_by_names(params_parser_snovault_types):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.configs import SearchConfig
+    aq = AbstractQueryFactory(params_parser_snovault_types)
+    configs = aq._get_search_configs_by_names(['TestingSearchSchema'])
+    assert len(configs) == 1
+    assert isinstance(configs[0], SearchConfig)
+    assert configs[0].name == 'TestingSearchSchema'
 
 
 def test_searches_queries_abstract_query_factory_get_properties_for_item_type(params_parser_snovault_types):
@@ -274,10 +292,10 @@ def test_searches_queries_abstract_query_factory_get_collection_name_for_item_ty
     assert aq._get_collection_name_for_item_type('TestingSearchSchema') == 'testing_search_schema'
 
 
-def test_searches_queries_abstract_query_factory_get_facets_for_item_type(params_parser_snovault_types):
+def test_searches_queries_abstract_query_factory_get_facets_from_configs(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     aq = AbstractQueryFactory(params_parser_snovault_types)
-    facets = aq._get_facets_for_item_type('TestingSearchSchema')
+    facets = aq._get_facets_from_configs()
     expected = [
         ('name', {'title': 'Name'}),
         ('status', {'title': 'Status', 'open_on_load': True})
@@ -557,6 +575,33 @@ def test_searches_queries_abstract_query_factory_get_default_facets(params_parse
     ]
 
 
+
+def test_searches_queries_abstract_query_factory_get_facets_from_configs(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+        '&type=TestingSearchSchema'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    facets = aq._get_facets_from_configs()
+    assert facets == [
+        ('status', {'title': 'Status', 'open_on_load': True}),
+        ('name', {'title': 'Name'})
+    ]
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+        '&type=TestingSearchSchema&config=TestConfigItem'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    facets = aq._get_facets_from_configs()
+    assert facets == [
+        ('a', 'b')
+    ]
+
+
 def test_searches_queries_abstract_query_factory_get_default_and_maybe_item_facets(params_parser_snovault_types):
     from snovault.elasticsearch.searches.queries import AbstractQueryFactory
     from pyramid.testing import DummyResource
@@ -698,6 +743,7 @@ def test_searches_queries_abstract_query_factory_get_reserved_keys(params_parser
         'remove',
         'cart',
         'debug',
+        'config',
         'searchTerm',
         'advancedQuery'
     ]
@@ -1348,6 +1394,105 @@ def test_searches_queries_abstract_query_factory_get_boost_values_for_item_type(
     assert aq._get_boost_values_for_item_type(
         'TestingSearchSchema'
     ) == {'accession': 1.0, 'status': 1.0, 'label': 1.0}
+
+
+def test_searches_queries_abstract_query_factory_get_config_param_values(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.configs import SearchConfig
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+        '&config=TestingSearchSchema'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    configs = aq._get_config_param_values()
+    assert len(configs) == 1
+    assert configs == ['TestingSearchSchema']
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+        '&config=TestingSearchSchema&config=custom'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    configs = aq._get_config_param_values()
+    assert len(configs) == 2
+    assert configs == ['TestingSearchSchema', 'custom']
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    configs = aq._get_config_param_values()
+    assert len(configs) == 0
+    assert configs == []
+
+
+def test_searches_queries_abstract_query_factory_get_configs_from_config_param_values(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.configs import SearchConfig
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+        '&config=TestingSearchSchema'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    configs = aq._get_configs_from_config_param_values()
+    assert len(configs) == 1
+    assert isinstance(configs[0], SearchConfig)
+    assert configs[0].name == 'TestingSearchSchema'
+    assert len(aq._get_configs_from_item_types()) == 0
+
+
+def test_searches_queries_abstract_query_factory_get_configs_from_configs_from_item_types(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.configs import SearchConfig
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+        '&type=TestingSearchSchema'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    configs = aq._get_configs_from_item_types()
+    assert len(configs) == 1
+    assert isinstance(configs[0], SearchConfig)
+    assert configs[0].name == 'TestingSearchSchema'
+    assert len(aq._get_configs_from_config_param_values()) == 0
+
+
+def test_searches_queries_abstract_query_factory_get_configs_from_param_values_or_item_types(dummy_request):
+    from snovault.elasticsearch.searches.queries import AbstractQueryFactory
+    from snovault.elasticsearch.searches.configs import SearchConfig
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+        '&type=TestingSearchSchema'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    configs = aq._get_configs_from_param_values_or_item_types()
+    assert len(configs) == 1
+    assert isinstance(configs[0], SearchConfig)
+    assert configs[0].name == 'TestingSearchSchema'
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    configs = aq._get_configs_from_param_values_or_item_types()
+    assert len(configs) == 0
+    dummy_request.environ['QUERY_STRING'] = (
+        'searchTerm=chip-seq&searchTerm=rna&searchTerm!=ENCODE+2'
+        '&config=TestingSearchSchema&config=TestConfigItem'
+    )
+    params_parser = ParamsParser(dummy_request)
+    aq = AbstractQueryFactory(params_parser)
+    configs = aq._get_configs_from_param_values_or_item_types()
+    assert len(configs) == 2
+    assert configs[0].name == 'TestingSearchSchema'
+    assert configs[1].name == 'TestConfigItem'
 
 
 def test_searches_queries_abstract_query_factory_show_internal_audits(dummy_request):

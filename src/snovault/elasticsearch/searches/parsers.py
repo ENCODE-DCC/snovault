@@ -3,6 +3,7 @@ from collections import defaultdict
 
 from .interfaces import ADVANCED_QUERY_KEY
 from .interfaces import CART_KEY
+from .interfaces import CONFIG_KEY
 from .interfaces import DEBUG_KEY
 from .interfaces import EXISTS
 from .interfaces import FIELD_KEY
@@ -339,6 +340,12 @@ class ParamsParser:
     def get_cart(self, params=None):
         return self.get_key_filters(
             key=CART_KEY,
+            params=params
+        )
+
+    def get_config(self, params=None):
+        return self.get_key_filters(
+            key=CONFIG_KEY,
             params=params
         )
 
