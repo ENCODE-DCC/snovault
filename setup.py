@@ -8,7 +8,7 @@ VERSION = "1.0.57"
 
 
 INSTALL_REQUIRES = [
-    "Pillow==7.0.0",
+    "Pillow==8.2.0",
     "SQLAlchemy==1.3.13",
     "WebOb==1.8.6",
     "WebTest==2.0.35",
