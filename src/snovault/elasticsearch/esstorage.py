@@ -91,8 +91,10 @@ class PickStorage(object):
         storage = self.storage()
         model = storage.get_by_uuid(uuid)
         if storage is self.read:
-            if model is None or model.invalidated():
+            model_invalidated = bool(model and model.invalidated())
+            if model_invalidated:
                 force_database_for_request()
+            if model is None or model_invalidated:
                 return self.write.get_by_uuid(uuid)
         return model
 
@@ -100,8 +102,10 @@ class PickStorage(object):
         storage = self.storage()
         model = storage.get_by_unique_key(unique_key, name, index=index)
         if storage is self.read:
-            if model is None or model.invalidated():
+            model_invalidated = bool(model and model.invalidated())
+            if model_invalidated:
                 force_database_for_request()
+            if model is None or model_invalidated:
                 return self.write.get_by_unique_key(unique_key, name, index=index)
         return model
 
