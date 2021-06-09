@@ -1,3 +1,4 @@
+import pytest
 from unittest.mock import Mock
 
 
@@ -31,3 +32,107 @@ class TestPickStorage(object):
         assert write.get_rev_links.called_once
         rev_links_model = write.get_rev_links.call_args[0][0]
         assert rev_links_model is model2
+
+
+def test_pick_storage_get_by_unique_key_forces_database_request_when_model_is_invalidated(dummy_request):
+    from pyramid.testing import testConfig
+    from ..esstorage import PickStorage
+    # Uses ES when model not invalidated.
+    dummy_request.datastore = 'elasticsearch'
+    es_model = Mock()
+    pg_model = Mock()
+    read = Mock()
+    write = Mock()
+    read.get_by_unique_key.return_value = es_model
+    write.get_by_unique_key.return_value = pg_model
+    es_model.invalidated.return_value = False
+    pg_model.invalidated.return_value = False
+    storage = PickStorage(read, write)
+    with testConfig(request=dummy_request):
+        model = storage.get_by_unique_key('accession', 'SNOFL000LSQ')
+    assert model is es_model
+    assert dummy_request.datastore == 'elasticsearch'
+    # Switches to PG when model invalidated.
+    es_model.invalidated.return_value = True
+    with testConfig(request=dummy_request):
+        model = storage.get_by_unique_key('accession', 'SNOFL000LSQ')
+    assert model is pg_model
+    assert dummy_request.datastore == 'database'
+
+
+def test_pick_storage_get_by_uuid_forces_database_request_when_model_is_invalidated(dummy_request):
+    from pyramid.testing import testConfig
+    from ..esstorage import PickStorage
+    # Uses ES when model not invalidated.
+    dummy_request.datastore = 'elasticsearch'
+    es_model = Mock()
+    pg_model = Mock()
+    read = Mock()
+    write = Mock()
+    read.get_by_uuid.return_value = es_model
+    write.get_by_uuid.return_value = pg_model
+    es_model.invalidated.return_value = False
+    pg_model.invalidated.return_value = False
+    storage = PickStorage(read, write)
+    with testConfig(request=dummy_request):
+        model = storage.get_by_uuid('123')
+    assert model is es_model
+    assert dummy_request.datastore == 'elasticsearch'
+    # Switches to PG when model invalidated.
+    es_model.invalidated.return_value = True
+    with testConfig(request=dummy_request):
+        model = storage.get_by_uuid('123')
+    assert model is pg_model
+    assert dummy_request.datastore == 'database'
+
+
+def test_pick_storage_get_by_unique_key_does_not_force_database_when_model_is_none(dummy_request):
+    from pyramid.testing import testConfig
+    from ..esstorage import PickStorage
+    dummy_request.datastore = 'elasticsearch'
+    es_model = Mock()
+    pg_model = Mock()
+    read = Mock()
+    write = Mock()
+    read.get_by_unique_key.return_value = es_model
+    write.get_by_unique_key.return_value = pg_model
+    es_model.invalidated.return_value = False
+    pg_model.invalidated.return_value = False
+    storage = PickStorage(read, write)
+    with testConfig(request=dummy_request):
+        model = storage.get_by_unique_key('accession', 'SNOFL000LSQ')
+    assert model is es_model
+    assert dummy_request.datastore == 'elasticsearch'
+    # Set model to None.
+    read.get_by_unique_key.return_value = None
+    with testConfig(request=dummy_request):
+        model = storage.get_by_unique_key('accession', 'SNOFL000LSQ')
+    # Make sure it looks in PG and doesn't force request.
+    assert model is pg_model
+    assert dummy_request.datastore == 'elasticsearch'
+
+
+def test_pick_storage_get_by_uuid_does_not_force_database_when_model_is_none(dummy_request):
+    from pyramid.testing import testConfig
+    from ..esstorage import PickStorage
+    dummy_request.datastore = 'elasticsearch'
+    es_model = Mock()
+    pg_model = Mock()
+    read = Mock()
+    write = Mock()
+    read.get_by_uuid.return_value = es_model
+    write.get_by_uuid.return_value = pg_model
+    es_model.invalidated.return_value = False
+    pg_model.invalidated.return_value = False
+    storage = PickStorage(read, write)
+    with testConfig(request=dummy_request):
+        model = storage.get_by_uuid('123')
+    assert model is es_model
+    assert dummy_request.datastore == 'elasticsearch'
+    # Set model to None.
+    read.get_by_uuid.return_value = None
+    with testConfig(request=dummy_request):
+        model = storage.get_by_uuid('123')
+    # Make sure it looks in PG and doesn't force request.
+    assert model is pg_model
+    assert dummy_request.datastore == 'elasticsearch'
