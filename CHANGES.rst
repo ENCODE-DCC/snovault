@@ -1,6 +1,11 @@
 Changes
 =======
 
+Snovault 1.0.58 (released) encoded v118.0
+-----------------------------------------
+1. SNO-170-avoid-rendering-from-database-3 (#346)
+2. SNO-202-upgrade-python (#345)
+
 Snovault 1.0.57 (released) encoded v116.0
 -----------------------------------------
 1. revert SNO-202-python3.8.5-upgrade (#338)
