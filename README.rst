@@ -57,7 +57,7 @@ System Installation (OSX Big Sur(testing), Catlina(10.15.x), Mojave(10.14.6))
 
         brew install openjdk@11
         # Add to your PATH in terminal profile, i.e. ~/.bash_profile or ~/.zshrc
-        export JAVA_HOME=$(/usr/libexec/java_home -v 1.8)
+        export JAVA_HOME=$(/usr/libexec/java_home -v 11)
 
 9. Elasticsearch 5.x
     .. code-block:: bash
