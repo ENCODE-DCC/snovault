@@ -158,7 +158,7 @@ def index_settings():
             'index.max_result_window': 99999,
             'index.mapping.total_fields.limit': 5000,
             'index.number_of_shards': 5,
-            'index.number_of_replicas': 2,
+            'index.number_of_replicas': 1,
             'analysis': {
                 'filter': {
                     'substring': {
