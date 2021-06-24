@@ -88,7 +88,10 @@ class RedisLRUCache:
         )
 
     def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
-        return json.loads(self.client.item_get(key)) or default
+        cached = self.client.item_get(key)
+        if cached is None:
+            return default
+        return json.loads(cached)
 
     def __contains__(self, key: str) -> bool:
         return self.client.client.exists(key) > 0
