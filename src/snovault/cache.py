@@ -1,7 +1,13 @@
+import json
+from functools import cached_property
+from typing import Any, Optional
+
 from pyramid.threadlocal import manager
 from sqlalchemy.util import LRUCache
 import transaction.interfaces
 from zope.interface import implementer
+
+from snovault.local_storage import LocalStoreClient
 
 
 @implementer(transaction.interfaces.ISynchronizer)
@@ -59,3 +65,36 @@ class ManagerLRUCache(object):
 
     def newTransaction(self, transaction):
         pass
+
+
+class RedisLRUCache:
+    def __init__(
+        self, host, port, database_index=0, socket_timeout=None, local_timezone="GMT"
+    ) -> None:
+        self.host = host
+        self.port = port
+        self.database_index = database_index
+        self.socket_timeout = socket_timeout
+        self.local_timezone = local_timezone
+
+    @cached_property
+    def client(self) -> LocalStoreClient:
+        return LocalStoreClient(
+            host=self.host,
+            port=self.port,
+            db_index=self.database_index,
+            socket_timeout=self.socket_timeout,
+            local_tz=self.local_timezone
+        )
+
+    def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
+        return json.loads(self.client.item_get(key)) or default
+
+    def __contains__(self, key: str) -> bool:
+        return self.client.client.exists(key) > 0
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """
+        Can store any json serializable type
+        """
+        self.client.item_set(key, json.dumps(value))

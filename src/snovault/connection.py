@@ -1,7 +1,7 @@
 from past.builtins import basestring
 from pyramid.decorator import reify
 from uuid import UUID
-from .cache import ManagerLRUCache
+from .cache import ManagerLRUCache, RedisLRUCache
 from .interfaces import (
     CONNECTION,
     STORAGE,
@@ -24,8 +24,12 @@ class Connection(object):
         self.registry = registry
         self.item_cache = ManagerLRUCache('snovault.connection.item_cache', 1000)
         self.unique_key_cache = ManagerLRUCache('snovault.connection.key_cache', 1000)
-        embed_cache_capacity = int(registry.settings.get('embed_cache.capacity', 5000))
-        self.embed_cache = ManagerLRUCache('snovault.connection.embed_cache', embed_cache_capacity)
+        self.embed_cache = RedisLRUCache(
+            host=registry.settings.get("local_storage_host"),
+            port=registry.settings.get("local_storage_port"),
+            database_index=registry.settings.get("local_storage_redis_index"),
+        )
+
     @reify
     def storage(self):
         return self.registry[STORAGE]
