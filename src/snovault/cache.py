@@ -67,7 +67,7 @@ class ManagerLRUCache(object):
         pass
 
 
-class RedisLRUCache:
+class RedisLRUEmbedCache:
     def __init__(
         self, host, port, database_index=0, socket_timeout=None, local_timezone="GMT"
     ) -> None:
@@ -87,7 +87,10 @@ class RedisLRUCache:
             local_tz=self.local_timezone
         )
 
-    def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
+    def get(self, key: str, default: Optional[str] = None) -> Any:
+        """
+        OK to keep embedded/linked uuids as lists when deserializing
+        """
         cached = self.client.item_get(key)
         if cached is None:
             return default
@@ -98,6 +101,7 @@ class RedisLRUCache:
 
     def __setitem__(self, key: str, value: Any) -> None:
         """
-        Can store any json serializable type
+        Need to convert uuid sets to arrays
         """
-        self.client.item_set(key, json.dumps(value))
+        result, embedded, linked = value
+        self.client.item_set(key, json.dumps([result, list(embedded), list(linked)]))
