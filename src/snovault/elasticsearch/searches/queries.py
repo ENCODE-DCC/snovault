@@ -984,6 +984,21 @@ class BasicSearchQueryFactoryWithFacets(BasicSearchQueryFactory):
         return self.search
 
 
+class BasicSearchQueryFactoryWithoutFacets(BasicSearchQueryFactory):
+    '''
+    Like BasicSearchQueryFactoryWithFacets but avoids adding aggregations
+    for facets. Allows for caching facets in separate request.
+    '''
+
+    def __init__(self, params_parser, *args, **kwargs):
+        super().__init__(params_parser, *args, **kwargs)
+
+    def build_query(self):
+        super().build_query()
+        self.add_sort()
+        return self.search
+
+
 class CollectionSearchQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
     '''
     Like BasicSearchQueryFactoryWithFacets but only searches over context item type.
