@@ -11,7 +11,10 @@ from snovault.elasticsearch.searches.fields import AllResponseField
 from snovault.elasticsearch.searches.fields import BasicMatrixWithFacetsResponseField
 from snovault.elasticsearch.searches.fields import BasicSearchResponseField
 from snovault.elasticsearch.searches.fields import BasicSearchWithFacetsResponseField
+from snovault.elasticsearch.searches.fields import BasicSearchWithoutFacetsResponseField
 from snovault.elasticsearch.searches.fields import BasicReportWithFacetsResponseField
+from snovault.elasticsearch.searches.fields import BasicReportWithoutFacetsResponseField
+from snovault.elasticsearch.searches.fields import CachedFacetsResponseField
 from snovault.elasticsearch.searches.fields import ClearFiltersResponseField
 from snovault.elasticsearch.searches.fields import ColumnsResponseField
 from snovault.elasticsearch.searches.fields import ContextResponseField
@@ -38,7 +41,9 @@ def includeme(config):
     config.add_route('search', '/search{slash:/?}')
     config.add_route('searchv2_raw', '/searchv2_raw{slash:/?}')
     config.add_route('searchv2_quick', '/searchv2_quick{slash:/?}')
+    config.add_route('search-cached-facets', '/search-cached-facets{slash:/?}')
     config.add_route('report', '/report{slash:/?}')
+    config.add_route('report-cached-facets', '/report-cached-facets{slash:/?}')
     config.add_route('matrixv2_raw', '/matrixv2_raw{slash:/?}')
     config.add_route('matrix', '/matrix{slash:/?}')
     config.add_route('missing_matrix', '/missing_matrix{slash:/?}')
@@ -119,6 +124,41 @@ def searchv2_quick(context, request):
     return fr.render()
 
 
+@view_config(route_name='search-cached-facets', request_method='GET', permission='search')
+def search_cached_facets(context, request):
+    # Note the order of rendering matters for some fields, e.g. AllResponseField and
+    # NotificationResponseField depend on results from BasicSearchWithFacetsResponseField.
+    fr = FieldedResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
+        response_fields=[
+            TitleResponseField(
+                title=SEARCH_TITLE
+            ),
+            TypeResponseField(
+                at_type=[SEARCH_TITLE]
+            ),
+            IDResponseField(),
+            ContextResponseField(),
+            CachedFacetsResponseField(
+                default_item_types=DEFAULT_ITEM_TYPES
+            ),
+            BasicSearchWithoutFacetsResponseField(
+                default_item_types=DEFAULT_ITEM_TYPES
+            ),
+            AllResponseField(),
+            NotificationResponseField(),
+            FiltersResponseField(),
+            ClearFiltersResponseField(),
+            ColumnsResponseField(),
+            SortResponseField(),
+            DebugQueryResponseField()
+        ]
+    )
+    return fr.render()
+
+
 def search_generator(request):
     '''
     For internal use (no view). Like search_quick but returns raw generator
@@ -153,6 +193,36 @@ def report(context, request):
             IDResponseField(),
             ContextResponseField(),
             BasicReportWithFacetsResponseField(),
+            AllResponseField(),
+            NotificationResponseField(),
+            FiltersResponseField(),
+            TypeOnlyClearFiltersResponseField(),
+            ColumnsResponseField(),
+            NonSortableResponseField(),
+            SortResponseField(),
+            DebugQueryResponseField()
+        ]
+    )
+    return fr.render()
+
+
+@view_config(route_name='report-cached-facets', request_method='GET', permission='search')
+def report_cached_facets(context, request):
+    fr = FieldedResponse(
+        _meta={
+            'params_parser': ParamsParser(request)
+        },
+        response_fields=[
+            TitleResponseField(
+                title=REPORT_TITLE
+            ),
+            TypeResponseField(
+                at_type=[REPORT_TITLE]
+            ),
+            IDResponseField(),
+            ContextResponseField(),
+            CachedFacetsResponseField(),
+            BasicReportWithoutFacetsResponseField(),
             AllResponseField(),
             NotificationResponseField(),
             FiltersResponseField(),

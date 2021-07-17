@@ -26,6 +26,7 @@ def test_searchv2_view(workbook, testapp):
     assert 'debug' not in r.json
     assert 'columns' in r.json
     assert 'sort' in r.json
+    assert 'facets' in r.json
 
 
 def test_searchv2_view_with_limit(workbook, testapp):
@@ -279,6 +280,128 @@ def test_searchv2_quick_view_specify_field(workbook, testapp):
     assert len(r.json['@graph'][0].keys()) == 2
 
 
+def test_search_cached_facets_view(workbook, testapp):
+    r = testapp.get(
+        '/search-cached-facets/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
+    )
+    assert r.json['title'] == 'Search'
+    assert len(r.json['@graph']) == 1
+    assert r.json['@graph'][0]['accession'] == 'SNOFL000LSQ'
+    assert r.json['@graph'][0]['status'] == 'deleted'
+    assert 'Snowflake' in r.json['@graph'][0]['@type']
+    assert len(r.json['facets']) == 5
+    assert r.json['@id'] == '/search-cached-facets/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
+    assert r.json['@context'] == '/terms/'
+    assert r.json['@type'] == ['Search']
+    assert r.json['total'] == 1
+    assert r.json['notification'] == 'Success'
+    assert len(r.json['filters']) == 4
+    assert r.status_code == 200
+    assert r.json['clear_filters'] == '/search-cached-facets/?type=Snowflake'
+    assert 'debug' not in r.json
+    assert 'columns' in r.json
+    assert 'sort' in r.json
+    assert 'facets' in r.json
+
+
+def test_search_cached_facets_view_with_limit(workbook, testapp):
+    r = testapp.get(
+        '/search-cached-facets/?type=Snowflake&limit=5'
+    )
+    assert len(r.json['@graph']) == 5
+    assert 'all' in r.json
+    r = testapp.get(
+        '/search-cached-facets/?type=Snowflake&limit=26'
+    )
+    assert len(r.json['@graph']) == 26
+    assert 'all' in r.json
+    r = testapp.get(
+        '/search-cached-facets/?type=Snowflake&limit=all'
+    )
+    assert len(r.json['@graph']) == 35
+    assert 'all' not in r.json
+    r = testapp.get(
+        '/search-cached-facets/?type=Snowflake&limit=35'
+    )
+    assert len(r.json['@graph']) == 35
+    assert 'all' not in r.json
+    r = testapp.get(
+        '/search-cached-facets/?type=Snowflake&limit=100000'
+    )
+    assert len(r.json['@graph']) == 35
+    assert 'all' not in r.json
+
+
+def test_search_cached_facets_view_with_limit_and_scan(workbook, testapp, mocker):
+    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithoutFacets
+    mocker.patch.object(BasicSearchQueryFactoryWithoutFacets, '_should_scan_over_results')
+    BasicSearchQueryFactoryWithoutFacets._should_scan_over_results.return_value = True
+    r = testapp.get(
+        '/search-cached-facets/?type=Snowflake&limit=all'
+    )
+    assert len(r.json['@graph']) == 35
+    r = testapp.get(
+        '/search-cached-facets/?type=Snowflake&limit=30'
+    )
+    assert len(r.json['@graph']) == 30
+    BasicSearchQueryFactoryWithoutFacets._should_scan_over_results.return_value = False
+    r = testapp.get(
+        '/search-cached-facets/?type=Snowflake&limit=all'
+    )
+    assert len(r.json['@graph']) == 25
+    r = testapp.get(
+        '/search-cached-facets/?type=Snowflake&limit=30'
+    )
+    assert len(r.json['@graph']) == 30
+
+
+def test_search_cached_facets_view_with_limit_zero(workbook, testapp):
+    r = testapp.get(
+        '/search-cached-facets/?type=Snowflake&limit=0'
+    )
+    assert len(r.json['@graph']) == 0
+    assert 'all' in r.json
+    assert r.json['total'] == 35
+
+
+def test_search_cached_facets_view_values(workbook, testapp):
+    r = testapp.get(
+        '/search-cached-facets/?status=released'
+    )
+    assert r.json['all'] == '/search-cached-facets/?status=released&limit=all'
+    assert r.json['notification'] == 'Success'
+    assert r.json['filters'][0] == {'field': 'status', 'remove': '/search-cached-facets/', 'term': 'released'}
+    assert r.json['clear_filters'] == '/search-cached-facets/'
+
+
+def test_search_cached_facets_view_values_no_results(workbook, testapp):
+    r = testapp.get(
+        '/search-cached-facets/?status=current&type=Snowflake',
+        status=404
+    )
+    assert r.json['notification'] == 'No results found'
+
+
+def test_search_cached_facets_view_values_malformed_query_string(workbook, testapp):
+    r = testapp.get(
+        '/search-cached-facets/?status=current&type=Snowflake&status=&format=json',
+        status=404
+    )
+    assert r.json['notification'] == 'No results found'
+
+
+def test_search_cached_facets_view_values_invalid_search_term(workbook, testapp):
+    r = testapp.get(
+        '/search-cached-facets/?searchTerm=[',
+        status=404
+    )
+    r = testapp.get(
+        '/search-cached-facets/?searchTerm=cherry^',
+        status=200
+    )
+    assert r.json['total'] == 1
+
+
 def test_search_generator(workbook, threadlocals, dummy_request):
     from snovault.elasticsearch.searches.parsers import ParamsParser
     from snovault.elasticsearch import ELASTIC_SEARCH
@@ -421,6 +544,31 @@ def test_reportv2_view_values_no_type(workbook, testapp):
         status=400
     )
     assert r.json['description'] == 'Report view requires specifying a single type: []'
+
+
+def test_report_cached_facets_view(workbook, testapp):
+    r = testapp.get(
+        '/report-cached-facets/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
+    )
+    assert r.json['title'] == 'Report'
+    assert len(r.json['@graph']) == 1
+    assert r.json['@graph'][0]['accession'] == 'SNOFL000LSQ'
+    assert r.json['@graph'][0]['status'] == 'deleted'
+    assert 'Snowflake' in r.json['@graph'][0]['@type']
+    assert len(r.json['facets']) == 5
+    assert r.json['@id'] == '/report-cached-facets/?type=Snowflake&award=/awards/U41HG006992/&accession=SNOFL000LSQ&status=deleted'
+    assert r.json['@context'] == '/terms/'
+    assert r.json['@type'] == ['Report']
+    assert r.json['total'] == 1
+    assert r.json['notification'] == 'Success'
+    assert len(r.json['filters']) == 4
+    assert r.status_code == 200
+    assert r.json['clear_filters'] == '/report-cached-facets/?type=Snowflake'
+    assert 'debug' not in r.json
+    assert 'columns' in r.json
+    assert 'non_sortable' in r.json
+    assert 'sort' in r.json
+    assert 'facets' in r.json
 
 
 def test_matrixv2_raw_view_raw_response(workbook, testapp):
