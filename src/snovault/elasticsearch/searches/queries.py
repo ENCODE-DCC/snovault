@@ -999,6 +999,25 @@ class BasicSearchQueryFactoryWithoutFacets(BasicSearchQueryFactory):
         return self.search
 
 
+class CachedFacetsQueryFactory(BasicSearchQueryFactoryWithFacets):
+    '''
+    Like BasicSearchQueryFactoryWithFacets but avoids returning hits so that
+    aggregations are cached by ES shard request_cache. Avoids adding source or sort
+    to minimize cache misses.
+    '''
+    def __init__(self, params_parser, *args, **kwargs):
+        super().__init__(params_parser, *args, **kwargs)
+
+    def add_source(self):
+        pass
+
+    def add_slice(self):
+        self.search = self._get_or_create_search()[0:0]
+
+    def add_sort(self):
+        pass
+
+
 class CollectionSearchQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
     '''
     Like BasicSearchQueryFactoryWithFacets but only searches over context item type.

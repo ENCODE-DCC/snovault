@@ -3958,6 +3958,8 @@ def test_searches_queries_basic_search_query_factory_with_facets_build_query(dum
     actual_post_filter_bool_must = actual['post_filter']['bool']['must']
     assert all(e in actual_post_filter_bool_must for e in expected_post_filter_bool_must)
     assert 'aggs' in actual
+    assert '_source' in actual
+    assert 'sort' in actual
 
 
 def test_searches_queries_basic_search_query_factory_without_facets_init(params_parser):
@@ -3981,6 +3983,34 @@ def test_searches_queries_basic_search_query_factory_without_facets_build_query(
     query = bsqf.build_query()
     actual = query.to_dict()
     assert 'aggs' not in actual
+    assert actual['size'] == 10
+    assert 'sort' in actual
+
+
+def test_searches_queries_cached_facet_query_factory_init(params_parser):
+    from snovault.elasticsearch.searches.queries import CachedFacetsQueryFactory
+    cfqf = CachedFacetsQueryFactory(params_parser)
+    assert isinstance(cfqf, CachedFacetsQueryFactory)
+
+
+def test_searches_queries_cached_facet_query_factory_build_query(dummy_request):
+    from snovault.elasticsearch.searches.queries import CachedFacetsQueryFactory
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.testing import DummyResource
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released&status=archived&file_format=bam'
+        '&lab.name!=thermo&restricted!=*&dbxref=*&replcate.biosample.title=cell'
+        '&limit=10'
+    )
+    dummy_request.context = DummyResource()
+    params_parser = ParamsParser(dummy_request)
+    cfqf = CachedFacetsQueryFactory(params_parser)
+    query = cfqf.build_query()
+    actual = query.to_dict()
+    assert 'aggs' in actual
+    assert '_source' not in actual
+    assert actual['size'] == 0
+    assert 'sort' not in actual
 
 
 def test_searches_queries_collection_search_query_factory_with_facets_get_item_types(params_parser):
