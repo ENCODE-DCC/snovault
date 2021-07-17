@@ -3993,11 +3993,24 @@ def test_searches_queries_collection_search_query_factory_with_facets_get_item_t
         ('type', 'TestingSearchSchema')
     ]
 
+def test_searches_queries_basic_report_query_factory_init(params_parser):
+    from snovault.elasticsearch.searches.queries import BasicReportQueryFactory
+    brqf = BasicReportQueryFactory(params_parser)
+    assert isinstance(brqf, BasicReportQueryFactory)
+    assert brqf.params_parser == params_parser
+
 
 def test_searches_queries_basic_report_query_factory_with_facets_init(params_parser):
     from snovault.elasticsearch.searches.queries import BasicReportQueryFactoryWithFacets
     brqf = BasicReportQueryFactoryWithFacets(params_parser)
     assert isinstance(brqf, BasicReportQueryFactoryWithFacets)
+    assert brqf.params_parser == params_parser
+
+
+def test_searches_queries_basic_report_query_factory_without_facets_init(params_parser):
+    from snovault.elasticsearch.searches.queries import BasicReportQueryFactoryWithoutFacets
+    brqf = BasicReportQueryFactoryWithoutFacets(params_parser)
+    assert isinstance(brqf, BasicReportQueryFactoryWithoutFacets)
     assert brqf.params_parser == params_parser
 
 
@@ -4140,6 +4153,31 @@ def test_searches_queries_basic_report_query_factory_with_facets_build_query(dum
     assert q['size'] == 10
     assert q['from'] == 0
     assert 'aggs' in q
+    assert q['query']['bool']
+    assert q['_source'] == ['embedded.@id', 'embedded.@type', 'embedded.accession']
+    assert q['sort'] == [
+        {'embedded.date_created': {'order': 'desc', 'unmapped_type': 'keyword'}},
+        {'embedded.label': {'order': 'desc', 'unmapped_type': 'keyword'}},
+        {'embedded.uuid': {'order': 'desc', 'unmapped_type': 'keyword'}}
+    ]
+
+
+def test_searches_queries_basic_report_query_factory_without_facets_build_query(dummy_request):
+    from snovault.elasticsearch.searches.queries import BasicReportQueryFactoryWithoutFacets
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.testing import DummyResource
+    dummy_request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+        '&limit=10&field=@id&field=accession&mode=picker'
+    )
+    params_parser = ParamsParser(dummy_request)
+    params_parser._request.context = DummyResource()
+    brqf = BasicReportQueryFactoryWithoutFacets(params_parser)
+    q = brqf.build_query()
+    q = q.to_dict()
+    assert q['size'] == 10
+    assert q['from'] == 0
+    assert 'aggs' not in q
     assert q['query']['bool']
     assert q['_source'] == ['embedded.@id', 'embedded.@type', 'embedded.accession']
     assert q['sort'] == [

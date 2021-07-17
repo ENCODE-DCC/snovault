@@ -1012,9 +1012,9 @@ class CollectionSearchQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
         return [(TYPE_KEY, self.params_parser._request.context.type_info.name)]
 
 
-class BasicReportQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
+class BasicReportQueryFactory(BasicSearchQueryFactory):
     '''
-    Like BasicSearchQueryFactoryWithFacets but makes sure single item type
+    Like BasicSearchQueryFactory but makes sure single item type
     without subtypes is specified.
     '''
 
@@ -1045,6 +1045,26 @@ class BasicReportQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
         self.validate_item_types()
         self.validate_item_type_subtypes()
         return super().build_query()
+
+
+class BasicReportQueryFactoryWithFacets(BasicReportQueryFactory, BasicSearchQueryFactoryWithFacets):
+    '''
+    Like BasicSearchQueryFactoryWithFacets but makes sure single item type
+    without subtypes is specified.
+    '''
+
+    def __init__(self, params_parser, *args, **kwargs):
+        super().__init__(params_parser, *args, **kwargs)
+
+
+class BasicReportQueryFactoryWithoutFacets(BasicReportQueryFactory, BasicSearchQueryFactoryWithoutFacets):
+    '''
+    Like BasicSearchQueryFactoryWithoutFacets but makes sure single item type
+    without subtypes is specified.
+    '''
+
+    def __init__(self, params_parser, *args, **kwargs):
+        super().__init__(params_parser, *args, **kwargs)
 
 
 class BasicMatrixQueryFactoryWithFacets(BasicSearchQueryFactoryWithFacets):
