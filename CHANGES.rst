@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.59 (released) encoded v120.0
+-----------------------------------------
+1. SNO-204-allow-facet-caching (#351)
+
 Snovault 1.0.58 (released) encoded v118.0
 -----------------------------------------
 1. SNO-170-avoid-rendering-from-database-3 (#346)
