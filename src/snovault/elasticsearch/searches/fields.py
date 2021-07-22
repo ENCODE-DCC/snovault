@@ -33,7 +33,10 @@ from .queries import AuditMatrixQueryFactoryWithFacets
 from .queries import BasicMatrixQueryFactoryWithFacets
 from .queries import BasicSearchQueryFactory
 from .queries import BasicSearchQueryFactoryWithFacets
+from .queries import BasicSearchQueryFactoryWithoutFacets
 from .queries import BasicReportQueryFactoryWithFacets
+from .queries import BasicReportQueryFactoryWithoutFacets
+from .queries import CachedFacetsQueryFactory
 from .queries import CollectionSearchQueryFactoryWithFacets
 from .queries import MissingMatrixQueryFactoryWithFacets
 from .responses import AuditMatrixResponseWithFacets
@@ -147,6 +150,49 @@ class BasicSearchWithFacetsResponseField(BasicSearchResponseField):
         )
 
 
+class BasicSearchWithoutFacetsResponseField(BasicSearchResponseField):
+    '''
+    Avoids calculating facet aggregations to allow for caching in separate request.
+    '''
+
+    def _build_query(self):
+        self.query_builder = BasicSearchQueryFactoryWithoutFacets(
+            params_parser=self.get_params_parser(),
+            **self.kwargs
+        )
+        self.query = self.query_builder.build_query()
+
+    def _format_results(self):
+        self.response.update(
+            {
+                GRAPH: self.results.to_graph(),
+                TOTAL: self.results.results.hits.total
+            }
+        )
+
+
+class CachedFacetsResponseField(BasicSearchResponseField):
+    '''
+    Gets facets in separate request that's cached by ES. Use with
+    BasicSearchWithoutFacetsResponseField to recreate the full
+    BasicSearchWithFacetsResponseField response.
+    '''
+
+    def _build_query(self):
+        self.query_builder = CachedFacetsQueryFactory(
+            params_parser=self.get_params_parser(),
+            **self.kwargs
+        )
+        self.query = self.query_builder.build_query()
+
+    def _format_results(self):
+        self.response.update(
+            {
+                FACETS: self.results.to_facets(),
+            }
+        )
+
+
 class CollectionSearchWithFacetsResponseField(BasicSearchWithFacetsResponseField):
     '''
     Like BasicSearchWithFacetsResponseField but uses CollectionSearchQueryFactoryWithFacets
@@ -197,6 +243,20 @@ class BasicReportWithFacetsResponseField(BasicSearchWithFacetsResponseField):
 
     def _build_query(self):
         self.query_builder = BasicReportQueryFactoryWithFacets(
+            params_parser=self.get_params_parser(),
+            **self.kwargs
+        )
+        self.query = self.query_builder.build_query()
+
+
+class BasicReportWithoutFacetsResponseField(BasicSearchWithoutFacetsResponseField):
+    '''
+    Like BasicSearchWithoutFacetsResponseField but uses BasicReportQueryFactoryWithoutFacet
+    query builder.
+    '''
+
+    def _build_query(self):
+        self.query_builder = BasicReportQueryFactoryWithoutFacets(
             params_parser=self.get_params_parser(),
             **self.kwargs
         )

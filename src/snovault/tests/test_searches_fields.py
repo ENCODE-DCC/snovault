@@ -123,6 +123,27 @@ def test_searches_fields_basic_search_with_facets_response_execute_query(dummy_p
     assert Search.execute.call_count == 1
 
 
+def test_searches_fields_basic_search_without_facets_response_field_init():
+    from snovault.elasticsearch.searches.fields import BasicSearchWithoutFacetsResponseField
+    brf = BasicSearchWithoutFacetsResponseField()
+    assert isinstance(brf, BasicSearchWithoutFacetsResponseField)
+
+
+def test_searches_fields_basic_search_without_facets_response_build_query(dummy_parent):
+    from snovault.elasticsearch.searches.fields import BasicSearchWithoutFacetsResponseField
+    from elasticsearch_dsl import Search
+    brf = BasicSearchWithoutFacetsResponseField()
+    brf.parent = dummy_parent
+    brf._build_query()
+    assert isinstance(brf.query, Search)
+
+
+def test_searches_fields_cached_facets_response_field_init():
+    from snovault.elasticsearch.searches.fields import CachedFacetsResponseField
+    cfrf = CachedFacetsResponseField()
+    assert isinstance(cfrf, CachedFacetsResponseField)
+
+
 def test_searches_fields_collection_search_with_facets_response_field_init():
     from snovault.elasticsearch.searches.fields import CollectionSearchWithFacetsResponseField
     crf = CollectionSearchWithFacetsResponseField()
@@ -155,6 +176,21 @@ def test_searches_fields_basic_report_with_facets_response_build_query(dummy_par
     brf._build_query()
     assert isinstance(brf.query, Search)
     assert isinstance(brf.query_builder, BasicReportQueryFactoryWithFacets)
+
+
+def test_searches_fields_basic_report_without_facets_response_build_query(dummy_parent):
+    from snovault.elasticsearch.searches.fields import BasicReportWithoutFacetsResponseField
+    from snovault.elasticsearch.searches.queries import BasicReportQueryFactoryWithoutFacets
+    from elasticsearch_dsl import Search
+    brf = BasicReportWithoutFacetsResponseField()
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&assay_title=Histone+ChIP-seq&award.project=Roadmap'
+        '&limit=all&frame=embedded&restricted!=*&searchTerm=ctcf'
+    )
+    brf.parent = dummy_parent
+    brf._build_query()
+    assert isinstance(brf.query, Search)
+    assert isinstance(brf.query_builder, BasicReportQueryFactoryWithoutFacets)
 
 
 def test_searches_fields_raw_search_with_aggs_response_field_init():
