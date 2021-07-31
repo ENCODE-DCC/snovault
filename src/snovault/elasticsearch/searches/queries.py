@@ -377,7 +377,10 @@ class AbstractQueryFactory:
 
     def _get_default_sort(self):
         if self._should_add_default_sort():
-            return DEFAULT_SORT.copy()
+            return [
+                self._make_sort_key_and_value(key)
+                for key in self.kwargs.get('default_sort') or DEFAULT_SORT
+            ]
 
     def _get_sort(self):
         return [

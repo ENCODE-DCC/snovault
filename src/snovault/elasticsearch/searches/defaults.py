@@ -98,9 +98,9 @@ KEEP_LAYERED_FIELDS = [
 DEFAULT_SORT_OPTIONS = {'order': 'desc', 'unmapped_type': 'keyword'}
 
 DEFAULT_SORT = [
-    {'embedded.date_created': {'order': 'desc', 'unmapped_type': 'keyword'}},
-    {'embedded.label': {'order': 'desc', 'unmapped_type': 'keyword'}},
-    {'embedded.uuid': {'order': 'desc', 'unmapped_type': 'keyword'}},
+    '-date_created',
+    '-label',
+    '-uuid',
 ]
 
 AUDIT_FIELDS = [

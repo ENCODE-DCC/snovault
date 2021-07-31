@@ -833,6 +833,19 @@ def test_searches_queries_abstract_query_factory_get_default_sort(dummy_request)
         {'embedded.label': {'order': 'desc', 'unmapped_type': 'keyword'}},
         {'embedded.uuid': {'order': 'desc', 'unmapped_type': 'keyword'}}
     ]
+    aq = AbstractQueryFactory(
+        params_parser,
+        default_sort=[
+            '-expression.tpm',
+            '-gene.symbol',
+            'file.@id',
+        ],
+    )
+    assert aq._get_default_sort() == [
+        {'embedded.expression.tpm': {'order': 'desc', 'unmapped_type': 'keyword'}},
+        {'embedded.gene.symbol': {'order': 'desc', 'unmapped_type': 'keyword'}},
+        {'embedded.file.@id': {'order': 'asc', 'unmapped_type': 'keyword'}}
+    ]
 
 
 def test_searches_queries_abstract_query_factory_get_sort(params_parser):
