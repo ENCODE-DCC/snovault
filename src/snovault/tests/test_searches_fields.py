@@ -802,3 +802,28 @@ def test_searches_fields_audit_matrix_with_facets_response_field_execute_query(d
     amwf._build_query()
     amwf._execute_query()
     assert Search.execute.call_count == 1
+
+
+def test_searches_fields_facet_groups_response_field_init():
+    from snovault.elasticsearch.searches.fields import FacetGroupsResponseField
+    fg = FacetGroupsResponseField()
+    assert isinstance(fg, FacetGroupsResponseField)
+
+
+def test_searches_fields_facet_groups_get_facet_groups(dummy_parent):
+    from snovault.elasticsearch.searches.fields import FacetGroupsResponseField
+    dummy_parent._meta['params_parser']._request.environ['QUERY_STRING'] = (
+        'type=TestingSearchSchema&status=released'
+    )
+    fg = FacetGroupsResponseField()
+    fg.parent = dummy_parent
+    assert fg._get_facet_groups() == [
+        {
+            'title': "Test group",
+            'name': 'TestingSearchSchema',
+            'facet_fields': [
+                'status',
+                'name'
+            ]
+        }
+    ]

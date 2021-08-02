@@ -188,6 +188,7 @@ class SearchConfig(MutableConfig):
         'boost_values',
         'matrix',
         'fields',
+        'facet_groups',
     ]
 
     def __init__(self, name, config):
