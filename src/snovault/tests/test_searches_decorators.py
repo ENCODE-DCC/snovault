@@ -140,7 +140,7 @@ def test_searces_decorators_catch_and_swap():
         dummy_func()
 
 
-def test_searces_decorators_conditional_cache(mocker):
+def test_searces_decorators_conditional_cache():
     from snovault.elasticsearch.searches.decorators import conditional_cache
     from functools import partial
     cache = {}
