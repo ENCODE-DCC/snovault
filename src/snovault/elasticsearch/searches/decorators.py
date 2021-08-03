@@ -96,3 +96,27 @@ def catch_and_swap(catch=Exception, swap=None, details=None):
         return wrapper
     return decorator
 
+
+def conditional_cache(cache, condition, key):
+    '''
+    Will use cache if `condition` function is met. Generates custom key
+    using `key` function. Cache should implement mapping interface.
+    '''
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if not condition(*args, **kwargs):
+                return func(*args, **kwargs)
+            cache_key = key(*args, **kwargs)
+            try:
+                return cache[cache_key]
+            except KeyError:
+                pass
+            result = func(*args, **kwargs)
+            try:
+                cache[cache_key] = result
+            except ValueError:
+                pass
+            return result
+        return wrapper
+    return decorator
