@@ -202,7 +202,7 @@ class TestingSearchSchema(Item):
         'additionalProperties': False,
         'facet_groups': [
             {
-                'title': "Test group",
+                'title': 'Test group',
                 'facet_fields': [
                     'status',
                     'name'

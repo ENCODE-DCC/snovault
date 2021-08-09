@@ -680,8 +680,12 @@ class FacetGroupsResponseField(ResponseField):
         for config in self.get_query_builder()._get_configs_from_param_values_or_item_types():
             schema_facet_groups = config.get('facet_groups', [])
             for schema_facet_group in schema_facet_groups:
-                schema_facet_group['name'] = config.name
-            facet_groups.extend(schema_facet_groups)
+                facet_groups.append(
+                    {
+                        'name': config.name,
+                        **schema_facet_group,
+                    }
+                )
         return facet_groups
 
     def render(self, *args, **kwargs):

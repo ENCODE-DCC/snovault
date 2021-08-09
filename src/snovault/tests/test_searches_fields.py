@@ -819,7 +819,7 @@ def test_searches_fields_facet_groups_get_facet_groups(dummy_parent):
     fg.parent = dummy_parent
     assert fg._get_facet_groups() == [
         {
-            'title': "Test group",
+            'title': 'Test group',
             'name': 'TestingSearchSchema',
             'facet_fields': [
                 'status',
