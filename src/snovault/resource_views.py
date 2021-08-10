@@ -13,16 +13,16 @@ from pyramid.view import (
     view_config,
 )
 from urllib.parse import urlencode
-from snovault.elasticsearch.searches.fields import AllResponseField
-from snovault.elasticsearch.searches.fields import CollectionSearchWithFacetsResponseField
-from snovault.elasticsearch.searches.fields import ColumnsResponseField
-from snovault.elasticsearch.searches.fields import CollectionClearFiltersResponseField
-from snovault.elasticsearch.searches.fields import FiltersResponseField
-from snovault.elasticsearch.searches.fields import IDResponseField
-from snovault.elasticsearch.searches.fields import NotificationResponseField
-from snovault.elasticsearch.searches.parsers import ParamsParser
-from snovault.elasticsearch.searches.parsers import QueryString
-from snovault.elasticsearch.searches.responses import FieldedResponse
+from snosearch.fields import AllResponseField
+from snosearch.fields import CollectionSearchWithFacetsResponseField
+from snosearch.fields import ColumnsResponseField
+from snosearch.fields import CollectionClearFiltersResponseField
+from snosearch.fields import FiltersResponseField
+from snosearch.fields import IDResponseField
+from snosearch.fields import NotificationResponseField
+from snosearch.parsers import ParamsParser
+from snosearch.parsers import QueryString
+from snosearch.responses import FieldedResponse
 from .calculated import calculate_properties
 from .calculated import calculate_select_properties
 from .calculated import calculate_filtered_properties
