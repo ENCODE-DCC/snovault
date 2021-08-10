@@ -9,6 +9,7 @@ from .interfaces import CLEAR_FILTERS
 from .interfaces import COLUMNS
 from .interfaces import DEBUG_KEY
 from .interfaces import EMBEDDED
+from .interfaces import FACET_GROUPS
 from .interfaces import FACETS
 from .interfaces import FIELD_KEY
 from .interfaces import FILTERS
@@ -661,4 +662,34 @@ class SearchBaseResponseField(ResponseField):
         self.parent = kwargs.get('parent')
         return {
             SEARCH_BASE: self._get_search_base()
+        }
+
+
+class FacetGroupsResponseField(ResponseField):
+    '''
+    Passes through the `facet_groups` property from the schema to the search
+    results, adding the relevant schema name as the `name` property for each
+    facet group.
+    '''
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _get_facet_groups(self):
+        facet_groups = []
+        for config in self.get_query_builder()._get_configs_from_param_values_or_item_types():
+            schema_facet_groups = config.get('facet_groups', [])
+            for schema_facet_group in schema_facet_groups:
+                facet_groups.append(
+                    {
+                        'name': config.name,
+                        **schema_facet_group,
+                    }
+                )
+        return facet_groups
+
+    def render(self, *args, **kwargs):
+        self.parent = kwargs.get('parent')
+        return {
+            FACET_GROUPS: self._get_facet_groups()
         }
