@@ -99,6 +99,19 @@ class FieldedGeneratorResponse(FieldedResponse):
         return response
 
 
+class FieldedInMemoryResponse(FieldedResponse):
+    '''
+    Like FieldedResponse but always returns an InMemoryResponse.
+    '''
+
+    def __init__(self, response_fields=[], _meta={}):
+        super().__init__(response_fields=response_fields, _meta=_meta)
+
+    def _response_factory(self):
+        response = InMemoryResponse(self)
+        return response
+
+
 class StreamedResponse:
     '''
     Streams FieldedResponse generators that would otherwise run the machine

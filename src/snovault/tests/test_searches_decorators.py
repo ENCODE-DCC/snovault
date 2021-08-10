@@ -138,3 +138,66 @@ def test_searces_decorators_catch_and_swap():
         raise ValueError
     with pytest.raises(Exception) as e:
         dummy_func()
+
+
+def test_searces_decorators_conditional_cache():
+    from snovault.elasticsearch.searches.decorators import conditional_cache
+    from functools import partial
+    cache = {}
+    context = None
+    request = {'value': "(('a', 'b'), ('c', 'd'))"}
+    def call_count(func):
+        def wrapper(*args, **kwargs):
+            wrapper.call_count += 1
+            return func(*args, **kwargs)
+        wrapper.call_count = 0
+        return wrapper
+    @call_count
+    def key(prefix, context, request):
+        return f'{prefix}.{request["value"]}'
+    @call_count
+    def condition(context, request):
+        return 'd' in request['value']
+    @call_count
+    def expensive_function():
+        return [1, 2, 'a', {'b': 'c'}]
+    @conditional_cache(
+        cache=cache,
+        condition=condition,
+        key=partial(key, 'results-prefix')
+    )
+    def get_results(context, request):
+        return expensive_function()
+    assert len(cache) == 0
+    assert expensive_function.call_count == 0
+    assert key.call_count == 0
+    assert condition.call_count == 0
+    results = get_results(context, request)
+    assert results == [1, 2, 'a', {'b': 'c'}]
+    assert len(cache) == 1
+    assert "results-prefix.(('a', 'b'), ('c', 'd'))" in cache
+    assert cache["results-prefix.(('a', 'b'), ('c', 'd'))"] == [1, 2, 'a', {'b': 'c'}]
+    assert expensive_function.call_count == 1
+    assert key.call_count == 1
+    assert condition.call_count == 1
+    results = get_results(context, request)
+    assert results == [1, 2, 'a', {'b': 'c'}]
+    assert len(cache) == 1
+    assert expensive_function.call_count == 1
+    assert key.call_count == 2
+    assert condition.call_count == 2
+    results = get_results(context, request)
+    assert expensive_function.call_count == 1
+    assert key.call_count == 3
+    assert condition.call_count == 3
+    @conditional_cache(
+        cache=cache,
+        condition=lambda context, request: False,
+        key=partial(key, 'results-prefix')
+    )
+    def get_results(context, request):
+        return expensive_function()
+    results = get_results(context, request)
+    assert expensive_function.call_count == 2
+    results = get_results(context, request)
+    assert expensive_function.call_count == 3

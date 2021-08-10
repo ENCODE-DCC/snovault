@@ -511,3 +511,64 @@ def test_searches_responses_fielded_generator_response_render(dummy_request):
     assert 'a' in response
     assert isinstance(response['a'], GeneratorType)
     assert list(response['a']) == [1, 2, 3]
+
+
+def test_searches_responses_fielded_in_memory_response_init():
+    from snovault.elasticsearch.searches.responses import FieldedInMemoryResponse
+    fimr = FieldedInMemoryResponse()
+    assert isinstance(fimr, FieldedInMemoryResponse)
+
+
+def test_searches_responses_fielded_in_memory_response_response_factory(dummy_request):
+    from snovault.elasticsearch.searches.responses import FieldedInMemoryResponse
+    from snovault.elasticsearch.searches.responses import InMemoryResponse
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    fimr = FieldedInMemoryResponse()
+    fimr.response = {'a': 1}
+    assert isinstance(fimr._response_factory(), InMemoryResponse)
+    fimr = FieldedInMemoryResponse(
+        _meta={
+            'params_parser': ParamsParser(dummy_request)
+        }
+    )
+    assert isinstance(fimr._response_factory(), InMemoryResponse)
+    fimr.response = {'a': (x for x in [1, 2, 3])}
+    assert isinstance(fimr._response_factory(), InMemoryResponse)
+    dummy_request.__parent__ = 'something'
+    fimr = FieldedInMemoryResponse(
+        _meta={
+            'params_parser': ParamsParser(dummy_request)
+        }
+    )
+    assert isinstance(fimr._response_factory(), InMemoryResponse)
+    fimr.response = {'a': (x for x in [1, 2, 3])}
+    assert isinstance(fimr._response_factory(), InMemoryResponse)
+
+
+def test_searches_responses_fielded_in_memory_response_render(dummy_request):
+    from snovault.elasticsearch.searches.responses import FieldedInMemoryResponse
+    from snovault.elasticsearch.searches.responses import InMemoryResponse
+    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from pyramid.response import Response
+    fimr = FieldedInMemoryResponse()
+    fimr.response = {'a': 1}
+    response = fimr.render()
+    assert isinstance(response, dict)
+    fimr.response = {'a': (x for x in [1, 2, 3])}
+    response = fimr.render()
+    assert isinstance(response, dict)
+    assert 'a' in response
+    assert isinstance(response['a'], list)
+    assert response['a'] == [1, 2, 3]
+    dummy_request.__parent__ = 'something'
+    fimr = FieldedInMemoryResponse(
+        _meta={
+            'params_parser': ParamsParser(dummy_request)
+        }
+    )
+    fimr.response = {'a': (x for x in [1, 2, 3])}
+    response = fimr.render()
+    assert isinstance(response, dict)
+    assert 'a' in response
+    assert isinstance(response['a'], list)
+    assert response['a'] == [1, 2, 3]
