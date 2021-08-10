@@ -58,7 +58,7 @@ def test_searchv2_view_with_limit(workbook, testapp):
 
 
 def test_searchv2_view_with_limit_and_scan(workbook, testapp, mocker):
-    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithFacets
+    from snosearch.queries import BasicSearchQueryFactoryWithFacets
     mocker.patch.object(BasicSearchQueryFactoryWithFacets, '_should_scan_over_results')
     BasicSearchQueryFactoryWithFacets._should_scan_over_results.return_value = True
     r = testapp.get(
@@ -333,7 +333,7 @@ def test_search_cached_facets_view_with_limit(workbook, testapp):
 
 
 def test_search_cached_facets_view_with_limit_and_scan(workbook, testapp, mocker):
-    from snovault.elasticsearch.searches.queries import BasicSearchQueryFactoryWithoutFacets
+    from snosearch.queries import BasicSearchQueryFactoryWithoutFacets
     mocker.patch.object(BasicSearchQueryFactoryWithoutFacets, '_should_scan_over_results')
     BasicSearchQueryFactoryWithoutFacets._should_scan_over_results.return_value = True
     r = testapp.get(
@@ -403,7 +403,7 @@ def test_search_cached_facets_view_values_invalid_search_term(workbook, testapp)
 
 
 def test_search_generator(workbook, threadlocals, dummy_request):
-    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snosearch.parsers import ParamsParser
     from snovault.elasticsearch import ELASTIC_SEARCH
     from elasticsearch import Elasticsearch
     from types import GeneratorType
@@ -422,7 +422,7 @@ def test_search_generator(workbook, threadlocals, dummy_request):
 
 
 def test_search_generator_field_specified(workbook, threadlocals, dummy_request):
-    from snovault.elasticsearch.searches.parsers import ParamsParser
+    from snosearch.parsers import ParamsParser
     from snovault.elasticsearch import ELASTIC_SEARCH
     from elasticsearch import Elasticsearch
     from types import GeneratorType
