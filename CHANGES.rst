@@ -1,6 +1,13 @@
 Changes
 =======
 
+Snovault 1.0.60 (released) encoded v121.0
+-----------------------------------------
+1. SNO-209-move-search-code-to-independent-package (#356)
+2. SNO-206-use-redis-cache-for-rnget-view (#354)
+3. SNO-207-facet-groups-support (#355)
+4. SNO-205-allow-customization-of-default-sort (#353)
+
 Snovault 1.0.59 (released) encoded v120.0
 -----------------------------------------
 1. SNO-204-allow-facet-caching (#351)
