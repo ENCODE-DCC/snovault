@@ -7,7 +7,6 @@ CHANGES = open(os.path.join(here, 'CHANGES.rst')).read()
 VERSION = "1.0.60"
 
 
-
 INSTALL_REQUIRES = [
     "Pillow==7.0.0",
     "SQLAlchemy==1.3.13",
