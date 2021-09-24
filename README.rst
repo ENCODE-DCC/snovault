@@ -118,6 +118,13 @@ Application Installation
 
     you may need to add the ``brew``-installed Postgres headers, usually ``-L/usr/local/opt/postgresql@11/lib``, to the ``LDFLAGS`` in addition to the ones given by ``pg_config --ldflags``.
 
+    If you have errors building that look like this::
+
+        The headers or library files could not be found for zlib,
+        a required dependency when compiling Pillow from source.
+
+    you mak need to run `CPATH=`xcrun --show-sdk-path`/usr/include pip install -e '.[dev]'` so that zlib headers can be found.
+
 3. Build Application
     .. code-block:: bash
 
