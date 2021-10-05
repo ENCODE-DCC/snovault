@@ -123,7 +123,7 @@ Application Installation
         The headers or library files could not be found for zlib,
         a required dependency when compiling Pillow from source.
 
-    you mak need to run `CPATH=`xcrun --show-sdk-path`/usr/include pip install -e '.[dev]'` so that zlib headers can be found.
+    you may need to run `CPATH=`xcrun --show-sdk-path`/usr/include pip install -e '.[dev]'` so that zlib headers can be found.
 
 3. Build Application
     .. code-block:: bash
