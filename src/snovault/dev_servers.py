@@ -39,7 +39,7 @@ def nginx_server_process(prefix='', echo=False):
     args = [
         os.path.join(prefix, 'nginx'),
         '-c', resource_filename('snovault', 'nginx-dev.conf'),
-        '-g', 'daemon off;'
+        '-g', 'daemon off; pid /dev/null;'
     ]
     process = subprocess.Popen(
         args,
