@@ -17,6 +17,7 @@ import shutil
 import sys
 import pdb
 import subprocess
+import time
 
 
 EPILOG = __doc__
@@ -26,8 +27,13 @@ logger = logging.getLogger(__name__)
 
 def print_to_terminal(stdout):
     while True:
+        printed = False
         for line in iter(stdout.readline, b''):
-            sys.stdout.write(line.decode('utf-8'))
+            if line:
+                sys.stdout.write(line.decode('utf-8'))
+                printed = True
+        if not printed:
+            time.sleep(0.1)
 
 def nginx_server_process(prefix='', echo=False):
     args = [
