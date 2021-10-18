@@ -75,6 +75,9 @@ def mimetypes_are_equal(m1, m2):
     major2 = m2.split('/')[0]
     if major1 == 'text' and major2 == 'text':
         return True
+    # Treat application/x-gzip and application/gzip as equivalent.
+    if m1.endswith('gzip') and m2.endswith('gzip'):
+        return True
     return m1 == m2
 
 
@@ -103,7 +106,10 @@ class ItemWithAttachment(Item):
 
         # Make sure the file extensions matches the mimetype
         download_meta['download'] = filename = attachment['download']
-        mime_type_from_filename, _ = mimetypes.guess_type(filename)
+        mime_type_from_filename, encoding_from_filename = mimetypes.guess_type(filename)
+        # Set gzip encoding as mimetype.
+        if encoding_from_filename == 'gzip':
+            mime_type_from_filename = 'application/gzip'
         if mime_type_from_filename is None:
             mime_type_from_filename = 'application/octet-stream'
         if mime_type:
@@ -257,6 +263,8 @@ def download(context, request):
         raise HTTPNotFound(filename)
 
     mimetype, content_encoding = guess_type(filename, strict=False)
+    if content_encoding == 'gzip':
+        mimetype = 'application/gzip'
     if mimetype is None:
         mimetype = 'application/octet-stream'
 
