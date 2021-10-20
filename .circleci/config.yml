@@ -15,7 +15,7 @@ executors:
       - ES_BIN: /usr/share/elasticsearch/bin
       - ES_MAJOR_VERSION: 5
       - PG_VERSION: 11
-      - NODE_VERSION: 10
+      - NODE_VERSION: 12
 
 commands:
   buildout:
