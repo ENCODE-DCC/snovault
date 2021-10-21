@@ -1,6 +1,15 @@
 Changes
 =======
 
+Snovault 1.0.61 (released) encoded v124.0
+-----------------------------------------
+1. SNO-214-upgrade-node-to-version-12-for-circleci-tests (#365)
+2. SNO-210-read-columns-from-configs (#368)
+3. SNO-216 Fix dev-servers 100% cpu usage when nothing to print. (#367)
+4. SNO-212 Allow gzip attachments (#363)
+5. SNO-213-circleci-node-install-fix (#364)
+6. SNO-211-increase-batch-size-in-scroll-api (#360)
+
 Snovault 1.0.60 (released) encoded v121.0
 -----------------------------------------
 1. SNO-209-move-search-code-to-independent-package (#356)
