@@ -60,6 +60,7 @@ def collection(name, **kw):
         collection = Collection(registry, name, ti, **kw)
         registry[COLLECTIONS].register(name, collection)
         registry[SEARCH_CONFIG].register_from_item(Item)
+        registry[SEARCH_CONFIG].register_pieces_from_item(Item)
 
     def decorate(Item):
 
@@ -87,6 +88,7 @@ def abstract_collection(name, **kw):
         collection = Collection(registry, name, ti, **kw)
         registry[COLLECTIONS].register(name, collection)
         registry[SEARCH_CONFIG].register_from_item(Item)
+        registry[SEARCH_CONFIG].register_pieces_from_item(Item)
 
     def decorate(Item):
 
