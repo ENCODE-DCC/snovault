@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.62 (released) encoded v124.0
+-----------------------------------------
+1. SNO-217-register-search-config-pieces-from-item (#370)
+
 Snovault 1.0.61 (released) encoded v124.0
 -----------------------------------------
 1. SNO-214-upgrade-node-to-version-12-for-circleci-tests (#365)
