@@ -35,7 +35,7 @@ INSTALL_REQUIRES = [
     "redis==3.5.3",
     "requests==2.22.0",
     "simplejson==3.17.0",
-    "snovault-search @ git+https://github.com/ENCODE-DCC/snovault-search.git@register-search-config-pieces-from-item",
+    "snovault-search==1.0.4",
     "transaction==3.0.0",
     "venusian==3.0.0",
     "zope.interface==5.3.0",
