@@ -218,6 +218,29 @@ def test_searchv2_view_debug_query(workbook, testapp):
     assert 'post_filter' in r.json['debug']['raw_query']
 
 
+def test_searchv2_view_facets_and_columns_config(workbook, testapp):
+    r = testapp.get(
+        '/search/?type=Snowflake'
+    )
+    assert len(r.json['columns']) == 8
+    r = testapp.get(
+        '/search/?type=Snowflake&config=SnowballColumns'
+    )
+    assert len(r.json['columns']) == 7
+    r = testapp.get(
+        '/search/?type=Snowflake'
+    )
+    assert len(r.json['facets']) == 3
+    assert len(r.json['columns']) == 8
+    assert r.json['facets'][1]['title'] == 'Snowflake status'
+    r = testapp.get(
+        '/search/?type=Snowflake&config=SnowballFacets'
+    )
+    assert len(r.json['facets']) == 3
+    assert len(r.json['columns']) == 8
+    assert r.json['facets'][1]['title'] == 'Snowball status'
+
+
 def test_searchv2_view_no_type(workbook, testapp):
     r = testapp.get('/search/')
     assert 'total' in r.json
