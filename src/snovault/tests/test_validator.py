@@ -10,6 +10,28 @@ from jsonschema_serialize_fork.exceptions import ValidationError
 validator_class = Draft4Validator
 
 
+fake_schema = {
+    'title': 'Fake',
+    'description': 'Schema',
+    '$schema': 'http://json-schema.org/draft-04/schema#',
+    'type': 'object',
+    'required': ['award', 'lab'],
+    'identifyingProperties': ['uuid'],
+    'additionalProperties': False,
+    'properties': {
+        'uuid': {
+            'type': 'string'
+        },
+        'award': {
+            'type': 'string'
+        },
+        'lab': {
+            'type': 'string'
+        }
+    }
+}
+
+
 def make_default(instance, subschema):
     if instance.get('skip'):
         return NO_DEFAULT
@@ -222,4 +244,54 @@ def test_validator_returns_error():
     )
     assert result == {}
     assert isinstance(errors[0], ValidationError)
+    assert errors[0].message == "'name' is a required property"
+
+
+def test_validator_check_schema():
+    from jsonschema import Draft202012Validator
+    validator_class.check_schema(fake_schema)
+    Draft202012Validator.check_schema(fake_schema)
+
+
+def test_validator_extend_with_default():
+    from copy import deepcopy
+    from snovault.schema_validation import SchemaValidator
+    original_instance = {
+        'x': 'y'
+    }
+    mutated_instance = deepcopy(original_instance)
+    assert original_instance == mutated_instance
+    schema = {'properties': {'foo': {'default': 'bar'}}}
+    SchemaValidator(schema).validate(mutated_instance)
+    assert original_instance == {'x': 'y'}
+    assert mutated_instance == {'x': 'y', 'foo': 'bar'}
+
+
+def test_validator_extend_with_default_and_serialize():
+    instance = {
+        'x': 'y'
+    }
+    from snovault.schema_validation import SchemaValidator
+    schema = {'properties': {'foo': {'default': 'bar'}}}
+    result, errors = SchemaValidator(schema).serialize(instance)
+    assert instance == {'x': 'y'}
+    assert result == {'x': 'y', 'foo': 'bar'}
+    assert errors == []
+    schema = {
+        'properties': {
+            'foo': {
+                'default': 'bar'
+            },
+            'name': {
+                'type': 'string'
+            }
+        },
+        'required': ['name']
+    }
+    result, errors = SchemaValidator(schema).serialize(
+        {
+            'foo': 'thing',
+        }
+    )
+    assert result == {'foo': 'thing'}
     assert errors[0].message == "'name' is a required property"
