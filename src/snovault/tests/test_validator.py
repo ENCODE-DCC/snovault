@@ -255,14 +255,14 @@ def test_validator_check_schema():
 
 def test_validator_extend_with_default():
     from copy import deepcopy
-    from snovault.schema_validation import SchemaValidator
+    from snovault.schema_validation import SerializingSchemaValidator
     original_instance = {
         'x': 'y'
     }
     mutated_instance = deepcopy(original_instance)
     assert original_instance == mutated_instance
     schema = {'properties': {'foo': {'default': 'bar'}}}
-    SchemaValidator(schema).validate(mutated_instance)
+    SerializingSchemaValidator(schema).validate(mutated_instance)
     assert original_instance == {'x': 'y'}
     assert mutated_instance == {'x': 'y', 'foo': 'bar'}
 
@@ -271,9 +271,9 @@ def test_validator_extend_with_default_and_serialize():
     instance = {
         'x': 'y'
     }
-    from snovault.schema_validation import SchemaValidator
+    from snovault.schema_validation import SerializingSchemaValidator
     schema = {'properties': {'foo': {'default': 'bar'}}}
-    result, errors = SchemaValidator(schema).serialize(instance)
+    result, errors = SerializingSchemaValidator(schema).serialize(instance)
     assert instance == {'x': 'y'}
     assert result == {'x': 'y', 'foo': 'bar'}
     assert errors == []
@@ -288,10 +288,53 @@ def test_validator_extend_with_default_and_serialize():
         },
         'required': ['name']
     }
-    result, errors = SchemaValidator(schema).serialize(
+    result, errors = SerializingSchemaValidator(schema).serialize(
         {
             'foo': 'thing',
         }
     )
     assert result == {'foo': 'thing'}
     assert errors[0].message == "'name' is a required property"
+
+
+def test_validator_extend_with_server_default_and_serialize():
+    instance = {
+        'x': 'y'
+    }
+    from snovault.schema_validation import SerializingSchemaValidator
+    SerializingSchemaValidator.SERVER_DEFAULTS = {
+        'test': make_default
+    }
+    schema = {'properties': {'foo': {'serverDefault': 'test'}}}
+    result, errors = SerializingSchemaValidator(schema).serialize(instance)
+    assert instance == {'x': 'y'}
+    assert result == {'x': 'y', 'foo': 'bar'}
+    assert errors == []
+    schema = {
+        'properties': {
+            'foo': {
+                'serverDefault': 'test'
+            },
+            'name': {
+                'type': 'string'
+            }
+        },
+        'required': ['name']
+    }
+    result, errors = SerializingSchemaValidator(schema).serialize(
+        {
+            'foo': 'thing',
+        }
+    )
+    assert result == {'foo': 'thing'}
+    assert errors[0].message == "'name' is a required property"
+    result, errors = SerializingSchemaValidator(schema).serialize(
+        {
+            'name': 'other thing',
+        }
+    )
+    assert result == {
+        'foo': 'bar',
+        'name': 'other thing',
+    }
+    assert not errors
