@@ -1,20 +1,59 @@
-# Draft202012Validator
 # "$schema": "https://json-schema.org/draft/2020-12/schema"
+from copy import deepcopy
 from jsonschema import Draft202012Validator
 from jsonschema import validators
-from copy import deepcopy
+from jsonschema.exceptions import ValidationError
+from pyramid.threadlocal import get_current_request
+from pyramid.traversal import find_resource
 
 
 NO_DEFAULT = object()
+
+
+def normalize_links(links):
+    request = get_current_request()
+    normalized_links = []
+    errors = []
+    for link in links:
+        try:
+            normalized_links.append(
+                str(find_resource(request.root, link).uuid)
+            )
+        except KeyError:
+            errors.append(
+                ValidationError(f'Unable to resolve link: {link}')
+            )
+    return normalized_links, errors
+
+
+def maybe_normalize_links_to_uuids(validator, property, subschema, instance):
+    errors = []
+    if 'linkTo' in subschema:
+        link = instance.get(property)
+        if link:
+            normalized_links, errors = normalize_links([link])
+            instance[property] = normalized_links[0]
+    if 'linkTo' in subschema.get('items', {}):
+        links = instance.get(property, [])
+        if links:
+            normalized_links, errors = normalize_links(links)
+            instance[property] = normalized_links
+    for error in errors:
+        yield error
 
 
 def extend_with_default(validator_class):
     validate_properties = validator_class.VALIDATORS['properties']
 
     def should_set_defaults(validator, instance):
+        return True
         if validator.is_type(instance, 'object'):
             return True
         return False
+
+    def maybe_normalize(validator, properties, instance, schema):
+        for property, subschema in properties.items():
+            yield from maybe_normalize_links_to_uuids(validator, property, subschema, instance)
 
     def set_defaults(validator, properties, instance, schema):
         for property, subschema in properties.items():
@@ -37,6 +76,7 @@ def extend_with_default(validator_class):
                     )
 
     def properties_with_defaults(validator, properties, instance, schema):
+        yield from maybe_normalize(validator, properties, instance, schema)
         if should_set_defaults(validator, instance):
             set_defaults(validator, properties, instance, schema)
         yield from validate_properties(validator, properties, instance, schema)

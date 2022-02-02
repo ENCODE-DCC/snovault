@@ -121,9 +121,6 @@ def linkTo(validator, linkTo, instance, schema):
                 yield ValidationError(error)
                 return
 
-    # And normalize the value to a uuid
-    instance = str(item.uuid)
-
 
 def linkFrom(validator, linkFrom, instance, schema):
     # avoid circular import
