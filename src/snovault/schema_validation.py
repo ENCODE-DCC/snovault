@@ -32,9 +32,9 @@ def should_mutate_properties(validator, instance):
     return False
 
 
-def get_items_or_empty_object(subschema):
+def get_items_or_empty_object(validator, subschema):
     items = subschema.get('items', {})
-    if isinstance(items, dict):
+    if validator.is_type(items, 'object'):
         return items
     return {}
 
@@ -46,7 +46,7 @@ def maybe_normalize_links_to_uuids(validator, property, subschema, instance):
         if link:
             normalized_links, errors = normalize_links([link])
             instance[property] = normalized_links[0]
-    if 'linkTo' in get_items_or_empty_object(subschema):
+    if 'linkTo' in get_items_or_empty_object(validator, subschema):
         links = instance.get(property, [])
         if links:
             normalized_links, errors = normalize_links(links)
