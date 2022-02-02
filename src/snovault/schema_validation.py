@@ -53,6 +53,10 @@ class SerializingSchemaValidator(ExtendedValidator):
 
     SERVER_DEFAULTS = {}
 
+    def add_server_defaults(self, server_defaults):
+        self.SERVER_DEFAULTS.update(server_defaults)
+        return self
+
     def serialize(self, instance):
         self._original_instance = instance
         self._mutated_instance = deepcopy(

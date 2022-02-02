@@ -40,11 +40,6 @@ def make_default(instance, subschema):
     return 'bar'
 
 
-validator_class.SERVER_DEFAULTS = {
-    'test': make_default
-}
-
-
 def test_validator_serializes_default_properties():
     schema = {
         'properties': {
@@ -73,7 +68,7 @@ def test_validator_serializes_default_properties_in_items():
         }
     }
     result, errors = validator_class(
-        schema
+        schema,
     ).serialize(
         [
             {}
@@ -92,7 +87,11 @@ def test_validator_serializes_server_default_properties():
         }
     }
     result, errors = validator_class(
-        schema
+        schema,
+    ).add_server_defaults(
+        {
+            'test': make_default
+        }
     ).serialize(
         {}
     )
@@ -110,7 +109,11 @@ def test_validator_ignores_server_default_returning_no_default():
         }
     }
     result, errors = validator_class(
-        schema
+        schema,
+    ).add_server_defaults(
+        {
+            'test': make_default
+        }
     ).serialize(
         {
             'skip': True
@@ -130,12 +133,14 @@ def test_validator_serializes_server_default_properties_in_items():
             }
         }
     }
-    result, errors = validator_class(
+    result, errors = SchemaValidator(
         schema
+    ).add_server_defaults(
+        {
+            'test': make_default
+        }
     ).serialize(
-        [
-            {}
-        ]
+        [{}]
     )
     assert result == [{'foo': 'bar'}]
     assert errors == []
@@ -254,11 +259,14 @@ def test_validator_extend_with_server_default_and_serialize():
         'x': 'y'
     }
     from snovault.schema_validation import SerializingSchemaValidator
-    SerializingSchemaValidator.SERVER_DEFAULTS = {
-        'test': make_default
-    }
     schema = {'properties': {'foo': {'serverDefault': 'test'}}}
-    result, errors = SerializingSchemaValidator(schema).serialize(instance)
+    result, errors = SerializingSchemaValidator(
+        schema,
+    ).add_server_defaults(
+        {
+            'test': make_default
+        }
+    ).serialize(instance)
     assert instance == {'x': 'y'}
     assert result == {'x': 'y', 'foo': 'bar'}
     assert errors == []
@@ -273,14 +281,26 @@ def test_validator_extend_with_server_default_and_serialize():
         },
         'required': ['name']
     }
-    result, errors = SerializingSchemaValidator(schema).serialize(
+    result, errors = SerializingSchemaValidator(
+        schema
+    ).add_server_defaults(
+        {
+            'test': make_default
+        }
+    ).serialize(
         {
             'foo': 'thing',
         }
     )
     assert result == {'foo': 'thing'}
     assert errors[0].message == "'name' is a required property"
-    result, errors = SerializingSchemaValidator(schema).serialize(
+    result, errors = SerializingSchemaValidator(
+        schema,
+    ).add_server_defaults(
+        {
+            'test': make_default
+        }
+    ).serialize(
         {
             'name': 'other thing',
         }
