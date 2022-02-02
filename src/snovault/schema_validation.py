@@ -26,6 +26,19 @@ def normalize_links(links):
     return normalized_links, errors
 
 
+def should_mutate_properties(validator, instance):
+    if validator.is_type(instance, 'object'):
+        return True
+    return False
+
+
+def get_items_or_empty_object(subschema):
+    items = subschema.get('items', {})
+    if isinstance(items, dict):
+        return items
+    return {}
+
+
 def maybe_normalize_links_to_uuids(validator, property, subschema, instance):
     errors = []
     if 'linkTo' in subschema:
@@ -33,7 +46,7 @@ def maybe_normalize_links_to_uuids(validator, property, subschema, instance):
         if link:
             normalized_links, errors = normalize_links([link])
             instance[property] = normalized_links[0]
-    if 'linkTo' in subschema.get('items', {}):
+    if 'linkTo' in get_items_or_empty_object(subschema):
         links = instance.get(property, [])
         if links:
             normalized_links, errors = normalize_links(links)
@@ -42,47 +55,41 @@ def maybe_normalize_links_to_uuids(validator, property, subschema, instance):
         yield error
 
 
+def set_defaults(validator, property, subschema, instance):
+    if 'default' in subschema:
+        instance.setdefault(
+            property,
+            deepcopy(subschema['default'])
+        )
+    if 'serverDefault' in subschema:
+        server_default = validator.server_default(
+            instance,
+            subschema
+        )
+        if server_default is not NO_DEFAULT:
+            instance.setdefault(
+                property,
+                server_default
+            )
+
+
 def extend_with_default(validator_class):
     validate_properties = validator_class.VALIDATORS['properties']
 
-    def should_set_defaults(validator, instance):
-        return True
-        if validator.is_type(instance, 'object'):
-            return True
-        return False
-
-    def maybe_normalize(validator, properties, instance, schema):
-        for property, subschema in properties.items():
-            yield from maybe_normalize_links_to_uuids(validator, property, subschema, instance)
-
-    def set_defaults(validator, properties, instance, schema):
+    def mutate_properties(validator, properties, instance, schema):
         for property, subschema in properties.items():
             if not validator.is_type(subschema, 'object'):
                 continue
-            if 'default' in subschema:
-                instance.setdefault(
-                    property,
-                    deepcopy(subschema['default'])
-                )
-            if 'serverDefault' in subschema:
-                server_default = validator.server_default(
-                    instance,
-                    subschema
-                )
-                if server_default is not NO_DEFAULT:
-                    instance.setdefault(
-                        property,
-                        server_default
-                    )
+            yield from maybe_normalize_links_to_uuids(validator, property, subschema, instance)
+            set_defaults(validator, property, subschema, instance)
 
-    def properties_with_defaults(validator, properties, instance, schema):
-        yield from maybe_normalize(validator, properties, instance, schema)
-        if should_set_defaults(validator, instance):
-            set_defaults(validator, properties, instance, schema)
+    def before_properties_validation_hook(validator, properties, instance, schema):
+        if should_mutate_properties(validator, instance):
+            yield from mutate_properties(validator, properties, instance, schema)
         yield from validate_properties(validator, properties, instance, schema)
 
     return validators.extend(
-        validator_class, {'properties': properties_with_defaults},
+        validator_class, {'properties': before_properties_validation_hook},
     )
 
 
