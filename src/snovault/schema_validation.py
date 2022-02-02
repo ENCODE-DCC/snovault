@@ -10,14 +10,25 @@ from pyramid.traversal import find_resource
 NO_DEFAULT = object()
 
 
-def normalize_links(links):
+def get_resource_base(validator, linkTo):
+    from snovault import COLLECTIONS
     request = get_current_request()
+    collections = request.registry[COLLECTIONS]
+    if validator.is_type(linkTo, 'string'):
+        resource_base = collections.get(linkTo, request.root)
+    else:
+        resource_base = request.root
+    return resource_base
+
+
+def normalize_links(validator, links, linkTo):
+    resource_base = get_resource_base(validator, linkTo)
     normalized_links = []
     errors = []
     for link in links:
         try:
             normalized_links.append(
-                str(find_resource(request.root, link).uuid)
+                str(find_resource(resource_base, link).uuid)
             )
         except KeyError:
             errors.append(
@@ -47,12 +58,20 @@ def maybe_normalize_links_to_uuids(validator, property, subschema, instance):
     if 'linkTo' in subschema:
         link = instance.get(property)
         if link:
-            normalized_links, errors = normalize_links([link])
+            normalized_links, errors = normalize_links(
+                validator,
+                [link],
+                subschema.get('linkTo'),
+            )
             instance[property] = normalized_links[0]
     if 'linkTo' in get_items_or_empty_object(validator, subschema):
         links = instance.get(property, [])
         if links:
-            normalized_links, errors = normalize_links(links)
+            normalized_links, errors = normalize_links(
+                validator,
+                links,
+                subschema.get('items').get('linkTo'),
+            )
             instance[property] = normalized_links
     for error in errors:
         yield error

@@ -16,7 +16,7 @@
             "format": "uuid",
             "serverDefault": "uuid4",
             "permission": "import_items",
-            "requestMethod": ["POST", "PATCH"]
+            "requestMethod": ["POST", "PATCH", "PUT"]
         }
     },
     "standard_status": {

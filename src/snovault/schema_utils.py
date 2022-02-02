@@ -93,7 +93,6 @@ def linkTo(validator, linkTo, instance, schema):
         error = "%r is not of type %s" % (instance, ", ".join(reprs))
         yield ValidationError(error)
         return
-
     linkEnum = schema.get('linkEnum')
     if linkEnum is not None:
         if not validator.is_type(linkEnum, "array"):
