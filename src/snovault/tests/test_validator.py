@@ -2,18 +2,19 @@ import pytest
 
 from collections import OrderedDict
 
-from jsonschema_serialize_fork.validators import Draft4Validator
-from jsonschema_serialize_fork import NO_DEFAULT
-from jsonschema_serialize_fork.exceptions import ValidationError
+from snovault.schema_validation import NO_DEFAULT
+from snovault.schema_utils import SchemaValidator
+from jsonschema.exceptions import ValidationError
 
 
-validator_class = Draft4Validator
+validator_class = SchemaValidator
 
 
 fake_schema = {
+    'id': 'abc',
     'title': 'Fake',
     'description': 'Schema',
-    '$schema': 'http://json-schema.org/draft-04/schema#',
+    '$schema': 'https://json-schema.org/draft/2020-12/schema',
     'type': 'object',
     'required': ['award', 'lab'],
     'identifyingProperties': ['uuid'],
@@ -39,6 +40,11 @@ def make_default(instance, subschema):
     return 'bar'
 
 
+validator_class.SERVER_DEFAULTS = {
+    'test': make_default
+}
+
+
 def test_validator_serializes_default_properties():
     schema = {
         'properties': {
@@ -48,8 +54,7 @@ def test_validator_serializes_default_properties():
         }
     }
     result, errors = validator_class(
-        schema,
-        serialize=True
+        schema
     ).serialize(
         {}
     )
@@ -68,8 +73,7 @@ def test_validator_serializes_default_properties_in_items():
         }
     }
     result, errors = validator_class(
-        schema,
-        serialize=True
+        schema
     ).serialize(
         [
             {}
@@ -88,11 +92,7 @@ def test_validator_serializes_server_default_properties():
         }
     }
     result, errors = validator_class(
-        schema,
-        serialize=True,
-        server_defaults={
-            'test': make_default
-        },
+        schema
     ).serialize(
         {}
     )
@@ -110,11 +110,7 @@ def test_validator_ignores_server_default_returning_no_default():
         }
     }
     result, errors = validator_class(
-        schema,
-        serialize=True,
-        server_defaults={
-            'test': make_default
-        },
+        schema
     ).serialize(
         {
             'skip': True
@@ -135,11 +131,7 @@ def test_validator_serializes_server_default_properties_in_items():
         }
     }
     result, errors = validator_class(
-        schema,
-        serialize=True,
-        server_defaults={
-            'test': make_default
-        },
+        schema
     ).serialize(
         [
             {}
@@ -149,57 +141,22 @@ def test_validator_serializes_server_default_properties_in_items():
     assert errors == []
 
 
-def test_validator_serializes_properties_in_order():
+def test_validator_serializes_properties_in_order_of_input():
     schema = {
-        'properties': OrderedDict(
-            [
-                ('foo', {}),
-                ('bar', {})
-            ]
-        )
+        'properties': {
+            'foo': {},
+            'bar': {},
+        }
     }
     validator = validator_class(
-        schema,
-        types={'object': OrderedDict},
-        serialize=True,
+        schema
     )
-    value = OrderedDict(
-        [
-            ('bar', 1),
-            ('foo', 2)
-        ]
-    )
-    result, errors = validator.serialize(value)
-    assert isinstance(result, OrderedDict)
-    assert list(result) == ['foo', 'bar']
-    assert errors == []
-
-
-def test_validator_serializes_properties_in_order_with_dict():
-    schema = {
-        'properties': OrderedDict(
-            [
-                ('foo', {}),
-                ('bar', {})
-            ]
-        )
+    value = {
+        'bar': 1,
+        'foo': 2
     }
-    validator = validator_class(
-        schema,
-        types={
-            'object': (OrderedDict, dict)
-        },
-        serialize=True,
-    )
-    value = dict(
-        [
-            ('bar', 1),
-            ('foo', 2)
-        ]
-    )
     result, errors = validator.serialize(value)
-    assert isinstance(result, OrderedDict)
-    assert list(result) == ['foo', 'bar']
+    assert list(result) == ['bar', 'foo']
     assert errors == []
 
 
@@ -215,7 +172,6 @@ def test_validator_returns_error():
     }
     result, errors = validator_class(
         schema,
-        serialize=True
     ).serialize(
         {
             'name': 'abc'
@@ -225,7 +181,6 @@ def test_validator_returns_error():
     assert not errors
     result, errors = validator_class(
         schema,
-        serialize=True
     ).serialize(
         {
             'name': 1
@@ -238,7 +193,6 @@ def test_validator_returns_error():
     assert errors[0].message == "1 is not of type 'string'"
     result, errors = validator_class(
         schema,
-        serialize=True
     ).serialize(
         {}
     )
@@ -248,9 +202,7 @@ def test_validator_returns_error():
 
 
 def test_validator_check_schema():
-    from jsonschema import Draft202012Validator
     validator_class.check_schema(fake_schema)
-    Draft202012Validator.check_schema(fake_schema)
 
 
 def test_validator_extend_with_default():

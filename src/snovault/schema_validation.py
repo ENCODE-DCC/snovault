@@ -1,6 +1,7 @@
 # Draft202012Validator
 # "$schema": "https://json-schema.org/draft/2020-12/schema"
-from jsonschema import Draft202012Validator, validators
+from jsonschema import Draft202012Validator
+from jsonschema import validators
 from copy import deepcopy
 
 
@@ -10,8 +11,15 @@ NO_DEFAULT = object()
 def extend_with_default(validator_class):
     validate_properties = validator_class.VALIDATORS['properties']
 
+    def should_set_defaults(instance):
+        if isinstance(instance, dict):
+            return True
+        return False
+
     def set_defaults(validator, properties, instance, schema):
         for property, subschema in properties.items():
+            if not isinstance(subschema, dict):
+                continue
             if 'default' in subschema:
                 instance.setdefault(
                     property,
@@ -19,7 +27,8 @@ def extend_with_default(validator_class):
                 )
             if 'serverDefault' in subschema:
                 server_default = validator.server_default(
-                    instance, subschema
+                    instance,
+                    subschema
                 )
                 if server_default is not NO_DEFAULT:
                     instance.setdefault(
@@ -27,20 +36,20 @@ def extend_with_default(validator_class):
                         server_default
                     )
 
-        for error in validate_properties(
-            validator, properties, instance, schema,
-        ):
-            yield error
+    def properties_with_defaults(validator, properties, instance, schema):
+        if should_set_defaults(instance):
+            set_defaults(validator, properties, instance, schema)
+        yield from validate_properties(validator, properties, instance, schema)
 
     return validators.extend(
-        validator_class, {'properties': set_defaults},
+        validator_class, {'properties': properties_with_defaults},
     )
 
 
-DefaultingDraft202012Validator = extend_with_default(Draft202012Validator)
+ExtendedValidator = extend_with_default(Draft202012Validator)
 
 
-class SerializingSchemaValidator(DefaultingDraft202012Validator):
+class SerializingSchemaValidator(ExtendedValidator):
 
     SERVER_DEFAULTS = {}
 
