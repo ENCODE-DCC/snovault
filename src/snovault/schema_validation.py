@@ -23,6 +23,9 @@ def normalize_links(links):
             errors.append(
                 ValidationError(f'Unable to resolve link: {link}')
             )
+            normalized_links.append(
+                link
+            )
     return normalized_links, errors
 
 
