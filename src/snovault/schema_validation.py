@@ -11,14 +11,14 @@ NO_DEFAULT = object()
 def extend_with_default(validator_class):
     validate_properties = validator_class.VALIDATORS['properties']
 
-    def should_set_defaults(instance):
-        if isinstance(instance, dict):
+    def should_set_defaults(validator, instance):
+        if validator.is_type(instance, 'object'):
             return True
         return False
 
     def set_defaults(validator, properties, instance, schema):
         for property, subschema in properties.items():
-            if not isinstance(subschema, dict):
+            if not validator.is_type(subschema, 'object'):
                 continue
             if 'default' in subschema:
                 instance.setdefault(
@@ -37,7 +37,7 @@ def extend_with_default(validator_class):
                     )
 
     def properties_with_defaults(validator, properties, instance, schema):
-        if should_set_defaults(instance):
+        if should_set_defaults(validator, instance):
             set_defaults(validator, properties, instance, schema)
         yield from validate_properties(validator, properties, instance, schema)
 
