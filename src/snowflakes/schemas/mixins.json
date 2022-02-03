@@ -15,7 +15,6 @@
             "type": "string",
             "format": "uuid",
             "serverDefault": "uuid4",
-            "permission": "import_items",
             "requestMethod": ["POST", "PATCH", "PUT"]
         }
     },
