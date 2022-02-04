@@ -1,7 +1,7 @@
 {
     "title": "Snowset",
     "description": "Abstract schema class for collections of snowflakes",
-    "id": "/profiles/snowset.json",
+    "$id": "/profiles/snowset.json",
     "$schema": "http://json-schema.org/draft-04/schema#",
     "type": "object",
     "required": [ "award", "lab"],
