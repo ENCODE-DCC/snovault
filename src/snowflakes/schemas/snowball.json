@@ -16,7 +16,7 @@
         { "$ref": "mixins.json#/submitted" },
         { "$ref": "snowset.json#/properties" }
     ],
-    "dependencies": {
+    "dependentSchemas": {
         "status": {
             "oneOf": [
                 {

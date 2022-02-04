@@ -26,7 +26,7 @@
             "title": "Lab"
         }
     },
-    "dependencies": {
+    "dependentSchemas": {
         "external_accession": {
             "not": {
                 "required": ["accession"]
