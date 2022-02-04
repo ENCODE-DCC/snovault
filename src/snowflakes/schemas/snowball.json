@@ -3,7 +3,7 @@
     "description": "Schema for submitting metadata for a Snowball with 1 or more snowflakes",
     "comment": "An snowball is a special case of snowset.",
     "$id": "/profiles/snowball.json",
-    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "required": ["award", "lab"],
     "identifyingProperties": ["uuid", "accession"],
