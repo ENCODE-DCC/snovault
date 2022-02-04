@@ -18,7 +18,7 @@ INSTALL_REQUIRES = [
     "elasticsearch-dsl==5.4.0",
     "elasticsearch==5.4.0",
     "future==0.18.2",
-    "jsonschema==4.4.0",
+    "jsonschema[format]==4.4.0",
     "lucenequery==0.1",
     "passlib==1.7.2",
     "psutil==5.6.7",
