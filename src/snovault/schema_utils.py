@@ -316,8 +316,12 @@ def validate(schema, data, current=None):
             current_value = data
             try:
                 for key in error.path:
+                    # If it's in original data then either user passed it in
+                    # or it's from PATCH object with unchanged data. If it's
+                    # unchanged then it's already been skipped above.
                     current_value = current_value[key]
             except KeyError:
+                # If it's not in original data then it's filled in by defaults.
                 continue
         filtered_errors.append(error)
 
