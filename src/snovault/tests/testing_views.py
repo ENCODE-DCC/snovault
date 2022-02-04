@@ -286,7 +286,7 @@ class TestingPostPutPatch(Item):
             "schema_version": {
                 "type": "string",
                 "pattern": "^\\d+(\\.\\d+)*$",
-                "requestMethod": ['POST'],
+                "requestMethod": [],
                 "default": "1",
             },
             "uuid": {
@@ -341,7 +341,7 @@ class TestingServerDefault(Item):
             "schema_version": {
                 "type": "string",
                 "pattern": "^\\d+(\\.\\d+)*$",
-                "requestMethod": ['POST'],
+                "requestMethod": [],
             },
             "uuid": {
                 "title": "UUID",
