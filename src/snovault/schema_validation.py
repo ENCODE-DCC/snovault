@@ -1,4 +1,3 @@
-# "$schema": "https://json-schema.org/draft/2020-12/schema"
 from copy import deepcopy
 from jsonschema import Draft202012Validator
 from jsonschema import validators
