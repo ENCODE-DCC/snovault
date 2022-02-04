@@ -311,6 +311,14 @@ def validate(schema, data, current=None):
                     validated_value = validated_value[key]
                 if validated_value == current_value:
                     continue
+        # Also ignore requestMethod and permission errors from defaults.
+        if isinstance(error, IgnoreUnchanged):
+            current_value = data
+            try:
+                for key in error.path:
+                    current_value = current_value[key]
+            except KeyError:
+                continue
         filtered_errors.append(error)
 
     return validated, filtered_errors
