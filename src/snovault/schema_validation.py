@@ -27,7 +27,7 @@ def normalize_links(validator, links, linkTo):
     for link in links:
         try:
             normalized_links.append(
-                str(find_resource(resource_base, link).uuid)
+                str(find_resource(resource_base, link.replace(':', '%3A')).uuid)
             )
         except KeyError:
             errors.append(
