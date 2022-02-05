@@ -33,7 +33,7 @@ INSTALL_REQUIRES = [
     "rdflib-jsonld==0.6.0",
     "rdflib==4.2.2",
     "redis==3.5.3",
-    "requests==2.22.0",
+    "requests==2.27.1",
     "simplejson==3.17.0",
     "snovault-search==1.0.4",
     "transaction==3.0.0",
