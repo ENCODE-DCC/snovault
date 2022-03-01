@@ -215,7 +215,16 @@ def test_snowflake_accession_put_admin(testapp, snowflake):
     assert res.json['errors'][0]['description'] == 'uuid may not be changed'
 
 
-def test_snowflake_accession_put_submitter(submitter_testapp, snowflake):
+def test_snowflake_accession_put_submitter(testapp, submitter, submitter_testapp, snowflake):
+    # Manually add submitter.
+    testapp.patch_json(
+        snowflake['@id'],
+        {
+            'submitted_by': submitter['@id']
+        },
+        status=200
+    )
+    testapp.get(snowflake['@id']).json
     snowflake_id = snowflake['@id']
     old_accession = snowflake['accession']
     # Can't resubmit @type/@id.
