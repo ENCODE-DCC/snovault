@@ -8,6 +8,7 @@ VERSION = "1.0.62"
 
 
 INSTALL_REQUIRES = [
+    "antlr4-python3-runtime==4.9.3",
     "Pillow==7.0.0",
     "SQLAlchemy==1.3.13",
     "WebOb==1.8.6",
