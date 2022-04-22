@@ -60,6 +60,63 @@ def mixinProperties(schema, resolver):
     return schema
 
 
+def resolve_merge_ref(ref, resolver):
+    with resolver.resolving(ref) as resolved:
+        if not isinstance(resolved, dict):
+            raise ValueError(
+                f'Schema ref {ref} must resolve dict, not {type(resolved)}'
+            )
+        return resolved
+
+
+def _update_resolved_data(resolved_data, value, resolver):
+    # Assumes resolved value is dictionary.
+    resolved_data.update(
+        # Recurse here in case the resolved value has refs.
+        resolve_merge_refs(
+            # Actually get the ref value.
+            resolve_merge_ref(value, resolver),
+            resolver
+        )
+    )
+
+
+def _handle_list_or_string_value(resolved_data, value, resolver):
+    if isinstance(value, list):
+        for v in value:
+            _update_resolved_data(resolved_data, v, resolver)
+    else:
+        _update_resolved_data(resolved_data, value, resolver)
+
+
+def resolve_merge_refs(data, resolver):
+    if isinstance(data, dict):
+        # Return copy.
+        resolved_data = {}
+        for k, v in data.items():
+            if k == '$merge':
+                _handle_list_or_string_value(resolved_data, v, resolver)
+            else:
+                resolved_data[k] = resolve_merge_refs(v, resolver)
+    elif isinstance(data, list):
+        # Return copy.
+        resolved_data = [
+            resolve_merge_refs(v, resolver)
+            for v in data
+        ]
+    else:
+        # Assumes we're only dealing with other JSON types
+        # like string, number, boolean, null, not other
+        # types like tuples, sets, functions, classes, etc.,
+        # which would require a deep copy.
+        resolved_data = data
+    return resolved_data
+
+
+def fill_in_schema_merge_refs(schema, resolver):
+    return resolve_merge_refs(schema, resolver)
+
+
 def linkTo(validator, linkTo, instance, schema):
     # avoid circular import
     from snovault import Item, COLLECTIONS
@@ -284,6 +341,7 @@ def load_schema(filename):
                            object_pairs_hook=collections.OrderedDict)
         resolver = RefResolver('file://' + asset.abspath(), schema)
     schema = mixinProperties(schema, resolver)
+    schema = fill_in_schema_merge_refs(schema, resolver)
 
     # SchemaValidator is not thread safe for now
     SchemaValidator(schema, resolver=resolver)
