@@ -152,7 +152,7 @@ class TypesTool(object):
             back = self.type_back_rev.setdefault(rev_type_name, {}).setdefault(rel, set())
             back.add((ti.name, prop_name))
 
-        path = [ti.item_type] + ti.base_types
+        path = [ti.name] + ti.base_types
         add_types_to_hierarchy(path, self.hierarchy)
 
         return ti
