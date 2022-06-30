@@ -54,6 +54,13 @@ def test_schemas_etag(testapp):
     testapp.get('/profiles/', headers={'If-None-Match': etag}, status=304)
 
 
+def test_schemas_type_hierarchy_view(testapp):
+    result = testapp.get('/profiles/')
+    print(result.json)
+    assert '_hierarchy' in result
+    assert False
+
+
 def test_etag_if_match_tid(testapp, award):
     res = testapp.get(award['@id'] + '?frame=edit', status=200)
     etag = res.etag
