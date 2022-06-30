@@ -58,7 +58,34 @@ def test_schemas_type_hierarchy_view(testapp):
     result = testapp.get('/profiles/')
     print(result.json)
     assert '_hierarchy' in result
-    assert False
+    actual = result['_hierarchy']
+    expected = {
+        'Item': {
+            'Award': {},
+            'Lab': {},
+            'AccessKey': {},
+            'Image': {},
+            'Page': {},
+            'Snowset': {
+                'Snowball': {},
+                'Snowfort': {}
+            },
+            'Snowflake': {},
+            'User': {},
+            'TestingBadAccession': {},
+            'TestingCustomEmbedSource': {},
+            'TestingCustomEmbedTarget': {},
+            'TestingDependencies': {},
+            'TestingDownload': {},
+            'TestingLinkSource': {},
+            'TestingLinkTarget': {},
+            'TestingPostPutPatch': {},
+            'TestingSearchSchema': {},
+            'TestingSearchSchemaSpecialFacets': {},
+            'TestingServerDefault': {}
+        }
+    }
+    assert actual == expected
 
 
 def test_etag_if_match_tid(testapp, award):
