@@ -119,6 +119,14 @@ class TypeInfo(AbstractTypeInfo):
         return revs
 
 
+def add_types_to_hierarchy(path, hierarchy):
+    value = hierarchy
+    for p in reversed(path):
+        if p not in value:
+            value[p] = {}
+        value = value[p]
+
+
 class TypesTool(object):
     def __init__(self, registry):
         self.registry = registry
@@ -126,6 +134,7 @@ class TypesTool(object):
         self.abstract = {}
         self.type_back_rev = {}
         self.all = {}
+        self.hierarchy = {}
 
     def register(self, factory):
         name = factory.__name__
@@ -142,6 +151,9 @@ class TypesTool(object):
             rev_type_name, rel = spec
             back = self.type_back_rev.setdefault(rev_type_name, {}).setdefault(rel, set())
             back.add((ti.name, prop_name))
+
+        path = [ti.name] + ti.base_types
+        add_types_to_hierarchy(path, self.hierarchy)
 
         return ti
 

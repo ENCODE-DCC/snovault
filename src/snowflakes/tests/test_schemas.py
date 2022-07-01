@@ -54,6 +54,39 @@ def test_schemas_etag(testapp):
     testapp.get('/profiles/', headers={'If-None-Match': etag}, status=304)
 
 
+def test_schemas_type_hierarchy_view(testapp):
+    result = testapp.get('/profiles/')
+    assert '_hierarchy' in result.json
+    actual = result.json['_hierarchy']
+    expected = {
+        'Item': {
+            'Award': {},
+            'Lab': {},
+            'AccessKey': {},
+            'Image': {},
+            'Page': {},
+            'Snowset': {
+                'Snowball': {},
+                'Snowfort': {}
+            },
+            'Snowflake': {},
+            'User': {},
+            'TestingBadAccession': {},
+            'TestingCustomEmbedSource': {},
+            'TestingCustomEmbedTarget': {},
+            'TestingDependencies': {},
+            'TestingDownload': {},
+            'TestingLinkSource': {},
+            'TestingLinkTarget': {},
+            'TestingPostPutPatch': {},
+            'TestingSearchSchema': {},
+            'TestingSearchSchemaSpecialFacets': {},
+            'TestingServerDefault': {}
+        }
+    }
+    assert actual == expected
+
+
 def test_etag_if_match_tid(testapp, award):
     res = testapp.get(award['@id'] + '?frame=edit', status=200)
     etag = res.etag

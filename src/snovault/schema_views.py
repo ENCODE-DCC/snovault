@@ -69,6 +69,8 @@ def schemas(context, request):
     for name, type_info in types.abstract.items():
         subtypes[name] = type_info.subtypes
 
+    schemas['_hierarchy'] = types.hierarchy
+
     return schemas
 
 

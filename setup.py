@@ -48,6 +48,7 @@ EXTRAS_REQUIRE = {
         "pytest==5.3.2",
         "pytest-bdd==3.2.1",
         "pytest-mock==2.0.0",
+        "splinter==0.17.0",
         "pytest-splinter==2.0.1",
         "pytest-exact-fixtures==0.3",
         "pytest-instafail==0.4.1.post0",
