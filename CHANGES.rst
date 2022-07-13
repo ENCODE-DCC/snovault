@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.63 (released) encoded v128.0
+-----------------------------------------
+1. ENCM-29-pin-antlr (#379)
+
 Snovault 1.0.62 (released) encoded v124.0
 -----------------------------------------
 1. SNO-217-register-search-config-pieces-from-item (#370)
