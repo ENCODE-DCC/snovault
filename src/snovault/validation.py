@@ -75,9 +75,6 @@ def failed_validation(exc, request):
             cors_headers
         )
     request.response.status = exc.status
-    request.response.headers.update(
-        cors_headers
-    )
     errors = list(request.errors)
     if exc.detail is not None:
         errors.append(exc.detail)
