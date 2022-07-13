@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.64 (released) encoded v128.0
+-----------------------------------------
+1. Pin splinter (#385)
+
 Snovault 1.0.63 (released) encoded v128.0
 -----------------------------------------
 1. ENCM-29-pin-antlr (#379)
