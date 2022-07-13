@@ -12,6 +12,8 @@ from pyramid.util import LAST
 from sqlalchemy.exc import InternalError
 import simplejson as json
 
+from snovault.cors import get_cors_headers
+
 
 def includeme(config):
     config.add_request_method(lambda request: {}, 'validated', reify=True)
@@ -66,8 +68,16 @@ class ValidationFailure(HTTPUnprocessableEntity):
 def failed_validation(exc, request):
     # Clear any existing response
     if 'response' in vars(request):
+        # Maintain CORS headers
+        cors_headers = get_cors_headers(request)
         del request.response
+        request.response.headers.update(
+            cors_headers
+        )
     request.response.status = exc.status
+    request.response.headers.update(
+        cors_headers
+    )
     errors = list(request.errors)
     if exc.detail is not None:
         errors.append(exc.detail)
@@ -87,7 +97,12 @@ def failed_validation(exc, request):
 def http_error(exc, request):
     # Clear any existing response
     if 'response' in vars(request):
+        # Maintain CORS headers
+        cors_headers = get_cors_headers(request)
         del request.response
+        request.response.headers.update(
+            cors_headers
+        )
     request.response.status = exc.status
     request.response.headerlist.extend(exc.headerlist)
     result = {
