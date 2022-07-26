@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.65 (released) encoded v128.0
+-----------------------------------------
+1. increase-field-limit (#388)
+
 Snovault 1.0.64 (released) encoded v128.0
 -----------------------------------------
 1. Pin splinter (#385)
