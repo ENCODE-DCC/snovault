@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.66 (released) encoded v129.0
+-----------------------------------------
+1. ENCM-89-support-big-image-attachments (#390)
+
 Snovault 1.0.65 (released) encoded v128.0
 -----------------------------------------
 1. increase-field-limit (#388)
