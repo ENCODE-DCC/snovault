@@ -34,6 +34,9 @@ DEGREE_FLIP_MAP = {
 }
 
 
+Image.MAX_IMAGE_PIXELS = 500000000
+
+
 def includeme(config):
     config.scan(__name__)
 

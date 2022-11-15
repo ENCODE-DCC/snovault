@@ -102,7 +102,9 @@ jobs:
       - checkout
       - run:
           name: Install twine
-          command: sudo pip install -U setuptools twine==3.3.0
+          command: |
+            sudo pip install -U pip
+            sudo pip install -U setuptools twine==3.3.0
       - run:
           name: Check package with twine
           command: |
@@ -116,7 +118,9 @@ jobs:
       - checkout
       - run:
           name: Install release requirements
-          command: sudo pip install -U setuptools twine==3.3.0
+          command: |
+            sudo pip install -U pip
+            sudo pip install -U setuptools twine==3.3.0
       - run:
           name: Run release
           command: |
