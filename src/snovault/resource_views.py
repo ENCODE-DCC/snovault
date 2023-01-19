@@ -57,8 +57,6 @@ def remove_item_keys(item, request):
 def collection_view_listing_db_with_additional_properties(context, request, additional_properties):
     result = {}
 
-    result.update(additional_properties)
-
     frame = request.params.get('frame', 'columns')
 
     limit = request.params.get('limit', 25)
@@ -88,6 +86,8 @@ def collection_view_listing_db_with_additional_properties(context, request, addi
         params.append(('limit', 'all'))
         result['all'] = '%s?%s' % (request.resource_path(context), urlencode(params))
 
+    result.update(additional_properties)
+
     return result
 
 
@@ -105,16 +105,16 @@ def collection_view_listing_es_with_additional_properties(context, request, addi
             'params_parser': ParamsParser(request)
         },
         response_fields=[
-            PassThroughResponseField(
-                values_to_pass_through=additional_properties,
-            ),
             IDResponseField(),
             CollectionSearchWithFacetsResponseField(),
             AllResponseField(),
             NotificationResponseField(),
             FiltersResponseField(),
             CollectionClearFiltersResponseField(),
-            ColumnsResponseField()
+            ColumnsResponseField(),
+            PassThroughResponseField(
+                values_to_pass_through=additional_properties,
+            ),
         ]
     )
     return fr.render()
