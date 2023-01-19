@@ -23,6 +23,9 @@ from snosearch.fields import NotificationResponseField
 from snosearch.parsers import ParamsParser
 from snosearch.parsers import QueryString
 from snosearch.responses import FieldedResponse
+
+from snovault.elasticsearch.searches.fields import PassThroughResponseField
+
 from .calculated import calculate_properties
 from .calculated import calculate_select_properties
 from .calculated import calculate_filtered_properties
@@ -51,10 +54,10 @@ def remove_item_keys(item, request):
     return item
 
 
-@view_config(context=AbstractCollection, permission='list', request_method='GET',
-             name='listing_db')
-def collection_view_listing_db(context, request):
+def collection_view_listing_db_with_additional_properties(context, request, additional_properties):
     result = {}
+
+    result.update(additional_properties)
 
     frame = request.params.get('frame', 'columns')
 
@@ -88,15 +91,23 @@ def collection_view_listing_db(context, request):
     return result
 
 
-@view_config(context=AbstractCollection, permission='list', request_method='GET', name='listing')
-def collection_view_listing_es(context, request):
+@view_config(context=AbstractCollection, permission='list', request_method='GET',
+             name='listing_db')
+def collection_view_listing_db(context, request):
+    return collection_view_listing_db_with_additional_properties(context, request, {})
+
+
+def collection_view_listing_es_with_additional_properties(context, request, additional_properties):
     if not hasattr(request, 'datastore') or request.datastore != ELASTIC_SEARCH:
-        return collection_view_listing_db(context, request)
+        return collection_view_listing_db_with_additional_properties(context, request, additional_properties)
     fr = FieldedResponse(
         _meta={
             'params_parser': ParamsParser(request)
         },
         response_fields=[
+            PassThroughResponseField(
+                values_to_pass_through=additional_properties,
+            ),
             IDResponseField(),
             CollectionSearchWithFacetsResponseField(),
             AllResponseField(),
@@ -107,6 +118,11 @@ def collection_view_listing_es(context, request):
         ]
     )
     return fr.render()
+
+
+@view_config(context=AbstractCollection, permission='list', request_method='GET', name='listing')
+def collection_view_listing_es(context, request):
+    return collection_view_listing_es_with_additional_properties(context, request, {})
 
 
 @view_config(context=Root, request_method='GET', name='page')
@@ -136,9 +152,11 @@ def collection_list(context, request):
     if request.query_string:
         properties['@id'] += '?' + request.query_string
 
-    result = request.embed(path, '@@listing?' + request.query_string, as_user=True)
-    result.update(properties)
-    return result
+    return collection_view_listing_es_with_additional_properties(
+        context,
+        request,
+        properties,
+    )
 
 
 @view_config(context=Root, request_method='GET')
