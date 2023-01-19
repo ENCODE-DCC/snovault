@@ -33,3 +33,20 @@ def test_searches_fields_non_sortable_response_field(dummy_parent):
     nrf = NonSortableResponseField()
     r = nrf.render(parent=dummy_parent)
     assert r['non_sortable'] == ['pipeline_error_detail', 'description', 'notes']
+
+
+def test_searches_fields_pass_through_response_field():
+    from snovault.elasticsearch.searches.fields import PassThroughResponseField
+    ptrf = PassThroughResponseField(
+        values_to_pass_through={
+            'some': 'values',
+            'in': 'a',
+            'dictionary': [],
+        }
+    )
+    result = ptrf.render()
+    assert result == {
+        'some': 'values',
+        'in': 'a',
+        'dictionary': []
+    }
