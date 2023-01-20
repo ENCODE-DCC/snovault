@@ -7,6 +7,7 @@ from itertools import islice
 from past.builtins import basestring
 from pyramid.exceptions import PredicateMismatch
 from pyramid.httpexceptions import HTTPNotFound
+from pyramid.httpexceptions import HTTPMovedPermanently
 from pyramid.settings import asbool
 from pyramid.view import (
     render_view_to_response,
@@ -151,6 +152,10 @@ def collection_list(context, request):
 
     if request.query_string:
         properties['@id'] += '?' + request.query_string
+
+    # Must check if canonical redirect needed before streaming response.
+    if request.path_qs != properties['@id']:
+        raise HTTPMovedPermanently(location=properties['@id'])
 
     return collection_view_listing_es_with_additional_properties(
         context,
