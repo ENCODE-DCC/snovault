@@ -7,6 +7,7 @@ from itertools import islice
 from past.builtins import basestring
 from pyramid.exceptions import PredicateMismatch
 from pyramid.httpexceptions import HTTPNotFound
+from pyramid.httpexceptions import HTTPMovedPermanently
 from pyramid.settings import asbool
 from pyramid.view import (
     render_view_to_response,
@@ -23,6 +24,9 @@ from snosearch.fields import NotificationResponseField
 from snosearch.parsers import ParamsParser
 from snosearch.parsers import QueryString
 from snosearch.responses import FieldedResponse
+
+from snovault.elasticsearch.searches.fields import PassThroughResponseField
+
 from .calculated import calculate_properties
 from .calculated import calculate_select_properties
 from .calculated import calculate_filtered_properties
@@ -51,9 +55,7 @@ def remove_item_keys(item, request):
     return item
 
 
-@view_config(context=AbstractCollection, permission='list', request_method='GET',
-             name='listing_db')
-def collection_view_listing_db(context, request):
+def collection_view_listing_db_with_additional_properties(context, request, additional_properties):
     result = {}
 
     frame = request.params.get('frame', 'columns')
@@ -85,13 +87,20 @@ def collection_view_listing_db(context, request):
         params.append(('limit', 'all'))
         result['all'] = '%s?%s' % (request.resource_path(context), urlencode(params))
 
+    result.update(additional_properties)
+
     return result
 
 
-@view_config(context=AbstractCollection, permission='list', request_method='GET', name='listing')
-def collection_view_listing_es(context, request):
+@view_config(context=AbstractCollection, permission='list', request_method='GET',
+             name='listing_db')
+def collection_view_listing_db(context, request):
+    return collection_view_listing_db_with_additional_properties(context, request, {})
+
+
+def collection_view_listing_es_with_additional_properties(context, request, additional_properties):
     if not hasattr(request, 'datastore') or request.datastore != ELASTIC_SEARCH:
-        return collection_view_listing_db(context, request)
+        return collection_view_listing_db_with_additional_properties(context, request, additional_properties)
     fr = FieldedResponse(
         _meta={
             'params_parser': ParamsParser(request)
@@ -103,10 +112,18 @@ def collection_view_listing_es(context, request):
             NotificationResponseField(),
             FiltersResponseField(),
             CollectionClearFiltersResponseField(),
-            ColumnsResponseField()
+            ColumnsResponseField(),
+            PassThroughResponseField(
+                values_to_pass_through=additional_properties,
+            ),
         ]
     )
     return fr.render()
+
+
+@view_config(context=AbstractCollection, permission='list', request_method='GET', name='listing')
+def collection_view_listing_es(context, request):
+    return collection_view_listing_es_with_additional_properties(context, request, {})
 
 
 @view_config(context=Root, request_method='GET', name='page')
@@ -136,9 +153,15 @@ def collection_list(context, request):
     if request.query_string:
         properties['@id'] += '?' + request.query_string
 
-    result = request.embed(path, '@@listing?' + request.query_string, as_user=True)
-    result.update(properties)
-    return result
+    # Must check if canonical redirect needed before streaming response.
+    if request.path_qs != properties['@id']:
+        raise HTTPMovedPermanently(location=properties['@id'])
+
+    return collection_view_listing_es_with_additional_properties(
+        context,
+        request,
+        properties,
+    )
 
 
 @view_config(context=Root, request_method='GET')
