@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.67 (released) encoded v129.2
+-----------------------------------------
+1. SNO2-21-files-crash (#399)
+
 Snovault 1.0.66 (released) encoded v129.0
 -----------------------------------------
 1. ENCM-89-support-big-image-attachments (#390)
