@@ -36,7 +36,7 @@ INSTALL_REQUIRES = [
     "redis==3.5.3",
     "requests==2.22.0",
     "simplejson==3.17.0",
-    "snovault-search==1.0.4",
+    "snovault-search==1.0.6",
     "transaction==3.0.0",
     "venusian==3.0.0",
     "zope.interface==5.3.0",
