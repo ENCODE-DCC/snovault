@@ -1,4 +1,4 @@
-pip==20.0.2
+pip==21.1
 psycopg2==2.8.4
 redis==3.5.3
 redis-server==5.0.7
