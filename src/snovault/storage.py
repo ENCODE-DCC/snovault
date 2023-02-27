@@ -459,8 +459,12 @@ class CurrentPropertySheet(Base):
     rid = Column(UUID, ForeignKey('resources.rid'),
                  nullable=False, primary_key=True)
     name = Column(types.String, nullable=False, primary_key=True)
-    sid = Column(types.Integer,
-                 ForeignKey('propsheets.sid'), nullable=False)
+    sid = Column(
+        types.Integer,
+        ForeignKey('propsheets.sid'),
+        nullable=False,
+        index=True,
+    )
     propsheet = orm.relationship(
         'PropertySheet', lazy='joined', innerjoin=True,
         primaryjoin="CurrentPropertySheet.sid==PropertySheet.sid",
