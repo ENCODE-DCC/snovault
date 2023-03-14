@@ -1,6 +1,10 @@
 Changes
 =======
 
+Snovault 1.0.68 (released) encoded v130
+-----------------------------------------
+1. SNO2-25-multiple-types (#402)
+
 Snovault 1.0.67 (released) encoded v129.2
 -----------------------------------------
 1. SNO2-21-files-crash (#399)
