@@ -1,8 +1,9 @@
 import re
 import rfc3987
-from jsonschema_serialize_fork import FormatChecker
+from jsonschema import FormatChecker
 from pyramid.threadlocal import get_current_request
 from uuid import UUID
+
 
 accession_re = re.compile(r'^SNO(SS|FL)[0-9][0-9][0-9][A-Z][A-Z][A-Z]$')
 test_accession_re = re.compile(r'^TST(SS|FL)[0-9][0-9][0-9]([0-9][0-9][0-9]|[A-Z][A-Z][A-Z])$')
