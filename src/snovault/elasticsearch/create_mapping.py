@@ -152,13 +152,17 @@ def schema_mapping(name, schema):
         }
 
 
-def index_settings():
+DEFAULT_SHARDS = 5
+DEFAULT_REPLICAS = 2
+
+
+def index_settings(*, shards, replicas):
     return {
         'settings': {
             'index.max_result_window': 99999,
             'index.mapping.total_fields.limit': 12000,
-            'index.number_of_shards': 5,
-            'index.number_of_replicas': 2,
+            'index.number_of_shards': shards,
+            'index.number_of_replicas': replicas,
             'analysis': {
                 'filter': {
                     'substring': {
@@ -488,6 +492,8 @@ def run(app, collections=None, dry_run=False):
 
     indices = []
     for collection_name in collections:
+        shards = DEFAULT_SHARDS
+        replicas = DEFAULT_REPLICAS
         if collection_name == 'meta':
             doc_type = 'meta'
             mapping = META_MAPPING
@@ -495,13 +501,24 @@ def run(app, collections=None, dry_run=False):
             index = doc_type = collection_name
             collection = registry[COLLECTIONS].by_item_type[collection_name]
             mapping = es_mapping(type_mapping(registry[TYPES], collection.type_info.item_type))
+            _type_info = registry[TYPES][collection.type_info.item_type]
+            _schema = _type_info.schema
+            print('Getting shard and replicas for', _type_info)
+            shards = _schema.get('es', {}).get('shards', shards)
+            replicas = _schema.get('es', {}).get('replicas', replicas)
+            print('Shards', shards, 'Replicas', replicas)
 
         if mapping is None:
             continue  # Testing collections
         if dry_run:
             print(json.dumps(sorted_dict({index: {doc_type: mapping}}), indent=4))
             continue
-        create_elasticsearch_index(es, index, index_settings())
+
+        _index_settings = index_settings(
+            shards=shards,
+            replicas=replicas,
+        )
+        create_elasticsearch_index(es, index, _index_settings)
         set_index_mapping(es, index, doc_type, {doc_type: mapping})
         if collection_name != 'meta':
             indices.append(index)
