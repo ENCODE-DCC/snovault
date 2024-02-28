@@ -83,7 +83,7 @@ jobs:
       # orb dependencies
       - run: sudo apt-get update -y && sudo apt-get install -y libgbm1
       # Use install tasks from the orb
-      - browser-tools/install-chrome
+      - browser-tools/install-chrome:
           chrome-version: 121.0.6167.212
       - browser-tools/install-chromedriver
       - run:
