@@ -152,8 +152,8 @@ def schema_mapping(name, schema):
         }
 
 
-DEFAULT_SHARDS = 5
-DEFAULT_REPLICAS = 2
+DEFAULT_SHARDS = 1
+DEFAULT_REPLICAS = 1
 
 
 def index_settings(*, shards, replicas):
