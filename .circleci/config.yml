@@ -74,7 +74,7 @@ jobs:
           name: NPM and non BDD tests
           command: |
             npm test
-            pytest -v -v --timeout=400 -m "not bdd"
+            pytest -s -v -v --timeout=400 -m "not bdd"
   bdd-tests:
     executor: snovault-executor
     resource_class: large
