@@ -84,7 +84,7 @@ jobs:
       - run: sudo apt-get update -y && sudo apt-get install -y libgbm1
       # Use install tasks from the orb
       - browser-tools/install-chrome:
-          chrome-version: 121.0.6167.212
+          chrome-version: "116.0.5845.96"
       - browser-tools/install-chromedriver
       - run:
           name: Run bdd tests
