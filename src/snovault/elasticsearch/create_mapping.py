@@ -503,10 +503,8 @@ def run(app, collections=None, dry_run=False):
             mapping = es_mapping(type_mapping(registry[TYPES], collection.type_info.item_type))
             _type_info = registry[TYPES][collection.type_info.item_type]
             _schema = _type_info.schema
-            print('Getting shard and replicas for', _type_info.item_type)
             shards = _schema.get('es', {}).get('shards', shards)
             replicas = _schema.get('es', {}).get('replicas', replicas)
-            print('Shards', shards, 'Replicas', replicas)
 
         if mapping is None:
             continue  # Testing collections
