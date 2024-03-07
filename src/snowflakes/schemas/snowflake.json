@@ -88,5 +88,9 @@
         "status": {
             "title": "Snowflake status"
         }
+    },
+    "es": {
+	"shards": 5,
+	"replicas": 2
     }
 }
