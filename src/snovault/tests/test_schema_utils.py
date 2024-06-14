@@ -16,9 +16,13 @@ def content(testapp):
 
 def test_uniqueItems_validates_normalized_links(content, threadlocals):
     schema = {
-        'uniqueItems': True,
-        'items': {
-            'linkTo': 'TestingLinkTarget',
+        'properties': {
+            'some_links': {
+                'uniqueItems': True,
+                'items': {
+                    'linkTo': 'TestingLinkTarget',
+                }
+            }
         }
     }
     uuid = targets[0]['uuid']
@@ -26,7 +30,7 @@ def test_uniqueItems_validates_normalized_links(content, threadlocals):
         uuid,
         '/testing-link-targets/{}'.format(uuid),
     ]
-    validated, errors = validate(schema, data)
+    validated, errors = validate(schema, {'some_links': data})
     assert len(errors) == 1
     assert (
         errors[0].message == "['{}', '{}'] has non-unique elements".format(

@@ -8,12 +8,10 @@ import json
 import codecs
 import collections
 import copy
-from jsonschema_serialize_fork import (
-    Draft4Validator,
-    FormatChecker,
-    RefResolver,
-)
-from jsonschema_serialize_fork.exceptions import ValidationError
+from snovault.schema_validation import SerializingSchemaValidator
+from jsonschema import FormatChecker
+from jsonschema import RefResolver
+from jsonschema.exceptions import ValidationError
 from uuid import UUID
 from .util import ensurelist
 
@@ -95,7 +93,6 @@ def linkTo(validator, linkTo, instance, schema):
         error = "%r is not of type %s" % (instance, ", ".join(reprs))
         yield ValidationError(error)
         return
-
     linkEnum = schema.get('linkEnum')
     if linkEnum is not None:
         if not validator.is_type(linkEnum, "array"):
@@ -122,10 +119,6 @@ def linkTo(validator, linkTo, instance, schema):
                 error = "%r is not in user submits_for" % instance
                 yield ValidationError(error)
                 return
-
-    # And normalize the value to a uuid
-    if validator._serialize:
-        validator._validated[-1] = str(item.uuid)
 
 
 def linkFrom(validator, linkFrom, instance, schema):
@@ -154,9 +147,6 @@ def linkFrom(validator, linkFrom, instance, schema):
             yield ValidationError(error)
             return
     else:
-        if validator._serialize:
-            lv = len(validator._validated)
-
         # Look for an existing item;
         # if found use the schema for its type,
         # which may be a subtype of an abstract linkType
@@ -210,16 +200,13 @@ def linkFrom(validator, linkFrom, instance, schema):
         for error in validator.descend(instance, subschema):
             yield error
 
-        if validator._serialize:
-            validated_instance = validator._validated[lv]
-            del validator._validated[lv:]
-            if uuid is not None:
-                validated_instance['uuid'] = uuid
-            elif 'uuid' in validated_instance:  # where does this come from?
-                del validated_instance['uuid']
-            if new_type is not None:
-                validated_instance['@type'] = [new_type]
-            validator._validated[-1] = validated_instance
+        validated_instance = instance
+        if uuid is not None:
+            validated_instance['uuid'] = uuid
+        elif 'uuid' in validated_instance:  # where does this come from?
+            del validated_instance['uuid']
+        if new_type is not None:
+            validated_instance['@type'] = [new_type]
 
 
 class IgnoreUnchanged(ValidationError):
@@ -250,17 +237,6 @@ def permission(validator, permission, instance, schema):
         yield IgnoreUnchanged(error)
 
 
-orig_uniqueItems = Draft4Validator.VALIDATORS['uniqueItems']
-
-
-def uniqueItems(validator, uI, instance, schema):
-    # Use serialized items if available
-    # (this gives the linkTo validator a chance to normalize paths into uuids)
-    if validator._serialize and validator._validated[-1]:
-        instance = validator._validated[-1]
-    yield from orig_uniqueItems(validator, uI, instance, schema)
-
-
 VALIDATOR_REGISTRY = {}
 
 
@@ -281,8 +257,8 @@ def notSubmittable(validator, linkTo, instance, schema):
     yield ValidationError('submission disallowed')
 
 
-class SchemaValidator(Draft4Validator):
-    VALIDATORS = Draft4Validator.VALIDATORS.copy()
+class SchemaValidator(SerializingSchemaValidator):
+    VALIDATORS = SerializingSchemaValidator.VALIDATORS.copy()
     VALIDATORS['notSubmittable'] = notSubmittable
     # for backwards-compatibility
     VALIDATORS['calculatedProperty'] = notSubmittable
@@ -290,7 +266,6 @@ class SchemaValidator(Draft4Validator):
     VALIDATORS['linkFrom'] = linkFrom
     VALIDATORS['permission'] = permission
     VALIDATORS['requestMethod'] = requestMethod
-    VALIDATORS['uniqueItems'] = uniqueItems
     VALIDATORS['validators'] = validators
     SERVER_DEFAULTS = SERVER_DEFAULTS
 
@@ -311,13 +286,13 @@ def load_schema(filename):
     schema = mixinProperties(schema, resolver)
 
     # SchemaValidator is not thread safe for now
-    SchemaValidator(schema, resolver=resolver, serialize=True)
+    SchemaValidator(schema, resolver=resolver)
     return schema
 
 
 def validate(schema, data, current=None):
     resolver = NoRemoteResolver.from_schema(schema)
-    sv = SchemaValidator(schema, resolver=resolver, serialize=True, format_checker=format_checker)
+    sv = SchemaValidator(schema, resolver=resolver, format_checker=format_checker)
     validated, errors = sv.serialize(data)
 
     filtered_errors = []
@@ -336,6 +311,18 @@ def validate(schema, data, current=None):
                     validated_value = validated_value[key]
                 if validated_value == current_value:
                     continue
+        # Also ignore requestMethod and permission errors from defaults.
+        if isinstance(error, IgnoreUnchanged):
+            current_value = data
+            try:
+                for key in error.path:
+                    # If it's in original data then either user passed it in
+                    # or it's from PATCH object with unchanged data. If it's
+                    # unchanged then it's already been skipped above.
+                    current_value = current_value[key]
+            except KeyError:
+                # If it's not in original data then it's filled in by defaults.
+                continue
         filtered_errors.append(error)
 
     return validated, filtered_errors

@@ -78,8 +78,8 @@ def schemas_map(context, request):
     types = request.registry[TYPES]
     profiles_map = {}
     for type_info in types.by_item_type.values():
-        if 'id' in type_info.schema:
-            profiles_map[type_info.name] = type_info.schema['id']
+        if '$id' in type_info.schema:
+            profiles_map[type_info.name] = type_info.schema['$id']
     profiles_map['@type'] = ['JSONSchemas']
     return profiles_map
 

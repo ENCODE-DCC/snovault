@@ -2,8 +2,8 @@
     "title": "Snowfort",
     "description": "Schema for submitting metadata for a Snowfort with 1 or more snowflakes",
     "comment": "An snowfort is a special case of snowset.",
-    "id": "/profiles/snowfort.json",
-    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$id": "/profiles/snowfort.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "required": ["award", "lab"],
     "identifyingProperties": ["uuid", "accession"],
@@ -16,7 +16,7 @@
         { "$ref": "mixins.json#/submitted" },
         { "$ref": "snowset.json#/properties" }
     ],
-    "dependencies": {
+    "dependentSchemas": {
         "status": {
             "oneOf": [
                 {

@@ -1,8 +1,8 @@
 {
     "title": "Snowflake ",
     "description": "Schema for submitting metadata for a snowflake",
-    "id": "/profiles/snowflake.json",
-    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$id": "/profiles/snowflake.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "required": ["snowset", "type","award", "lab"],
     "identifyingProperties": ["uuid", "accession"],
@@ -26,7 +26,7 @@
             "title": "Lab"
         }
     },
-    "dependencies": {
+    "dependentSchemas": {
         "external_accession": {
             "not": {
                 "required": ["accession"]
