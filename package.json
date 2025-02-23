@@ -56,7 +56,7 @@
     "google-analytics": "file:node_shims/google-analytics",
     "immutable": "^3.7.5",
     "js-cookie": "^2.2.1",
-    "marked": "^0.7.0",
+    "marked": "^4.0.10",
     "moment": "^2.8.2",
     "query-string": "^4.1.0",
     "react": "^0.12.2",
